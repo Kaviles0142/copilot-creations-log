@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, User, Clock, MapPin, Loader2 } from "lucide-react";
+import { Search, User, Clock, MapPin, Loader2, Image, Palette } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoricalFigure } from "./HistoricalChat";
@@ -31,6 +31,8 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<WikipediaData[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [generatedPortraits, setGeneratedPortraits] = useState<Record<string, string>>({});
+  const [isGeneratingPortrait, setIsGeneratingPortrait] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const extractPeriodFromText = (text: string): string => {
@@ -137,15 +139,63 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
     }
   };
 
+  const generatePortrait = async (result: WikipediaData) => {
+    const figureId = generateFigureId(result.title);
+    
+    if (generatedPortraits[figureId]) {
+      toast({
+        title: "Portrait Already Generated",
+        description: `Portrait for ${result.title} already exists`,
+      });
+      return;
+    }
+
+    setIsGeneratingPortrait(prev => ({ ...prev, [figureId]: true }));
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-historical-portrait', {
+        body: {
+          figureName: result.title,
+          description: result.extract,
+          period: extractPeriodFromText(result.extract),
+          historicalContext: result.description
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setGeneratedPortraits(prev => ({ ...prev, [figureId]: data.image }));
+        toast({
+          title: "Portrait Generated",
+          description: `AI generated a historical portrait of ${result.title}`,
+        });
+      } else {
+        throw new Error(data.error || 'Portrait generation failed');
+      }
+    } catch (error) {
+      console.error('Portrait generation error:', error);
+      toast({
+        title: "Generation Failed",
+        description: "Failed to generate portrait. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPortrait(prev => ({ ...prev, [figureId]: false }));
+    }
+  };
+
   const selectFigure = (result: WikipediaData) => {
     const period = extractPeriodFromText(result.extract);
+    
+    const figurePortrait = generatedPortraits[generateFigureId(result.title)] || result.thumbnail;
     
     const figure: HistoricalFigure = {
       id: generateFigureId(result.title),
       name: result.title,
       period: period,
       description: result.description || result.extract.substring(0, 100) + "...",
-      avatar: "🎭" // Default avatar
+      avatar: figurePortrait ? "🖼️" : "🎭" // Use painting emoji if we have a portrait
     };
 
     onSelectFigure(figure);
@@ -187,8 +237,16 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
       {selectedFigure && (
         <Card className="p-4 border-primary bg-primary/5">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-              <User className="h-6 w-6" />
+            <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center overflow-hidden">
+              {generatedPortraits[selectedFigure.id] ? (
+                <img 
+                  src={generatedPortraits[selectedFigure.id]} 
+                  alt={selectedFigure.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="h-6 w-6" />
+              )}
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-lg">{selectedFigure.name}</h3>
@@ -207,28 +265,62 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
       {searchResults.length > 0 && (
         <div className="space-y-2">
           <h4 className="font-medium text-sm text-muted-foreground">Search Results:</h4>
-          {searchResults.map((result, index) => (
-            <Card 
-              key={index}
-              className="p-3 cursor-pointer transition-all hover:shadow-md hover:bg-accent"
-              onClick={() => selectFigure(result)}
-            >
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                  <User className="h-5 w-5" />
+          {searchResults.map((result, index) => {
+            const figureId = generateFigureId(result.title);
+            const hasPortrait = generatedPortraits[figureId];
+            const isGenerating = isGeneratingPortrait[figureId];
+            
+            return (
+              <Card 
+                key={index}
+                className="p-3 cursor-pointer transition-all hover:shadow-md hover:bg-accent"
+                onClick={() => selectFigure(result)}
+              >
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center overflow-hidden">
+                    {hasPortrait ? (
+                      <img 
+                        src={generatedPortraits[figureId]} 
+                        alt={result.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-sm truncate">{result.title}</h4>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {extractPeriodFromText(result.extract)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {result.extract.substring(0, 150)}...
+                    </p>
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generatePortrait(result);
+                      }}
+                      disabled={!!isGenerating || !!hasPortrait}
+                      className="h-8 w-8 p-0"
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : hasPortrait ? (
+                        <Image className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Palette className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm truncate">{result.title}</h4>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {extractPeriodFromText(result.extract)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {result.extract.substring(0, 150)}...
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
