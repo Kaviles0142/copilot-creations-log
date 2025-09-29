@@ -114,37 +114,51 @@ serve(async (req) => {
       }
     }
 
-    if (!audioUrl) {
-      // Fallback to preset voice if no suitable audio found
-      const presetVoiceMap: Record<string, string> = {
-        'john-f-kennedy': 'Daniel',
-        'jfk': 'Daniel',
-        'albert-einstein': 'Brian', 
-        'winston-churchill': 'George',
-        'abraham-lincoln': 'Will',
-        'napoleon': 'George',
-        'shakespeare': 'Callum',
-        'marie-curie': 'Sarah',
-        'cleopatra': 'Charlotte',
-        'joan-of-arc': 'Jessica'
-      };
-      
-      const presetVoiceId = presetVoiceMap[figureId] || 'Daniel';
-      
-      console.log(`No suitable audio found, using preset voice "${presetVoiceId}" for ${figureName}`);
-
-      return new Response(JSON.stringify({
-        success: true,
-        voice_id: presetVoiceId,
-        voice_name: `${figureName} (Preset Voice)`,
-        source: 'Preset voice - no suitable audio found for cloning',
-        message: `Using preset voice for ${figureName} - authentic cloning will be available when better audio is found`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Try Resemble.ai voice cloning pipeline
+    console.log(`Attempting Resemble.ai voice cloning for ${figureName}...`);
+    
+    try {
+      // Call our Resemble.ai voice cloning function
+      const resembleResponse = await fetch(`https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-voice-clone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        },
+        body: JSON.stringify({
+          figureName: figureName,
+          figureId: figureId,
+          audioUrl: audioUrl // Will be null if no audio found, causing fallback to preset
+        })
       });
+
+      if (resembleResponse.ok) {
+        const resembleData = await resembleResponse.json();
+        if (resembleData.success) {
+          console.log(`Successfully created Resemble.ai voice: ${resembleData.voice_name}`);
+          
+          return new Response(JSON.stringify({
+            success: true,
+            voice_id: resembleData.voice_id,
+            voice_name: resembleData.voice_name,
+            source: audioUrl || 'Resemble.ai preset voice',
+            message: audioUrl 
+              ? `🎤 Successfully cloned authentic voice for ${figureName}!`
+              : `🎤 Created premium Resemble.ai voice for ${figureName}!`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      console.log('Resemble.ai cloning failed, falling back to ElevenLabs...');
+      
+    } catch (resembleError) {
+      console.error('Resemble.ai pipeline error:', resembleError);
+      console.log('Falling back to ElevenLabs voice library...');
     }
 
-    // Instead of fake cloning, let's use ElevenLabs' voice library for authentic-sounding voices
+    // Fallback to ElevenLabs voice library for authentic-sounding voices
     console.log(`Finding best authentic voice match from ElevenLabs library for ${figureName}...`);
     
     try {
@@ -179,7 +193,7 @@ serve(async (req) => {
           voice_id: voiceLibraryResult.voice_id,
           voice_name: `${figureName} (Authentic Voice)`,
           source: audioUrl,
-          message: `🎤 Found authentic voice that matches ${figureName}'s characteristics!`
+          message: `🎤 Found authentic ElevenLabs voice that matches ${figureName}'s characteristics!`
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -190,7 +204,7 @@ serve(async (req) => {
     } catch (voiceError) {
       console.log(`Voice library search failed, using premium preset voice`);
       
-      // Fallback to our best preset voices
+      // Final fallback to our best preset voices
       const premiumVoiceMap: Record<string, string> = {
         'john-f-kennedy': 'onwK4e9ZLuTAKqWW03F9',  // Daniel - mature, presidential
         'jfk': 'onwK4e9ZLuTAKqWW03F9',
