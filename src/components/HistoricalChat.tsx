@@ -10,6 +10,10 @@ import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import ConversationHistory from "./ConversationHistory";
 import DocumentUpload from "./DocumentUpload";
+import ConversationExport from "./ConversationExport";
+import FigureRecommendations from "./FigureRecommendations";
+import TimelineVisualization from "./TimelineVisualization";
+import VoiceSettings from "./VoiceSettings";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -694,6 +698,43 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
           />
 
 
+          {/* Conversation Export */}
+          <ConversationExport 
+            messages={messages}
+            selectedFigure={selectedFigure}
+          />
+
+          {/* Figure Recommendations */}
+          <FigureRecommendations
+            selectedFigure={selectedFigure}
+            onSelectFigure={(figure) => {
+              setSelectedFigure(figure);
+              setMessages([]);
+              setCurrentConversationId(null);
+              setDocuments([]);
+            }}
+          />
+
+          {/* Timeline Visualization */}
+          <TimelineVisualization
+            selectedFigure={selectedFigure}
+            onSelectFigure={(figure) => {
+              setSelectedFigure(figure);
+              setMessages([]);
+              setCurrentConversationId(null);
+              setDocuments([]);
+            }}
+          />
+
+          {/* Voice Settings */}
+          <VoiceSettings
+            selectedFigure={selectedFigure}
+            onVoiceGenerated={(audioUrl) => {
+              const audio = new Audio(audioUrl);
+              audio.play();
+            }}
+          />
+
           {/* Document Upload */}
           <DocumentUpload
             conversationId={currentConversationId}
@@ -802,7 +843,13 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
               </div>
               <div className="flex items-center space-x-2">
                 {/* Music Session Button for Musical Figures */}
-                {selectedFigure.id === 'hendrix' && (
+                {(selectedFigure.id === 'hendrix' || 
+                  selectedFigure.id === 'mozart' || 
+                  selectedFigure.id === 'beethoven' || 
+                  selectedFigure.id === 'bach' ||
+                  selectedFigure.name?.toLowerCase().includes('musician') ||
+                  selectedFigure.name?.toLowerCase().includes('composer') ||
+                  selectedFigure.description?.toLowerCase().includes('music')) && (
                   <Button
                     variant="outline"
                     size="sm"
