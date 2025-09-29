@@ -13,7 +13,7 @@ import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import VoiceSettings from "./VoiceSettings";
-
+import { VoiceCloning } from "./VoiceCloning";
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -785,9 +785,26 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className="w-80 border-r border-border bg-card overflow-y-auto">{/* Added overflow-y-auto for scrolling */}
+      <div className="w-80 border-r border-border bg-card overflow-y-auto">
         <div className="p-6 space-y-4">
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
+          
+          {/* Voice Cloning Section */}
+          <div className="mb-6 p-4 border rounded-lg bg-accent/5">
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Clone Historical Voices
+            </h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Upload authentic recordings to create realistic voice clones
+            </p>
+            <VoiceCloning 
+              onVoiceCloned={(voiceId, voiceName) => {
+                toast({ title: "Success", description: `Voice clone created: ${voiceName}!` });
+                console.log('New voice clone:', { voiceId, voiceName });
+              }} 
+            />
+          </div>
           
           {/* Conversation History */}
           <ConversationHistory 

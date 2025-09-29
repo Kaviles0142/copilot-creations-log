@@ -154,6 +154,39 @@ export type Database = {
           },
         ]
       }
+      historical_voices: {
+        Row: {
+          created_at: string
+          description: string | null
+          figure_id: string | null
+          id: string
+          is_cloned: boolean | null
+          updated_at: string
+          voice_id: string
+          voice_name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          figure_id?: string | null
+          id?: string
+          is_cloned?: boolean | null
+          updated_at?: string
+          voice_id: string
+          voice_name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          figure_id?: string | null
+          id?: string
+          is_cloned?: boolean | null
+          updated_at?: string
+          voice_id?: string
+          voice_name?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
