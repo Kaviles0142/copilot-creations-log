@@ -560,7 +560,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voice = await getVoiceForFigure(figure);
+    const voice = getElevenLabsVoiceForFigure(figure);
+    console.log(`Using ElevenLabs voice: ${voice} for ${figure.name}`);
 
     const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
       method: 'POST',
@@ -576,8 +577,11 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to generate speech');
+      console.error('ElevenLabs TTS Error:', data.error);
+      throw new Error(data.error || 'Failed to generate speech with ElevenLabs');
     }
+
+    console.log(`Successfully received ElevenLabs audio for ${figure.name}`);
 
     const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
     setCurrentAudio(audio);
@@ -586,43 +590,44 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     audio.onended = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
+      console.log('ElevenLabs audio playback completed');
     };
 
     audio.onerror = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.error('Error playing audio');
+      console.error('Error playing ElevenLabs audio');
     };
 
     await audio.play();
-    console.log('Natural OpenAI TTS audio played successfully');
+    console.log('Ultra-natural ElevenLabs speech started playing');
   };
 
-  // Get appropriate OpenAI voice for historical figures  
-  const getOpenAIVoiceForFigure = (figure: HistoricalFigure): string => {
+  // Get appropriate ElevenLabs voice for historical figures  
+  const getElevenLabsVoiceForFigure = (figure: HistoricalFigure): string => {
     const isMale = detectGender(figure);
     
     if (isMale) {
-      // Male voices from OpenAI - these sound very natural
+      // Premium ElevenLabs male voices - ultra natural
       const maleVoices = {
-        'albert-einstein': 'onyx',      // Deep, thoughtful, perfect for Einstein
-        'winston-churchill': 'onyx',    // Authoritative
-        'abraham-lincoln': 'fable',     // Warm, presidential  
-        'shakespeare': 'echo',          // Dramatic, eloquent
-        'napoleon': 'onyx',            // Commanding
-        'socrates': 'fable',           // Wise, philosophical
+        'albert-einstein': 'Daniel',    // Mature, thoughtful, perfect for Einstein
+        'winston-churchill': 'George',  // Authoritative, British
+        'abraham-lincoln': 'Will',      // Confident, presidential  
+        'shakespeare': 'Callum',        // British, eloquent
+        'napoleon': 'George',          // Commanding
+        'socrates': 'Eric',            // Wise, warm
       };
       
-      return maleVoices[figure.id] || 'onyx'; // Onyx is the deepest male voice
+      return maleVoices[figure.id] || 'Daniel'; // Daniel is perfect for intellectuals
     } else {
-      // Female voices from OpenAI
+      // Premium ElevenLabs female voices
       const femaleVoices = {
-        'marie-curie': 'nova',         // Intelligent, clear
-        'cleopatra': 'shimmer',        // Regal, commanding
-        'joan-of-arc': 'alloy'         // Strong, determined
+        'marie-curie': 'Sarah',        // Professional, intelligent
+        'cleopatra': 'Charlotte',      // Regal, clear
+        'joan-of-arc': 'Jessica'       // Strong, friendly
       };
       
-      return femaleVoices[figure.id] || 'nova'; // Nova is clear and intelligent
+      return femaleVoices[figure.id] || 'Sarah'; // Sarah is clear and professional
     }
   };
 
