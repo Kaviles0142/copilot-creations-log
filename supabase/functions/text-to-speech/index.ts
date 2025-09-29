@@ -87,7 +87,7 @@ serve(async (req) => {
     
     const base64Audio = btoa(binary);
 
-    console.log(`Successfully generated natural audio of ${audioBuffer.byteLength} bytes`);
+    console.log(`Successfully generated natural ElevenLabs audio of ${audioBuffer.byteLength} bytes`);
 
     return new Response(
       JSON.stringify({ audioContent: base64Audio }),
