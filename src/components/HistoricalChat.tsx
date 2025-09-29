@@ -781,41 +781,39 @@ const HistoricalChat = () => {
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
     const voiceId = await getOrCreateAuthenticVoice(figure);
     console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
-
-    // Use Resemble AI for better quality TTS with cloned voices
-    console.log(`Generating speech with Resemble AI for ${figure.name}`);
     
-    const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-text-to-speech', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyY2xwdnJ5cmpsYWZhY29jYm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDk5NTAsImV4cCI6MjA3NDY4NTk1MH0.noDkcnCcthJhY4WavgDDZYl__QtOq1Y9t9dTowrU2tc`,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('text-to-speech', {
+      body: { 
         text: text,
-        voice: voiceId // Use the specific voice ID from cloning or fallback
-      }),
+        voiceId: voiceId,
+        modelId: 'eleven_multilingual_v2'
+      }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Resemble AI TTS failed:', errorText);
-      throw new Error(`Resemble AI TTS failed: ${response.status} - ${errorText}`);
+    if (error) {
+      console.error('TTS Error:', error);
+      return;
     }
 
-    const data = await response.json();
-
-    if (!data.audioContent) {
+    if (!data?.audioContent) {
       console.error('No audio content received');
-      throw new Error('No audio content received');
+      return;
     }
 
-    console.log(`Successfully received Resemble AI audio for ${figure.name}`);
-
-    const audio = new Audio(`data:audio/wav;base64,${data.audioContent}`);
+    // Convert base64 to audio blob and play
+    const binaryString = atob(data.audioContent);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    
+    const audio = new Audio(audioUrl);
     setCurrentAudio(audio);
     setIsPlayingAudio(true);
-
+    
     audio.onended = () => {
       setIsPlayingAudio(false);
       setIsPaused(false);
@@ -934,32 +932,28 @@ const HistoricalChat = () => {
     try {
       console.log(`Creating authentic voice for ${figure.name}...`);
       
-      // Trigger voice creation through our reliable Resemble AI system
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-voice-clone', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyY2xwdnJ5cmpsYWZhY29jYm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDk5NTAsImV4cCI6MjA3NDY4NTk1MH0.noDkcnCcthJhY4WavgDDZYl__QtOq1Y9t9dTowrU2tc`,
-        },
-        body: JSON.stringify({
+      // Use the enhanced voice cloning system
+      const { data, error } = await supabase.functions.invoke('enhanced-voice-clone', {
+        body: { 
           figureName: figure.name,
-          figureId: figure.id,
-          audioUrl: null
-        }),
+          figureId: figure.id
+        }
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          const voiceCreationMessage: Message = {
-            id: Date.now().toString(),
-            content: `🎭 **Authentic Voice Ready**: Created an AI voice profile for ${figure.name} using advanced voice synthesis! I'm now using speech patterns and characteristics designed to match how ${figure.name} might have sounded based on historical records.`,
-            type: "assistant",
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, voiceCreationMessage]);
-          console.log(`Successfully created voice for ${figure.name}`);
-        }
+      if (error) {
+        console.error('Voice cloning error:', error);
+        return;
+      }
+      
+      if (data?.success) {
+        const voiceCreationMessage: Message = {
+          id: Date.now().toString(),
+          content: `🎭 **Authentic Voice Ready**: Created an AI voice profile for ${figure.name} using advanced voice synthesis! I'm now using speech patterns and characteristics designed to match how ${figure.name} might have sounded based on historical records.`,
+          type: "assistant",
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, voiceCreationMessage]);
+        console.log(`Successfully created voice for ${figure.name}`);
       }
     } catch (error) {
       console.error('Error creating authentic voice:', error);
