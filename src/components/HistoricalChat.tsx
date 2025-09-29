@@ -10,6 +10,7 @@ import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import ConversationHistory from "./ConversationHistory";
 import DocumentUpload from "./DocumentUpload";
+import BooksKnowledge from "./BooksKnowledge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -38,6 +39,18 @@ interface UploadedDocument {
   created_at: string;
 }
 
+interface BookInfo {
+  id: string;
+  title: string;
+  authors: string[];
+  description: string | null;
+  published_date: string | null;
+  page_count: number | null;
+  categories: string[];
+  book_type: 'by_figure' | 'about_figure' | 'related';
+}
+
+
 const HistoricalChat = () => {
   const [selectedFigure, setSelectedFigure] = useState<HistoricalFigure | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,6 +67,7 @@ const HistoricalChat = () => {
   const [recordingTranscript, setRecordingTranscript] = useState("");
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
 
@@ -675,6 +689,12 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
               loadConversation(conv.id);
             }}
             selectedFigureId={selectedFigure?.id}
+          />
+
+          {/* Books Knowledge */}
+          <BooksKnowledge
+            selectedFigure={selectedFigure}
+            onBooksDiscovered={setBooks}
           />
 
           {/* Document Upload */}
