@@ -7,6 +7,7 @@ import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play } 
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Message {
   id: string;
@@ -89,6 +90,25 @@ const HistoricalChat = () => {
     }
   };
 
+  // Handle current events search using SerpApi
+  const handleCurrentEventsSearch = async (query: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('serpapi-search', {
+        body: { 
+          query: query + " current events news",
+          type: "news",
+          num: 5
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Current events search error:', error);
+      return null;
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedFigure) return;
 
@@ -104,6 +124,36 @@ const HistoricalChat = () => {
     setIsLoading(true);
 
     try {
+      // Search for background information about the figure or topic and current events
+      const [wikiData, youtubeData, currentEventsData] = await Promise.all([
+        searchWikipedia(selectedFigure.name),
+        searchYoutube(`${selectedFigure.name} original voice recording interview speeches`),
+        handleCurrentEventsSearch(`latest news ${new Date().getFullYear()}`)
+      ]);
+
+      const context = `
+Historical Figure: ${selectedFigure.name} (${selectedFigure.period})
+Background: ${selectedFigure.description}
+
+Additional Context:
+${wikiData ? `Wikipedia Summary: ${wikiData.title}: ${wikiData.extract || 'No additional information found'}` : ''}
+
+Current Events (${new Date().getFullYear()}):
+${currentEventsData?.results ? currentEventsData.results.slice(0, 3).map((news: any) => 
+  `- ${news.title}: ${news.snippet} (${news.source})`
+).join('\n') : 'No current events data available'}
+
+Available Voice References:
+${youtubeData ? youtubeData.slice(0, 3).map((video: any) => 
+  `- ${video.title} (${video.hasOriginalVoice ? 'ORIGINAL VOICE' : 'Historical Content'})`
+).join('\n') : 'No video references found'}
+
+Previous conversation:
+${messages.slice(-3).map(msg => `${msg.type}: ${msg.content}`).join('\n')}
+
+Instructions: You are ${selectedFigure.name}. Respond as this historical figure would, with authentic personality, speaking style, and knowledge from their era. You now have knowledge of current events and can comment on modern topics from your historical perspective. Include their views, personality quirks, and speaking patterns. Keep responses engaging but historically accurate to their character while incorporating insights about current events when relevant.
+      `;
+
       // Call OpenAI through our Edge Function
       const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
         method: 'POST',
@@ -112,8 +162,8 @@ const HistoricalChat = () => {
         },
         body: JSON.stringify({
           message: inputMessage,
-          historicalFigure: selectedFigure,
-          conversationHistory: messages
+          context: context,
+          figure: selectedFigure.name
         }),
       });
 
