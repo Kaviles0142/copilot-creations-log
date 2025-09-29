@@ -638,10 +638,10 @@ const HistoricalChat = () => {
     const voiceId = await getOrCreateAuthenticVoice(figure);
     console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
 
-    // Use only Resemble.ai for text-to-speech
-    console.log(`Generating speech with Resemble.ai for ${figure.name} using voice: ${voiceId}`);
+    // Use ElevenLabs for better quality TTS
+    console.log(`Generating speech with ElevenLabs for ${figure.name}`);
     
-    const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-text-to-speech', {
+    const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -649,24 +649,24 @@ const HistoricalChat = () => {
       },
       body: JSON.stringify({
         text: text,
-        voice: voiceId
+        voice: figure.name // Pass the figure name to get appropriate voice
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Resemble.ai TTS failed:', errorText);
-      throw new Error(`Resemble.ai TTS failed: ${response.status} - ${errorText}`);
+      console.error('ElevenLabs TTS failed:', errorText);
+      throw new Error(`ElevenLabs TTS failed: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
 
-    if (!response.ok) {
-      console.error('TTS Error:', data.error);
-      throw new Error(data.error || 'Failed to generate speech');
+    if (!data.audioContent) {
+      console.error('No audio content received');
+      throw new Error('No audio content received');
     }
 
-    console.log(`Successfully received audio for ${figure.name}`);
+    console.log(`Successfully received ElevenLabs audio for ${figure.name}`);
 
     const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
     setCurrentAudio(audio);
@@ -685,7 +685,6 @@ const HistoricalChat = () => {
     };
 
     await audio.play();
-    console.log('Authentic voice speech started playing');
   };
 
   // Auto-clone voice for historical figure using authentic recordings
