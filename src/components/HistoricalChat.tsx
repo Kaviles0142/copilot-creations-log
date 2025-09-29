@@ -422,20 +422,25 @@ const HistoricalChat = () => {
   };
 
   const generateSpeech = async (text: string, figure: HistoricalFigure) => {
+    console.log('🔊 Starting speech generation for:', figure.name, 'Text:', text.substring(0, 50) + '...');
+    
+    if (!isAutoVoiceEnabled) {
+      console.log('🔇 Auto voice is disabled, skipping speech');
+      return;
+    }
+
     try {
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
       }
 
-      // Try premium speech first for better quality, fallback to browser speech
-      try {
-        await generatePremiumSpeech(text, figure);
-      } catch (premiumError) {
-        console.log('Premium speech failed, using browser speech:', premiumError);
-        if ('speechSynthesis' in window) {
-          generateBrowserSpeech(text, figure);
-        }
+      // Skip premium speech for now, go straight to browser speech that works
+      console.log('🎤 Using browser speech synthesis');
+      if ('speechSynthesis' in window) {
+        generateBrowserSpeech(text, figure);
+      } else {
+        console.error('Speech synthesis not supported in this browser');
       }
     } catch (error) {
       console.error('Error generating speech:', error);
