@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice = "Carsten" } = await req.json();
+    const { text, voice = "Einstein" } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -26,7 +26,8 @@ serve(async (req) => {
 
     // Map voice names to ElevenLabs voice IDs with premium natural voices
     const voiceMap: Record<string, string> = {
-      'Carsten': 'DKCevyuNm5sbcmJ7NN8a',       // Carsten Beyreuther - perfect accent for Einstein
+      'Einstein': '5rAEJ3ntjdwPSijjydPl',       // New Einstein voice from voice library
+      'Carsten': 'DKCevyuNm5sbcmJ7NN8a',       // Carsten Beyreuther - backup
       'Brian': 'nPczCjzI2devNBz1zQrb',         // Deep, natural male voice
       'Daniel': 'onwK4e9ZLuTAKqWW03F9',        // Mature, thoughtful male voice  
       'George': 'JBFqnCBsd6RMkjVDRZzb',        // Authoritative male voice
@@ -43,7 +44,7 @@ serve(async (req) => {
       'Aria': '9BWtsMINqrJLrRacOk9x',           // Default female voice
     };
 
-    const voiceId = voiceMap[voice] || voiceMap['Carsten'];
+    const voiceId = voiceMap[voice] || voiceMap['Einstein'];
 
     console.log(`Generating premium ElevenLabs speech for: "${text.substring(0, 50)}..." with voice: ${voice} (${voiceId})`);
 
