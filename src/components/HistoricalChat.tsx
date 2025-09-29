@@ -10,7 +10,6 @@ import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import ConversationHistory from "./ConversationHistory";
 import DocumentUpload from "./DocumentUpload";
-import BooksKnowledge from "./BooksKnowledge";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import TimelineVisualization from "./TimelineVisualization";
@@ -820,15 +819,6 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
               />
             </div>
 
-            {/* Books Knowledge Section */}
-            {selectedFigure && (
-              <div className="mt-6">
-                <BooksKnowledge 
-                  selectedFigure={selectedFigure}
-                  onBooksDiscovered={setBooks}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
