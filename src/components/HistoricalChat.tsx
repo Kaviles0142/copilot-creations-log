@@ -666,7 +666,7 @@ What would you like to discuss about my life, work, or thoughts on modern develo
       const searchQuery = `${figure.name} original speech recording authentic voice interview`;
       console.log(`Calling auto-clone-voice API for ${figure.name}...`);
       
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/auto-clone-voice', {
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/enhanced-voice-clone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -685,10 +685,14 @@ What would you like to discuss about my life, work, or thoughts on modern develo
         if (result.success) {
           console.log(`Successfully auto-cloned voice for ${figure.name}:`, result.voice_id);
           
-          // Show success message to user
+          // Show success message to user with enhanced quality info
+          const qualityInfo = result.quality_score ? ` (Quality: ${result.quality_score}/100)` : '';
+          const pipelineInfo = result.enhancements?.processing_pipeline ? 
+            `\n\n🔬 **Enhancement Pipeline**: ${result.enhancements.processing_pipeline}` : '';
+          
           const successMessage: Message = {
             id: Date.now().toString(),
-            content: `🎤 **Authentic Voice Activated**: I found original recordings of ${figure.name} and cloned their authentic voice! You're now hearing how ${figure.name} actually sounded.`,
+            content: `🧬 **Enhanced Voice Activated**: I found original recordings of ${figure.name} and created an enhanced voice clone using advanced AI processing!${qualityInfo}${pipelineInfo}\n\nYou're now hearing a high-quality recreation of how ${figure.name} actually sounded.`,
             type: "assistant",
             timestamp: new Date(),
           };
