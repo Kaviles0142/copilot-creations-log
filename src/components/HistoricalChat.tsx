@@ -10,7 +10,7 @@ import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import ConversationHistory from "./ConversationHistory";
 import DocumentUpload from "./DocumentUpload";
-import BooksKnowledge from "./BooksKnowledge";
+
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -693,11 +693,6 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
             selectedFigureId={selectedFigure?.id}
           />
 
-          {/* Books Knowledge */}
-          <BooksKnowledge
-            selectedFigure={selectedFigure}
-            onBooksDiscovered={setBooks}
-          />
 
           {/* Document Upload */}
           <DocumentUpload
