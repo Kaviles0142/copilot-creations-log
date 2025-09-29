@@ -217,17 +217,38 @@ async function createResembleVoiceClone(apiKey: string, figureName: string, audi
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Resemble.ai voice creation error:', errorText);
+      console.error('Resemble.ai voice creation error:', response.status, errorText);
+      
+      // Check for subscription-related errors
+      if (response.status === 403 || response.status === 402 || response.status === 401) {
+        console.error(`Resemble AI subscription error: ${response.status}`);
+        throw new Error(
+          `Resemble AI Business plan required for voice cloning. ` +
+          `Current error: ${response.status}. ` +
+          `Please upgrade at https://app.resemble.ai/billing to enable voice cloning API access.`
+        );
+      }
       
       // Try to parse the error to understand the issue
+      let errorDetail = 'Unknown error';
       try {
         const errorData = JSON.parse(errorText);
         console.error('Parsed error:', errorData);
+        errorDetail = errorData.detail || errorData.message || errorText;
       } catch (e) {
         console.error('Raw error text:', errorText);
+        errorDetail = errorText;
       }
       
-      // Fallback to a premium preset voice if cloning fails
+      // If it's a plan limitation, throw an error instead of falling back
+      if (errorText.toLowerCase().includes('plan') || 
+          errorText.toLowerCase().includes('subscription') ||
+          errorText.toLowerCase().includes('upgrade')) {
+        throw new Error(`Resemble AI plan limitation: ${errorDetail}`);
+      }
+      
+      // For other errors, fallback to a preset voice
+      console.log('Using fallback voice due to API error');
       return createFallbackVoice(figureName);
     }
 
