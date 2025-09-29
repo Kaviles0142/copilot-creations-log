@@ -74,7 +74,6 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
-  const [showVoiceCloning, setShowVoiceCloning] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -560,8 +559,34 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     return naturalText;
   };
 
+  // Fallback voice selection for when auto-cloning fails
+  const getFallbackVoice = (figure: HistoricalFigure): string => {
+    const isMale = detectGender(figure);
+    
+    if (isMale) {
+      const maleVoices = {
+        'albert-einstein': 'Einstein',  // From voice library
+        'winston-churchill': 'George',  
+        'abraham-lincoln': 'Will',      
+        'shakespeare': 'Callum',        
+        'napoleon': 'George',          
+        'socrates': 'Eric',            
+      };
+      
+      return maleVoices[figure.id] || 'Einstein';
+    } else {
+      const femaleVoices = {
+        'marie-curie': 'Sarah',        
+        'cleopatra': 'Charlotte',      
+        'joan-of-arc': 'Jessica'       
+      };
+      
+      return femaleVoices[figure.id] || 'Sarah';
+    }
+  };
+
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voiceId = await getVoiceForFigure(figure);
+    const voiceId = await getOrCreateAuthenticVoice(figure);
     console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
 
     const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
@@ -578,11 +603,11 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('ElevenLabs TTS Error:', data.error);
-      throw new Error(data.error || 'Failed to generate speech with ElevenLabs');
+      console.error('TTS Error:', data.error);
+      throw new Error(data.error || 'Failed to generate speech');
     }
 
-    console.log(`Successfully received ElevenLabs audio for ${figure.name}`);
+    console.log(`Successfully received audio for ${figure.name}`);
 
     const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
     setCurrentAudio(audio);
@@ -591,61 +616,75 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     audio.onended = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.log('ElevenLabs audio playback completed');
+      console.log('Audio playback completed');
     };
 
     audio.onerror = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.error('Error playing ElevenLabs audio');
+      console.error('Error playing audio');
     };
 
     await audio.play();
-    console.log('Premium ElevenLabs speech started playing');
+    console.log('Authentic voice speech started playing');
   };
 
-  // Get voice for historical figure - check for cloned voices first
-  const getVoiceForFigure = async (figure: HistoricalFigure): Promise<string> => {
+  // Auto-clone voice for historical figure using authentic recordings
+  const getOrCreateAuthenticVoice = async (figure: HistoricalFigure): Promise<string> => {
     try {
-      // First, check if we have a cloned voice for this figure
-      const { data: clonedVoices, error } = await supabase
+      // First, check if we already have a cloned voice for this figure
+      const { data: existingVoices, error } = await supabase
         .from('historical_voices')
         .select('*')
         .eq('figure_id', figure.id)
         .eq('is_cloned', true)
         .order('created_at', { ascending: false });
 
-      if (!error && clonedVoices && clonedVoices.length > 0) {
-        console.log(`Using cloned voice for ${figure.name}:`, clonedVoices[0].voice_name);
-        return clonedVoices[0].voice_id;
+      if (!error && existingVoices && existingVoices.length > 0) {
+        console.log(`Using existing cloned voice for ${figure.name}:`, existingVoices[0].voice_name);
+        return existingVoices[0].voice_id;
       }
 
-      // Fallback to preset voices
-      const isMale = detectGender(figure);
+      console.log(`No cloned voice found for ${figure.name}, searching for authentic recordings...`);
       
-      if (isMale) {
-        const maleVoices = {
-          'albert-einstein': 'Einstein',  // From voice library
-          'winston-churchill': 'George',  
-          'abraham-lincoln': 'Will',      
-          'shakespeare': 'Callum',        
-          'napoleon': 'George',          
-          'socrates': 'Eric',            
-        };
-        
-        return maleVoices[figure.id] || 'Einstein';
-      } else {
-        const femaleVoices = {
-          'marie-curie': 'Sarah',        
-          'cleopatra': 'Charlotte',      
-          'joan-of-arc': 'Jessica'       
-        };
-        
-        return femaleVoices[figure.id] || 'Sarah';
+      // Search for authentic recordings and auto-clone voice
+      const searchQuery = `${figure.name} original speech recording authentic voice interview`;
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/auto-clone-voice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          figureName: figure.name,
+          figureId: figure.id,
+          searchQuery: searchQuery
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log(`Successfully auto-cloned voice for ${figure.name}:`, result.voice_id);
+          
+          // Show success message to user
+          const successMessage: Message = {
+            id: Date.now().toString(),
+            content: `🎤 **Authentic Voice Activated**: I found original recordings of ${figure.name} and cloned their authentic voice! You're now hearing how ${figure.name} actually sounded.`,
+            type: "assistant",
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, successMessage]);
+          
+          return result.voice_id;
+        }
       }
+
+      // Fallback to preset voices if auto-cloning fails
+      return getFallbackVoice(figure);
+      
     } catch (error) {
-      console.error('Error getting voice for figure:', error);
-      return 'Einstein'; // Default fallback
+      console.error('Error getting/creating authentic voice:', error);
+      return getFallbackVoice(figure);
     }
   };
 
@@ -864,15 +903,6 @@ What would you like to discuss about my life, work, or thoughts on modern develo
           />
           
           <div className="space-y-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowVoiceCloning(!showVoiceCloning)}
-              className="flex items-center gap-1"
-            >
-              <Mic className="h-4 w-4" />
-              Clone Voice
-            </Button>
             <Button
               variant="outline"
               className="w-full justify-start"

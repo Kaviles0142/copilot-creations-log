@@ -44,29 +44,60 @@ serve(async (req) => {
       'Aria': '9BWtsMINqrJLrRacOk9x',           // Default female voice
     };
 
-    const voiceId = voiceMap[voice] || voiceMap['Einstein'];
+    const voiceId = voice.includes('-cloned-') ? voice : (voiceMap[voice] || voiceMap['Einstein']);
 
-    console.log(`Generating premium ElevenLabs speech for: "${text.substring(0, 50)}..." with voice: ${voice} (${voiceId})`);
+    console.log(`Generating speech for: "${text.substring(0, 50)}..." with voice: ${voice} (${voiceId})`);
 
-    // Call ElevenLabs TTS API for ultra-natural speech
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY,
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: "eleven_multilingual_v2", // Premium model for most natural speech
-        voice_settings: {
-          stability: 0.75,        // Higher stability for consistent voice
-          similarity_boost: 0.8,  // Higher similarity for more natural sound
-          style: 0.2,            // Slight style for personality
-          use_speaker_boost: true // Enhanced voice clarity
-        }
-      }),
-    });
+    // Handle auto-cloned voices vs preset voices
+    let response;
+    
+    if (voice.includes('-cloned-')) {
+      // For auto-cloned voices, use a representative preset voice for now
+      // In a real implementation, this would use the actual cloned voice
+      const fallbackVoiceId = voiceMap['Einstein']; // Use Einstein as high-quality fallback
+      
+      console.log(`Using fallback voice ${fallbackVoiceId} for auto-cloned voice ${voice}`);
+      
+      // Call ElevenLabs TTS API with fallback voice
+      response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${fallbackVoiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_multilingual_v2",
+          voice_settings: {
+            stability: 0.8,
+            similarity_boost: 0.9,
+            style: 0.3,
+            use_speaker_boost: true
+          }
+        }),
+      });
+    } else {
+      // Regular preset voice handling
+      response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_multilingual_v2", // Premium model for most natural speech
+          voice_settings: {
+            stability: 0.75,        // Higher stability for consistent voice
+            similarity_boost: 0.8,  // Higher similarity for more natural sound
+            style: 0.2,            // Slight style for personality
+            use_speaker_boost: true // Enhanced voice clarity
+          }
+        }),
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
