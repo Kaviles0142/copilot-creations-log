@@ -80,6 +80,48 @@ export type Database = {
         }
         Relationships: []
       }
+      cloned_voices: {
+        Row: {
+          audio_quality_score: number | null
+          created_at: string
+          figure_id: string
+          figure_name: string
+          id: string
+          is_active: boolean | null
+          source_description: string | null
+          source_url: string | null
+          updated_at: string
+          voice_id: string
+          voice_name: string
+        }
+        Insert: {
+          audio_quality_score?: number | null
+          created_at?: string
+          figure_id: string
+          figure_name: string
+          id?: string
+          is_active?: boolean | null
+          source_description?: string | null
+          source_url?: string | null
+          updated_at?: string
+          voice_id: string
+          voice_name: string
+        }
+        Update: {
+          audio_quality_score?: number | null
+          created_at?: string
+          figure_id?: string
+          figure_name?: string
+          id?: string
+          is_active?: boolean | null
+          source_description?: string | null
+          source_url?: string | null
+          updated_at?: string
+          voice_id?: string
+          voice_name?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string

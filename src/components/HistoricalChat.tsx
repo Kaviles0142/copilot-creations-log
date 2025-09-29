@@ -637,13 +637,14 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   // Auto-clone voice for historical figure using authentic recordings
   const getOrCreateAuthenticVoice = async (figure: HistoricalFigure): Promise<string> => {
     try {
-      // First, check if we already have a cloned voice for this figure
+      // Check if we already have a cloned voice in the new table
       const { data: existingVoices, error } = await supabase
-        .from('historical_voices')
+        .from('cloned_voices')
         .select('*')
         .eq('figure_id', figure.id)
-        .eq('is_cloned', true)
-        .order('created_at', { ascending: false });
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       if (!error && existingVoices && existingVoices.length > 0) {
         console.log(`Using existing cloned voice for ${figure.name}:`, existingVoices[0].voice_name);
