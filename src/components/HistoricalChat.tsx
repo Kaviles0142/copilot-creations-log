@@ -50,7 +50,6 @@ interface BookInfo {
   book_type: 'by_figure' | 'about_figure' | 'related';
 }
 
-
 const HistoricalChat = () => {
   const [selectedFigure, setSelectedFigure] = useState<HistoricalFigure | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -340,10 +339,20 @@ const HistoricalChat = () => {
         handleCurrentEventsSearch(`latest news ${new Date().getFullYear()}`)
       ]);
 
+      // Include document context if available
       const documentContext = documents.length > 0 
         ? `\n\nAvailable Documents:\n${documents.map(doc => 
             `- ${doc.filename}: ${doc.parsed_content ? doc.parsed_content.substring(0, 500) + '...' : 'File uploaded but not analyzed'}`
           ).join('\n')}`
+        : '';
+
+      // Include books context if available
+      const booksContext = books.length > 0 
+        ? `\n\nLiterary Knowledge - Books by and about you:\n${books.map(book => {
+            const typeLabel = book.book_type === 'by_figure' ? 'Your work' : 
+                             book.book_type === 'about_figure' ? 'About you' : 'Related';
+            return `- ${book.title} by ${book.authors.join(', ')} (${typeLabel})${book.description ? ': ' + book.description.substring(0, 200) + '...' : ''}`;
+          }).slice(0, 10).join('\n')}${books.length > 10 ? `\n... and ${books.length - 10} more books` : ''}`
         : '';
 
       const context = `
@@ -365,10 +374,12 @@ ${youtubeData ? youtubeData.slice(0, 3).map((video: any) =>
 
 ${documentContext}
 
+${booksContext}
+
 Previous conversation:
 ${messages.slice(-3).map(msg => `${msg.type}: ${msg.content}`).join('\n')}
 
-Instructions: You are ${selectedFigure!.name}. Respond as this historical figure would, with authentic personality, speaking style, and knowledge from their era. You now have knowledge of current events and can comment on modern topics from your historical perspective. If documents are provided, reference and analyze them in your response. Include their views, personality quirks, and speaking patterns. Keep responses engaging but historically accurate to their character while incorporating insights about current events when relevant.
+Instructions: You are ${selectedFigure!.name}. Respond as this historical figure would, with authentic personality, speaking style, and knowledge from their era. You now have access to comprehensive knowledge about your own works and what has been written about you. Reference your books and writings when relevant. You also have knowledge of current events and can comment on modern topics from your historical perspective. If documents are provided, reference and analyze them in your response. Include your views, personality quirks, and speaking patterns. Keep responses engaging but historically accurate to your character while incorporating insights about current events and your literary legacy when relevant.
       `;
 
       const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
