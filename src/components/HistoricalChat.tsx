@@ -595,6 +595,35 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     };
 
     await audio.play();
+    console.log('Natural OpenAI TTS audio played successfully');
+  };
+
+  // Get appropriate OpenAI voice for historical figures  
+  const getOpenAIVoiceForFigure = (figure: HistoricalFigure): string => {
+    const isMale = detectGender(figure);
+    
+    if (isMale) {
+      // Male voices from OpenAI - these sound very natural
+      const maleVoices = {
+        'albert-einstein': 'onyx',      // Deep, thoughtful, perfect for Einstein
+        'winston-churchill': 'onyx',    // Authoritative
+        'abraham-lincoln': 'fable',     // Warm, presidential  
+        'shakespeare': 'echo',          // Dramatic, eloquent
+        'napoleon': 'onyx',            // Commanding
+        'socrates': 'fable',           // Wise, philosophical
+      };
+      
+      return maleVoices[figure.id] || 'onyx'; // Onyx is the deepest male voice
+    } else {
+      // Female voices from OpenAI
+      const femaleVoices = {
+        'marie-curie': 'nova',         // Intelligent, clear
+        'cleopatra': 'shimmer',        // Regal, commanding
+        'joan-of-arc': 'alloy'         // Strong, determined
+      };
+      
+      return femaleVoices[figure.id] || 'nova'; // Nova is clear and intelligent
+    }
   };
 
   const getVoicePitch = (figure: HistoricalFigure): number => {
