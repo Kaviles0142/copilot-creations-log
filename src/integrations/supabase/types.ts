@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      books: {
+        Row: {
+          authors: string[]
+          book_type: string
+          categories: string[] | null
+          created_at: string
+          description: string | null
+          figure_id: string
+          figure_name: string
+          google_books_id: string | null
+          id: string
+          info_link: string | null
+          isbn_10: string | null
+          isbn_13: string | null
+          language: string | null
+          page_count: number | null
+          preview_link: string | null
+          published_date: string | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          authors: string[]
+          book_type: string
+          categories?: string[] | null
+          created_at?: string
+          description?: string | null
+          figure_id: string
+          figure_name: string
+          google_books_id?: string | null
+          id?: string
+          info_link?: string | null
+          isbn_10?: string | null
+          isbn_13?: string | null
+          language?: string | null
+          page_count?: number | null
+          preview_link?: string | null
+          published_date?: string | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          authors?: string[]
+          book_type?: string
+          categories?: string[] | null
+          created_at?: string
+          description?: string | null
+          figure_id?: string
+          figure_name?: string
+          google_books_id?: string | null
+          id?: string
+          info_link?: string | null
+          isbn_10?: string | null
+          isbn_13?: string | null
+          language?: string | null
+          page_count?: number | null
+          preview_link?: string | null
+          published_date?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string
