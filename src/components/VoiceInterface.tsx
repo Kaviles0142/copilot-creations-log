@@ -65,19 +65,25 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ selectedFigure, onSpeak
     }
 
     try {
+      console.log('🚀 Starting conversation with:', selectedFigure.name);
       setIsConnecting(true);
+      
       chatRef.current = new RealtimeChat(
         selectedFigure,
         handleMessage,
         handleConnectionChange
       );
+      
+      console.log('🔗 Attempting to connect...');
       await chatRef.current.connect();
+      console.log('✅ Connection successful!');
+      
     } catch (error) {
-      console.error('Error starting conversation:', error);
+      console.error('❌ Error starting conversation:', error);
       setIsConnecting(false);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to start voice conversation',
+        title: "Connection Error",
+        description: `Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     }

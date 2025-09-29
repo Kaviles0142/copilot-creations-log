@@ -7,10 +7,16 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('🔗 Realtime voice chat function called');
+  console.log('📋 Request method:', req.method);
+  console.log('📋 Request URL:', req.url);
+  
   const { headers } = req;
   const upgradeHeader = headers.get("upgrade") || "";
+  console.log('📋 Upgrade header:', upgradeHeader);
 
   if (upgradeHeader.toLowerCase() !== "websocket") {
+    console.log('❌ Not a WebSocket connection');
     return new Response("Expected WebSocket connection", { status: 400 });
   }
 
@@ -18,7 +24,11 @@ serve(async (req) => {
   const figure = url.searchParams.get("figure");
   const figureName = url.searchParams.get("figureName");
   
+  console.log('📋 Figure:', figure);
+  console.log('📋 Figure Name:', figureName);
+  
   if (!figure || !figureName) {
+    console.log('❌ Missing figure parameters');
     return new Response("Missing figure parameters", { status: 400 });
   }
 
