@@ -44,7 +44,7 @@ serve(async (req) => {
         Remember: You can hear everything through their microphone - their playing, their room acoustics, even background noise. Comment on what you actually hear. Be supportive but give real musical guidance.`
       };
 
-      const systemPrompt = musicianPrompts[figure as string] || musicianPrompts.hendrix;
+      const systemPrompt = musicianPrompts.hendrix; // Default to hendrix for now
       
       return new Response(JSON.stringify({ systemPrompt }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
