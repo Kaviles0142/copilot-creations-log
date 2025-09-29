@@ -44,10 +44,34 @@ serve(async (req) => {
     try {
       // 1. Search books related to the figure
       console.log(`Searching books for figure: ${figure.name} (ID: ${figure.id})`);
+      
+      // First try to discover books if none exist
+      try {
+        const discoverResponse = await fetch(`${supabaseUrl}/functions/v1/discover-books`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            figureName: figure.name,
+            figureId: figure.id,
+            forceRefresh: false
+          })
+        });
+        
+        if (discoverResponse.ok) {
+          const discoverResult = await discoverResponse.json();
+          console.log(`Books discovery result: ${discoverResult.books?.length || 0} books found`);
+        }
+      } catch (discoverError) {
+        console.log('Books discovery failed:', discoverError);
+      }
+
       const { data: books, error: booksError } = await supabase
         .from('books')
-        .select('title, authors, description, book_type')
-        .or(`figure_name.ilike.%${figure.name}%,figure_id.eq.${figure.id}`)
+        .select('title, authors, description')
+        .eq('figure_id', figure.id)
         .limit(5);
 
       if (booksError) {
@@ -57,7 +81,7 @@ serve(async (req) => {
         if (books && books.length > 0) {
           relevantKnowledge += '\n\n📚 RELEVANT BOOKS AND SOURCES:\n';
           books.forEach(book => {
-            relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'} (${book.book_type})\n`;
+            relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
             if (book.description) {
               relevantKnowledge += `  Summary: ${book.description.substring(0, 300)}...\n`;
             }

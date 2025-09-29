@@ -342,7 +342,8 @@ const HistoricalChat = () => {
       };
       setMessages(prev => [...prev, errorMessage]);
       await saveMessage(errorMessage, conversationId);
-    } finally {
+      
+      // Reset loading state on error
       setIsLoading(false);
       setAbortController(null);
     }
@@ -428,10 +429,18 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Generate speech if auto-voice is enabled (but don't await to keep stop button visible)
+      // Generate speech if auto-voice is enabled
       if (isAutoVoiceEnabled) {
-        generateSpeech(aiResponse, selectedFigure!);
+        try {
+          await generateSpeech(aiResponse, selectedFigure!);
+        } catch (speechError) {
+          console.error('Speech generation failed:', speechError);
+        }
       }
+
+      // Reset loading state after everything completes
+      setIsLoading(false);
+      setAbortController(null);
 
       // Show toast indicating which AI was used
       toast({
