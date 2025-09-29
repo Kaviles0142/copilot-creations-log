@@ -339,26 +339,45 @@ const HistoricalChat = () => {
     const maxRetries = 3;
     
     try {
-      // For now, provide a basic response while we fix the edge function
-      const periodText = selectedFigure!.period || "a significant period in history";
-      const descriptionText = selectedFigure!.description || "my contributions to human knowledge and society";
-      
-      const mockResponse = `Hello! I am ${selectedFigure!.name}. I apologize, but I'm currently experiencing some technical difficulties with my advanced AI responses. However, I can tell you that as ${selectedFigure!.name}, I lived during ${periodText} and am known for ${descriptionText}. 
+      // Get conversation history for context
+      const conversationHistory = messages.map(msg => ({
+        role: msg.type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
 
-What would you like to discuss about my life, work, or thoughts on modern developments?
+      // Call the real AI chat function
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyY2xwdnJ5cmpsYWZhY29jYm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDk5NTAsImV4cCI6MjA3NDY4NTk1MH0.noDkcnCcthJhY4WavgDDZYl__QtOq1Y9t9dTowrU2tc`,
+        },
+        body: JSON.stringify({
+          message: input,
+          figure: selectedFigure,
+          context: conversationHistory
+        }),
+      });
 
-*Note: Full AI responses will be restored once technical issues are resolved.*`;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('AI chat failed:', errorText);
+        throw new Error(`AI chat failed: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      const aiResponse = result.response || result.message || "I apologize, but I couldn't generate a proper response.";
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: mockResponse,
+        content: aiResponse,
         type: "assistant",
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
-      await generateSpeech(mockResponse, selectedFigure!);
+      await generateSpeech(aiResponse, selectedFigure!);
 
     } catch (error) {
       console.error(`Attempt ${attempt} failed:`, error);
@@ -601,6 +620,7 @@ What would you like to discuss about my life, work, or thoughts on modern develo
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyY2xwdnJ5cmpsYWZhY29jYm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDk5NTAsImV4cCI6MjA3NDY4NTk1MH0.noDkcnCcthJhY4WavgDDZYl__QtOq1Y9t9dTowrU2tc`,
       },
       body: JSON.stringify({
         text: text,
