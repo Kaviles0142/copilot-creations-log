@@ -1,5 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +8,7 @@ const corsHeaders = {
 
 console.log("Google Books Discovery function loaded");
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,217 +18,209 @@ Deno.serve(async (req) => {
     console.log('Books discovery request:', { figureName, figureId, forceRefresh });
 
     if (!figureName || !figureId) {
-      console.error('Missing required parameters');
-      return new Response(
-        JSON.stringify({ error: 'figureName and figureId are required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      throw new Error('Figure name and ID are required');
     }
 
-    // Initialize Supabase client
+    const GOOGLE_BOOKS_API_KEY = Deno.env.get('GOOGLE_BOOKS_API_KEY');
+    if (!GOOGLE_BOOKS_API_KEY) {
+      throw new Error('Google Books API key not configured');
+    }
+
+    // Get Supabase credentials
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check if we already have books for this figure (unless forcing refresh)
     if (!forceRefresh) {
-      const { data: existingBooks, error: fetchError } = await supabase
-        .from('books')
-        .select('*')
-        .eq('figure_id', figureId);
-
-      if (!fetchError && existingBooks && existingBooks.length > 0) {
-        console.log(`Found ${existingBooks.length} existing books for ${figureName}`);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            cached: true,
-            books: existingBooks,
-            totalBooks: existingBooks.length
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      const existingResponse = await fetch(
+        `${supabaseUrl}/rest/v1/books?figure_id=eq.${figureId}&select=*`,
+        {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
           }
-        );
+        }
+      );
+      
+      if (existingResponse.ok) {
+        const existingBooks = await existingResponse.json();
+        if (existingBooks && existingBooks.length > 0) {
+          console.log(`Found ${existingBooks.length} existing books for ${figureName}`);
+          return new Response(JSON.stringify({
+            success: true,
+            books: existingBooks,
+            cached: true
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
 
-    const apiKey = Deno.env.get('GOOGLE_BOOKS_API_KEY');
-    if (!apiKey) {
-      console.error('GOOGLE_BOOKS_API_KEY environment variable not set');
-      return new Response(
-        JSON.stringify({ error: 'Google Books API key not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
+    console.log(`Searching Google Books for ${figureName}...`);
 
-    console.log('Discovering books for:', figureName);
-    
-    // Search for different types of books
+    // Search Google Books API
     const searchQueries = [
-      `inauthor:"${figureName}"`, // Books by the figure
-      `intitle:"${figureName}" OR subject:"${figureName}"`, // Books about the figure
-      `"${figureName}" biography`, // Biographies
-      `"${figureName}" works`, // Collected works
-      `"${figureName}" letters OR correspondence`, // Letters/correspondence
+      `"${figureName}" biography`,
+      `"${figureName}" autobiography`,
+      `"${figureName}" life story`,
+      `about "${figureName}"`,
+      figureName
     ];
 
-    const allBooks = [];
+    const allBooks: any[] = [];
     const seenBooks = new Set();
 
     for (const query of searchQueries) {
       try {
-        console.log('Searching with query:', query);
+        const booksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&key=${GOOGLE_BOOKS_API_KEY}`;
         
-        const searchUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&key=${apiKey}`;
-        const response = await fetch(searchUrl);
+        console.log(`Searching with query: "${query}"`);
+        const response = await fetch(booksUrl);
         
         if (!response.ok) {
-          console.error('Google Books API request failed:', response.status, response.statusText);
+          console.error(`Google Books API error for query "${query}":`, response.status);
           continue;
         }
 
         const data = await response.json();
-        
+        console.log(`Found ${data.totalItems || 0} results for query: "${query}"`);
+
         if (data.items) {
           for (const item of data.items) {
-            const volumeInfo = item.volumeInfo;
             const bookId = item.id;
-            
-            // Skip if we've already seen this book
             if (seenBooks.has(bookId)) continue;
             seenBooks.add(bookId);
 
-            // Skip if no title or authors
-            if (!volumeInfo.title || !volumeInfo.authors) continue;
-
-            // Determine book type based on authors and content
-            let bookType = 'related';
+            const volumeInfo = item.volumeInfo || {};
+            const title = volumeInfo.title || 'Unknown Title';
             const authors = volumeInfo.authors || [];
-            const title = volumeInfo.title.toLowerCase();
-            const description = (volumeInfo.description || '').toLowerCase();
+            const description = volumeInfo.description || '';
+            const publishedDate = volumeInfo.publishedDate || '';
+            const pageCount = volumeInfo.pageCount || 0;
+            const categories = volumeInfo.categories || [];
+            const imageLinks = volumeInfo.imageLinks || {};
+            const previewLink = volumeInfo.previewLink || '';
+            const infoLink = volumeInfo.infoLink || '';
+
+            // Relevance scoring
+            let relevanceScore = 0;
+            const titleLower = title.toLowerCase();
+            const descriptionLower = description.toLowerCase();
+            const figureNameLower = figureName.toLowerCase();
             
-            if (authors.some(author => 
-              author.toLowerCase().includes(figureName.toLowerCase()) ||
-              figureName.toLowerCase().includes(author.toLowerCase())
-            )) {
-              bookType = 'by_figure';
-            } else if (
-              title.includes(figureName.toLowerCase()) ||
-              description.includes(figureName.toLowerCase()) ||
-              title.includes('biography') ||
-              title.includes('life of') ||
-              description.includes('biography')
-            ) {
-              bookType = 'about_figure';
+            // High relevance if figure name is in title
+            if (titleLower.includes(figureNameLower)) {
+              relevanceScore += 50;
             }
 
-            // Extract ISBNs
-            let isbn10 = null;
-            let isbn13 = null;
-            if (volumeInfo.industryIdentifiers) {
-              for (const identifier of volumeInfo.industryIdentifiers) {
-                if (identifier.type === 'ISBN_10') isbn10 = identifier.identifier;
-                if (identifier.type === 'ISBN_13') isbn13 = identifier.identifier;
-              }
+            // Medium relevance if it's a biography/autobiography
+            if (titleLower.includes('biography') || titleLower.includes('autobiography') || 
+                titleLower.includes('life of') || titleLower.includes('story of')) {
+              relevanceScore += 30;
             }
 
-            const book = {
-              figure_id: figureId,
-              figure_name: figureName,
-              title: volumeInfo.title,
-              authors: authors,
-              description: volumeInfo.description || null,
-              published_date: volumeInfo.publishedDate || null,
-              page_count: volumeInfo.pageCount || null,
-              categories: volumeInfo.categories || [],
-              thumbnail_url: volumeInfo.imageLinks?.thumbnail || null,
-              preview_link: volumeInfo.previewLink || null,
-              info_link: volumeInfo.infoLink || null,
-              book_type: bookType,
-              google_books_id: bookId,
-              isbn_10: isbn10,
-              isbn_13: isbn13,
-              language: volumeInfo.language || 'en'
-            };
+            // Low relevance if figure name is in description
+            if (descriptionLower.includes(figureNameLower)) {
+              relevanceScore += 20;
+            }
 
-            allBooks.push(book);
+            // Bonus for longer descriptions (more detailed books)
+            if (description.length > 500) {
+              relevanceScore += 10;
+            }
+
+            // Bonus for books with page counts (complete books)
+            if (pageCount > 100) {
+              relevanceScore += 15;
+            }
+
+            // Only include books with reasonable relevance
+            if (relevanceScore >= 20) {
+              allBooks.push({
+                figure_id: figureId,
+                google_books_id: bookId,
+                title: title,
+                authors: authors,
+                description: description.substring(0, 1000), // Limit description length
+                published_date: publishedDate,
+                page_count: pageCount,
+                categories: categories,
+                thumbnail_url: imageLinks.thumbnail || imageLinks.smallThumbnail || null,
+                preview_link: previewLink,
+                info_link: infoLink,
+                relevance_score: relevanceScore,
+                search_query: query
+              });
+            }
           }
         }
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-      } catch (error) {
-        console.error('Error in search query:', query, error);
+      } catch (queryError) {
+        console.error(`Error with query "${query}":`, queryError);
         continue;
       }
     }
 
-    console.log(`Found ${allBooks.length} total books for ${figureName}`);
+    // Sort by relevance score and take top 20
+    allBooks.sort((a, b) => b.relevance_score - a.relevance_score);
+    const topBooks = allBooks.slice(0, 20);
 
-    // Sort books by relevance (by figure first, then about figure, then related)
-    allBooks.sort((a, b) => {
-      const typeOrder = { 'by_figure': 0, 'about_figure': 1, 'related': 2 };
-      return typeOrder[a.book_type] - typeOrder[b.book_type];
-    });
+    console.log(`Found ${topBooks.length} relevant books for ${figureName}`);
 
-    // Store books in database
-    if (allBooks.length > 0) {
-      // Clear existing books if force refresh
-      if (forceRefresh) {
-        await supabase
-          .from('books')
-          .delete()
-          .eq('figure_id', figureId);
-      }
-
-      const { error: insertError } = await supabase
-        .from('books')
-        .insert(allBooks);
-
-      if (insertError) {
-        console.error('Error inserting books:', insertError);
-        // Continue anyway, return the found books
-      } else {
-        console.log(`Successfully stored ${allBooks.length} books in database`);
-      }
+    if (topBooks.length === 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        books: [],
+        message: `No relevant books found for ${figureName}`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        cached: false,
-        books: allBooks,
-        totalBooks: allBooks.length,
-        breakdown: {
-          by_figure: allBooks.filter(b => b.book_type === 'by_figure').length,
-          about_figure: allBooks.filter(b => b.book_type === 'about_figure').length,
-          related: allBooks.filter(b => b.book_type === 'related').length
-        }
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // Store books in Supabase
+    console.log(`Storing ${topBooks.length} books in database...`);
+    
+    const insertResponse = await fetch(
+      `${supabaseUrl}/rest/v1/books`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(topBooks)
       }
     );
 
+    if (!insertResponse.ok) {
+      const error = await insertResponse.text();
+      console.error('Failed to store books:', error);
+      throw new Error(`Failed to store books: ${error}`);
+    }
+
+    const storedBooks = await insertResponse.json();
+    console.log(`Successfully stored ${storedBooks.length} books for ${figureName}`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      books: storedBooks,
+      totalFound: allBooks.length,
+      stored: storedBooks.length
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   } catch (error) {
-    console.error('Error in Google Books discovery function:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    console.error('Books discovery error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to discover books';
+    return new Response(JSON.stringify({
+      error: errorMessage
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

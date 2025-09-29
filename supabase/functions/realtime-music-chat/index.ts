@@ -44,15 +44,16 @@ serve(async (req) => {
         Remember: You can hear everything through their microphone - their playing, their room acoustics, even background noise. Comment on what you actually hear. Be supportive but give real musical guidance.`
       };
 
-      const systemPrompt = musicianPrompts[figure] || musicianPrompts.hendrix;
+      const systemPrompt = musicianPrompts[figure as string] || musicianPrompts.hendrix;
       
       return new Response(JSON.stringify({ systemPrompt }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: errorMessage }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -118,7 +119,10 @@ Remember: You can hear everything through their microphone AND you have detailed
       // Send session.update after receiving session.created
       if (data.type === 'session.created' && !sessionCreated) {
         sessionCreated = true;
-        const systemPrompt = musicianPrompts[currentFigure] || musicianPrompts.hendrix;
+        const musicianPrompts: Record<string, string> = {
+          hendrix: "You are Jimi Hendrix's spirit guide for musicians..."
+        };
+        const systemPrompt = musicianPrompts[currentFigure as string] || musicianPrompts.hendrix;
         
         const sessionUpdate = {
           type: 'session.update',
