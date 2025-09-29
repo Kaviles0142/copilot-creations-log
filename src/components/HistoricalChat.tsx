@@ -654,6 +654,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
       
       // Search for authentic recordings and auto-clone voice
       const searchQuery = `${figure.name} original speech recording authentic voice interview`;
+      console.log(`Calling auto-clone-voice API for ${figure.name}...`);
+      
       const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/auto-clone-voice', {
         method: 'POST',
         headers: {
@@ -665,6 +667,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
           searchQuery: searchQuery
         }),
       });
+
+      console.log(`Auto-clone-voice response status: ${response.status}`);
 
       if (response.ok) {
         const result = await response.json();
@@ -699,6 +703,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
       
     } catch (error) {
       console.error('Error getting/creating authentic voice:', error);
+      console.error('Error details:', error.message || error);
+      console.error('Falling back to preset voice for:', figure.name);
       return getFallbackVoice(figure);
     }
   };
