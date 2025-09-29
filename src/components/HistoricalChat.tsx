@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe, Save, RefreshCw } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
+import ConversationHistory from "./ConversationHistory";
+import DocumentUpload from "./DocumentUpload";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 export interface Message {
   id: string;
@@ -25,6 +28,16 @@ export interface HistoricalFigure {
   avatar: string;
 }
 
+interface UploadedDocument {
+  id: string;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  storage_path: string;
+  parsed_content: string | null;
+  created_at: string;
+}
+
 const HistoricalChat = () => {
   const [selectedFigure, setSelectedFigure] = useState<HistoricalFigure | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,6 +52,10 @@ const HistoricalChat = () => {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTranscript, setRecordingTranscript] = useState("");
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [retryCount, setRetryCount] = useState(0);
+  const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
   useEffect(() => {
@@ -71,10 +88,8 @@ const HistoricalChat = () => {
           }
         }
 
-        // Update the recording transcript for real-time display
         setRecordingTranscript(interimTranscript);
 
-        // Add final transcript to input
         if (finalTranscript) {
           setInputMessage(prev => prev + finalTranscript + ' ');
           setRecordingTranscript("");
@@ -103,7 +118,7 @@ const HistoricalChat = () => {
       
       setRecognition(recognition);
     }
-  }, [selectedLanguage]); // Recreate recognition when language changes
+  }, [selectedLanguage]);
 
   // Initialize speech synthesis voices
   useEffect(() => {
@@ -120,7 +135,6 @@ const HistoricalChat = () => {
   useEffect(() => {
     if (selectedFigure) {
       createAuthenticVoice(selectedFigure);
-      // Set language based on historical figure
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
     }
@@ -135,28 +149,8 @@ const HistoricalChat = () => {
     if (isListening) {
       recognition.stop();
     } else {
-      // Update recognition language before starting
       recognition.lang = selectedLanguage;
       recognition.start();
-    }
-  };
-
-  // Handle current events search using SerpApi
-  const handleCurrentEventsSearch = async (query: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('serpapi-search', {
-        body: { 
-          query: query + " current events news",
-          type: "news",
-          num: 5
-        }
-      });
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Current events search error:', error);
-      return null;
     }
   };
 
@@ -179,8 +173,117 @@ const HistoricalChat = () => {
     return figureLanguages[figure.id] || 'en-US';
   };
 
+  // Handle current events search using SerpApi
+  const handleCurrentEventsSearch = async (query: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('serpapi-search', {
+        body: { 
+          query: query + " current events news",
+          type: "news",
+          num: 5
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Current events search error:', error);
+      return null;
+    }
+  };
+
+  // Create new conversation when figure is selected
+  const createNewConversation = async (figure: HistoricalFigure) => {
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert({
+          figure_id: figure.id,
+          figure_name: figure.name,
+          language: selectedLanguage,
+          title: `Chat with ${figure.name}`
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setCurrentConversationId(data.id);
+      return data.id;
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create conversation",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  // Load conversation history
+  const loadConversation = async (conversationId: string) => {
+    try {
+      const { data: messagesData, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const loadedMessages: Message[] = messagesData?.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        type: msg.type as "user" | "assistant",
+        timestamp: new Date(msg.created_at)
+      })) || [];
+
+      setMessages(loadedMessages);
+
+      // Load documents for this conversation
+      const { data: docsData, error: docsError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (docsError) throw docsError;
+      setDocuments(docsData || []);
+
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Save message to database
+  const saveMessage = async (message: Message, conversationId: string) => {
+    try {
+      await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          content: message.content,
+          type: message.type
+        });
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedFigure) return;
+
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      conversationId = await createNewConversation(selectedFigure);
+      if (!conversationId) return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -192,18 +295,46 @@ const HistoricalChat = () => {
     setMessages(prev => [...prev, userMessage]);
     setInputMessage("");
     setIsLoading(true);
+    setRetryCount(0);
+
+    await saveMessage(userMessage, conversationId);
 
     try {
-      // Search for background information about the figure or topic and current events
+      await processMessageWithRetry(inputMessage, conversationId);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I apologize, but I'm having trouble responding right now. Please try again.",
+        type: "assistant", 
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      await saveMessage(errorMessage, conversationId);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processMessageWithRetry = async (input: string, conversationId: string, attempt: number = 1): Promise<void> => {
+    const maxRetries = 3;
+    
+    try {
       const [wikiData, youtubeData, currentEventsData] = await Promise.all([
-        searchWikipedia(selectedFigure.name),
-        searchYoutube(`${selectedFigure.name} original voice recording interview speeches`),
+        searchWikipedia(selectedFigure!.name),
+        searchYoutube(`${selectedFigure!.name} original voice recording interview speeches`),
         handleCurrentEventsSearch(`latest news ${new Date().getFullYear()}`)
       ]);
 
+      const documentContext = documents.length > 0 
+        ? `\n\nAvailable Documents:\n${documents.map(doc => 
+            `- ${doc.filename}: ${doc.parsed_content ? doc.parsed_content.substring(0, 500) + '...' : 'File uploaded but not analyzed'}`
+          ).join('\n')}`
+        : '';
+
       const context = `
-Historical Figure: ${selectedFigure.name} (${selectedFigure.period})
-Background: ${selectedFigure.description}
+Historical Figure: ${selectedFigure!.name} (${selectedFigure!.period})
+Background: ${selectedFigure!.description}
 
 Additional Context:
 ${wikiData ? `Wikipedia Summary: ${wikiData.title}: ${wikiData.extract || 'No additional information found'}` : ''}
@@ -218,22 +349,23 @@ ${youtubeData ? youtubeData.slice(0, 3).map((video: any) =>
   `- ${video.title} (${video.hasOriginalVoice ? 'ORIGINAL VOICE' : 'Historical Content'})`
 ).join('\n') : 'No video references found'}
 
+${documentContext}
+
 Previous conversation:
 ${messages.slice(-3).map(msg => `${msg.type}: ${msg.content}`).join('\n')}
 
-Instructions: You are ${selectedFigure.name}. Respond as this historical figure would, with authentic personality, speaking style, and knowledge from their era. You now have knowledge of current events and can comment on modern topics from your historical perspective. Include their views, personality quirks, and speaking patterns. Keep responses engaging but historically accurate to their character while incorporating insights about current events when relevant.
+Instructions: You are ${selectedFigure!.name}. Respond as this historical figure would, with authentic personality, speaking style, and knowledge from their era. You now have knowledge of current events and can comment on modern topics from your historical perspective. If documents are provided, reference and analyze them in your response. Include their views, personality quirks, and speaking patterns. Keep responses engaging but historically accurate to their character while incorporating insights about current events when relevant.
       `;
 
-      // Call OpenAI through our Edge Function
       const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: inputMessage,
+          message: input,
           context: context,
-          figure: selectedFigure.name
+          figure: selectedFigure!.name
         }),
       });
 
@@ -251,20 +383,26 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      await saveMessage(assistantMessage, conversationId);
+      await generateSpeech(data.response, selectedFigure!);
 
-      // Generate speech with authentic voice
-      await generateSpeech(data.response, selectedFigure);
     } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "I apologize, but I'm having trouble responding right now. Please try again.",
-        type: "assistant", 
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+      console.error(`Attempt ${attempt} failed:`, error);
+      
+      if (attempt < maxRetries) {
+        console.log(`Retrying... (${attempt + 1}/${maxRetries})`);
+        setRetryCount(attempt);
+        
+        toast({
+          title: "Retrying...",
+          description: `Attempt ${attempt + 1} of ${maxRetries}`,
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        return processMessageWithRetry(input, conversationId, attempt + 1);
+      } else {
+        throw error;
+      }
     }
   };
 
@@ -290,17 +428,14 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
 
   const generateSpeech = async (text: string, figure: HistoricalFigure) => {
     try {
-      // Stop any current audio
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
       }
 
-      // Use Web Speech API for free multi-language TTS
       if ('speechSynthesis' in window) {
         generateBrowserSpeech(text, figure);
       } else {
-        // Fallback to ElevenLabs for premium quality
         await generatePremiumSpeech(text, figure);
       }
     } catch (error) {
@@ -310,12 +445,10 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
   };
 
   const generateBrowserSpeech = (text: string, figure: HistoricalFigure) => {
-    // Stop any current speech
     speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Find the best voice for the selected language
     const voice = availableVoices.find(v => 
       v.lang.startsWith(selectedLanguage.split('-')[0]) && 
       (v.lang === selectedLanguage || v.default)
@@ -326,7 +459,7 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
     }
 
     utterance.lang = selectedLanguage;
-    utterance.rate = 0.9; // Slightly slower for better comprehension
+    utterance.rate = 0.9;
     utterance.pitch = getVoicePitch(figure);
     
     utterance.onstart = () => setIsPlayingAudio(true);
@@ -337,7 +470,6 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    // Get authentic voice for the historical figure
     const voice = await getVoiceForFigure(figure);
 
     const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
@@ -357,7 +489,6 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
       throw new Error(data.error || 'Failed to generate speech');
     }
 
-    // Create audio element and play
     const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
     setCurrentAudio(audio);
     setIsPlayingAudio(true);
@@ -377,44 +508,37 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
   };
 
   const getVoicePitch = (figure: HistoricalFigure): number => {
-    // Adjust pitch based on historical figure characteristics
     const pitchMap: Record<string, number> = {
-      'winston-churchill': 0.8, // Lower, authoritative
-      'marie-curie': 1.1,       // Higher, feminine
-      'napoleon': 0.9,          // Confident
-      'cleopatra': 1.2,         // Regal, feminine
-      'shakespeare': 1.0,       // Natural
-      'abraham-lincoln': 0.85,  // Deep, thoughtful
+      'winston-churchill': 0.8,
+      'marie-curie': 1.1,
+      'napoleon': 0.9,
+      'cleopatra': 1.2,
+      'shakespeare': 1.0,
+      'abraham-lincoln': 0.85,
     };
     return pitchMap[figure.id] || 1.0;
   };
 
   const getVoiceForFigure = async (figure: HistoricalFigure): Promise<string> => {
-    // First, check if we have authentic cloned voices stored
-    const authenticVoices: Record<string, string> = {
-      // Store actual ElevenLabs voice IDs of cloned historical voices here
-      // These will be populated as we create voice clones
-    };
+    const authenticVoices: Record<string, string> = {};
 
-    // If we have a cloned voice, use it
     if (authenticVoices[figure.id]) {
       return authenticVoices[figure.id];
     }
 
-    // Fallback to regional voices while cloning is in progress
     const regionalVoices: Record<string, string> = {
-      'winston-churchill': 'George', // British authority
-      'albert-einstein': 'Brian',    // Thoughtful, scientific
-      'marie-curie': 'Charlotte',    // Elegant French
-      'leonardo-da-vinci': 'Liam',   // Italian Renaissance
-      'cleopatra': 'Sarah',          // Regal, Egyptian
-      'socrates': 'Daniel',          // Greek philosopher
-      'shakespeare': 'Will',         // Classic English
-      'napoleon': 'Roger',           // French commander
-      'abraham-lincoln': 'Brian',    // American statesman
-      'julius-caesar': 'George',     // Roman authority
-      'joan-of-arc': 'Charlotte',    // French warrior
-      'galileo': 'Liam'              // Italian scientist
+      'winston-churchill': 'George',
+      'albert-einstein': 'Brian',
+      'marie-curie': 'Charlotte',
+      'leonardo-da-vinci': 'Liam',
+      'cleopatra': 'Sarah',
+      'socrates': 'Daniel',
+      'shakespeare': 'Will',
+      'napoleon': 'Roger',
+      'abraham-lincoln': 'Brian',
+      'julius-caesar': 'George',
+      'joan-of-arc': 'Charlotte',
+      'galileo': 'Liam'
     };
 
     return regionalVoices[figure.id] || 'Aria';
@@ -424,17 +548,14 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
     try {
       console.log(`Searching for authentic recordings of ${figure.name}...`);
       
-      // Search for authentic recordings
       const searchQuery = `${figure.name} original speech recording authentic voice`;
       const youtubeResults = await searchYoutube(searchQuery);
       
       if (youtubeResults && youtubeResults.length > 0) {
-        // Find the most authentic recording
         const authenticRecording = youtubeResults.find((video: any) => 
           video.hasOriginalVoice && video.isHistoricalContent
         ) || youtubeResults[0];
 
-        // Show user we're creating authentic voice
         const voiceCreationMessage: Message = {
           id: Date.now().toString(),
           content: `🎙️ **Authentic Voice Ready**: Found original recordings of ${figure.name}! I'm now using their authentic speech patterns and accent. Listen closely - this is how ${figure.name} actually sounded when speaking.`,
@@ -535,8 +656,33 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <div className="w-80 border-r border-border bg-card">
-        <div className="p-6">
+        <div className="p-6 space-y-4">
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
+          
+          {/* Conversation History */}
+          <ConversationHistory 
+            onSelectConversation={(conv) => {
+              const figure = { 
+                id: conv.figure_id, 
+                name: conv.figure_name, 
+                period: '', 
+                description: '', 
+                avatar: '' 
+              };
+              setSelectedFigure(figure);
+              setCurrentConversationId(conv.id);
+              setSelectedLanguage(conv.language);
+              loadConversation(conv.id);
+            }}
+            selectedFigureId={selectedFigure?.id}
+          />
+
+          {/* Document Upload */}
+          <DocumentUpload
+            conversationId={currentConversationId}
+            onDocumentUploaded={setDocuments}
+            documents={documents}
+          />
           
           <div className="space-y-4">
             <Button
@@ -573,7 +719,23 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
               Find Voice Recordings
             </Button>
 
-            {/* Language Selector */}
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => {
+                setMessages([]);
+                setCurrentConversationId(null);
+                setDocuments([]);
+                if (selectedFigure) {
+                  createNewConversation(selectedFigure);
+                }
+              }}
+              disabled={!selectedFigure}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              New Conversation
+            </Button>
+
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center">
                 <Globe className="mr-2 h-4 w-4" />
@@ -613,7 +775,12 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
               <h3 className="font-semibold mb-3">Select Historical Figure</h3>
               <AvatarSelector 
                 selectedFigure={selectedFigure}
-                onSelectFigure={setSelectedFigure}
+                onSelectFigure={(figure) => {
+                  setSelectedFigure(figure);
+                  setMessages([]);
+                  setCurrentConversationId(null);
+                  setDocuments([]);
+                }}
               />
             </div>
           </div>
@@ -707,7 +874,6 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
               </Button>
             </div>
             
-            {/* Real-time speech transcription display */}
             {isRecording && (
               <div className="mt-3 p-3 bg-muted/50 rounded-lg border-2 border-dashed border-primary/30">
                 <div className="flex items-center space-x-2 mb-2">
@@ -732,6 +898,13 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
                 <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2 animate-ping"></div>
                 🎤 Preparing to listen... Speak now
               </p>
+            )}
+            
+            {retryCount > 0 && (
+              <div className="flex items-center space-x-2 text-sm text-orange-600 mt-2">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Retrying... ({retryCount}/3)</span>
+              </div>
             )}
           </div>
         )}
