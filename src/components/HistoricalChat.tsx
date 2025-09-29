@@ -409,13 +409,39 @@ What would you like to discuss about my life, work, or thoughts on modern develo
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    const voice = availableVoices.find(v => 
-      v.lang.startsWith(selectedLanguage.split('-')[0]) && 
-      (v.lang === selectedLanguage || v.default)
-    ) || availableVoices.find(v => v.lang.startsWith('en'));
+    // Find a masculine voice for male historical figures
+    let preferredVoice = null;
+    
+    if (['albert-einstein', 'winston-churchill', 'abraham-lincoln', 'napoleon', 'socrates', 'shakespeare', 'galileo', 'leonardo-da-vinci', 'julius-caesar'].includes(figure.id)) {
+      // For male figures, prefer masculine voices
+      preferredVoice = availableVoices.find(v => 
+        v.lang.startsWith(selectedLanguage.split('-')[0]) && 
+        (v.name.toLowerCase().includes('male') || 
+         v.name.toLowerCase().includes('david') ||
+         v.name.toLowerCase().includes('mark') ||
+         v.name.toLowerCase().includes('daniel') ||
+         !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('samantha'))
+      );
+    } else {
+      // For female figures, prefer feminine voices
+      preferredVoice = availableVoices.find(v => 
+        v.lang.startsWith(selectedLanguage.split('-')[0]) && 
+        (v.name.toLowerCase().includes('female') || 
+         v.name.toLowerCase().includes('samantha') ||
+         v.name.toLowerCase().includes('victoria'))
+      );
+    }
+    
+    // Fallback to any voice in the right language
+    const voice = preferredVoice || 
+      availableVoices.find(v => 
+        v.lang.startsWith(selectedLanguage.split('-')[0]) && 
+        (v.lang === selectedLanguage || v.default)
+      ) || availableVoices.find(v => v.lang.startsWith('en'));
 
     if (voice) {
       utterance.voice = voice;
+      console.log(`Using voice: ${voice.name} for ${figure.name}`);
     }
 
     utterance.lang = selectedLanguage;
@@ -470,13 +496,19 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   const getVoicePitch = (figure: HistoricalFigure): number => {
     const pitchMap: Record<string, number> = {
       'winston-churchill': 0.8,
+      'albert-einstein': 0.75,   // Lower pitch for Einstein
       'marie-curie': 1.1,
       'napoleon': 0.9,
       'cleopatra': 1.2,
       'shakespeare': 1.0,
       'abraham-lincoln': 0.85,
+      'leonardo-da-vinci': 0.9,
+      'socrates': 0.8,
+      'galileo': 0.85,
+      'julius-caesar': 0.8,
+      'joan-of-arc': 1.15,
     };
-    return pitchMap[figure.id] || 1.0;
+    return pitchMap[figure.id] || (figure.id.includes('marie') || figure.id.includes('cleopatra') || figure.id.includes('joan') ? 1.1 : 0.85);
   };
 
   const getVoiceForFigure = async (figure: HistoricalFigure): Promise<string> => {
