@@ -37,6 +37,9 @@ verify_jwt = false
 [functions.realtime-music-chat]
 verify_jwt = false
 
+[functions.realtime-voice-chat]
+verify_jwt = false
+
 [functions.auto-clone-voice]
 verify_jwt = false
 
