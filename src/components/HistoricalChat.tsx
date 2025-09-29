@@ -355,7 +355,8 @@ const HistoricalChat = () => {
         body: JSON.stringify({
           message: input,
           figure: selectedFigure,
-          context: conversationHistory
+          context: conversationHistory,
+          conversationId: conversationId
         }),
       });
 
