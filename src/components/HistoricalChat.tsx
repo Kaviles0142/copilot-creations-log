@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -77,6 +77,7 @@ const HistoricalChat = () => {
   const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok'>('openai');
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -319,11 +320,19 @@ const HistoricalChat = () => {
     setIsLoading(true);
     setRetryCount(0);
 
+    // Create new abort controller for this request
+    const controller = new AbortController();
+    setAbortController(controller);
+
     await saveMessage(userMessage, conversationId);
 
     try {
-      await processMessageWithRetry(inputMessage, conversationId);
+      await processMessageWithRetry(inputMessage, conversationId, controller);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request was aborted');
+        return;
+      }
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -335,10 +344,30 @@ const HistoricalChat = () => {
       await saveMessage(errorMessage, conversationId);
     } finally {
       setIsLoading(false);
+      setAbortController(null);
     }
   };
 
-  const processMessageWithRetry = async (input: string, conversationId: string, attempt: number = 1): Promise<void> => {
+  const handleStopGeneration = () => {
+    // Stop any ongoing API requests
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+
+    // Stop speech synthesis
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    // Reset loading states
+    setIsLoading(false);
+    setRetryCount(0);
+    
+    console.log('🛑 Generation stopped by user');
+  };
+
+  const processMessageWithRetry = async (input: string, conversationId: string, controller?: AbortController, attempt: number = 1): Promise<void> => {
     const maxRetries = 3;
     
     try {
@@ -355,6 +384,7 @@ const HistoricalChat = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyY2xwdnJ5cmpsYWZhY29jYm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDk5NTAsImV4cCI6MjA3NDY4NTk1MH0.noDkcnCcthJhY4WavgDDZYl__QtOq1Y9t9dTowrU2tc`,
         },
+        signal: controller?.signal,
         body: JSON.stringify({
           message: input,
           figure: selectedFigure,
@@ -405,7 +435,7 @@ const HistoricalChat = () => {
         });
         
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        return processMessageWithRetry(input, conversationId, attempt + 1);
+        return processMessageWithRetry(input, conversationId, controller, attempt + 1);
       } else {
         throw error;
       }
@@ -1178,14 +1208,25 @@ const HistoricalChat = () => {
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               </div>
-              <Button 
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isLoading}
-                size="icon"
-                className="h-[60px] w-[60px]"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+              {isLoading ? (
+                <Button 
+                  onClick={handleStopGeneration}
+                  size="icon"
+                  variant="destructive"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleSendMessage}
+                  disabled={!inputMessage.trim()}
+                  size="icon"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             
             {isRecording && (
