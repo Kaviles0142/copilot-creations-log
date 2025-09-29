@@ -48,14 +48,16 @@ serve(async (req) => {
         text: text,
         options: {
           emotion: 'natural',
-          speed: 0.95,  // Slightly slower for more natural speech
+          speed: 0.85,  // Even slower for more natural speech
           pitch: 0,
           volume: 1.0,
-          sample_rate: 44100,  // Higher quality audio
-          format: 'wav',  // Better quality format
-          emphasis: 'medium',  // Add natural emphasis
-          prosody_rate: '0.9',  // Natural speech rate
-          quality: 'high'  // Highest quality setting
+          sample_rate: 48000,  // Maximum quality audio
+          format: 'wav',  // Best quality format
+          emphasis: 'strong',  // More natural emphasis
+          prosody_rate: '0.8',  // Even more natural speech rate
+          quality: 'highest',  // Maximum quality setting
+          naturalness: 'high',  // Added naturalness
+          style: 'conversational'  // More conversational style
         }
       }),
     });
