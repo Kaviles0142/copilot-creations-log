@@ -879,25 +879,6 @@ const HistoricalChat = () => {
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
           
           
-          {/* Conversation History */}
-          <ConversationHistory 
-            onSelectConversation={(conv) => {
-              const figure = { 
-                id: conv.figure_id, 
-                name: conv.figure_name, 
-                period: '', 
-                description: '', 
-                avatar: '' 
-              };
-              setSelectedFigure(figure);
-              setCurrentConversationId(conv.id);
-              setSelectedLanguage(conv.language);
-              loadConversation(conv.id);
-            }}
-            selectedFigureId={selectedFigure?.id}
-          />
-
-
           {/* Conversation Export */}
           <ConversationExport 
             messages={messages}
