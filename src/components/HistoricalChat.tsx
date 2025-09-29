@@ -8,7 +8,7 @@ import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
-import ConversationHistory from "./ConversationHistory";
+import FigureList from "./FigureList";
 import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
@@ -1202,9 +1202,9 @@ const HistoricalChat = () => {
                 }}
               />
 
-              {/* Conversation History */}
+              {/* Figure List with Conversations */}
               <div className="mt-4">
-                <ConversationHistory
+                <FigureList
                   onSelectConversation={(conversation) => {
                     // Find the figure for this conversation
                     const figure: HistoricalFigure = {

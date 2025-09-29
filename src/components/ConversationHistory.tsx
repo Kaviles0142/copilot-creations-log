@@ -21,9 +21,10 @@ interface Conversation {
 interface ConversationHistoryProps {
   onSelectConversation: (conversation: Conversation) => void;
   selectedFigureId?: string;
+  onConversationDelete?: () => void;
 }
 
-export default function ConversationHistory({ onSelectConversation, selectedFigureId }: ConversationHistoryProps) {
+export default function ConversationHistory({ onSelectConversation, selectedFigureId, onConversationDelete }: ConversationHistoryProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -81,6 +82,9 @@ export default function ConversationHistory({ onSelectConversation, selectedFigu
       if (error) throw error;
 
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      
+      // Notify parent component about deletion
+      onConversationDelete?.();
       
       toast({
         title: "Success",
