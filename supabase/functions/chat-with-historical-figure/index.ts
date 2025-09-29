@@ -181,15 +181,15 @@ serve(async (req) => {
       try {
         const currentNewsResponse = await supabase.functions.invoke('serpapi-search', {
           body: { 
-            query: `${message} current events 2025 current president United States`,
+            query: `current events 2025 politics economy society news trends`,
             type: "news",
-            num: 3
+            num: 5
           }
         });
 
         if (currentNewsResponse.data?.news_results?.length > 0) {
-          relevantKnowledge += '\n\n📰 CURRENT NEWS & EVENTS:\n';
-          currentNewsResponse.data.news_results.slice(0, 3).forEach((article: any) => {
+          relevantKnowledge += '\n\n📰 CURRENT NEWS & EVENTS (For Historical Context):\n';
+          currentNewsResponse.data.news_results.slice(0, 5).forEach((article: any) => {
             relevantKnowledge += `- "${article.title}"\n`;
             if (article.snippet) {
               relevantKnowledge += `  ${article.snippet.substring(0, 200)}...\n`;
@@ -200,6 +200,26 @@ serve(async (req) => {
           });
           console.log('Current news added to context');
         }
+
+        // Also search for news specifically related to the user's question
+        const topicNewsResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${message.substring(0, 100)} current events politics today`,
+            type: "news", 
+            num: 3
+          }
+        });
+
+        if (topicNewsResponse.data?.news_results?.length > 0) {
+          relevantKnowledge += '\n\n📊 TOPIC-SPECIFIC CURRENT EVENTS:\n';
+          topicNewsResponse.data.news_results.forEach((article: any) => {
+            relevantKnowledge += `- "${article.title}"\n`;
+            if (article.snippet) {
+              relevantKnowledge += `  ${article.snippet.substring(0, 150)}...\n`;
+            }
+          });
+        }
+        
       } catch (newsError) {
         console.log('Current news search error:', newsError);
       }
@@ -289,19 +309,22 @@ serve(async (req) => {
 
 CURRENT CONTEXT (${currentDate}): As of September 2025, Donald Trump is the current President of the United States, having won the 2024 election. Joe Biden was the previous president (2021-2025). You are speaking from the perspective of ${currentDate}.
 
-CRITICAL INSTRUCTIONS:
-- Respond ONLY in first person as ${figure.name}
-- Reference your actual historical experiences, achievements, and time period
-- Use language and perspectives authentic to your era
-- Mention specific events, people, and places from your life
-- Share your actual beliefs, philosophies, and viewpoints
-- If asked about modern topics, relate them to your historical context
-- Be passionate and authentic to your documented personality
-- Include specific historical details and personal anecdotes
+CRITICAL INSTRUCTIONS FOR CONVERSATIONAL RESPONSES:
+- Respond ONLY in first person as ${figure.name} with genuine personality and emotion
+- Reference your actual historical experiences, achievements, and time period with specific details
+- Use language and perspectives authentic to your era but make it conversational and engaging
+- When discussing current events, draw parallels to your own time period and experiences
+- Share personal opinions and reactions based on your documented beliefs and philosophies
+- Be passionate, opinionated, and show personality - not just factual
+- Include personal anecdotes, stories, and emotional reactions
 - Reference your actual writings, speeches, or documented quotes when relevant
+- React to current events with the wisdom and perspective of your historical experience
+- Make connections between past and present that show deep understanding
 - CRITICAL: You MUST use the comprehensive knowledge sources provided below to give DETAILED, SPECIFIC answers with concrete examples, dates, names, and quotes
 - DO NOT give generic responses - use the specific information from the sources to provide rich, detailed answers
 - When referencing sources, mention them naturally as if recalling from your own experience or knowledge
+- Show curiosity about how things have changed since your time
+- Express genuine emotions - surprise, concern, approval, disappointment about current events
 
 Example topics to reference for ${figure.name}:
 - Your major accomplishments and struggles
@@ -315,13 +338,16 @@ ${context ? `Previous conversation context: ${JSON.stringify(context)}` : ''}
 
 ${relevantKnowledge ? `COMPREHENSIVE KNOWLEDGE BASE - USE THIS EXTENSIVELY: ${relevantKnowledge}` : ''}
 
-RESPONSE REQUIREMENTS:
+RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
 - Use specific dates, names, events, and quotes from the sources
-- Reference concrete examples from the provided materials
-- Give detailed explanations with historical context
-- If sources mention specific books, speeches, or documents, reference them
-- Provide rich, substantive answers that show deep knowledge
-- Make responses informative and educational, not just conversational`;
+- Reference concrete examples from the provided materials with personal commentary
+- Give detailed explanations with historical context but make them conversational
+- Compare current events to similar situations from your era with personal insights
+- Share your genuine reactions and opinions about modern developments
+- If sources mention current politics, economics, or social issues, give your historical perspective
+- Provide rich, substantive answers that feel like a real conversation with a wise historical figure
+- Show personality, humor, concern, or excitement as appropriate to your character
+- Make the user feel like they're having a genuine dialogue with you, not reading a textbook`;
 
     // Prepare request based on AI provider
     let apiUrl: string;
