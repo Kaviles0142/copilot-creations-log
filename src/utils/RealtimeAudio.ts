@@ -327,21 +327,31 @@ export class RealtimeChat {
       this.ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Received message:', data.type);
+          console.log('Received message:', data.type, data);
           
           this.onMessage(data);
           
           if (data.type === 'response.audio.delta') {
+            console.log('Playing audio delta, length:', data.delta?.length, 'cloned_voice:', data.cloned_voice);
             // Play audio chunk
-            const binaryString = atob(data.delta);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            if (this.audioContext) {
-              await playAudioData(this.audioContext, bytes);
+            if (data.cloned_voice) {
+              // Handle cloned voice audio (base64 encoded audio file)
+              const audio = new Audio(`data:audio/wav;base64,${data.delta}`);
+              await audio.play();
+            } else {
+              // Handle OpenAI audio (PCM data)
+              const binaryString = atob(data.delta);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              if (this.audioContext) {
+                console.log('Playing PCM audio, bytes length:', bytes.length);
+                await playAudioData(this.audioContext, bytes);
+              }
             }
           } else if (data.type === 'session_ready') {
+            console.log('Session ready, starting recording...');
             // Start audio recording once session is ready
             await this.startRecording();
           }
