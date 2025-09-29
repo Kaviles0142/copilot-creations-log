@@ -26,25 +26,43 @@ serve(async (req) => {
 
     // Map voice names to ElevenLabs voice IDs with premium natural voices
     const voiceMap: Record<string, string> = {
-      'Einstein': '5rAEJ3ntjdwPSijjydPl',       // New Einstein voice from voice library
-      'Carsten': 'DKCevyuNm5sbcmJ7NN8a',       // Carsten Beyreuther - backup
-      'Brian': 'nPczCjzI2devNBz1zQrb',         // Deep, natural male voice
-      'Daniel': 'onwK4e9ZLuTAKqWW03F9',        // Mature, thoughtful male voice  
-      'George': 'JBFqnCBsd6RMkjVDRZzb',        // Authoritative male voice
-      'Eric': 'cjVigY5qzO86Huf0OWal',          // Warm male voice
-      'Liam': 'TX3LPaxmHKxFdv7VOQHJ',          // Young male voice
-      'Will': 'bIHbv24MWmeRgasZH58o',          // Confident male voice
-      'Callum': 'N2lVS1w4EtoT3dr4eOWO',        // British male voice
-      'Roger': 'CwhRBWXzGAHq8TQ4Fs17',         // Professional male voice
-      'Sarah': 'EXAVITQu4vr4xnSDxMaL',         // Professional female voice
-      'Laura': 'FGY2WhTYpPnrIDTdsKH5',         // Warm female voice
-      'Charlotte': 'XB0fDUnXU5powFXDhCwa',      // Clear female voice
-      'Alice': 'Xb7hH8MSUJpSbSDYk0k2',         // Young female voice
-      'Jessica': 'cgSgspJ2msm6clMCkdW9',        // Friendly female voice
-      'Aria': '9BWtsMINqrJLrRacOk9x',           // Default female voice
+      // Historical Figures - Premium voices that match their characteristics
+      'John F. Kennedy': 'JBFqnCBsd6RMkjVDRZzb',    // George - Authoritative, presidential male voice
+      'Abraham Lincoln': 'onwK4e9ZLuTAKqWW03F9',    // Daniel - Deep, thoughtful male voice
+      'Winston Churchill': 'CwhRBWXzGAHq8TQ4Fs17',   // Roger - Professional, distinguished male voice
+      'Franklin D. Roosevelt': 'bIHbv24MWmeRgasZH58o', // Will - Confident, commanding male voice
+      'Theodore Roosevelt': 'N2lVS1w4EtoT3dr4eOWO',   // Callum - Strong, energetic male voice
+      'Napoleon Bonaparte': 'cjVigY5qzO86Huf0OWal',   // Eric - Confident European male voice
+      'Albert Einstein': '5rAEJ3ntjdwPSijjydPl',      // Einstein - Intellectual, thoughtful voice
+      'Leonardo da Vinci': 'TX3LPaxmHKxFdv7VOQHJ',    // Liam - Creative, renaissance voice
+      'Shakespeare': 'nPczCjzI2devNBz1zQrb',          // Brian - British, literary voice
+      
+      // Female Historical Figures
+      'Marie Curie': 'EXAVITQu4vr4xnSDxMaL',          // Sarah - Professional, intelligent female voice
+      'Cleopatra': 'XB0fDUnXU5powFXDhCwa',            // Charlotte - Regal, commanding female voice
+      'Joan of Arc': 'cgSgspJ2msm6clMCkdW9',          // Jessica - Strong, determined female voice
+      'Elizabeth I': 'FGY2WhTYpPnrIDTdsKH5',          // Laura - Royal, authoritative female voice
+      
+      // Fallback voices for generic names
+      'Einstein': '5rAEJ3ntjdwPSijjydPl',
+      'Carsten': 'DKCevyuNm5sbcmJ7NN8a',
+      'Brian': 'nPczCjzI2devNBz1zQrb',
+      'Daniel': 'onwK4e9ZLuTAKqWW03F9',
+      'George': 'JBFqnCBsd6RMkjVDRZzb',
+      'Eric': 'cjVigY5qzO86Huf0OWal',
+      'Liam': 'TX3LPaxmHKxFdv7VOQHJ',
+      'Will': 'bIHbv24MWmeRgasZH58o',
+      'Callum': 'N2lVS1w4EtoT3dr4eOWO',
+      'Roger': 'CwhRBWXzGAHq8TQ4Fs17',
+      'Sarah': 'EXAVITQu4vr4xnSDxMaL',
+      'Laura': 'FGY2WhTYpPnrIDTdsKH5',
+      'Charlotte': 'XB0fDUnXU5powFXDhCwa',
+      'Alice': 'Xb7hH8MSUJpSbSDYk0k2',
+      'Jessica': 'cgSgspJ2msm6clMCkdW9',
+      'Aria': '9BWtsMINqrJLrRacOk9x',
     };
 
-    const voiceId = voice.includes('-cloned-') ? voice : (voiceMap[voice] || voiceMap['Einstein']);
+    const voiceId = voice.includes('-cloned-') ? voice : (voiceMap[voice] || voiceMap['John F. Kennedy']);
 
     console.log(`Generating speech for: "${text.substring(0, 50)}..." with voice: ${voice} (${voiceId})`);
 
@@ -52,9 +70,21 @@ serve(async (req) => {
     let response;
     
     if (voice.includes('-cloned-')) {
-      // For auto-cloned voices, use a representative preset voice for now
-      // In a real implementation, this would use the actual cloned voice
-      const fallbackVoiceId = voiceMap['Einstein']; // Use Einstein as high-quality fallback
+      // For auto-cloned voices, use the specific historical figure's voice
+      // Extract figure name to find appropriate fallback
+      let fallbackVoiceId = voiceMap['John F. Kennedy']; // Use JFK as default since it's presidential
+      
+      if (voice.includes('John F. Kennedy') || voice.includes('john-f-kennedy')) {
+        fallbackVoiceId = voiceMap['John F. Kennedy'];
+      } else if (voice.includes('Abraham Lincoln') || voice.includes('lincoln')) {
+        fallbackVoiceId = voiceMap['Abraham Lincoln'];
+      } else if (voice.includes('Winston Churchill') || voice.includes('churchill')) {
+        fallbackVoiceId = voiceMap['Winston Churchill'];
+      } else if (voice.includes('Napoleon') || voice.includes('napoleon')) {
+        fallbackVoiceId = voiceMap['Napoleon Bonaparte'];
+      } else if (voice.includes('Einstein') || voice.includes('albert-einstein')) {
+        fallbackVoiceId = voiceMap['Albert Einstein'];
+      }
       
       console.log(`Using fallback voice ${fallbackVoiceId} for auto-cloned voice ${voice}`);
       
