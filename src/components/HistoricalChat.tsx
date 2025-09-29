@@ -392,10 +392,14 @@ What would you like to discuss about my life, work, or thoughts on modern develo
         currentAudio.currentTime = 0;
       }
 
-      if ('speechSynthesis' in window) {
-        generateBrowserSpeech(text, figure);
-      } else {
+      // Try premium speech first for better quality, fallback to browser speech
+      try {
         await generatePremiumSpeech(text, figure);
+      } catch (premiumError) {
+        console.log('Premium speech failed, using browser speech:', premiumError);
+        if ('speechSynthesis' in window) {
+          generateBrowserSpeech(text, figure);
+        }
       }
     } catch (error) {
       console.error('Error generating speech:', error);
@@ -473,8 +477,15 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     }
 
     utterance.lang = selectedLanguage;
-    utterance.rate = 0.9;
+    
+    // Make voice sound more natural and less robotic
+    utterance.rate = 0.85;  // Slightly slower for more natural speech
     utterance.pitch = getVoicePitch(figure);
+    utterance.volume = 0.9;
+    
+    // Add natural pauses and inflection by processing the text
+    const naturalText = addNaturalPauses(text);
+    utterance.text = naturalText;
     
     utterance.onstart = () => setIsPlayingAudio(true);
     utterance.onend = () => setIsPlayingAudio(false);
@@ -530,6 +541,22 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     
     // Default to male (most historical figures in databases are male)
     return true;
+  };
+
+  // Add natural pauses and inflection to make speech less robotic
+  const addNaturalPauses = (text: string): string => {
+    let naturalText = text;
+    
+    // Add slight pauses after punctuation for more natural speech
+    naturalText = naturalText.replace(/\./g, '..');
+    naturalText = naturalText.replace(/,/g, ', ');
+    naturalText = naturalText.replace(/!/g, '!.');
+    naturalText = naturalText.replace(/\?/g, '?.');
+    
+    // Add emphasis markers for important words
+    naturalText = naturalText.replace(/\b(I am|I was|my|very|indeed|certainly|absolutely)\b/gi, '$1');
+    
+    return naturalText;
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
