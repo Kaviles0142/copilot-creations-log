@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -213,16 +213,20 @@ const HistoricalChat = () => {
   };
 
   const getVoiceForFigure = (figure: HistoricalFigure): string => {
-    // Map historical figures to appropriate voices
+    // Map historical figures to regionally appropriate voices
     const voiceMap: Record<string, string> = {
-      'winston-churchill': 'George',
-      'albert-einstein': 'Brian',
-      'marie-curie': 'Charlotte',
-      'leonardo-da-vinci': 'Liam',
-      'cleopatra': 'Sarah',
-      'socrates': 'Daniel',
-      'shakespeare': 'Will',
-      'napoleon': 'Roger'
+      'winston-churchill': 'George', // British accent
+      'albert-einstein': 'Brian',    // For German-accented English
+      'marie-curie': 'Charlotte',    // French accent
+      'leonardo-da-vinci': 'Liam',   // Italian accent
+      'cleopatra': 'Sarah',          // Egyptian/Mediterranean
+      'socrates': 'Daniel',          // Greek accent
+      'shakespeare': 'Will',         // Classic English
+      'napoleon': 'Roger',           // French accent
+      'abraham-lincoln': 'Brian',    // American
+      'julius-caesar': 'George',     // Latin/Roman authority
+      'joan-of-arc': 'Charlotte',    // French
+      'galileo': 'Liam'              // Italian
     };
 
     return voiceMap[figure.id] || 'Aria';
@@ -264,6 +268,62 @@ const HistoricalChat = () => {
     }
   };
 
+  const searchYoutube = async (query: string) => {
+    try {
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/youtube-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, maxResults: 3 }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.results;
+      } else {
+        console.error('YouTube search failed:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error searching YouTube:', error);
+      return null;
+    }
+  };
+
+  const handleYoutubeSearch = async (query: string) => {
+    const youtubeResults = await searchYoutube(query);
+    if (youtubeResults && youtubeResults.length > 0) {
+      const videoLinks = youtubeResults
+        .slice(0, 3)
+        .map((video: any) => `🎥 **${video.title}**\n${video.description.substring(0, 100)}...\n[Watch on YouTube](${video.url})`)
+        .join('\n\n---\n\n');
+
+      const searchMessage: Message = {
+        id: Date.now().toString(),
+        content: `🎬 **YouTube Search Results for "${query}"**\n\n${videoLinks}`,
+        type: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, searchMessage]);
+
+      // If this is a search for the current figure, suggest using authentic recordings
+      if (selectedFigure && query.toLowerCase().includes(selectedFigure.name.toLowerCase())) {
+        const authenticity = youtubeResults.find((video: any) => video.hasOriginalVoice);
+        if (authenticity) {
+          const suggestionMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            content: `💡 **Voice Authenticity Tip**: I found recordings that may contain ${selectedFigure.name}'s actual voice! While I use a regional accent for text-to-speech, you can listen to these recordings to hear the authentic voice and speaking patterns.`,
+            type: "assistant",
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, suggestionMessage]);
+        }
+      }
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
@@ -291,6 +351,19 @@ const HistoricalChat = () => {
               >
                 <Search className="mr-2 h-4 w-4" />
                 Search Wikipedia
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  const figName = selectedFigure?.name || '';
+                  const query = prompt('Search YouTube for historical recordings:', `${figName} speech original recording`);
+                  if (query) handleYoutubeSearch(query);
+                }}
+              >
+                <Play className="mr-2 h-4 w-4" />
+                Find Voice Recordings
               </Button>
 
               {showFileUpload && (
