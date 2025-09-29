@@ -676,7 +676,7 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className="w-80 border-r border-border bg-card">
+      <div className="w-80 border-r border-border bg-card overflow-y-auto">{/* Added overflow-y-auto for scrolling */}
         <div className="p-6 space-y-4">
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
           
