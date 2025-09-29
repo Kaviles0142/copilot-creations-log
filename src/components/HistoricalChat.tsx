@@ -360,11 +360,25 @@ const HistoricalChat = () => {
       window.speechSynthesis.cancel();
     }
 
-    // Reset loading states
+    // Stop current audio playback
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      setCurrentAudio(null);
+    }
+
+    // Reset loading and audio states
     setIsLoading(false);
+    setIsPlayingAudio(false);
     setRetryCount(0);
     
     console.log('🛑 Generation stopped by user');
+    
+    toast({
+      title: "Stopped",
+      description: "Generation and voice playback have been stopped",
+      duration: 2000,
+    });
   };
 
   const processMessageWithRetry = async (input: string, conversationId: string, controller?: AbortController, attempt: number = 1): Promise<void> => {
@@ -413,7 +427,11 @@ const HistoricalChat = () => {
 
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
-      await generateSpeech(aiResponse, selectedFigure!);
+      
+      // Generate speech if auto-voice is enabled (but don't await to keep stop button visible)
+      if (isAutoVoiceEnabled) {
+        generateSpeech(aiResponse, selectedFigure!);
+      }
 
       // Show toast indicating which AI was used
       toast({
