@@ -429,7 +429,11 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Generate speech if auto-voice is enabled (keep loading state until speech is done)
+      // Reset loading state after text response is complete (UI becomes responsive)
+      setIsLoading(false);
+      setAbortController(null);
+      
+      // Generate speech if auto-voice is enabled (stop button remains via isPlayingAudio)
       if (isAutoVoiceEnabled) {
         try {
           await generateSpeech(aiResponse, selectedFigure!);
@@ -437,10 +441,6 @@ const HistoricalChat = () => {
           console.error('Speech generation failed:', speechError);
         }
       }
-
-      // Reset loading state ONLY after everything is complete (text + speech)
-      setIsLoading(false);
-      setAbortController(null);
 
       // Show toast indicating which AI was used
       toast({
@@ -1235,7 +1235,7 @@ const HistoricalChat = () => {
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               </div>
-              {isLoading ? (
+              {(isLoading || isPlayingAudio) ? (
                 <Button 
                   onClick={handleStopGeneration}
                   size="icon"
