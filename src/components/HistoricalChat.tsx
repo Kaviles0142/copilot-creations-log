@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe, Save, RefreshCw, Guitar } from "lucide-react";
-import AvatarSelector from "./AvatarSelector";
+import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import ConversationHistory from "./ConversationHistory";
@@ -806,14 +806,15 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
             )}
 
             <div>
-              <h3 className="font-semibold mb-3">Select Historical Figure</h3>
-              <AvatarSelector 
+              <h3 className="font-semibold mb-3">Search Any Historical Figure</h3>
+              <HistoricalFigureSearch 
                 selectedFigure={selectedFigure}
                 onSelectFigure={(figure) => {
                   setSelectedFigure(figure);
                   setMessages([]);
                   setCurrentConversationId(null);
                   setDocuments([]);
+                  setBooks([]);
                 }}
               />
             </div>
