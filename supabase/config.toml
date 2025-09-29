@@ -1,1 +1,21 @@
 project_id = "trclpvryrjlafacocbnd"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+enabled = true
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[functions.chat-with-historical-figure]
+verify_jwt = false
+
+[edge_runtime]
+enabled = true
+port = 54323

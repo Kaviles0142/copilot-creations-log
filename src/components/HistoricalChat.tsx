@@ -44,17 +44,46 @@ const HistoricalChat = () => {
     setInputMessage("");
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual AI call)
-    setTimeout(() => {
+    try {
+      // Call OpenAI through our Edge Function
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: inputMessage,
+          historicalFigure: selectedFigure,
+          conversationHistory: messages
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get response');
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `As ${selectedFigure.name}, I would say: "${inputMessage}" is an interesting question from your time. In my era of ${selectedFigure.period}, we might have approached this differently...`,
+        content: data.response,
         type: "assistant",
         timestamp: new Date(),
       };
+
       setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I apologize, but I'm having trouble responding right now. Please try again.",
+        type: "assistant", 
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
