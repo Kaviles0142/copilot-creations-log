@@ -37,41 +37,73 @@ const HistoricalChat = () => {
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTranscript, setRecordingTranscript] = useState("");
 
-  // Initialize speech recognition
+  // Initialize speech recognition with enhanced settings
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = selectedLanguage;
+      recognition.maxAlternatives = 1;
       
       recognition.onstart = () => {
         setIsListening(true);
-        console.log('Voice recognition started');
+        setIsRecording(true);
+        setRecordingTranscript("");
+        console.log('Voice recognition started in', selectedLanguage);
       };
       
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInputMessage(prev => prev + transcript);
-        console.log('Speech recognition result:', transcript);
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Update the recording transcript for real-time display
+        setRecordingTranscript(interimTranscript);
+
+        // Add final transcript to input
+        if (finalTranscript) {
+          setInputMessage(prev => prev + finalTranscript + ' ');
+          setRecordingTranscript("");
+        }
+        
+        console.log('Speech recognition result:', finalTranscript || interimTranscript);
       };
       
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
+        setIsRecording(false);
+        setRecordingTranscript("");
+        
+        if (event.error === 'no-speech') {
+          console.log('No speech detected, stopping recognition');
+        }
       };
       
       recognition.onend = () => {
         setIsListening(false);
+        setIsRecording(false);
+        setRecordingTranscript("");
         console.log('Voice recognition ended');
       };
       
       setRecognition(recognition);
     }
-  }, []);
+  }, [selectedLanguage]); // Recreate recognition when language changes
 
   // Initialize speech synthesis voices
   useEffect(() => {
@@ -103,6 +135,8 @@ const HistoricalChat = () => {
     if (isListening) {
       recognition.stop();
     } else {
+      // Update recognition language before starting
+      recognition.lang = selectedLanguage;
       recognition.start();
     }
   };
@@ -645,7 +679,7 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder={`Ask ${selectedFigure.name} anything...`}
+                  placeholder={`Ask ${selectedFigure.name} anything... (or click the mic to speak in ${selectedLanguage.split('-')[1]})`}
                   className="min-h-[60px] resize-none pr-12"
                   disabled={isLoading}
                 />
@@ -654,7 +688,11 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
                   disabled={isLoading}
                   variant="ghost"
                   size="sm"
-                  className={`absolute right-2 top-2 h-8 w-8 ${isListening ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}
+                  className={`absolute right-2 top-2 h-8 w-8 ${
+                    isListening 
+                      ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
+                      : 'text-muted-foreground hover:text-primary'
+                  }`}
                 >
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
@@ -668,9 +706,31 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
                 <Send className="h-4 w-4" />
               </Button>
             </div>
-            {isListening && (
-              <p className="text-sm text-muted-foreground mt-2 animate-pulse">
-                🎤 Listening... Speak now
+            
+            {/* Real-time speech transcription display */}
+            {isRecording && (
+              <div className="mt-3 p-3 bg-muted/50 rounded-lg border-2 border-dashed border-primary/30">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-primary">
+                    Listening in {selectedLanguage.split('-')[1]}...
+                  </span>
+                </div>
+                {recordingTranscript && (
+                  <p className="text-sm text-muted-foreground italic">
+                    "{recordingTranscript}"
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Speak clearly. Say "stop" or click the mic to finish.
+                </p>
+              </div>
+            )}
+            
+            {isListening && !isRecording && (
+              <p className="text-sm text-muted-foreground mt-2 animate-pulse flex items-center">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2 animate-ping"></div>
+                🎤 Preparing to listen... Speak now
               </p>
             )}
           </div>
