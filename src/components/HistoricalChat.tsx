@@ -610,7 +610,7 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     if (isMale) {
       // Premium ElevenLabs male voices - ultra natural
       const maleVoices = {
-        'albert-einstein': 'Daniel',    // Mature, thoughtful, perfect for Einstein
+        'albert-einstein': 'Carsten',   // Perfect accent for Einstein!
         'winston-churchill': 'George',  // Authoritative, British
         'abraham-lincoln': 'Will',      // Confident, presidential  
         'shakespeare': 'Callum',        // British, eloquent
@@ -618,7 +618,7 @@ What would you like to discuss about my life, work, or thoughts on modern develo
         'socrates': 'Eric',            // Wise, warm
       };
       
-      return maleVoices[figure.id] || 'Daniel'; // Daniel is perfect for intellectuals
+      return maleVoices[figure.id] || 'Carsten'; // Carsten is perfect for intellectuals
     } else {
       // Premium ElevenLabs female voices
       const femaleVoices = {

@@ -26,20 +26,21 @@ serve(async (req) => {
 
     // Map voice names to ElevenLabs voice IDs with premium natural voices
     const voiceMap: Record<string, string> = {
-      'Brian': 'nPczCjzI2devNBz1zQrb',      // Deep, natural male voice
-      'Daniel': 'onwK4e9ZLuTAKqWW03F9',     // Mature, thoughtful male voice  
-      'George': 'JBFqnCBsd6RMkjVDRZzb',     // Authoritative male voice
-      'Eric': 'cjVigY5qzO86Huf0OWal',       // Warm male voice
-      'Liam': 'TX3LPaxmHKxFdv7VOQHJ',       // Young male voice
-      'Will': 'bIHbv24MWmeRgasZH58o',       // Confident male voice
-      'Callum': 'N2lVS1w4EtoT3dr4eOWO',     // British male voice
-      'Roger': 'CwhRBWXzGAHq8TQ4Fs17',      // Professional male voice
-      'Sarah': 'EXAVITQu4vr4xnSDxMaL',      // Professional female voice
-      'Laura': 'FGY2WhTYpPnrIDTdsKH5',      // Warm female voice
-      'Charlotte': 'XB0fDUnXU5powFXDhCwa',   // Clear female voice
-      'Alice': 'Xb7hH8MSUJpSbSDYk0k2',      // Young female voice
-      'Jessica': 'cgSgspJ2msm6clMCkdW9',     // Friendly female voice
-      'Aria': '9BWtsMINqrJLrRacOk9x',        // Default female voice
+      'Carsten': 'uy4RqSpZT2JjOTI8dO2t',       // Perfect accent for Einstein
+      'Brian': 'nPczCjzI2devNBz1zQrb',         // Deep, natural male voice
+      'Daniel': 'onwK4e9ZLuTAKqWW03F9',        // Mature, thoughtful male voice  
+      'George': 'JBFqnCBsd6RMkjVDRZzb',        // Authoritative male voice
+      'Eric': 'cjVigY5qzO86Huf0OWal',          // Warm male voice
+      'Liam': 'TX3LPaxmHKxFdv7VOQHJ',          // Young male voice
+      'Will': 'bIHbv24MWmeRgasZH58o',          // Confident male voice
+      'Callum': 'N2lVS1w4EtoT3dr4eOWO',        // British male voice
+      'Roger': 'CwhRBWXzGAHq8TQ4Fs17',         // Professional male voice
+      'Sarah': 'EXAVITQu4vr4xnSDxMaL',         // Professional female voice
+      'Laura': 'FGY2WhTYpPnrIDTdsKH5',         // Warm female voice
+      'Charlotte': 'XB0fDUnXU5powFXDhCwa',      // Clear female voice
+      'Alice': 'Xb7hH8MSUJpSbSDYk0k2',         // Young female voice
+      'Jessica': 'cgSgspJ2msm6clMCkdW9',        // Friendly female voice
+      'Aria': '9BWtsMINqrJLrRacOk9x',           // Default female voice
     };
 
     const voiceId = voiceMap[voice] || voiceMap['Brian'];
