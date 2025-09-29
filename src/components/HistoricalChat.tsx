@@ -560,8 +560,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voice = getOpenAIVoiceForFigure(figure);
-    console.log(`Using OpenAI voice: ${voice} for ${figure.name}`);
+    const voice = getElevenLabsVoiceForFigure(figure);
+    console.log(`Using ElevenLabs voice: ${voice} for ${figure.name}`);
 
     const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
       method: 'POST',
@@ -577,11 +577,11 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('OpenAI TTS Error:', data.error);
-      throw new Error(data.error || 'Failed to generate speech with OpenAI');
+      console.error('ElevenLabs TTS Error:', data.error);
+      throw new Error(data.error || 'Failed to generate speech with ElevenLabs');
     }
 
-    console.log(`Successfully received OpenAI audio for ${figure.name}`);
+    console.log(`Successfully received ElevenLabs audio for ${figure.name}`);
 
     const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
     setCurrentAudio(audio);
@@ -590,44 +590,44 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     audio.onended = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.log('OpenAI audio playback completed');
+      console.log('ElevenLabs audio playback completed');
     };
 
     audio.onerror = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.error('Error playing OpenAI audio');
+      console.error('Error playing ElevenLabs audio');
     };
 
     await audio.play();
-    console.log('High-quality OpenAI speech started playing');
+    console.log('Premium ElevenLabs speech started playing');
   };
 
-  // Get appropriate OpenAI voice for historical figures  
-  const getOpenAIVoiceForFigure = (figure: HistoricalFigure): string => {
+  // Get appropriate ElevenLabs voice for historical figures  
+  const getElevenLabsVoiceForFigure = (figure: HistoricalFigure): string => {
     const isMale = detectGender(figure);
     
     if (isMale) {
-      // OpenAI male voices - natural and high quality
+      // Premium ElevenLabs male voices - ultra natural
       const maleVoices = {
-        'albert-einstein': 'onyx',      // Deep, thoughtful, perfect for Einstein
-        'winston-churchill': 'fable',   // Authoritative
-        'abraham-lincoln': 'echo',      // Presidential, warm  
-        'shakespeare': 'echo',          // Dramatic, eloquent
-        'napoleon': 'onyx',            // Commanding
-        'socrates': 'fable',           // Wise, philosophical
+        'albert-einstein': 'Carsten',   // Carsten Beyreuther - perfect accent!
+        'winston-churchill': 'George',  // Authoritative, British
+        'abraham-lincoln': 'Will',      // Confident, presidential  
+        'shakespeare': 'Callum',        // British, eloquent
+        'napoleon': 'George',          // Commanding
+        'socrates': 'Eric',            // Wise, warm
       };
       
-      return maleVoices[figure.id] || 'onyx'; // Onyx is deep and thoughtful
+      return maleVoices[figure.id] || 'Carsten'; // Carsten is perfect for intellectuals
     } else {
-      // OpenAI female voices
+      // Premium ElevenLabs female voices
       const femaleVoices = {
-        'marie-curie': 'nova',         // Intelligent, clear
-        'cleopatra': 'shimmer',        // Regal, commanding
-        'joan-of-arc': 'alloy'         // Strong, determined
+        'marie-curie': 'Sarah',        // Professional, intelligent
+        'cleopatra': 'Charlotte',      // Regal, clear
+        'joan-of-arc': 'Jessica'       // Strong, friendly
       };
       
-      return femaleVoices[figure.id] || 'nova'; // Nova is clear and intelligent
+      return femaleVoices[figure.id] || 'Sarah'; // Sarah is clear and professional
     }
   };
 
