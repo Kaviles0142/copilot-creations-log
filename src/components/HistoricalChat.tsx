@@ -408,39 +408,68 @@ What would you like to discuss about my life, work, or thoughts on modern develo
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Find a masculine voice for male historical figures
-    let preferredVoice = null;
+    // Detect gender from figure information
+    const isMale = detectGender(figure);
+    console.log(`Detected gender for ${figure.name}: ${isMale ? 'Male' : 'Female'}`);
     
-    if (['albert-einstein', 'winston-churchill', 'abraham-lincoln', 'napoleon', 'socrates', 'shakespeare', 'galileo', 'leonardo-da-vinci', 'julius-caesar'].includes(figure.id)) {
-      // For male figures, prefer masculine voices
-      preferredVoice = availableVoices.find(v => 
-        v.lang.startsWith(selectedLanguage.split('-')[0]) && 
-        (v.name.toLowerCase().includes('male') || 
-         v.name.toLowerCase().includes('david') ||
-         v.name.toLowerCase().includes('mark') ||
-         v.name.toLowerCase().includes('daniel') ||
-         !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('samantha'))
-      );
+    let selectedVoice = null;
+    
+    if (isMale) {
+      // For male figures - prioritize definitively masculine voices
+      selectedVoice = availableVoices.find(v => {
+        const name = v.name.toLowerCase();
+        const lang = v.lang.toLowerCase();
+        
+        // First priority: Explicitly male voices
+        if (name.includes('male') || name.includes('man') || name.includes('david') || 
+            name.includes('mark') || name.includes('daniel') || name.includes('alex') ||
+            name.includes('james') || name.includes('michael') || name.includes('thomas') ||
+            name.includes('google us english') || name.includes('microsoft david') ||
+            name.includes('aaron') || name.includes('albert')) {
+          return lang.startsWith(selectedLanguage.split('-')[0]) || lang.startsWith('en');
+        }
+        return false;
+      });
+      
+      // Second priority: Voices that are NOT female
+      if (!selectedVoice) {
+        selectedVoice = availableVoices.find(v => {
+          const name = v.name.toLowerCase();
+          const lang = v.lang.toLowerCase();
+          
+          return (lang.startsWith(selectedLanguage.split('-')[0]) || lang.startsWith('en')) &&
+                 !name.includes('female') && !name.includes('woman') && 
+                 !name.includes('samantha') && !name.includes('victoria') &&
+                 !name.includes('kate') && !name.includes('susan') && !name.includes('anna') &&
+                 !name.includes('marie') && !name.includes('karen') && !name.includes('helen');
+        });
+      }
     } else {
-      // For female figures, prefer feminine voices
-      preferredVoice = availableVoices.find(v => 
-        v.lang.startsWith(selectedLanguage.split('-')[0]) && 
-        (v.name.toLowerCase().includes('female') || 
-         v.name.toLowerCase().includes('samantha') ||
-         v.name.toLowerCase().includes('victoria'))
-      );
+      // For female figures - prioritize feminine voices
+      selectedVoice = availableVoices.find(v => {
+        const name = v.name.toLowerCase();
+        const lang = v.lang.toLowerCase();
+        
+        return (lang.startsWith(selectedLanguage.split('-')[0]) || lang.startsWith('en')) &&
+               (name.includes('female') || name.includes('woman') || name.includes('samantha') ||
+                name.includes('victoria') || name.includes('kate') || name.includes('susan') ||
+                name.includes('anna') || name.includes('marie') || name.includes('karen') ||
+                name.includes('helen') || name.includes('microsoft zira'));
+      });
     }
     
-    // Fallback to any voice in the right language
-    const voice = preferredVoice || 
-      availableVoices.find(v => 
-        v.lang.startsWith(selectedLanguage.split('-')[0]) && 
-        (v.lang === selectedLanguage || v.default)
-      ) || availableVoices.find(v => v.lang.startsWith('en'));
+    // Final fallback to any voice in the right language
+    if (!selectedVoice) {
+      selectedVoice = availableVoices.find(v => 
+        v.lang.startsWith(selectedLanguage.split('-')[0]) || v.lang.startsWith('en')
+      );
+    }
 
-    if (voice) {
-      utterance.voice = voice;
-      console.log(`Using voice: ${voice.name} for ${figure.name}`);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      console.log(`Selected voice for ${figure.name}: ${selectedVoice.name} (${selectedVoice.lang})`);
+    } else {
+      console.log(`No specific voice found for ${figure.name}, using default`);
     }
 
     utterance.lang = selectedLanguage;
@@ -452,6 +481,55 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     utterance.onerror = () => setIsPlayingAudio(false);
 
     speechSynthesis.speak(utterance);
+  };
+
+  // Gender detection function
+  const detectGender = (figure: HistoricalFigure): boolean => {
+    // Known male figures
+    const maleNames = [
+      'albert einstein', 'winston churchill', 'abraham lincoln', 'napoleon',
+      'socrates', 'shakespeare', 'galileo', 'leonardo da vinci', 'julius caesar',
+      'isaac newton', 'charles darwin', 'thomas edison', 'benjamin franklin',
+      'george washington', 'martin luther king', 'nelson mandela', 'mozart',
+      'beethoven', 'bach', 'hendrix', 'elvis', 'john lennon', 'bob dylan',
+      'plato', 'aristotle', 'confucius', 'buddha', 'jesus', 'muhammad',
+      'tesla', 'jobs', 'gates', 'musk'
+    ];
+    
+    // Known female figures  
+    const femaleNames = [
+      'marie curie', 'cleopatra', 'joan of arc', 'anne frank', 'mother teresa',
+      'rosa parks', 'amelia earhart', 'virginia woolf', 'jane austen',
+      'frida kahlo', 'coco chanel', 'oprah winfrey', 'malala yousafzai',
+      'elizabeth', 'victoria', 'catherine', 'mary', 'helen keller'
+    ];
+    
+    const figureName = figure.name.toLowerCase();
+    const figureDesc = figure.description.toLowerCase();
+    
+    // Check explicit lists first
+    if (maleNames.some(name => figureName.includes(name))) return true;
+    if (femaleNames.some(name => figureName.includes(name))) return true;
+    
+    // Check for gender indicators in description
+    if (figureDesc.includes('he ') || figureDesc.includes('his ') || 
+        figureDesc.includes('him ') || figureDesc.includes('man') ||
+        figureDesc.includes('king') || figureDesc.includes('emperor') ||
+        figureDesc.includes('father') || figureDesc.includes('son') ||
+        figureDesc.includes('brother') || figureDesc.includes('male')) {
+      return true;
+    }
+    
+    if (figureDesc.includes('she ') || figureDesc.includes('her ') || 
+        figureDesc.includes('woman') || figureDesc.includes('queen') ||
+        figureDesc.includes('empress') || figureDesc.includes('mother') ||
+        figureDesc.includes('daughter') || figureDesc.includes('sister') ||
+        figureDesc.includes('female')) {
+      return false;
+    }
+    
+    // Default to male (most historical figures in databases are male)
+    return true;
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
