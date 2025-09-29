@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe, Save, RefreshCw } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe, Save, RefreshCw, Guitar } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import ConversationHistory from "./ConversationHistory";
 import DocumentUpload from "./DocumentUpload";
 import BooksKnowledge from "./BooksKnowledge";
+import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -69,6 +70,7 @@ const HistoricalChat = () => {
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
+  const [showMusicInterface, setShowMusicInterface] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -838,20 +840,35 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
                     : ' (Translated)'}
                 </p>
               </div>
-              {currentAudio && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleAudio}
-                  className="ml-2"
-                >
-                  {isPlayingAudio ? (
-                    <VolumeX className="h-4 w-4" />
-                  ) : (
-                    <Volume2 className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
+              <div className="flex items-center space-x-2">
+                {/* Music Session Button for Musical Figures */}
+                {selectedFigure.id === 'hendrix' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMusicInterface(true)}
+                    className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                  >
+                    <Guitar className="h-4 w-4 mr-2" />
+                    Live Music Session
+                  </Button>
+                )}
+                
+                {currentAudio && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleAudio}
+                    className="ml-2"
+                  >
+                    {isPlayingAudio ? (
+                      <VolumeX className="h-4 w-4" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             <h2 className="text-lg font-semibold text-muted-foreground">
@@ -941,6 +958,15 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
           </div>
         )}
       </div>
+      
+      {/* Music Voice Interface Modal */}
+      {showMusicInterface && selectedFigure && (
+        <MusicVoiceInterface
+          figureId={selectedFigure.id}
+          figureName={selectedFigure.name}
+          onClose={() => setShowMusicInterface(false)}
+        />
+      )}
     </div>
   );
 };

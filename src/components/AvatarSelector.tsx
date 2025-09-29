@@ -50,6 +50,13 @@ const historicalFigures: HistoricalFigure[] = [
     period: "Tudor England (1533-1603)",
     description: "Queen of England and Ireland",
     avatar: "🏰"
+  },
+  {
+    id: "hendrix",
+    name: "Jimi Hendrix",
+    period: "1960s Rock Era (1942-1970)", 
+    description: "Legendary guitarist and rock innovator",
+    avatar: "🎸"
   }
 ];
 
