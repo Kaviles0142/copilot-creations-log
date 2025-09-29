@@ -340,83 +340,23 @@ const HistoricalChat = () => {
     const maxRetries = 3;
     
     try {
-      const [wikiData, youtubeData, currentEventsData] = await Promise.all([
-        searchWikipedia(selectedFigure!.name),
-        searchYoutube(`${selectedFigure!.name} original voice recording interview speeches`),
-        handleCurrentEventsSearch(`latest news ${new Date().getFullYear()}`)
-      ]);
+      // For now, provide a basic response while we fix the edge function
+      const mockResponse = `Hello! I am ${selectedFigure!.name}. I apologize, but I'm currently experiencing some technical difficulties with my advanced AI responses. However, I can tell you that as ${selectedFigure!.name}, I lived during ${selectedFigure!.period} and am known for ${selectedFigure!.description}. 
 
-      // Include document context if available
-      const documentContext = documents.length > 0 
-        ? `\n\nAvailable Documents:\n${documents.map(doc => 
-            `- ${doc.filename}: ${doc.parsed_content ? doc.parsed_content.substring(0, 500) + '...' : 'File uploaded but not analyzed'}`
-          ).join('\n')}`
-        : '';
+What would you like to discuss about my life, work, or thoughts on modern developments?
 
-      // Include books context if available
-      const booksContext = books.length > 0 
-        ? `\n\nLiterary Knowledge - Books by and about you:\n${books.map(book => {
-            const typeLabel = book.book_type === 'by_figure' ? 'Your work' : 
-                             book.book_type === 'about_figure' ? 'About you' : 'Related';
-            return `- ${book.title} by ${book.authors.join(', ')} (${typeLabel})${book.description ? ': ' + book.description.substring(0, 200) + '...' : ''}`;
-          }).slice(0, 10).join('\n')}${books.length > 10 ? `\n... and ${books.length - 10} more books` : ''}`
-        : '';
-
-      const context = `
-Historical Figure: ${selectedFigure!.name} (${selectedFigure!.period})
-Background: ${selectedFigure!.description}
-
-Additional Context:
-${wikiData ? `Wikipedia Summary: ${wikiData.title}: ${wikiData.extract || 'No additional information found'}` : ''}
-
-Current Events (${new Date().getFullYear()}):
-${currentEventsData?.results ? currentEventsData.results.slice(0, 3).map((news: any) => 
-  `- ${news.title}: ${news.snippet} (${news.source})`
-).join('\n') : 'No current events data available'}
-
-Available Voice References:
-${youtubeData ? youtubeData.slice(0, 3).map((video: any) => 
-  `- ${video.title} (${video.hasOriginalVoice ? 'ORIGINAL VOICE' : 'Historical Content'})`
-).join('\n') : 'No video references found'}
-
-${documentContext}
-
-${booksContext}
-
-Previous conversation:
-${messages.slice(-3).map(msg => `${msg.type}: ${msg.content}`).join('\n')}
-
-Instructions: You are ${selectedFigure!.name}. Respond as this historical figure would, with authentic personality, speaking style, and knowledge from their era. You now have access to comprehensive knowledge about your own works and what has been written about you. Reference your books and writings when relevant. You also have knowledge of current events and can comment on modern topics from your historical perspective. If documents are provided, reference and analyze them in your response. Include your views, personality quirks, and speaking patterns. Keep responses engaging but historically accurate to your character while incorporating insights about current events and your literary legacy when relevant.
-      `;
-
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: input,
-          context: context,
-          figure: selectedFigure!.name
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get response');
-      }
+*Note: Full AI responses will be restored once technical issues are resolved.*`;
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.response,
+        content: mockResponse,
         type: "assistant",
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
-      await generateSpeech(data.response, selectedFigure!);
+      await generateSpeech(mockResponse, selectedFigure!);
 
     } catch (error) {
       console.error(`Attempt ${attempt} failed:`, error);

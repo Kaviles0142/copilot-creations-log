@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -7,79 +6,84 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { message, figure, context } = await req.json();
+    const body = await req.json();
+    console.log('Request received:', body);
+    
+    const message = body.message;
+    const figure = body.figure;
+    const context = body.context;
     
     if (!message || !figure) {
-      throw new Error('Message and historical figure are required');
+      console.log('Missing parameters:', { message: !!message, figure: !!figure });
+      return new Response(JSON.stringify({ 
+        error: 'Message and historical figure are required' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+    const apiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!apiKey) {
+      return new Response(JSON.stringify({ 
+        error: 'API key not configured' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Build conversation context
-    const messages = [
-      {
-        role: "system",
-        content: `You are a historical figure. Respond authentically as this character with knowledge of both your historical period and modern times (up to 2024).
-        
-        Instructions:
-        - Use your historical character's personality, speaking style, and worldview
-        - Comment on modern developments through your historical lens
-        - Be educational and engaging while staying in character
-        - Keep responses conversational and around 2-3 paragraphs
-        
-        Context: ${context || 'You are chatting with someone interested in history.'}
-        `
-      },
-      {
-        role: "user",
-        content: message
-      }
-    ];
+    console.log('Making OpenAI request...');
 
-    console.log('Sending request to OpenAI with messages:', JSON.stringify(messages, null, 2));
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: messages,
+        messages: [
+          { 
+            role: 'system', 
+            content: `You are ${figure}. ${context || 'Respond as this historical figure authentically.'}` 
+          },
+          { role: 'user', content: message }
+        ],
         max_tokens: 500,
-        temperature: 0.8,
+        temperature: 0.8
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error('OpenAI error:', errorText);
+      return new Response(JSON.stringify({ 
+        error: `API error: ${openaiResponse.status}` 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const data = await response.json();
-    console.log('OpenAI response:', data);
-    
-    const aiResponse = data.choices[0].message.content;
+    const data = await openaiResponse.json();
+    const response = data.choices[0].message.content;
 
-    return new Response(JSON.stringify({ response: aiResponse }), {
+    console.log('Success - returning response');
+
+    return new Response(JSON.stringify({ response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in chat-with-historical-figure function:', error);
+    console.error('Function error:', error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
+      error: 'Internal error' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
