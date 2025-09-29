@@ -573,7 +573,9 @@ What would you like to discuss about my life, work, or thoughts on modern develo
         'abraham-lincoln': 'Will',      
         'shakespeare': 'Callum',        
         'napoleon': 'George',          
-        'socrates': 'Eric',            
+        'socrates': 'Eric',
+        'john-f-kennedy': 'Daniel',     // More presidential voice for JFK
+        'jfk': 'Daniel',                // Alternative JFK ID
       };
       
       return maleVoices[figure.id] || 'Einstein';
@@ -679,7 +681,13 @@ What would you like to discuss about my life, work, or thoughts on modern develo
           setMessages(prev => [...prev, successMessage]);
           
           return result.voice_id;
+        } else {
+          console.log(`Auto-cloning failed for ${figure.name}:`, result.error);
         }
+      } else {
+        console.error(`Auto-clone-voice API call failed for ${figure.name}:`, response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error details:', errorText);
       }
 
       // Fallback to preset voices if auto-cloning fails
