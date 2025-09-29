@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe, Save, RefreshCw, Guitar } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -434,18 +434,6 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
     }
   };
 
-  const handleWikipediaSearch = async (query: string) => {
-    const wikipediaData = await searchWikipedia(query);
-    if (wikipediaData) {
-      const searchMessage: Message = {
-        id: Date.now().toString(),
-        content: `📖 **${wikipediaData.title}**\n\n${wikipediaData.extract}\n\n[Read more on Wikipedia](${wikipediaData.url})`,
-        type: "assistant",
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, searchMessage]);
-    }
-  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -728,30 +716,6 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
               Upload Documents
             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => {
-                const query = prompt('Search Wikipedia for:');
-                if (query) handleWikipediaSearch(query);
-              }}
-            >
-              <Search className="mr-2 h-4 w-4" />
-              Search Wikipedia
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => {
-                const figName = selectedFigure?.name || '';
-                const query = prompt('Search YouTube for historical recordings:', `${figName} speech original recording`);
-                if (query) handleYoutubeSearch(query);
-              }}
-            >
-              <Play className="mr-2 h-4 w-4" />
-              Find Voice Recordings
-            </Button>
 
             <Button
               variant="outline"
