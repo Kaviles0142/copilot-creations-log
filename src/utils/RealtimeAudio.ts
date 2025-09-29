@@ -14,9 +14,9 @@ export class AudioRecorder {
         audio: {
           sampleRate: 24000,
           channelCount: 1,
-          echoCancellation: false, // Keep natural sound for music
-          noiseSuppression: false, // Don't suppress musical instruments
-          autoGainControl: false   // Preserve musical dynamics
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
       
@@ -34,6 +34,8 @@ export class AudioRecorder {
       
       this.source.connect(this.processor);
       this.processor.connect(this.audioContext.destination);
+      
+      console.log('Audio recorder started successfully');
     } catch (error) {
       console.error('Error accessing microphone:', error);
       throw error;
@@ -57,6 +59,7 @@ export class AudioRecorder {
       this.audioContext.close();
       this.audioContext = null;
     }
+    console.log('Audio recorder stopped');
   }
 }
 
@@ -291,5 +294,127 @@ export class RealtimeMusicChat {
       type: 'music_analysis',
       musicData: musicData
     }));
+  }
+}
+
+export class RealtimeChat {
+  private ws: WebSocket | null = null;
+  private audioContext: AudioContext | null = null;
+  private recorder: AudioRecorder | null = null;
+
+  constructor(
+    private figure: any,
+    private onMessage: (message: any) => void,
+    private onConnectionChange: (connected: boolean) => void
+  ) {}
+
+  async connect() {
+    try {
+      console.log(`Connecting to realtime chat for ${this.figure.name}...`);
+      
+      // Initialize audio context
+      this.audioContext = new AudioContext({ sampleRate: 24000 });
+      
+      // Connect to our Supabase WebSocket edge function
+      const wsUrl = `wss://trclpvryrjlafacocbnd.functions.supabase.co/functions/v1/realtime-voice-chat?figure=${encodeURIComponent(this.figure.id)}&figureName=${encodeURIComponent(this.figure.name)}`;
+      this.ws = new WebSocket(wsUrl);
+      
+      this.ws.onopen = () => {
+        console.log('Connected to realtime chat');
+        this.onConnectionChange(true);
+      };
+      
+      this.ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('Received message:', data.type);
+          
+          this.onMessage(data);
+          
+          if (data.type === 'response.audio.delta') {
+            // Play audio chunk
+            const binaryString = atob(data.delta);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            if (this.audioContext) {
+              await playAudioData(this.audioContext, bytes);
+            }
+          } else if (data.type === 'session_ready') {
+            // Start audio recording once session is ready
+            await this.startRecording();
+          }
+          
+        } catch (error) {
+          console.error('Error processing message:', error);
+        }
+      };
+      
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        this.onConnectionChange(false);
+      };
+      
+      this.ws.onclose = () => {
+        console.log('WebSocket closed');
+        this.onConnectionChange(false);
+      };
+      
+    } catch (error) {
+      console.error('Error connecting to realtime chat:', error);
+      throw error;
+    }
+  }
+
+  private async startRecording() {
+    try {
+      this.recorder = new AudioRecorder((audioData) => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          const audioBase64 = encodeAudioForAPI(audioData);
+          this.ws.send(JSON.stringify({
+            type: 'input_audio_buffer.append',
+            audio: audioBase64
+          }));
+        }
+      });
+      
+      await this.recorder.start();
+      console.log('Recording started');
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      throw error;
+    }
+  }
+
+  sendTextMessage(text: string) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
+
+    const event = {
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text
+          }
+        ]
+      }
+    };
+
+    this.ws.send(JSON.stringify(event));
+    this.ws.send(JSON.stringify({type: 'response.create'}));
+  }
+
+  disconnect() {
+    console.log('Disconnecting realtime chat...');
+    this.recorder?.stop();
+    this.ws?.close();
+    this.audioContext?.close();
+    this.onConnectionChange(false);
   }
 }

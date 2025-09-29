@@ -15,8 +15,9 @@ import FigureRecommendations from "./FigureRecommendations";
 import VoiceSettings from "./VoiceSettings";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
+import VoiceInterface from "./VoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export interface Message {
   id: string;
@@ -75,6 +76,7 @@ const HistoricalChat = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
   const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok'>('openai');
+  const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -890,6 +892,12 @@ const HistoricalChat = () => {
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
           
           
+          {/* Voice Interface */}
+          <VoiceInterface
+            selectedFigure={selectedFigure}
+            onSpeakingChange={setIsVoiceChatting}
+          />
+
           {/* AI Provider Selection */}
           <Card className="p-4">
             <h3 className="font-semibold mb-3 flex items-center">
