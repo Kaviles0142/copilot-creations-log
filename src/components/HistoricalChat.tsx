@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Send, User, Bot } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -29,6 +29,8 @@ const HistoricalChat = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedFigure) return;
@@ -72,6 +74,9 @@ const HistoricalChat = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Generate speech for the response
+      await generateSpeech(data.response, selectedFigure);
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -90,6 +95,85 @@ const HistoricalChat = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const generateSpeech = async (text: string, figure: HistoricalFigure) => {
+    try {
+      // Stop any current audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      // Choose voice based on historical figure characteristics
+      const voice = getVoiceForFigure(figure);
+
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: text,
+          voice: voice
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate speech');
+      }
+
+      // Create audio element and play
+      const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+      setCurrentAudio(audio);
+      setIsPlayingAudio(true);
+
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        setCurrentAudio(null);
+      };
+
+      audio.onerror = () => {
+        setIsPlayingAudio(false);
+        setCurrentAudio(null);
+        console.error('Error playing audio');
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error('Error generating speech:', error);
+      setIsPlayingAudio(false);
+    }
+  };
+
+  const getVoiceForFigure = (figure: HistoricalFigure): string => {
+    // Map historical figures to appropriate voices
+    const voiceMap: Record<string, string> = {
+      'winston-churchill': 'George',
+      'albert-einstein': 'Brian',
+      'marie-curie': 'Charlotte',
+      'leonardo-da-vinci': 'Liam',
+      'cleopatra': 'Sarah',
+      'socrates': 'Daniel',
+      'shakespeare': 'Will',
+      'napoleon': 'Roger'
+    };
+
+    return voiceMap[figure.id] || 'Aria';
+  };
+
+  const toggleAudio = () => {
+    if (currentAudio) {
+      if (isPlayingAudio) {
+        currentAudio.pause();
+        setIsPlayingAudio(false);
+      } else {
+        currentAudio.play();
+        setIsPlayingAudio(true);
+      }
     }
   };
 
@@ -136,10 +220,24 @@ const HistoricalChat = () => {
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <User className="h-5 w-5 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h2 className="font-semibold">{selectedFigure.name}</h2>
                 <p className="text-sm text-muted-foreground">{selectedFigure.period}</p>
               </div>
+              {currentAudio && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAudio}
+                  className="ml-2"
+                >
+                  {isPlayingAudio ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
           ) : (
             <h2 className="text-lg font-semibold text-muted-foreground">
