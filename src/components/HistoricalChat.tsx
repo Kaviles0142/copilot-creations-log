@@ -682,12 +682,16 @@ What would you like to discuss about my life, work, or thoughts on modern develo
           
           return result.voice_id;
         } else {
-          console.log(`Auto-cloning failed for ${figure.name}:`, result.error);
+          console.log(`Auto-cloning failed for ${figure.name}:`, result.error || result.message);
+          // If cloning failed, use fallback voice
+          return getFallbackVoice(figure);
         }
       } else {
         console.error(`Auto-clone-voice API call failed for ${figure.name}:`, response.status, response.statusText);
         const errorText = await response.text();
         console.error('Error details:', errorText);
+        // If API call failed, use fallback voice
+        return getFallbackVoice(figure);
       }
 
       // Fallback to preset voices if auto-cloning fails

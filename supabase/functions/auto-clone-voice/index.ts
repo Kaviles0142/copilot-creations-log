@@ -24,6 +24,8 @@ serve(async (req) => {
     // Check API keys
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
     const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
     if (!ELEVENLABS_API_KEY) {
       throw new Error('ElevenLabs API key not found');
@@ -69,25 +71,103 @@ serve(async (req) => {
       }
     }
 
-    // If no authentic recording found, create a placeholder voice clone
-    // This simulates the voice cloning process
-    console.log(`Creating voice clone for ${figureName}...`);
-    
-    // Generate a unique voice ID for this figure
-    const timestamp = Date.now();
-    const voiceId = `${figureId}-cloned-${timestamp}`;
-    
-    // Store the cloned voice information in Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // If we found an authentic recording, attempt to clone it with ElevenLabs
+    if (audioUrl && ELEVENLABS_API_KEY) {
+      try {
+        console.log(`Attempting to clone voice from: ${audioUrl}`);
+        
+        // For now, we'll create a voice clone using ElevenLabs instant voice cloning
+        // Note: This is a simplified approach. In production, you'd need to:
+        // 1. Download/extract audio from YouTube
+        // 2. Process and clean the audio
+        // 3. Upload to ElevenLabs for cloning
+        
+        // Create voice clone with ElevenLabs
+        const cloneResponse = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${ELEVENLABS_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: `${figureName} (Auto-cloned)`,
+            description: `Auto-cloned voice from: ${videoTitle}`,
+            labels: {
+              accent: 'american',
+              description: `Historical figure: ${figureName}`,
+              age: 'middle_aged',
+              gender: 'male'
+            }
+          }),
+        });
 
+        if (cloneResponse.ok) {
+          const cloneResult = await cloneResponse.json();
+          const actualVoiceId = cloneResult.voice_id;
+          
+          console.log(`Successfully cloned voice with ElevenLabs: ${actualVoiceId}`);
+          
+          // Store the cloned voice information in Supabase
+          const voiceData = {
+            voice_id: actualVoiceId,
+            voice_name: `${figureName} (Auto-cloned)`,
+            description: `Auto-cloned from: ${videoTitle}`,
+            is_cloned: true,
+            figure_id: figureId,
+            created_at: new Date().toISOString()
+          };
+
+          const storeResponse = await fetch(
+            `${supabaseUrl}/rest/v1/historical_voices`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify(voiceData)
+            }
+          );
+
+          if (storeResponse.ok) {
+            console.log(`Successfully stored cloned voice for ${figureName}`);
+            return new Response(JSON.stringify({
+              success: true,
+              voice_id: actualVoiceId,
+              voice_name: `${figureName} (Auto-cloned)`,
+              source: audioUrl,
+              message: `Successfully auto-cloned voice for ${figureName} using ElevenLabs`
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        } else {
+          const error = await cloneResponse.text();
+          console.error('ElevenLabs cloning failed:', error);
+        }
+      } catch (error) {
+        console.error('Voice cloning error:', error);
+      }
+    }
+
+    // If voice cloning failed, create a simulated clone with a preset voice
+    // This ensures we always return something but with a note that it's not authentic
+    console.log(`Voice cloning failed for ${figureName}, creating placeholder entry...`);
+    
+    // Generate a unique voice ID for this figure - use timestamp for uniqueness
+    const timestamp = Date.now();
+    const simulatedVoiceId = `${figureId}-simulated-${timestamp}`;
+    
+    // Store the simulated voice information in Supabase
     const voiceData = {
-      voice_id: voiceId,
-      voice_name: `${figureName} (Auto-cloned)`,
+      voice_id: simulatedVoiceId,
+      voice_name: `${figureName} (Simulated)`,
       description: audioUrl ? 
-        `Auto-cloned from: ${videoTitle}` : 
-        `Auto-generated authentic voice for ${figureName}`,
-      is_cloned: true,
+        `Failed to clone from: ${videoTitle} - using preset voice` : 
+        `No authentic recordings found for ${figureName} - using preset voice`,
+      is_cloned: false, // Mark as not actually cloned
       figure_id: figureId,
       created_at: new Date().toISOString()
     };
@@ -113,15 +193,14 @@ serve(async (req) => {
       throw new Error(`Failed to store voice: ${error}`);
     }
 
-    const storedVoice = await storeResponse.json();
-    console.log(`Successfully auto-cloned voice for ${figureName}:`, voiceId);
+    console.log(`Created placeholder entry for ${figureName} - voice cloning failed`);
 
     return new Response(JSON.stringify({
-      success: true,
-      voice_id: voiceId,
-      voice_name: `${figureName} (Auto-cloned)`,
-      source: audioUrl || 'Generated authentic voice',
-      message: `Successfully auto-cloned voice for ${figureName}`
+      success: false,
+      voice_id: simulatedVoiceId,
+      voice_name: `${figureName} (Simulated)`,
+      source: audioUrl || 'No authentic recordings found',
+      message: `Voice cloning failed for ${figureName} - using preset voice instead`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
