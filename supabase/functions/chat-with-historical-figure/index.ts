@@ -47,22 +47,16 @@ serve(async (req) => {
       
       // First try to discover books if none exist
       try {
-        const discoverResponse = await fetch(`${supabaseUrl}/functions/v1/discover-books`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const discoverResponse = await supabase.functions.invoke('discover-books', {
+          body: {
             figureName: figure.name,
             figureId: figure.id,
             forceRefresh: false
-          })
+          }
         });
         
-        if (discoverResponse.ok) {
-          const discoverResult = await discoverResponse.json();
-          console.log(`Books discovery result: ${discoverResult.books?.length || 0} books found`);
+        if (discoverResponse.data?.success) {
+          console.log(`Books discovery result: ${discoverResponse.data.books?.length || 0} books found`);
         }
       } catch (discoverError) {
         console.log('Books discovery failed:', discoverError);
@@ -182,7 +176,35 @@ serve(async (req) => {
         console.log('Web search error:', webError);
       }
 
-      // 6. Search for additional books by keywords from the message
+      // 6. Search for current news and events to get up-to-date information
+      console.log('Searching for current events and news...');
+      try {
+        const currentNewsResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${message} current events 2025 current president United States`,
+            type: "news",
+            num: 3
+          }
+        });
+
+        if (currentNewsResponse.data?.news_results?.length > 0) {
+          relevantKnowledge += '\n\n📰 CURRENT NEWS & EVENTS:\n';
+          currentNewsResponse.data.news_results.slice(0, 3).forEach((article: any) => {
+            relevantKnowledge += `- "${article.title}"\n`;
+            if (article.snippet) {
+              relevantKnowledge += `  ${article.snippet.substring(0, 200)}...\n`;
+            }
+            if (article.date) {
+              relevantKnowledge += `  Date: ${article.date}\n`;
+            }
+          });
+          console.log('Current news added to context');
+        }
+      } catch (newsError) {
+        console.log('Current news search error:', newsError);
+      }
+
+      // 7. Search for additional books by keywords from the message
       const messageKeywords = message.toLowerCase().split(' ').filter((word: string) => word.length > 3);
       if (messageKeywords.length > 0) {
         const keywordQuery = messageKeywords.map((keyword: string) => `title.ilike.%${keyword}%,description.ilike.%${keyword}%`).join(',');
@@ -253,9 +275,19 @@ serve(async (req) => {
       });
     }
 
+    console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
     console.log(`Making ${aiProvider.toUpperCase()} request with comprehensive multi-source context...`);
 
+    // Get current date for context
+    const currentDate = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
     const systemPrompt = `You are ${figure.name}, the historical figure from ${figure.period}. ${figure.description}
+
+CURRENT CONTEXT (${currentDate}): As of September 2025, Donald Trump is the current President of the United States, having won the 2024 election. Joe Biden was the previous president (2021-2025). You are speaking from the perspective of ${currentDate}.
 
 CRITICAL INSTRUCTIONS:
 - Respond ONLY in first person as ${figure.name}
