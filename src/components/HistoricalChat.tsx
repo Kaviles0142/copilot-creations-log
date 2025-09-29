@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -141,6 +141,19 @@ const HistoricalChat = () => {
     }
   };
 
+  const handleWikipediaSearch = async (query: string) => {
+    const wikipediaData = await searchWikipedia(query);
+    if (wikipediaData) {
+      const searchMessage: Message = {
+        id: Date.now().toString(),
+        content: `📖 **${wikipediaData.title}**\n\n${wikipediaData.extract}\n\n[Read more on Wikipedia](${wikipediaData.url})`,
+        type: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, searchMessage]);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -227,6 +240,30 @@ const HistoricalChat = () => {
     }
   };
 
+  const searchWikipedia = async (query: string) => {
+    try {
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/wikipedia-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Wikipedia search failed:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error searching Wikipedia:', error);
+      return null;
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
@@ -234,21 +271,33 @@ const HistoricalChat = () => {
         <div className="p-6">
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
           
-          <div className="space-y-4">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => setShowFileUpload(!showFileUpload)}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Documents
-            </Button>
+            <div className="space-y-4">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setShowFileUpload(!showFileUpload)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Documents
+              </Button>
 
-            {showFileUpload && (
-              <Card className="p-4">
-                <FileUpload onFileUpload={(files) => console.log('Files uploaded:', files)} />
-              </Card>
-            )}
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  const query = prompt('Search Wikipedia for:');
+                  if (query) handleWikipediaSearch(query);
+                }}
+              >
+                <Search className="mr-2 h-4 w-4" />
+                Search Wikipedia
+              </Button>
+
+              {showFileUpload && (
+                <Card className="p-4">
+                  <FileUpload onFileUpload={(files) => console.log('Files uploaded:', files)} />
+                </Card>
+              )}
 
             <div>
               <h3 className="font-semibold mb-3">Select Historical Figure</h3>
