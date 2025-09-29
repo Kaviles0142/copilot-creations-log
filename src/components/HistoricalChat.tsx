@@ -74,6 +74,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
+  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok'>('openai');
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -356,7 +357,8 @@ const HistoricalChat = () => {
           message: input,
           figure: selectedFigure,
           context: conversationHistory,
-          conversationId: conversationId
+          conversationId: conversationId,
+          aiProvider: selectedAIProvider
         }),
       });
 
@@ -368,6 +370,7 @@ const HistoricalChat = () => {
 
       const result = await response.json();
       const aiResponse = result.response || result.message || "I apologize, but I couldn't generate a proper response.";
+      const usedProvider = result.aiProvider || selectedAIProvider;
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -379,6 +382,13 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       await generateSpeech(aiResponse, selectedFigure!);
+
+      // Show toast indicating which AI was used
+      toast({
+        title: `Response from ${usedProvider === 'grok' ? 'Grok' : 'OpenAI'}`,
+        description: `${selectedFigure.name} responded using ${usedProvider === 'grok' ? 'X.AI Grok' : 'OpenAI GPT-4o Mini'}`,
+        duration: 2000,
+      });
 
     } catch (error) {
       console.error(`Attempt ${attempt} failed:`, error);
@@ -880,8 +890,41 @@ const HistoricalChat = () => {
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
           
           
+          {/* AI Provider Selection */}
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Bot className="h-4 w-4 mr-2" />
+              AI Provider
+            </h3>
+            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok') => setSelectedAIProvider(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">
+                  <div className="flex items-center">
+                    <span className="mr-2">🤖</span>
+                    OpenAI GPT-4o Mini
+                  </div>
+                </SelectItem>
+                <SelectItem value="grok">
+                  <div className="flex items-center">
+                    <span className="mr-2">🚀</span>
+                    Grok (X.AI)
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              {selectedAIProvider === 'openai' 
+                ? 'OpenAI provides reliable, well-structured responses'
+                : 'Grok offers conversational, real-time aware responses'
+              }
+            </p>
+          </Card>
+
           {/* Conversation Export */}
-          <ConversationExport 
+          <ConversationExport
             messages={messages}
             selectedFigure={selectedFigure}
           />

@@ -20,6 +20,7 @@ serve(async (req) => {
     const figure = body.figure;
     const context = body.context;
     const conversationId = body.conversationId;
+    const aiProvider = body.aiProvider || 'openai'; // Default to OpenAI
     
     if (!message || !figure) {
       console.log('Missing parameters:', { message: !!message, figure: !!figure });
@@ -206,17 +207,29 @@ serve(async (req) => {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
 
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) {
+    // Get API keys for both providers
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    const grokApiKey = Deno.env.get('GROK_API_KEY');
+    
+    if (aiProvider === 'grok' && !grokApiKey) {
       return new Response(JSON.stringify({ 
-        error: 'API key not configured' 
+        error: 'Grok API key not configured' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    if (aiProvider === 'openai' && !openaiApiKey) {
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('Making OpenAI request with comprehensive multi-source context...');
+    console.log(`Making ${aiProvider.toUpperCase()} request with comprehensive multi-source context...`);
 
     const systemPrompt = `You are ${figure.name}, the historical figure from ${figure.period}. ${figure.description}
 
@@ -254,13 +267,33 @@ RESPONSE REQUIREMENTS:
 - Provide rich, substantive answers that show deep knowledge
 - Make responses informative and educational, not just conversational`;
 
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
+    // Prepare request based on AI provider
+    let apiUrl: string;
+    let requestHeaders: Record<string, string>;
+    let requestBody: any;
+
+    if (aiProvider === 'grok') {
+      apiUrl = 'https://api.x.ai/v1/chat/completions';
+      requestHeaders = {
+        'Authorization': `Bearer ${grokApiKey}`,
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+      };
+      requestBody = {
+        model: 'grok-beta',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 1500,
+        temperature: 0.7
+      };
+    } else {
+      apiUrl = 'https://api.openai.com/v1/chat/completions';
+      requestHeaders = {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      };
+      requestBody = {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
@@ -268,30 +301,36 @@ RESPONSE REQUIREMENTS:
         ],
         max_tokens: 1500,
         temperature: 0.7
-      }),
+      };
+    }
+
+    const aiResponse = await fetch(apiUrl, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
     });
 
-    console.log(`OpenAI request completed. Status: ${openaiResponse.status}`);
+    console.log(`${aiProvider.toUpperCase()} request completed. Status: ${aiResponse.status}`);
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error('OpenAI error:', errorText);
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error(`${aiProvider.toUpperCase()} error:`, errorText);
       return new Response(JSON.stringify({ 
-        error: `API error: ${openaiResponse.status}` 
+        error: `${aiProvider.toUpperCase()} API error: ${aiResponse.status}` 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const data = await openaiResponse.json();
+    const data = await aiResponse.json();
     const response = data.choices[0].message.content;
 
-    console.log(`Response generated. Length: ${response.length} characters`);
+    console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
     console.log('Success - returning comprehensive multi-source enhanced response');
 
-    return new Response(JSON.stringify({ response }), {
+    return new Response(JSON.stringify({ response, aiProvider }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
