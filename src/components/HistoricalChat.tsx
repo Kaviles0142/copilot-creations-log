@@ -51,6 +51,7 @@ interface BookInfo {
 }
 
 const HistoricalChat = () => {
+  console.log("HistoricalChat component loading...");
   const [selectedFigure, setSelectedFigure] = useState<HistoricalFigure | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
