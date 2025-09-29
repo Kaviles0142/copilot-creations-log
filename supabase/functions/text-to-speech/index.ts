@@ -26,7 +26,7 @@ serve(async (req) => {
 
     // Map voice names to ElevenLabs voice IDs with premium natural voices
     const voiceMap: Record<string, string> = {
-      'Carsten': 'uy4RqSpZT2JjOTI8dO2t',       // Perfect accent for Einstein
+      'Carsten': 'DKCevyuNm5sbcmJ7NN8a',       // Carsten Beyreuther - perfect accent for Einstein
       'Brian': 'nPczCjzI2devNBz1zQrb',         // Deep, natural male voice
       'Daniel': 'onwK4e9ZLuTAKqWW03F9',        // Mature, thoughtful male voice  
       'George': 'JBFqnCBsd6RMkjVDRZzb',        // Authoritative male voice
