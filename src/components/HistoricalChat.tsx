@@ -77,6 +77,7 @@ const HistoricalChat = () => {
   const [showMusicInterface, setShowMusicInterface] = useState(false);
   const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok'>('openai');
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
+  const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
