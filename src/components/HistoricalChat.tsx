@@ -560,8 +560,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voice = getElevenLabsVoiceForFigure(figure);
-    console.log(`Using ElevenLabs voice: ${voice} for ${figure.name}`);
+    const voice = getOpenAIVoiceForFigure(figure);
+    console.log(`Using OpenAI voice: ${voice} for ${figure.name}`);
 
     const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
       method: 'POST',
@@ -577,11 +577,11 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('ElevenLabs TTS Error:', data.error);
-      throw new Error(data.error || 'Failed to generate speech with ElevenLabs');
+      console.error('OpenAI TTS Error:', data.error);
+      throw new Error(data.error || 'Failed to generate speech with OpenAI');
     }
 
-    console.log(`Successfully received ElevenLabs audio for ${figure.name}`);
+    console.log(`Successfully received OpenAI audio for ${figure.name}`);
 
     const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
     setCurrentAudio(audio);
@@ -590,44 +590,44 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     audio.onended = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.log('ElevenLabs audio playback completed');
+      console.log('OpenAI audio playback completed');
     };
 
     audio.onerror = () => {
       setIsPlayingAudio(false);
       setCurrentAudio(null);
-      console.error('Error playing ElevenLabs audio');
+      console.error('Error playing OpenAI audio');
     };
 
     await audio.play();
-    console.log('Ultra-natural ElevenLabs speech started playing');
+    console.log('High-quality OpenAI speech started playing');
   };
 
-  // Get appropriate ElevenLabs voice for historical figures  
-  const getElevenLabsVoiceForFigure = (figure: HistoricalFigure): string => {
+  // Get appropriate OpenAI voice for historical figures  
+  const getOpenAIVoiceForFigure = (figure: HistoricalFigure): string => {
     const isMale = detectGender(figure);
     
     if (isMale) {
-      // Premium ElevenLabs male voices - ultra natural
+      // OpenAI male voices - natural and high quality
       const maleVoices = {
-        'albert-einstein': 'Carsten',   // Perfect accent for Einstein!
-        'winston-churchill': 'George',  // Authoritative, British
-        'abraham-lincoln': 'Will',      // Confident, presidential  
-        'shakespeare': 'Callum',        // British, eloquent
-        'napoleon': 'George',          // Commanding
-        'socrates': 'Eric',            // Wise, warm
+        'albert-einstein': 'onyx',      // Deep, thoughtful, perfect for Einstein
+        'winston-churchill': 'fable',   // Authoritative
+        'abraham-lincoln': 'echo',      // Presidential, warm  
+        'shakespeare': 'echo',          // Dramatic, eloquent
+        'napoleon': 'onyx',            // Commanding
+        'socrates': 'fable',           // Wise, philosophical
       };
       
-      return maleVoices[figure.id] || 'Carsten'; // Carsten is perfect for intellectuals
+      return maleVoices[figure.id] || 'onyx'; // Onyx is deep and thoughtful
     } else {
-      // Premium ElevenLabs female voices
+      // OpenAI female voices
       const femaleVoices = {
-        'marie-curie': 'Sarah',        // Professional, intelligent
-        'cleopatra': 'Charlotte',      // Regal, clear
-        'joan-of-arc': 'Jessica'       // Strong, friendly
+        'marie-curie': 'nova',         // Intelligent, clear
+        'cleopatra': 'shimmer',        // Regal, commanding
+        'joan-of-arc': 'alloy'         // Strong, determined
       };
       
-      return femaleVoices[figure.id] || 'Sarah'; // Sarah is clear and professional
+      return femaleVoices[figure.id] || 'nova'; // Nova is clear and intelligent
     }
   };
 

@@ -13,64 +13,39 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice = "Brian" } = await req.json();
+    const { text, voice = "onyx" } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
     }
 
-    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
-    if (!ELEVENLABS_API_KEY) {
-      throw new Error('ElevenLabs API key not found');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not found');
     }
 
-    // Map voice names to ElevenLabs voice IDs with premium natural voices
-    const voiceMap: Record<string, string> = {
-      'Carsten': 'DKCevyuNm5sbcmJ7NN8a',       // Carsten Beyreuther - perfect accent for Einstein
-      'Brian': 'nPczCjzI2devNBz1zQrb',         // Deep, natural male voice
-      'Daniel': 'onwK4e9ZLuTAKqWW03F9',        // Mature, thoughtful male voice  
-      'George': 'JBFqnCBsd6RMkjVDRZzb',        // Authoritative male voice
-      'Eric': 'cjVigY5qzO86Huf0OWal',          // Warm male voice
-      'Liam': 'TX3LPaxmHKxFdv7VOQHJ',          // Young male voice
-      'Will': 'bIHbv24MWmeRgasZH58o',          // Confident male voice
-      'Callum': 'N2lVS1w4EtoT3dr4eOWO',        // British male voice
-      'Roger': 'CwhRBWXzGAHq8TQ4Fs17',         // Professional male voice
-      'Sarah': 'EXAVITQu4vr4xnSDxMaL',         // Professional female voice
-      'Laura': 'FGY2WhTYpPnrIDTdsKH5',         // Warm female voice
-      'Charlotte': 'XB0fDUnXU5powFXDhCwa',      // Clear female voice
-      'Alice': 'Xb7hH8MSUJpSbSDYk0k2',         // Young female voice
-      'Jessica': 'cgSgspJ2msm6clMCkdW9',        // Friendly female voice
-      'Aria': '9BWtsMINqrJLrRacOk9x',           // Default female voice
-    };
+    console.log(`Generating natural OpenAI speech for: "${text.substring(0, 50)}..." with voice: ${voice}`);
 
-    const voiceId = voiceMap[voice] || voiceMap['Brian'];
-
-    console.log(`Generating natural ElevenLabs speech for: "${text.substring(0, 50)}..." with voice: ${voice} (${voiceId})`);
-
-    // Call ElevenLabs TTS API for ultra-natural speech
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    // Call OpenAI TTS API for natural-sounding speech
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: {
-        'Accept': 'audio/mpeg',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY,
       },
       body: JSON.stringify({
-        text: text,
-        model_id: "eleven_multilingual_v2", // Premium model for most natural speech
-        voice_settings: {
-          stability: 0.75,        // Higher stability for consistent voice
-          similarity_boost: 0.8,  // Higher similarity for more natural sound
-          style: 0.2,            // Slight style for personality
-          use_speaker_boost: true // Enhanced voice clarity
-        }
+        model: 'tts-1-hd',  // Use HD model for better quality
+        input: text,
+        voice: voice, // onyx, echo, fable, alloy, nova, shimmer
+        response_format: 'mp3',
+        speed: 0.9, // Slightly slower for more natural speech
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('ElevenLabs API error:', errorText);
-      throw new Error(`ElevenLabs API error: ${response.status} ${errorText}`);
+      console.error('OpenAI TTS API error:', errorText);
+      throw new Error(`OpenAI TTS API error: ${response.status} ${errorText}`);
     }
 
     // Convert audio buffer to base64 (handle large files properly)
@@ -88,7 +63,7 @@ serve(async (req) => {
     
     const base64Audio = btoa(binary);
 
-    console.log(`Successfully generated natural ElevenLabs audio of ${audioBuffer.byteLength} bytes`);
+    console.log(`Successfully generated natural OpenAI audio of ${audioBuffer.byteLength} bytes`);
 
     return new Response(
       JSON.stringify({ audioContent: base64Audio }),
