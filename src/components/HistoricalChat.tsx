@@ -12,7 +12,6 @@ import ConversationHistory from "./ConversationHistory";
 import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
-import TimelineVisualization from "./TimelineVisualization";
 import VoiceSettings from "./VoiceSettings";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
@@ -687,8 +686,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
             }}
           />
 
-          {/* Timeline Visualization */}
-          <TimelineVisualization
+          {/* Figure Recommendations */}
+          <FigureRecommendations
             selectedFigure={selectedFigure}
             onSelectFigure={(figure) => {
               setSelectedFigure(figure);
