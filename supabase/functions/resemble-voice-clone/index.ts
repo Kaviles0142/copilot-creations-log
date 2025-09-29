@@ -172,12 +172,27 @@ function assessAudioQuality(audioBuffer: ArrayBuffer): number {
   return 50;
 }
 
-async function createResembleVoiceClone(apiKey: string, figureName: string, audioUrl: string) {
+async function createResembleVoiceClone(apiKey: string, figureName: string, audioUrl: string | null) {
   console.log(`Creating Resemble.ai voice clone for ${figureName}`);
   
   try {
+    // First, try to find historical audio for this figure
+    let cloneAudioUrl = audioUrl;
+    
+    if (!cloneAudioUrl) {
+      // Search for historical speeches/recordings online
+      cloneAudioUrl = await findHistoricalAudio(figureName);
+    }
+    
+    if (!cloneAudioUrl) {
+      console.log(`No audio source found for ${figureName}, using fallback`);
+      return createFallbackVoice(figureName);
+    }
+
+    console.log(`Using audio source: ${cloneAudioUrl}`);
+    
     // Download the audio file
-    const audioResponse = await fetch(audioUrl);
+    const audioResponse = await fetch(cloneAudioUrl);
     if (!audioResponse.ok) {
       throw new Error(`Failed to download audio for cloning: ${audioResponse.status}`);
     }
@@ -188,10 +203,10 @@ async function createResembleVoiceClone(apiKey: string, figureName: string, audi
     const formData = new FormData();
     const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
     formData.append('file', audioBlob, 'voice_sample.wav');
-    formData.append('name', `${figureName} (Historical Clone)`);
-    formData.append('description', `AI-generated voice clone of historical figure ${figureName}`);
+    formData.append('name', `${figureName}_historical_clone`);
+    formData.append('description', `Historical voice clone of ${figureName} from authentic recording`);
 
-    // Call Resemble.ai voice cloning API
+    // Call Resemble.ai voice creation API
     const response = await fetch('https://app.resemble.ai/api/v2/voices', {
       method: 'POST',
       headers: {
@@ -202,18 +217,26 @@ async function createResembleVoiceClone(apiKey: string, figureName: string, audi
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Resemble.ai API error:', errorText);
+      console.error('Resemble.ai voice creation error:', errorText);
+      
+      // Try to parse the error to understand the issue
+      try {
+        const errorData = JSON.parse(errorText);
+        console.error('Parsed error:', errorData);
+      } catch (e) {
+        console.error('Raw error text:', errorText);
+      }
       
       // Fallback to a premium preset voice if cloning fails
       return createFallbackVoice(figureName);
     }
 
     const result = await response.json();
-    console.log('Resemble.ai voice created:', result);
+    console.log('Resemble.ai voice created successfully:', result);
 
     return {
       voice_id: result.uuid || result.id,
-      voice_name: result.name || `${figureName} (Cloned)`,
+      voice_name: `${figureName} (Authentic Clone)`,
       provider: 'resemble'
     };
 
@@ -222,6 +245,68 @@ async function createResembleVoiceClone(apiKey: string, figureName: string, audi
     // Fallback to preset voice
     return createFallbackVoice(figureName);
   }
+}
+
+async function findHistoricalAudio(figureName: string): Promise<string | null> {
+  console.log(`Searching for historical audio of ${figureName}...`);
+  
+  // Known historical audio sources for major figures
+  const historicalAudioSources: Record<string, string | null> = {
+    'John F. Kennedy': 'https://archive.org/download/jfk_inaugural_address/jfk_inaugural_1961.mp3',
+    'Winston Churchill': 'https://archive.org/download/Churchill_WeShallFightOnTheBeaches/WeShallFightOnTheBeaches.mp3',
+    'Martin Luther King Jr.': 'https://archive.org/download/MLKDream/MLKDream_64kb.mp3',
+    'Franklin D. Roosevelt': 'https://archive.org/download/FDR_Pearl_Harbor_Speech/Pearl_Harbor_Address_1941.mp3',
+    'Abraham Lincoln': null, // No audio recordings exist
+  };
+  
+  const audioUrl = historicalAudioSources[figureName];
+  
+  if (audioUrl) {
+    // Verify the audio source is accessible
+    try {
+      const testResponse = await fetch(audioUrl, { method: 'HEAD' });
+      if (testResponse.ok) {
+        console.log(`Found historical audio for ${figureName}: ${audioUrl}`);
+        return audioUrl;
+      }
+    } catch (error) {
+      console.log(`Historical audio source not accessible: ${error}`);
+    }
+  }
+  
+  // If no direct source, try to search Archive.org API
+  try {
+    const searchQuery = `${figureName} speech original recording`;
+    const archiveSearchUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(searchQuery)}&fl=identifier,title&rows=5&output=json`;
+    
+    const searchResponse = await fetch(archiveSearchUrl);
+    const searchData = await searchResponse.json();
+    
+    if (searchData.response?.docs?.length > 0) {
+      const firstResult = searchData.response.docs[0];
+      const itemUrl = `https://archive.org/download/${firstResult.identifier}`;
+      
+      // Try to find an MP3 file in the item
+      const itemMetadataUrl = `https://archive.org/metadata/${firstResult.identifier}`;
+      const metadataResponse = await fetch(itemMetadataUrl);
+      const metadataData = await metadataResponse.json();
+      
+      const audioFile = metadataData.files?.find((file: any) => 
+        file.name?.endsWith('.mp3') || file.name?.endsWith('.wav')
+      );
+      
+      if (audioFile) {
+        const audioUrl = `${itemUrl}/${audioFile.name}`;
+        console.log(`Found archive audio for ${figureName}: ${audioUrl}`);
+        return audioUrl;
+      }
+    }
+  } catch (error) {
+    console.log(`Archive.org search failed: ${error}`);
+  }
+  
+  console.log(`No historical audio found for ${figureName}`);
+  return null;
 }
 
 function createFallbackVoice(figureName: string) {

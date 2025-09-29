@@ -37,24 +37,23 @@ serve(async (req) => {
 
     console.log(`Using Resemble.ai voice ID: ${voiceId} for text: "${text.substring(0, 50)}..."`);
 
-    // Call Resemble.ai TTS API with correct format
-    const response = await fetch('https://app.resemble.ai/api/v2/projects/YOUR_PROJECT_UUID/clips', {
+    // Call Resemble.ai TTS API - using proper project setup
+    const projectId = Deno.env.get('RESEMBLE_PROJECT_ID') || 'default';
+    const apiUrl = `https://app.resemble.ai/api/v2/projects/${projectId}/clips`;
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Token token="${RESEMBLE_API_KEY}"`,
+        'Authorization': `Bearer ${RESEMBLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        data: {
-          body: text,
-          voice_uuid: voiceId,
-          is_public: false,
-          is_archived: false,
-          precision: 'PCM_22050',
-          output_format: 'mp3',
-          include_timestamps: false,
-          raw: false
-        }
+        body: text,
+        voice_uuid: voiceId,
+        precision: 'PCM_22050',
+        output_format: 'mp3',
+        is_public: false,
+        is_archived: false
       }),
     });
 

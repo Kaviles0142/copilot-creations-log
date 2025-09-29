@@ -782,11 +782,11 @@ const HistoricalChat = () => {
     const voiceId = await getOrCreateAuthenticVoice(figure);
     console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
     
-    const { data, error } = await supabase.functions.invoke('text-to-speech', {
+    // Use Resemble AI for authentic voice cloning and TTS
+    const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
       body: { 
         text: text,
-        voiceId: voiceId,
-        modelId: 'eleven_multilingual_v2'
+        voice: voiceId
       }
     });
 
@@ -932,11 +932,12 @@ const HistoricalChat = () => {
     try {
       console.log(`Creating authentic voice for ${figure.name}...`);
       
-      // Use the enhanced voice cloning system
-      const { data, error } = await supabase.functions.invoke('enhanced-voice-clone', {
+      // Use Resemble AI for authentic voice cloning from historical sources
+      const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
         body: { 
           figureName: figure.name,
-          figureId: figure.id
+          figureId: figure.id,
+          audioUrl: null // Let the function find historical audio
         }
       });
 
