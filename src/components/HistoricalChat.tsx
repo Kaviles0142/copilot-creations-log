@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Search, Play, Globe } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -34,6 +35,8 @@ const HistoricalChat = () => {
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState("en-US");
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -70,10 +73,24 @@ const HistoricalChat = () => {
     }
   }, []);
 
+  // Initialize speech synthesis voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+    };
+
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
+
   // Auto-create authentic voice when figure is selected
   useEffect(() => {
     if (selectedFigure) {
       createAuthenticVoice(selectedFigure);
+      // Set language based on historical figure
+      const figureLanguage = getFigureLanguage(selectedFigure);
+      setSelectedLanguage(figureLanguage);
     }
   }, [selectedFigure]);
 
@@ -107,6 +124,25 @@ const HistoricalChat = () => {
       console.error('Current events search error:', error);
       return null;
     }
+  };
+
+  // Get native language for historical figure
+  const getFigureLanguage = (figure: HistoricalFigure): string => {
+    const figureLanguages: Record<string, string> = {
+      'winston-churchill': 'en-GB',
+      'albert-einstein': 'de-DE',
+      'marie-curie': 'fr-FR',
+      'leonardo-da-vinci': 'it-IT',
+      'cleopatra': 'ar-SA',
+      'socrates': 'el-GR',
+      'shakespeare': 'en-GB',
+      'napoleon': 'fr-FR',
+      'abraham-lincoln': 'en-US',
+      'julius-caesar': 'la',
+      'joan-of-arc': 'fr-FR',
+      'galileo': 'it-IT'
+    };
+    return figureLanguages[figure.id] || 'en-US';
   };
 
   const handleSendMessage = async () => {
@@ -226,47 +262,97 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
         currentAudio.currentTime = 0;
       }
 
-      // Get authentic voice for the historical figure
-      const voice = await getVoiceForFigure(figure);
-
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: text,
-          voice: voice
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate speech');
+      // Use Web Speech API for free multi-language TTS
+      if ('speechSynthesis' in window) {
+        generateBrowserSpeech(text, figure);
+      } else {
+        // Fallback to ElevenLabs for premium quality
+        await generatePremiumSpeech(text, figure);
       }
-
-      // Create audio element and play
-      const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
-      setCurrentAudio(audio);
-      setIsPlayingAudio(true);
-
-      audio.onended = () => {
-        setIsPlayingAudio(false);
-        setCurrentAudio(null);
-      };
-
-      audio.onerror = () => {
-        setIsPlayingAudio(false);
-        setCurrentAudio(null);
-        console.error('Error playing audio');
-      };
-
-      await audio.play();
     } catch (error) {
       console.error('Error generating speech:', error);
       setIsPlayingAudio(false);
     }
+  };
+
+  const generateBrowserSpeech = (text: string, figure: HistoricalFigure) => {
+    // Stop any current speech
+    speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Find the best voice for the selected language
+    const voice = availableVoices.find(v => 
+      v.lang.startsWith(selectedLanguage.split('-')[0]) && 
+      (v.lang === selectedLanguage || v.default)
+    ) || availableVoices.find(v => v.lang.startsWith('en'));
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    utterance.lang = selectedLanguage;
+    utterance.rate = 0.9; // Slightly slower for better comprehension
+    utterance.pitch = getVoicePitch(figure);
+    
+    utterance.onstart = () => setIsPlayingAudio(true);
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+
+    speechSynthesis.speak(utterance);
+  };
+
+  const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
+    // Get authentic voice for the historical figure
+    const voice = await getVoiceForFigure(figure);
+
+    const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        voice: voice
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to generate speech');
+    }
+
+    // Create audio element and play
+    const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+    setCurrentAudio(audio);
+    setIsPlayingAudio(true);
+
+    audio.onended = () => {
+      setIsPlayingAudio(false);
+      setCurrentAudio(null);
+    };
+
+    audio.onerror = () => {
+      setIsPlayingAudio(false);
+      setCurrentAudio(null);
+      console.error('Error playing audio');
+    };
+
+    await audio.play();
+  };
+
+  const getVoicePitch = (figure: HistoricalFigure): number => {
+    // Adjust pitch based on historical figure characteristics
+    const pitchMap: Record<string, number> = {
+      'winston-churchill': 0.8, // Lower, authoritative
+      'marie-curie': 1.1,       // Higher, feminine
+      'napoleon': 0.9,          // Confident
+      'cleopatra': 1.2,         // Regal, feminine
+      'shakespeare': 1.0,       // Natural
+      'abraham-lincoln': 0.85,  // Deep, thoughtful
+    };
+    return pitchMap[figure.id] || 1.0;
   };
 
   const getVoiceForFigure = async (figure: HistoricalFigure): Promise<string> => {
@@ -339,6 +425,9 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
         currentAudio.play();
         setIsPlayingAudio(true);
       }
+    } else if ('speechSynthesis' in window && isPlayingAudio) {
+      speechSynthesis.cancel();
+      setIsPlayingAudio(false);
     }
   };
 
@@ -450,6 +539,36 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
               Find Voice Recordings
             </Button>
 
+            {/* Language Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center">
+                <Globe className="mr-2 h-4 w-4" />
+                Speech Language
+              </label>
+              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en-US">🇺🇸 English (US)</SelectItem>
+                  <SelectItem value="en-GB">🇬🇧 English (UK)</SelectItem>
+                  <SelectItem value="fr-FR">🇫🇷 French</SelectItem>
+                  <SelectItem value="de-DE">🇩🇪 German</SelectItem>
+                  <SelectItem value="it-IT">🇮🇹 Italian</SelectItem>
+                  <SelectItem value="es-ES">🇪🇸 Spanish</SelectItem>
+                  <SelectItem value="pt-BR">🇧🇷 Portuguese</SelectItem>
+                  <SelectItem value="ru-RU">🇷🇺 Russian</SelectItem>
+                  <SelectItem value="ja-JP">🇯🇵 Japanese</SelectItem>
+                  <SelectItem value="zh-CN">🇨🇳 Chinese</SelectItem>
+                  <SelectItem value="ar-SA">🇸🇦 Arabic</SelectItem>
+                  <SelectItem value="hi-IN">🇮🇳 Hindi</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Free browser-based text-to-speech in multiple languages
+              </p>
+            </div>
+
             {showFileUpload && (
               <Card className="p-4">
                 <FileUpload onFileUpload={(files) => console.log('Files uploaded:', files)} />
@@ -479,7 +598,12 @@ Instructions: You are ${selectedFigure.name}. Respond as this historical figure 
               <div className="flex-1">
                 <h2 className="font-semibold">{selectedFigure.name}</h2>
                 <p className="text-sm text-muted-foreground">{selectedFigure.period}</p>
-                <p className="text-xs text-green-600">🎙️ Using Authentic Voice</p>
+                <p className="text-xs text-green-600">
+                  🎙️ Speaking in {selectedLanguage.split('-')[1]} 
+                  {selectedLanguage.startsWith(getFigureLanguage(selectedFigure).split('-')[0]) 
+                    ? ' (Native Language)' 
+                    : ' (Translated)'}
+                </p>
               </div>
               {currentAudio && (
                 <Button
