@@ -36,12 +36,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Search for relevant books and documents
-    console.log('Searching for relevant knowledge...');
+    // Search for relevant knowledge from ALL sources
+    console.log('Searching across all available sources...');
     let relevantKnowledge = '';
 
     try {
-      // Search books related to the figure
+      // 1. Search books related to the figure
       const { data: books, error: booksError } = await supabase
         .from('books')
         .select('title, authors, description, book_type')
@@ -51,7 +51,7 @@ serve(async (req) => {
       if (booksError) {
         console.log('Books search error:', booksError);
       } else if (books && books.length > 0) {
-        relevantKnowledge += '\n\nRELEVANT BOOKS AND SOURCES:\n';
+        relevantKnowledge += '\n\n📚 RELEVANT BOOKS AND SOURCES:\n';
         books.forEach(book => {
           relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'} (${book.book_type})\n`;
           if (book.description) {
@@ -60,7 +60,7 @@ serve(async (req) => {
         });
       }
 
-      // Search documents if conversation ID is provided
+      // 2. Search documents if conversation ID is provided
       if (conversationId) {
         const { data: documents, error: docsError } = await supabase
           .from('documents')
@@ -71,7 +71,7 @@ serve(async (req) => {
         if (docsError) {
           console.log('Documents search error:', docsError);
         } else if (documents && documents.length > 0) {
-          relevantKnowledge += '\n\nUPLOADED DOCUMENTS:\n';
+          relevantKnowledge += '\n\n📄 UPLOADED DOCUMENTS:\n';
           documents.forEach(doc => {
             relevantKnowledge += `- ${doc.filename}\n`;
             if (doc.parsed_content) {
@@ -81,7 +81,71 @@ serve(async (req) => {
         }
       }
 
-      // Search for additional books by keywords from the message
+      // 3. Search YouTube for video content
+      try {
+        const youtubeResponse = await supabase.functions.invoke('youtube-search', {
+          body: { 
+            query: `${figure.name} original speech documentary interview historical`,
+            maxResults: 3
+          }
+        });
+
+        if (youtubeResponse.data?.results?.length > 0) {
+          relevantKnowledge += '\n\n🎥 YOUTUBE VIDEOS & DOCUMENTARIES:\n';
+          youtubeResponse.data.results.forEach((video: any) => {
+            relevantKnowledge += `- "${video.title}" (${video.channelTitle})\n`;
+            if (video.description) {
+              relevantKnowledge += `  Description: ${video.description.substring(0, 150)}...\n`;
+            }
+            relevantKnowledge += `  URL: ${video.url}\n`;
+          });
+        }
+      } catch (youtubeError) {
+        console.log('YouTube search error:', youtubeError);
+      }
+
+      // 4. Search Wikipedia for detailed biographical information
+      try {
+        const wikiResponse = await supabase.functions.invoke('wikipedia-search', {
+          body: { query: figure.name }
+        });
+
+        if (wikiResponse.data?.extract) {
+          relevantKnowledge += '\n\n📖 WIKIPEDIA INFORMATION:\n';
+          relevantKnowledge += `${wikiResponse.data.extract.substring(0, 400)}...\n`;
+          if (wikiResponse.data.url) {
+            relevantKnowledge += `Source: ${wikiResponse.data.url}\n`;
+          }
+        }
+      } catch (wikiError) {
+        console.log('Wikipedia search error:', wikiError);
+      }
+
+      // 5. Search web articles and scholarly sources
+      try {
+        const webResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${figure.name} biography articles scholarly sources historical documents`,
+            type: "search",
+            num: 5
+          }
+        });
+
+        if (webResponse.data?.organic_results?.length > 0) {
+          relevantKnowledge += '\n\n🌐 WEB ARTICLES & SCHOLARLY SOURCES:\n';
+          webResponse.data.organic_results.slice(0, 3).forEach((result: any) => {
+            relevantKnowledge += `- "${result.title}"\n`;
+            if (result.snippet) {
+              relevantKnowledge += `  ${result.snippet.substring(0, 200)}...\n`;
+            }
+            relevantKnowledge += `  Source: ${result.link}\n`;
+          });
+        }
+      } catch (webError) {
+        console.log('Web search error:', webError);
+      }
+
+      // 6. Search for additional books by keywords from the message
       const messageKeywords = message.toLowerCase().split(' ').filter((word: string) => word.length > 3);
       if (messageKeywords.length > 0) {
         const keywordQuery = messageKeywords.map((keyword: string) => `title.ilike.%${keyword}%,description.ilike.%${keyword}%`).join(',');
@@ -93,7 +157,7 @@ serve(async (req) => {
           .limit(3);
 
         if (!keywordError && keywordBooks && keywordBooks.length > 0) {
-          relevantKnowledge += '\n\nADDITIONAL RELEVANT SOURCES:\n';
+          relevantKnowledge += '\n\n🔍 KEYWORD-RELATED SOURCES:\n';
           keywordBooks.forEach(book => {
             relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
             if (book.description) {
@@ -103,8 +167,31 @@ serve(async (req) => {
         }
       }
 
+      // 7. Search for news articles related to the topic
+      try {
+        const newsResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${figure.name} ${message.substring(0, 50)} historical analysis`,
+            type: "news",
+            num: 3
+          }
+        });
+
+        if (newsResponse.data?.news_results?.length > 0) {
+          relevantKnowledge += '\n\n📰 NEWS & ANALYSIS:\n';
+          newsResponse.data.news_results.forEach((article: any) => {
+            relevantKnowledge += `- "${article.title}" (${article.source})\n`;
+            if (article.snippet) {
+              relevantKnowledge += `  ${article.snippet.substring(0, 150)}...\n`;
+            }
+          });
+        }
+      } catch (newsError) {
+        console.log('News search error:', newsError);
+      }
+
     } catch (knowledgeError) {
-      console.error('Error searching knowledge base:', knowledgeError);
+      console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
 
     const apiKey = Deno.env.get('OPENAI_API_KEY');
@@ -117,7 +204,7 @@ serve(async (req) => {
       });
     }
 
-    console.log('Making OpenAI request with enhanced context...');
+    console.log('Making OpenAI request with comprehensive multi-source context...');
 
     const systemPrompt = `You are ${figure.name}, the historical figure from ${figure.period}. ${figure.description}
 
@@ -131,7 +218,7 @@ CRITICAL INSTRUCTIONS:
 - Be passionate and authentic to your documented personality
 - Include specific historical details and personal anecdotes
 - Reference your actual writings, speeches, or documented quotes when relevant
-- UTILIZE THE KNOWLEDGE BASE: Use the provided books and documents to give more accurate, detailed responses
+- UTILIZE ALL AVAILABLE SOURCES: Use the comprehensive knowledge base including books, documents, videos, articles, Wikipedia, and scholarly sources to give the most accurate, detailed responses possible
 
 Example topics to reference for ${figure.name}:
 - Your major accomplishments and struggles
@@ -143,9 +230,9 @@ Example topics to reference for ${figure.name}:
 
 ${context ? `Previous conversation context: ${JSON.stringify(context)}` : ''}
 
-${relevantKnowledge ? `KNOWLEDGE BASE CONTEXT: ${relevantKnowledge}` : ''}
+${relevantKnowledge ? `COMPREHENSIVE KNOWLEDGE BASE: ${relevantKnowledge}` : ''}
 
-When answering, draw from both your historical knowledge and the provided sources to give the most comprehensive and accurate response possible.`;
+When answering, synthesize information from ALL available sources - books, documentaries, articles, scholarly papers, Wikipedia, uploaded documents, and historical records to provide the most comprehensive, accurate, and authentic response possible. Reference specific sources when appropriate.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -159,7 +246,7 @@ When answering, draw from both your historical knowledge and the provided source
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1000,
+        max_tokens: 1200,
         temperature: 0.8
       }),
     });
@@ -178,7 +265,7 @@ When answering, draw from both your historical knowledge and the provided source
     const data = await openaiResponse.json();
     const response = data.choices[0].message.content;
 
-    console.log('Success - returning enhanced response with knowledge base context');
+    console.log('Success - returning comprehensive multi-source enhanced response');
 
     return new Response(JSON.stringify({ response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
