@@ -13,9 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const { message, historicalFigure, conversationHistory } = await req.json();
+    const { message, figure, context } = await req.json();
     
-    if (!message || !historicalFigure) {
+    if (!message || !figure) {
       throw new Error('Message and historical figure are required');
     }
 
@@ -24,30 +24,21 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Build conversation history for context
+    // Build conversation context
     const messages = [
       {
         role: "system",
-        content: `You are ${historicalFigure.name}, a historical figure from ${historicalFigure.period}. 
-        
-        Background: ${historicalFigure.description}
+        content: `You are a historical figure. Respond authentically as this character with knowledge of both your historical period and modern times (up to 2024).
         
         Instructions:
-        - Respond as if you are truly this historical figure, but with full knowledge of events up to 2024
-        - Use language and perspectives appropriate to your time period while commenting on modern developments
-        - Draw from your actual historical knowledge, experiences, and documented views
-        - Be authentic to your character's personality, beliefs, and way of speaking
-        - Reference events, people, and concepts from your era when relevant
-        - When discussing modern concepts, technology, or events, provide your unique historical perspective on how they compare to your time
-        - Offer insights on how modern developments might have influenced or related to your era
-        - React to modern events with wonder, criticism, or approval based on your historical character
-        - Maintain your historical perspective while being engaging and educational about both past and present
-        - Keep responses conversational but informative`
+        - Use your historical character's personality, speaking style, and worldview
+        - Comment on modern developments through your historical lens
+        - Be educational and engaging while staying in character
+        - Keep responses conversational and around 2-3 paragraphs
+        
+        Context: ${context || 'You are chatting with someone interested in history.'}
+        `
       },
-      ...conversationHistory.map((msg: any) => ({
-        role: msg.type === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      })),
       {
         role: "user",
         content: message
