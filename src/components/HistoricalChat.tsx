@@ -667,30 +667,6 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     return pitchMap[figure.id] || (figure.id.includes('marie') || figure.id.includes('cleopatra') || figure.id.includes('joan') ? 1.1 : 0.85);
   };
 
-  const getVoiceForFigure = async (figure: HistoricalFigure): Promise<string> => {
-    const authenticVoices: Record<string, string> = {};
-
-    if (authenticVoices[figure.id]) {
-      return authenticVoices[figure.id];
-    }
-
-    const regionalVoices: Record<string, string> = {
-      'winston-churchill': 'George',
-      'albert-einstein': 'Brian',
-      'marie-curie': 'Charlotte',
-      'leonardo-da-vinci': 'Liam',
-      'cleopatra': 'Sarah',
-      'socrates': 'Daniel',
-      'shakespeare': 'Will',
-      'napoleon': 'Roger',
-      'abraham-lincoln': 'Brian',
-      'julius-caesar': 'George',
-      'joan-of-arc': 'Charlotte',
-      'galileo': 'Liam'
-    };
-
-    return regionalVoices[figure.id] || 'Aria';
-  };
 
   const createAuthenticVoice = async (figure: HistoricalFigure) => {
     try {
