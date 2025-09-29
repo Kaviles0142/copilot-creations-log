@@ -1017,6 +1017,26 @@ const HistoricalChat = () => {
                   setBooks([]);
                 }}
               />
+
+              {/* Conversation History */}
+              <div className="mt-4">
+                <ConversationHistory
+                  onSelectConversation={(conversation) => {
+                    // Find the figure for this conversation
+                    const figure: HistoricalFigure = {
+                      id: conversation.figure_id,
+                      name: conversation.figure_name,
+                      period: "", // Will be filled by search or default
+                      description: "", // Will be filled by search or default
+                      avatar: ""
+                    };
+                    
+                    setSelectedFigure(figure);
+                    setCurrentConversationId(conversation.id);
+                    loadConversation(conversation.id);
+                  }}
+                />
+              </div>
             </div>
 
           </div>
