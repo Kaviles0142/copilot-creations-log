@@ -340,7 +340,10 @@ const HistoricalChat = () => {
     
     try {
       // For now, provide a basic response while we fix the edge function
-      const mockResponse = `Hello! I am ${selectedFigure!.name}. I apologize, but I'm currently experiencing some technical difficulties with my advanced AI responses. However, I can tell you that as ${selectedFigure!.name}, I lived during ${selectedFigure!.period} and am known for ${selectedFigure!.description}. 
+      const periodText = selectedFigure!.period || "a significant period in history";
+      const descriptionText = selectedFigure!.description || "my contributions to human knowledge and society";
+      
+      const mockResponse = `Hello! I am ${selectedFigure!.name}. I apologize, but I'm currently experiencing some technical difficulties with my advanced AI responses. However, I can tell you that as ${selectedFigure!.name}, I lived during ${periodText} and am known for ${descriptionText}. 
 
 What would you like to discuss about my life, work, or thoughts on modern developments?
 
