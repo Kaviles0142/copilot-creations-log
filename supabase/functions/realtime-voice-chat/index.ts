@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,12 +22,37 @@ serve(async (req) => {
     return new Response("Missing figure parameters", { status: 400 });
   }
 
+  // Initialize Supabase client
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
   console.log(`Starting realtime voice chat with ${figureName}`);
 
   const { socket, response } = Deno.upgradeWebSocket(req);
   
   let openAISocket: WebSocket | null = null;
   let sessionEstablished = false;
+  let useClonedVoice = false;
+  let clonedVoiceId: string | null = null;
+
+  // Check for cloned voice upfront
+  try {
+    const { data: clonedVoice } = await supabase
+      .from('cloned_voices')
+      .select('voice_id, voice_name')
+      .eq('figure_id', figure)
+      .eq('is_active', true)
+      .single();
+    
+    if (clonedVoice?.voice_id) {
+      console.log(`Found cloned voice: ${clonedVoice.voice_name} (${clonedVoice.voice_id})`);
+      useClonedVoice = true;
+      clonedVoiceId = clonedVoice.voice_id;
+    }
+  } catch (error) {
+    console.log('No cloned voice found, using OpenAI default voice');
+  }
 
   socket.onopen = () => {
     console.log("Client WebSocket connected");
@@ -57,7 +83,7 @@ serve(async (req) => {
       }));
     };
 
-    openAISocket.onmessage = (event) => {
+    openAISocket.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data);
         console.log("OpenAI message type:", data.type);
@@ -70,7 +96,7 @@ serve(async (req) => {
           const sessionUpdate = {
             type: 'session.update',
             session: {
-              modalities: ["text", "audio"],
+              modalities: useClonedVoice ? ["text"] : ["text", "audio"], // Disable OpenAI audio if we have cloned voice
               instructions: `You are ${figureName}, the historical figure. Respond ONLY in first person as ${figureName}. 
               
 CRITICAL INSTRUCTIONS:
@@ -108,8 +134,50 @@ Remember: You are having a natural voice conversation. Speak conversationally an
           
           socket.send(JSON.stringify({
             type: 'session_ready',
-            message: `Ready to chat with ${figureName}`
+            message: `Ready to chat with ${figureName}`,
+            using_cloned_voice: useClonedVoice
           }));
+        }
+
+        // Handle text completion for cloned voice generation
+        if (useClonedVoice && data.type === 'response.text.done') {
+          console.log("Generating cloned voice audio for:", data.response.output[0]?.content?.text);
+          
+          try {
+            // Generate audio using Resemble AI
+            const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-text-to-speech', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                text: data.response.output[0]?.content?.text || '',
+                voice_id: clonedVoiceId
+              })
+            });
+
+            if (response.ok) {
+              const audioData = await response.json();
+              
+              // Send custom audio event to client
+              socket.send(JSON.stringify({
+                type: 'response.audio.delta',
+                delta: audioData.audio_base64,
+                cloned_voice: true
+              }));
+              
+              socket.send(JSON.stringify({
+                type: 'response.audio.done',
+                cloned_voice: true
+              }));
+              
+              // Also forward the text response
+              socket.send(event.data);
+              return;
+            }
+          } catch (error) {
+            console.error("Error generating cloned voice:", error);
+          }
         }
 
         // Forward all messages to client
