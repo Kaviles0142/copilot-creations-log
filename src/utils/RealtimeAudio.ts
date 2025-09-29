@@ -280,4 +280,16 @@ export class RealtimeMusicChat {
 
     this.ws.send(JSON.stringify({ type: 'response.create' }));
   }
+
+  sendMusicAnalysis(musicData: any) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('WebSocket not ready for music analysis');
+      return;
+    }
+
+    this.ws.send(JSON.stringify({
+      type: 'music_analysis',
+      musicData: musicData
+    }));
+  }
 }
