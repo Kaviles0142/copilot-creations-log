@@ -42,6 +42,7 @@ serve(async (req) => {
 
     try {
       // 1. Search books related to the figure
+      console.log(`Searching books for figure: ${figure.name} (ID: ${figure.id})`);
       const { data: books, error: booksError } = await supabase
         .from('books')
         .select('title, authors, description, book_type')
@@ -50,14 +51,20 @@ serve(async (req) => {
 
       if (booksError) {
         console.log('Books search error:', booksError);
-      } else if (books && books.length > 0) {
-        relevantKnowledge += '\n\n📚 RELEVANT BOOKS AND SOURCES:\n';
-        books.forEach(book => {
-          relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'} (${book.book_type})\n`;
-          if (book.description) {
-            relevantKnowledge += `  Summary: ${book.description.substring(0, 200)}...\n`;
-          }
-        });
+      } else {
+        console.log(`Found ${books?.length || 0} books for ${figure.name}`);
+        if (books && books.length > 0) {
+          relevantKnowledge += '\n\n📚 RELEVANT BOOKS AND SOURCES:\n';
+          books.forEach(book => {
+            relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'} (${book.book_type})\n`;
+            if (book.description) {
+              relevantKnowledge += `  Summary: ${book.description.substring(0, 300)}...\n`;
+            }
+          });
+          console.log('Books knowledge added to context');
+        } else {
+          console.log('No books found for this figure');
+        }
       }
 
       // 2. Search documents if conversation ID is provided
@@ -82,6 +89,7 @@ serve(async (req) => {
       }
 
       // 3. Search YouTube for video content
+      console.log(`Searching YouTube for ${figure.name}...`);
       try {
         const youtubeResponse = await supabase.functions.invoke('youtube-search', {
           body: { 
@@ -90,15 +98,19 @@ serve(async (req) => {
           }
         });
 
+        console.log('YouTube response:', youtubeResponse);
         if (youtubeResponse.data?.results?.length > 0) {
           relevantKnowledge += '\n\n🎥 YOUTUBE VIDEOS & DOCUMENTARIES:\n';
           youtubeResponse.data.results.forEach((video: any) => {
             relevantKnowledge += `- "${video.title}" (${video.channelTitle})\n`;
             if (video.description) {
-              relevantKnowledge += `  Description: ${video.description.substring(0, 150)}...\n`;
+              relevantKnowledge += `  Description: ${video.description.substring(0, 200)}...\n`;
             }
             relevantKnowledge += `  URL: ${video.url}\n`;
           });
+          console.log(`Added ${youtubeResponse.data.results.length} YouTube videos to context`);
+        } else {
+          console.log('No YouTube videos found');
         }
       } catch (youtubeError) {
         console.log('YouTube search error:', youtubeError);
@@ -218,7 +230,9 @@ CRITICAL INSTRUCTIONS:
 - Be passionate and authentic to your documented personality
 - Include specific historical details and personal anecdotes
 - Reference your actual writings, speeches, or documented quotes when relevant
-- UTILIZE ALL AVAILABLE SOURCES: Use the comprehensive knowledge base including books, documents, videos, articles, Wikipedia, and scholarly sources to give the most accurate, detailed responses possible
+- CRITICAL: You MUST use the comprehensive knowledge sources provided below to give DETAILED, SPECIFIC answers with concrete examples, dates, names, and quotes
+- DO NOT give generic responses - use the specific information from the sources to provide rich, detailed answers
+- When referencing sources, mention them naturally as if recalling from your own experience or knowledge
 
 Example topics to reference for ${figure.name}:
 - Your major accomplishments and struggles
@@ -230,9 +244,15 @@ Example topics to reference for ${figure.name}:
 
 ${context ? `Previous conversation context: ${JSON.stringify(context)}` : ''}
 
-${relevantKnowledge ? `COMPREHENSIVE KNOWLEDGE BASE: ${relevantKnowledge}` : ''}
+${relevantKnowledge ? `COMPREHENSIVE KNOWLEDGE BASE - USE THIS EXTENSIVELY: ${relevantKnowledge}` : ''}
 
-When answering, synthesize information from ALL available sources - books, documentaries, articles, scholarly papers, Wikipedia, uploaded documents, and historical records to provide the most comprehensive, accurate, and authentic response possible. Reference specific sources when appropriate.`;
+RESPONSE REQUIREMENTS:
+- Use specific dates, names, events, and quotes from the sources
+- Reference concrete examples from the provided materials
+- Give detailed explanations with historical context
+- If sources mention specific books, speeches, or documents, reference them
+- Provide rich, substantive answers that show deep knowledge
+- Make responses informative and educational, not just conversational`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -246,10 +266,13 @@ When answering, synthesize information from ALL available sources - books, docum
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1200,
-        temperature: 0.8
+        max_tokens: 1500,
+        temperature: 0.7
       }),
     });
+
+    console.log(`OpenAI request completed. Status: ${openaiResponse.status}`);
+    console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
@@ -265,6 +288,7 @@ When answering, synthesize information from ALL available sources - books, docum
     const data = await openaiResponse.json();
     const response = data.choices[0].message.content;
 
+    console.log(`Response generated. Length: ${response.length} characters`);
     console.log('Success - returning comprehensive multi-source enhanced response');
 
     return new Response(JSON.stringify({ response }), {
