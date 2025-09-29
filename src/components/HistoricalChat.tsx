@@ -74,6 +74,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
+  const [showVoiceCloning, setShowVoiceCloning] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -560,8 +561,8 @@ What would you like to discuss about my life, work, or thoughts on modern develo
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voice = getElevenLabsVoiceForFigure(figure);
-    console.log(`Using ElevenLabs voice: ${voice} for ${figure.name}`);
+    const voiceId = await getVoiceForFigure(figure);
+    console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
 
     const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
       method: 'POST',
@@ -570,7 +571,7 @@ What would you like to discuss about my life, work, or thoughts on modern develo
       },
       body: JSON.stringify({
         text: text,
-        voice: voice
+        voice: voiceId // Use the voice ID directly
       }),
     });
 
@@ -603,31 +604,48 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     console.log('Premium ElevenLabs speech started playing');
   };
 
-  // Get appropriate ElevenLabs voice for historical figures  
-  const getElevenLabsVoiceForFigure = (figure: HistoricalFigure): string => {
-    const isMale = detectGender(figure);
-    
-    if (isMale) {
-      // Premium ElevenLabs male voices - ultra natural
-      const maleVoices = {
-        'albert-einstein': 'Einstein',  // New voice from ElevenLabs library!
-        'winston-churchill': 'George',  // Authoritative, British
-        'abraham-lincoln': 'Will',      // Confident, presidential  
-        'shakespeare': 'Callum',        // British, eloquent
-        'napoleon': 'George',          // Commanding
-        'socrates': 'Eric',            // Wise, warm
-      };
+  // Get voice for historical figure - check for cloned voices first
+  const getVoiceForFigure = async (figure: HistoricalFigure): Promise<string> => {
+    try {
+      // First, check if we have a cloned voice for this figure
+      const { data: clonedVoices, error } = await supabase
+        .from('historical_voices')
+        .select('*')
+        .eq('figure_id', figure.id)
+        .eq('is_cloned', true)
+        .order('created_at', { ascending: false });
+
+      if (!error && clonedVoices && clonedVoices.length > 0) {
+        console.log(`Using cloned voice for ${figure.name}:`, clonedVoices[0].voice_name);
+        return clonedVoices[0].voice_id;
+      }
+
+      // Fallback to preset voices
+      const isMale = detectGender(figure);
       
-      return maleVoices[figure.id] || 'Einstein'; // New Einstein voice as default
-    } else {
-      // Premium ElevenLabs female voices
-      const femaleVoices = {
-        'marie-curie': 'Sarah',        // Professional, intelligent
-        'cleopatra': 'Charlotte',      // Regal, clear
-        'joan-of-arc': 'Jessica'       // Strong, friendly
-      };
-      
-      return femaleVoices[figure.id] || 'Sarah'; // Sarah is clear and professional
+      if (isMale) {
+        const maleVoices = {
+          'albert-einstein': 'Einstein',  // From voice library
+          'winston-churchill': 'George',  
+          'abraham-lincoln': 'Will',      
+          'shakespeare': 'Callum',        
+          'napoleon': 'George',          
+          'socrates': 'Eric',            
+        };
+        
+        return maleVoices[figure.id] || 'Einstein';
+      } else {
+        const femaleVoices = {
+          'marie-curie': 'Sarah',        
+          'cleopatra': 'Charlotte',      
+          'joan-of-arc': 'Jessica'       
+        };
+        
+        return femaleVoices[figure.id] || 'Sarah';
+      }
+    } catch (error) {
+      console.error('Error getting voice for figure:', error);
+      return 'Einstein'; // Default fallback
     }
   };
 
@@ -870,6 +888,15 @@ What would you like to discuss about my life, work, or thoughts on modern develo
           />
           
           <div className="space-y-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowVoiceCloning(!showVoiceCloning)}
+              className="flex items-center gap-1"
+            >
+              <Mic className="h-4 w-4" />
+              Clone Voice
+            </Button>
             <Button
               variant="outline"
               className="w-full justify-start"
