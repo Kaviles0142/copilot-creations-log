@@ -594,43 +594,24 @@ What would you like to discuss about my life, work, or thoughts on modern develo
     const voiceId = await getOrCreateAuthenticVoice(figure);
     console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
 
-    // Try Resemble.ai first, fallback to ElevenLabs
-    let response;
-    let usedResemble = false;
+    // Use only Resemble.ai for text-to-speech
+    console.log(`Generating speech with Resemble.ai for ${figure.name} using voice: ${voiceId}`);
     
-    try {
-      // First attempt with Resemble.ai
-      response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-text-to-speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: text,
-          voice: voiceId
-        }),
-      });
-      
-      if (response.ok) {
-        usedResemble = true;
-        console.log(`Using Resemble.ai TTS for ${figure.name}`);
-      } else {
-        throw new Error(`Resemble.ai TTS failed: ${response.status}`);
-      }
-    } catch (resembleError) {
-      console.log(`Resemble.ai TTS failed, falling back to ElevenLabs...`);
-      
-      // Fallback to ElevenLabs TTS
-      response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/text-to-speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: text,
-          voice: voiceId
-        }),
-      });
+    const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-text-to-speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        voice: voiceId
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Resemble.ai TTS failed:', errorText);
+      throw new Error(`Resemble.ai TTS failed: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
