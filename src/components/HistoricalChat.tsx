@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square, Pause, RotateCcw, Play } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -62,6 +62,7 @@ const HistoricalChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
@@ -349,6 +350,81 @@ const HistoricalChat = () => {
     }
   };
 
+  const handlePauseAudio = () => {
+    // Pause current audio playback
+    if (currentAudio && isPlayingAudio) {
+      currentAudio.pause();
+      setIsPlayingAudio(false);
+      setIsPaused(true);
+    }
+
+    // Pause speech synthesis (note: no native pause, so we stop it)
+    if ('speechSynthesis' in window && isPlayingAudio && !currentAudio) {
+      window.speechSynthesis.pause();
+      setIsPlayingAudio(false);
+      setIsPaused(true);
+    }
+    
+    console.log('⏸️ Audio paused');
+    
+    toast({
+      title: "Paused",
+      description: "Audio playback has been paused",
+      duration: 2000,
+    });
+  };
+
+  const handleResumeAudio = () => {
+    // Resume current audio playback
+    if (currentAudio && isPaused) {
+      currentAudio.play();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+
+    // Resume speech synthesis
+    if ('speechSynthesis' in window && isPaused && !currentAudio) {
+      window.speechSynthesis.resume();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+    
+    console.log('▶️ Audio resumed');
+  };
+
+  const handleReplayAudio = () => {
+    // Replay current audio from beginning
+    if (currentAudio) {
+      currentAudio.currentTime = 0;
+      currentAudio.play();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+
+    // For speech synthesis, we need to restart (no native replay)
+    if ('speechSynthesis' in window && !currentAudio) {
+      window.speechSynthesis.cancel();
+      // We would need to re-generate the speech here
+      setIsPlayingAudio(false);
+      setIsPaused(false);
+      
+      toast({
+        title: "Replay",
+        description: "Click the voice button to replay the message",
+        duration: 3000,
+      });
+      return;
+    }
+    
+    console.log('🔄 Audio replayed from beginning');
+    
+    toast({
+      title: "Replaying",
+      description: "Audio restarted from the beginning",
+      duration: 2000,
+    });
+  };
+
   const handleStopGeneration = () => {
     // Stop any ongoing API requests
     if (abortController) {
@@ -356,24 +432,30 @@ const HistoricalChat = () => {
       setAbortController(null);
     }
 
-    // Stop speech synthesis
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    // If audio is playing, pause it instead of stopping
+    if (isPlayingAudio) {
+      handlePauseAudio();
+      return;
     }
 
-    // Stop current audio playback
+    // Complete stop - reset everything
     if (currentAudio) {
       currentAudio.pause();
       currentAudio.currentTime = 0;
       setCurrentAudio(null);
     }
 
-    // Reset loading and audio states
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    // Reset all states
     setIsLoading(false);
     setIsPlayingAudio(false);
+    setIsPaused(false);
     setRetryCount(0);
     
-    console.log('🛑 Generation stopped by user');
+    console.log('🛑 Generation completely stopped');
     
     toast({
       title: "Stopped",
@@ -591,8 +673,14 @@ const HistoricalChat = () => {
     utterance.text = naturalText;
     
     utterance.onstart = () => setIsPlayingAudio(true);
-    utterance.onend = () => setIsPlayingAudio(false);
-    utterance.onerror = () => setIsPlayingAudio(false);
+    utterance.onend = () => {
+      setIsPlayingAudio(false);
+      setIsPaused(false);
+    };
+    utterance.onerror = () => {
+      setIsPlayingAudio(false);
+      setIsPaused(false);
+    };
 
     speechSynthesis.speak(utterance);
   };
@@ -730,12 +818,14 @@ const HistoricalChat = () => {
 
     audio.onended = () => {
       setIsPlayingAudio(false);
+      setIsPaused(false);
       setCurrentAudio(null);
       console.log('Audio playback completed');
     };
 
     audio.onerror = () => {
       setIsPlayingAudio(false);
+      setIsPaused(false);
       setCurrentAudio(null);
       console.error('Error playing audio');
     };
@@ -1235,7 +1325,8 @@ const HistoricalChat = () => {
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               </div>
-              {(isLoading || isPlayingAudio) ? (
+              {isLoading ? (
+                // Show stop button during text generation
                 <Button 
                   onClick={handleStopGeneration}
                   size="icon"
@@ -1244,7 +1335,38 @@ const HistoricalChat = () => {
                 >
                   <Square className="h-4 w-4" />
                 </Button>
+              ) : isPlayingAudio ? (
+                // Show pause button during audio playback
+                <Button 
+                  onClick={handlePauseAudio}
+                  size="icon"
+                  variant="secondary"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+              ) : isPaused ? (
+                // Show play and replay buttons when paused
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleResumeAudio}
+                    size="icon"
+                    variant="default"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={handleReplayAudio}
+                    size="icon"
+                    variant="outline"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
               ) : (
+                // Show send button when ready
                 <Button 
                   onClick={handleSendMessage}
                   disabled={!inputMessage.trim()}
