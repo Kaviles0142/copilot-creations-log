@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Send, User, Bot, Volume2, VolumeX } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff } from "lucide-react";
 import AvatarSelector from "./AvatarSelector";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -31,6 +31,56 @@ const HistoricalChat = () => {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = () => {
+        setIsListening(true);
+        console.log('Voice recognition started');
+      };
+      
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputMessage(prev => prev + transcript);
+        console.log('Speech recognition result:', transcript);
+      };
+      
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+        console.log('Voice recognition ended');
+      };
+      
+      setRecognition(recognition);
+    }
+  }, []);
+
+  const toggleVoiceRecognition = () => {
+    if (!recognition) {
+      alert('Speech recognition is not supported in your browser');
+      return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedFigure) return;
@@ -259,14 +309,25 @@ const HistoricalChat = () => {
         {selectedFigure && (
           <div className="border-t border-border bg-card p-4">
             <div className="flex space-x-2">
-              <Textarea
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={`Ask ${selectedFigure.name} anything...`}
-                className="min-h-[60px] resize-none"
-                disabled={isLoading}
-              />
+              <div className="flex-1 relative">
+                <Textarea
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={`Ask ${selectedFigure.name} anything...`}
+                  className="min-h-[60px] resize-none pr-12"
+                  disabled={isLoading}
+                />
+                <Button
+                  onClick={toggleVoiceRecognition}
+                  disabled={isLoading}
+                  variant="ghost"
+                  size="sm"
+                  className={`absolute right-2 top-2 h-8 w-8 ${isListening ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}
+                >
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              </div>
               <Button 
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isLoading}
@@ -276,6 +337,11 @@ const HistoricalChat = () => {
                 <Send className="h-4 w-4" />
               </Button>
             </div>
+            {isListening && (
+              <p className="text-sm text-muted-foreground mt-2 animate-pulse">
+                🎤 Listening... Speak now
+              </p>
+            )}
           </div>
         )}
       </div>
