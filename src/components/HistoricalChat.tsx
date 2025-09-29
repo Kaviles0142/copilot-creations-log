@@ -435,12 +435,18 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
 
-      // Skip premium speech for now, go straight to browser speech that works
-      console.log('🎤 Using browser speech synthesis');
-      if ('speechSynthesis' in window) {
-        generateBrowserSpeech(text, figure);
-      } else {
-        console.error('Speech synthesis not supported in this browser');
+      // Try Resemble.ai first for better quality voices
+      console.log('🎤 Attempting Resemble.ai TTS...');
+      try {
+        await generatePremiumSpeech(text, figure);
+        console.log('✅ Resemble.ai TTS successful');
+      } catch (premiumError) {
+        console.log('❌ Resemble.ai TTS failed, falling back to browser speech:', premiumError);
+        if ('speechSynthesis' in window) {
+          generateBrowserSpeech(text, figure);
+        } else {
+          console.error('Speech synthesis not supported in this browser');
+        }
       }
     } catch (error) {
       console.error('Error generating speech:', error);

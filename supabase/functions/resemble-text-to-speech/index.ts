@@ -37,27 +37,23 @@ serve(async (req) => {
 
     console.log(`Using Resemble.ai voice ID: ${voiceId} for text: "${text.substring(0, 50)}..."`);
 
-    // Call Resemble.ai TTS API with enhanced quality settings
-    const response = await fetch(`https://app.resemble.ai/api/v2/voices/${voiceId}/synthesize`, {
+    // Call Resemble.ai TTS API with correct format
+    const response = await fetch('https://app.resemble.ai/api/v2/projects/YOUR_PROJECT_UUID/clips', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${RESEMBLE_API_KEY}`,
+        'Authorization': `Token token="${RESEMBLE_API_KEY}"`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: text,
-        options: {
-          emotion: 'natural',
-          speed: 0.85,  // Even slower for more natural speech
-          pitch: 0,
-          volume: 1.0,
-          sample_rate: 48000,  // Maximum quality audio
-          format: 'wav',  // Best quality format
-          emphasis: 'strong',  // More natural emphasis
-          prosody_rate: '0.8',  // Even more natural speech rate
-          quality: 'highest',  // Maximum quality setting
-          naturalness: 'high',  // Added naturalness
-          style: 'conversational'  // More conversational style
+        data: {
+          body: text,
+          voice_uuid: voiceId,
+          is_public: false,
+          is_archived: false,
+          precision: 'PCM_22050',
+          output_format: 'mp3',
+          include_timestamps: false,
+          raw: false
         }
       }),
     });
