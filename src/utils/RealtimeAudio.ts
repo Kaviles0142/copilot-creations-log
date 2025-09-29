@@ -314,32 +314,36 @@ export class RealtimeChat {
       
       // Initialize audio context
       this.audioContext = new AudioContext({ sampleRate: 24000 });
+      console.log('Audio context initialized:', this.audioContext.state);
       
       // Connect to our Supabase WebSocket edge function
       const wsUrl = `wss://trclpvryrjlafacocbnd.functions.supabase.co/functions/v1/realtime-voice-chat?figure=${encodeURIComponent(this.figure.id)}&figureName=${encodeURIComponent(this.figure.name)}`;
+      console.log('Attempting to connect to WebSocket:', wsUrl);
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('Connected to realtime chat');
+        console.log('✅ WebSocket connected successfully');
         this.onConnectionChange(true);
       };
       
       this.ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Received message:', data.type, data);
+          console.log('📨 Received message:', data.type, data);
           
           this.onMessage(data);
           
           if (data.type === 'response.audio.delta') {
-            console.log('Playing audio delta, length:', data.delta?.length, 'cloned_voice:', data.cloned_voice);
+            console.log('🔊 Playing audio delta, length:', data.delta?.length, 'cloned_voice:', data.cloned_voice);
             // Play audio chunk
             if (data.cloned_voice) {
               // Handle cloned voice audio (base64 encoded audio file)
+              console.log('Playing cloned voice audio');
               const audio = new Audio(`data:audio/wav;base64,${data.delta}`);
               await audio.play();
             } else {
               // Handle OpenAI audio (PCM data)
+              console.log('Playing OpenAI PCM audio');
               const binaryString = atob(data.delta);
               const bytes = new Uint8Array(binaryString.length);
               for (let i = 0; i < binaryString.length; i++) {
@@ -351,28 +355,30 @@ export class RealtimeChat {
               }
             }
           } else if (data.type === 'session_ready') {
-            console.log('Session ready, starting recording...');
+            console.log('🎤 Session ready, starting recording...');
             // Start audio recording once session is ready
             await this.startRecording();
+          } else if (data.type === 'error') {
+            console.error('❌ WebSocket error received:', data.message);
           }
           
         } catch (error) {
-          console.error('Error processing message:', error);
+          console.error('❌ Error processing message:', error);
         }
       };
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ WebSocket connection error:', error);
         this.onConnectionChange(false);
       };
       
-      this.ws.onclose = () => {
-        console.log('WebSocket closed');
+      this.ws.onclose = (event) => {
+        console.log('🔌 WebSocket closed, code:', event.code, 'reason:', event.reason);
         this.onConnectionChange(false);
       };
       
     } catch (error) {
-      console.error('Error connecting to realtime chat:', error);
+      console.error('❌ Error connecting to realtime chat:', error);
       throw error;
     }
   }
