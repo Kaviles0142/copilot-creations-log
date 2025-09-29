@@ -875,6 +875,32 @@ Instructions: You are ${selectedFigure!.name}. Respond as this historical figure
                     )}
                   </Button>
                 )}
+                
+                <ConversationExport 
+                  messages={messages} 
+                  selectedFigure={selectedFigure} 
+                />
+                
+                <FigureRecommendations 
+                  selectedFigure={selectedFigure} 
+                  onSelectFigure={setSelectedFigure} 
+                />
+                
+                <TimelineVisualization 
+                  selectedFigure={selectedFigure} 
+                  onSelectFigure={setSelectedFigure} 
+                />
+                
+                <VoiceSettings 
+                  selectedFigure={selectedFigure}
+                  onVoiceGenerated={(audioUrl) => {
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                    setCurrentAudio(audio);
+                    setIsPlayingAudio(true);
+                    audio.onended = () => setIsPlayingAudio(false);
+                  }} 
+                />
               </div>
             </div>
           ) : (
