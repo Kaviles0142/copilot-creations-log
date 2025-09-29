@@ -27,7 +27,7 @@ serve(async (req) => {
     // Map voice names to ElevenLabs voice IDs with premium natural voices
     const voiceMap: Record<string, string> = {
       // Historical Figures - Premium voices that match their characteristics
-      'John F. Kennedy': 'jgZhwQhGPa2RZhtCI0j0',    // Custom JFK voice from ElevenLabs
+      'John F. Kennedy': 'UZvBfqEdvCFLqsBOo9Zr',    // Updated JFK voice from ElevenLabs
       'Abraham Lincoln': 'onwK4e9ZLuTAKqWW03F9',    // Daniel - Deep, thoughtful male voice
       'Winston Churchill': 'CwhRBWXzGAHq8TQ4Fs17',   // Roger - Professional, distinguished male voice
       'Franklin D. Roosevelt': 'bIHbv24MWmeRgasZH58o', // Will - Confident, commanding male voice
