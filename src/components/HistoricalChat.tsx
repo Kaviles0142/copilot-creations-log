@@ -1273,7 +1273,7 @@ const HistoricalChat = () => {
             )}
 
             <div>
-              <h3 className="font-semibold mb-3">Search Any Historical Figure</h3>
+              <h3 className="font-semibold mb-3">🔍 Find Historical Figures</h3>
               <HistoricalFigureSearch 
                 selectedFigure={selectedFigure}
                 onSelectFigure={(figure) => {
@@ -1285,33 +1285,24 @@ const HistoricalChat = () => {
                 }}
               />
 
-              {/* Conversation History */}
-              <div className="mt-4">
-                <ConversationHistory
-                  onSelectConversation={(conversation) => {
-                    // Find the figure for this conversation
-                    const figure: HistoricalFigure = {
-                      id: conversation.figure_id,
-                      name: conversation.figure_name,
-                      period: "", // Will be filled by search or default
-                      description: "", // Will be filled by search or default
-                      avatar: ""
-                    };
-                    
-                    setSelectedFigure(figure);
-                    setCurrentConversationId(conversation.id);
-                    loadConversation(conversation.id);
-                  }}
-                  selectedFigureId={selectedFigure?.id}
-                  onConversationDelete={() => {
-                    // Clear current conversation if it was deleted
-                    setMessages([]);
-                    setCurrentConversationId(null);
-                  }}
-                />
-              </div>
+              {/* Recent Conversations with Current Figure */}
+              {selectedFigure && (
+                <div className="mt-4">
+                  <ConversationHistory
+                    onSelectConversation={(conversation) => {
+                      setCurrentConversationId(conversation.id);
+                      loadConversation(conversation.id);
+                    }}
+                    selectedFigureId={selectedFigure.id}
+                    onConversationDelete={() => {
+                      setMessages([]);
+                      setCurrentConversationId(null);
+                    }}
+                  />
+                </div>
+              )}
 
-              {/* Figure List with Conversations */}
+              {/* All Previous Chats Overview */}
               <div className="mt-4">
                 <FigureList
                   onSelectConversation={(conversation) => {

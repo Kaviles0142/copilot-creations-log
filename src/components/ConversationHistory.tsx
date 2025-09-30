@@ -171,7 +171,7 @@ export default function ConversationHistory({ onSelectConversation, selectedFigu
       <div className="flex items-center space-x-2 mb-4">
         <History className="h-4 w-4 text-primary" />
         <h3 className="font-semibold">
-          {selectedFigureId ? 'Figure History' : 'All Conversations'}
+          {selectedFigureId ? '📚 Recent Chats' : '🕒 All Recent Conversations'}
         </h3>
         <div className="flex items-center space-x-2 ml-auto">
           <Badge variant="secondary">

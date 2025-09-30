@@ -160,7 +160,7 @@ export default function FigureList({ onSelectConversation }: FigureListProps) {
     <Card className="p-4">
       <div className="flex items-center space-x-2 mb-4">
         <MessageCircle className="h-4 w-4 text-primary" />
-        <h3 className="font-semibold">Chat History</h3>
+        <h3 className="font-semibold">👥 All People Chatted With</h3>
         <Badge variant="secondary" className="ml-auto">
           {figures.length} {figures.length === 1 ? 'person' : 'people'}
         </Badge>
