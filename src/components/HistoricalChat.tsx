@@ -820,17 +820,17 @@ const HistoricalChat = () => {
       if (clonedVoiceId && (clonedVoiceId.startsWith('resemble_') || clonedVoiceId.startsWith('coqui_'))) {
         console.log(`🎯 Using CLONED voice: ${clonedVoiceId} for ${figure.name}`);
         
-        // Use Coqui TTS for cloned voices (handles both coqui_ and resemble_ voices)
-        const { data, error } = await supabase.functions.invoke('coqui-text-to-speech', {
+        // Use ElevenLabs TTS for cloned voices
+        const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
           body: { 
             text: text,
-            voice: clonedVoiceId
+            voice: figure.name // Use figure name for voice mapping
           }
         });
 
-        // If Coqui works, use it
+        // If ElevenLabs works, use it
         if (!error && data?.audioContent) {
-          console.log('✅ Successfully used Coqui TTS with CLONED voice');
+          console.log('✅ Successfully used ElevenLabs TTS');
           playAudioFromBase64(data.audioContent);
           return;
         } else {
@@ -848,19 +848,18 @@ const HistoricalChat = () => {
         }
       }
       
-      // Use premium ElevenLabs voice with figure-specific mapping
-      const premiumVoiceId = `coqui_${figure.id.replace(/-/g, '_')}_premium_fallback`;
-      console.log(`🎵 Using premium voice: ${premiumVoiceId} for ${figure.name}`);
+      // Use ElevenLabs as fallback
+      console.log(`🎵 Using ElevenLabs fallback for ${figure.name}`);
       
-      const { data, error } = await supabase.functions.invoke('coqui-text-to-speech', {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
         body: { 
           text: text,
-          voice: premiumVoiceId
+          voice: figure.name // Use figure name for voice mapping
         }
       });
 
       if (error) {
-        console.error('❌ Premium TTS Error:', error);
+        console.error('❌ ElevenLabs TTS Error:', error);
         return;
       }
 
