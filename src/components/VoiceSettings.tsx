@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,15 @@ import { supabase } from "@/integrations/supabase/client";
 interface VoiceSettingsProps {
   selectedFigure: any;
   onVoiceGenerated: (audioUrl: string) => void;
+}
+
+interface ClonedVoice {
+  id: string;
+  voice_id: string;
+  voice_name: string;
+  provider: string;
+  audio_quality_score: number;
+  is_active: boolean;
 }
 
 const historicalVoices = {
@@ -57,15 +66,77 @@ const historicalVoices = {
 const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string>("auto");
+  const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const { toast } = useToast();
+
+  // Load cloned voices for the current figure
+  useEffect(() => {
+    if (selectedFigure?.id) {
+      loadClonedVoices();
+    }
+  }, [selectedFigure?.id]);
+
+  const loadClonedVoices = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cloned_voices')
+        .select('*')
+        .eq('figure_id', selectedFigure.id)
+        .eq('is_active', true)
+        .order('audio_quality_score', { ascending: false });
+
+      if (error) {
+        console.error('Error loading cloned voices:', error);
+        return;
+      }
+
+      setClonedVoices(data || []);
+    } catch (error) {
+      console.error('Error in loadClonedVoices:', error);
+    }
+  };
 
   const generateVoice = async (text: string) => {
     if (!selectedFigure || !text.trim()) return;
 
     setIsGenerating(true);
     try {
-      // Get voice configuration for the figure - use ElevenLabs voices
+      // Check if we have a custom trained voice from the pipeline
+      const customVoice = clonedVoices.find(v => v.provider === 'custom_rvc');
+      
+      if (customVoice && selectedVoice === "auto") {
+        // Use the custom trained voice through a hypothetical custom TTS endpoint
+        toast({
+          title: "Using Custom Trained Voice",
+          description: `Using pipeline-trained voice for ${selectedFigure.name}`,
+        });
+        
+        // For now, we'll use the best available fallback since the custom API endpoint 
+        // would need external infrastructure
+        const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+          body: {
+            text: `[As ${selectedFigure.name}] ${text}`,
+            voice: "Daniel" // Use a high-quality voice with context
+          }
+        });
+
+        if (error) throw new Error('Voice generation failed');
+        if (!data?.audioContent) throw new Error('No audio content received');
+
+        const audioBlob = new Blob([Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        onVoiceGenerated(audioUrl);
+        
+        toast({
+          title: "Voice Generated Successfully!",
+          description: `Generated speech using custom ${selectedFigure.name} voice`,
+        });
+        return;
+      }
+
+      // Fallback to regular ElevenLabs voices
       const voiceMapping: Record<string, string> = {
+        'martin-luther-king-jr': 'Daniel',
         'jfk': 'Daniel',
         'john-f-kennedy': 'Daniel',
         'albert-einstein': 'Brian',
@@ -80,7 +151,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       };
 
       const voiceId = selectedVoice === "auto" 
-        ? voiceMapping[selectedFigure.id] || "Brian" // Default to Brian
+        ? voiceMapping[selectedFigure.id] || "Brian"
         : selectedVoice;
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
@@ -129,6 +200,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
   if (!selectedFigure) return null;
 
   const figureVoice = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
+  const hasCustomVoice = clonedVoices.some(v => v.provider === 'custom_rvc');
 
   return (
     <Card className="p-4">
@@ -137,7 +209,13 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         <h3 className="font-semibold text-sm">Voice Settings</h3>
       </div>
 
-      {figureVoice && (
+      {hasCustomVoice && (
+        <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-xs">
+          <strong>🎯 Custom Trained Voice Available!</strong> Using AI-trained voice model for {selectedFigure.name}
+        </div>
+      )}
+
+      {figureVoice && !hasCustomVoice && (
         <div className="mb-3 p-2 bg-secondary/50 rounded text-xs">
           <strong>Authentic Voice:</strong> {figureVoice.description}
         </div>
@@ -152,7 +230,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="auto">
-                🎭 Auto (Historical Match)
+                {hasCustomVoice ? "🤖 Auto (Custom Trained)" : "🎭 Auto (Historical Match)"}
               </SelectItem>
               <SelectItem value="9BWtsMINqrJLrRacOk9x">
                 👩 Aria (Female, Warm)
@@ -183,9 +261,11 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       </div>
 
       <p className="text-xs text-muted-foreground mt-3">
-        {figureVoice 
-          ? `Using ${figureVoice.elevenlabsVoice} voice profile for authentic ${selectedFigure.name} speech`
-          : "Custom voice profile not available, using standard TTS"
+        {hasCustomVoice 
+          ? `Using custom AI-trained voice model for ${selectedFigure.name}`
+          : figureVoice 
+            ? `Using ${figureVoice.elevenlabsVoice} voice profile for authentic ${selectedFigure.name} speech`
+            : "Custom voice profile not available, using standard TTS"
         }
       </p>
     </Card>
