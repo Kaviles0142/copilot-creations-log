@@ -25,7 +25,7 @@ serve(async (req) => {
     console.log(`Generating speech with ElevenLabs for voice: ${voice}`);
     console.log(`Text: "${text.substring(0, 100)}..."`);
 
-    // Map voice names to ElevenLabs voice IDs
+    // Map voice names to ElevenLabs voice IDs, or use direct voice ID if provided
     const voiceMap: Record<string, string> = {
       'Brian': 'nPczCjzI2devNBz1zQrb',
       'Alice': 'Xb7hH8MSUJpSbSDYk0k2',
@@ -52,8 +52,11 @@ serve(async (req) => {
       'default': 'nPczCjzI2devNBz1zQrb' // Brian as default
     };
 
-    // Get voice ID, default to Brian if not found
-    const voiceId = voiceMap[voice] || voiceMap['Brian'];
+    // If voice looks like a voice ID (alphanumeric with length > 10), use it directly
+    // Otherwise, map it from the voiceMap
+    const voiceId = (voice.length > 10 && /^[a-zA-Z0-9]+$/.test(voice)) 
+      ? voice 
+      : (voiceMap[voice] || voiceMap['Brian']);
     
     console.log(`Using ElevenLabs voice ID: ${voiceId} for voice: ${voice}`);
 

@@ -33,7 +33,8 @@ export const SourcesIndicator = ({ sourcesUsed, isVisible }: SourcesIndicatorPro
     sourcesUsed.historicalContext + 
     sourcesUsed.webArticles;
 
-  if (totalSources === 0) return null;
+  // Only show if there are meaningful sources (more than just basic lookup)
+  if (totalSources <= 1) return null;
 
   return (
     <Card className="mb-4 border-green-200 bg-green-50/50 dark:bg-green-900/20 dark:border-green-800">
