@@ -138,8 +138,31 @@ async function generateFallbackSpeech(text: string, voice: string) {
     throw new Error('ElevenLabs API key not found for fallback');
   }
 
-  // Use a default ElevenLabs voice for fallback
-  const fallbackVoiceId = 'onwK4e9ZLuTAKqWW03F9'; // Daniel voice
+  // Enhanced voice mapping for historical figures
+  const voiceMapping: { [key: string]: string } = {
+    // Male voices - ElevenLabs voice IDs
+    'Brian': 'nPczCjzI2devNBz1zQrb',     // Deep, presidential
+    'Bill': 'pqHfZKP75CvOlQylNhV4',      // Deep, resonant  
+    'George': 'JBFqnCBsd6RMkjVDRZzb',    // British accent
+    'Daniel': 'onwK4e9ZLuTAKqWW03F9',    // Confident, clear
+    'Eric': 'cjVigY5qzO86Huf0OWal',      // Intellectual
+    'Will': 'bIHbv24MWmeRgasZH58o',      // Wise, measured
+    'Callum': 'N2lVS1w4EtoT3dr4eOWO',    // British, dramatic
+    'Chris': 'iP95p4xoKVk53GoZ742B',     // Scientific
+    'Liam': 'TX3LPaxmHKxFdv7VOQHJ',      // Young, powerful
+    
+    // Female voices
+    'Sarah': 'EXAVITQu4vr4xnSDxMaL',     // Intelligent
+    'Laura': 'FGY2WhTYpPnrIDTdsKH5',     // British, authoritative
+    'Charlotte': 'XB0fDUnXU5powFXDhCwa',  // Regal
+    'Jessica': 'cgSgspJ2msm6clMCkdW9',    // Young, determined
+    'Alice': 'Xb7hH8MSUJpSbSDYk0k2',     // Literary, thoughtful
+    'Aria': '9BWtsMINqrJLrRacOk9x',      // Passionate, artistic
+  };
+
+  // Get the appropriate ElevenLabs voice ID
+  const fallbackVoiceId = voiceMapping[voice] || 'onwK4e9ZLuTAKqWW03F9'; // Default to Daniel
+  console.log(`Using ElevenLabs voice ${voice} (ID: ${fallbackVoiceId}) for fallback`);
   
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${fallbackVoiceId}`, {
     method: 'POST',

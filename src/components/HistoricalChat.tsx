@@ -751,31 +751,65 @@ const HistoricalChat = () => {
     return naturalText;
   };
 
-  // Fallback voice selection for when auto-cloning fails
+  // Enhanced fallback voice selection with historical accuracy
   const getFallbackVoice = (figure: HistoricalFigure): string => {
     const isMale = detectGender(figure);
     
     if (isMale) {
       const maleVoices = {
-        'albert-einstein': 'Einstein',  // From voice library
-        'winston-churchill': 'George',  
-        'abraham-lincoln': 'Will',      
-        'shakespeare': 'Callum',        
-        'napoleon': 'George',          
-        'socrates': 'Eric',
-        'john-f-kennedy': 'Daniel',     // More presidential voice for JFK
-        'jfk': 'Daniel',                // Alternative JFK ID
+        // Presidential/Political Figures - Authoritative, clear voices
+        'john-f-kennedy': 'Brian',          // Deep, presidential voice
+        'jfk': 'Brian',                     
+        'abraham-lincoln': 'Bill',          // Deep, resonant voice for Lincoln
+        'winston-churchill': 'George',      // British-accented voice
+        'franklin-d-roosevelt': 'Daniel',   // Confident presidential voice
+        
+        // Intellectual/Scientific - Thoughtful, measured voices  
+        'albert-einstein': 'Eric',          // Intellectual, slightly accented
+        'socrates': 'Will',                 // Wise, measured tone
+        'leonardo-da-vinci': 'Callum',      // Renaissance intellectual
+        'charles-darwin': 'Chris',          // Scientific, British accent
+        
+        // Military/Leadership - Strong, commanding voices
+        'napoleon': 'George',               // Commanding, authoritative
+        'alexander-the-great': 'Liam',      // Young but powerful
+        'julius-caesar': 'Bill',            // Roman authority
+        
+        // Literary/Artistic - Expressive, cultured voices
+        'shakespeare': 'Callum',            // British, dramatic
+        'mark-twain': 'Daniel',             // American storyteller
+        'edgar-allan-poe': 'Eric',          // Dark, mysterious
+        
+        // Religious/Philosophical - Gentle but authoritative
+        'martin-luther-king-jr': 'Brian',   // Powerful, resonant speaking voice
+        'confucius': 'Will',                // Wise, calm
+        'gandhi': 'Eric',                   // Gentle but firm
       };
       
-      return maleVoices[figure.id] || 'Einstein';
+      return maleVoices[figure.id] || 'Daniel'; // Default to presidential voice
     } else {
       const femaleVoices = {
-        'marie-curie': 'Sarah',        
-        'cleopatra': 'Charlotte',      
-        'joan-of-arc': 'Jessica'       
+        // Scientific/Intellectual 
+        'marie-curie': 'Sarah',             // Intelligent, French-accented
+        'rosalind-franklin': 'Laura',       // Scientific, British
+        
+        // Historical Leaders
+        'cleopatra': 'Charlotte',           // Regal, commanding
+        'elizabeth-i': 'Jessica',           // Royal British accent
+        'catherine-the-great': 'Alice',     // Imperial, authoritative
+        
+        // Social/Political Activists
+        'joan-of-arc': 'Jessica',           // Young but determined French
+        'florence-nightingale': 'Laura',    // Caring but authoritative British
+        'eleanor-roosevelt': 'Sarah',       // First Lady elegance
+        
+        // Literary/Artistic
+        'jane-austen': 'Charlotte',         // Refined British
+        'virginia-woolf': 'Alice',          // Literary, thoughtful
+        'frida-kahlo': 'Aria',             // Passionate, artistic
       };
       
-      return femaleVoices[figure.id] || 'Sarah';
+      return femaleVoices[figure.id] || 'Sarah'; // Default to intellectual voice
     }
   };
 
