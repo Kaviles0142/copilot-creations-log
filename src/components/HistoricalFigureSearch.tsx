@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, User, Clock, MapPin, Loader2 } from "lucide-react";
+import { Search, User, Clock, MapPin, Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoricalFigure } from "./HistoricalChat";
@@ -162,6 +162,15 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
     });
   };
 
+  const clearSelection = () => {
+    onSelectFigure(null as any); // Clear the selected figure
+    setSearchResults([]); // Clear search results
+    toast({
+      title: "Selection cleared",
+      description: "You can now search for another historical figure",
+    });
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       searchHistoricalFigure();
@@ -170,6 +179,20 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
 
   return (
     <div className="space-y-4">
+      {selectedFigure && (
+        <div className="flex items-center space-x-2 mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={clearSelection}
+            className="flex items-center space-x-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Search</span>
+          </Button>
+        </div>
+      )}
+      
       <div className="flex space-x-2">
         <Input
           placeholder="Search any historical figure..."
