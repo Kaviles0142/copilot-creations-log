@@ -11,8 +11,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestData: any;
   try {
-    const { text, voice = "default" } = await req.json();
+    requestData = await req.json();
+    const { text, voice = "default" } = requestData;
 
     if (!text) {
       throw new Error('Text is required');
@@ -109,11 +111,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in resemble-text-to-speech:', error);
     
-    // Try fallback speech generation
+    // Try fallback speech generation with ElevenLabs
     try {
       return await generateFallbackSpeech(
-        (await req.json())?.text || 'Error occurred',
-        (await req.json())?.voice || 'default'
+        requestData?.text || 'Error occurred',
+        requestData?.voice || 'default'
       );
     } catch (fallbackError) {
       console.error('Fallback speech generation failed:', fallbackError);
@@ -129,49 +131,42 @@ serve(async (req) => {
 });
 
 async function generateFallbackSpeech(text: string, voice: string) {
-  console.log('Generating fallback speech using browser TTS simulation');
+  console.log('Fallback: Generating speech using ElevenLabs API');
   
-  // Create a simple fallback by returning a success response
-  // In a real implementation, you might use a different TTS service
-  // or generate silent audio
-  
-  // Generate minimal audio data (silent audio)
-  const sampleRate = 22050;
-  const duration = Math.max(1, text.length * 0.05); // Estimate duration
-  const numSamples = Math.floor(sampleRate * duration);
-  
-  // Create minimal WAV header + silent audio
-  const buffer = new ArrayBuffer(44 + numSamples * 2);
-  const view = new DataView(buffer);
-  
-  // WAV header
-  const writeString = (offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-  
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + numSamples * 2, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(36, 'data');
-  view.setUint32(40, numSamples * 2, true);
-  
-  // Silent audio data (all zeros)
-  for (let i = 0; i < numSamples; i++) {
-    view.setInt16(44 + i * 2, 0, true);
+  const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+  if (!ELEVENLABS_API_KEY) {
+    throw new Error('ElevenLabs API key not found for fallback');
   }
+
+  // Use a default ElevenLabs voice for fallback
+  const fallbackVoiceId = 'onwK4e9ZLuTAKqWW03F9'; // Daniel voice
+  
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${fallbackVoiceId}`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': ELEVENLABS_API_KEY,
+    },
+    body: JSON.stringify({
+      text: text,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.5,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+  }
+
+  const audioBuffer = await response.arrayBuffer();
+  const uint8Array = new Uint8Array(audioBuffer);
   
   // Convert to base64
-  const uint8Array = new Uint8Array(buffer);
   let binary = '';
   const chunkSize = 0x8000;
   
@@ -182,13 +177,13 @@ async function generateFallbackSpeech(text: string, voice: string) {
   
   const base64Audio = btoa(binary);
   
-  console.log(`Generated fallback silent audio of ${buffer.byteLength} bytes`);
+  console.log(`Generated ElevenLabs fallback audio of ${audioBuffer.byteLength} bytes`);
   
   return new Response(
     JSON.stringify({ 
       audioContent: base64Audio,
       fallback: true,
-      message: 'Generated using fallback method - audio may be silent'
+      message: 'Generated using ElevenLabs fallback'
     }),
     {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
