@@ -152,7 +152,57 @@ serve(async (req) => {
         console.log('Wikipedia search error:', wikiError);
       }
 
-      // 5. Search web articles and scholarly sources
+      // 5. Search for current events and recent discussions about the figure
+      try {
+        console.log(`Searching for current events related to ${figure.name}...`);
+        const currentEventsResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `"${figure.name}" current events recent news 2024 2025`,
+            num: 5
+          }
+        });
+
+        if (currentEventsResponse.data?.organic_results?.length > 0) {
+          relevantKnowledge += '\n\n📰 CURRENT EVENTS & RECENT DISCUSSIONS:\n';
+          currentEventsResponse.data.organic_results.slice(0, 3).forEach((result: any) => {
+            relevantKnowledge += `- "${result.title}"\n`;
+            if (result.snippet) {
+              relevantKnowledge += `  ${result.snippet.substring(0, 200)}...\n`;
+            }
+            relevantKnowledge += `  Source: ${result.link}\n`;
+          });
+          console.log(`Added ${currentEventsResponse.data.organic_results.length} current events to context`);
+        }
+      } catch (eventsError) {
+        console.log('Current events search error:', eventsError);
+      }
+
+      // 6. Search for historical context and legacy information
+      try {
+        console.log(`Searching for historical context about ${figure.name}...`);
+        const historicalResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `"${figure.name}" historical impact legacy influence modern society`,
+            num: 5
+          }
+        });
+
+        if (historicalResponse.data?.organic_results?.length > 0) {
+          relevantKnowledge += '\n\n🏛️ HISTORICAL CONTEXT & LEGACY:\n';
+          historicalResponse.data.organic_results.slice(0, 3).forEach((result: any) => {
+            relevantKnowledge += `- "${result.title}"\n`;
+            if (result.snippet) {
+              relevantKnowledge += `  ${result.snippet.substring(0, 200)}...\n`;
+            }
+            relevantKnowledge += `  Source: ${result.link}\n`;
+          });
+          console.log(`Added ${historicalResponse.data.organic_results.length} historical context results to context`);
+        }
+      } catch (historyError) {
+        console.log('Historical context search error:', historyError);
+      }
+
+      // 7. Search web articles and scholarly sources
       try {
         const webResponse = await supabase.functions.invoke('serpapi-search', {
           body: { 
