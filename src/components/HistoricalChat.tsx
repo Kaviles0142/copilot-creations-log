@@ -15,8 +15,6 @@ import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import VoiceSettings from "./VoiceSettings";
 import ConversationHistory from "./ConversationHistory";
-import { VoiceCloningPipeline } from "./VoiceCloningPipeline";
-import { RealVoiceCloningGuide } from "./RealVoiceCloningGuide";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -1201,7 +1199,8 @@ const HistoricalChat = () => {
             }}
           />
 
-          {/* Voice Settings */}
+
+          {/* Voice Settings - Clean User Interface */}
           <VoiceSettings
             selectedFigure={selectedFigure}
             onVoiceGenerated={(audioUrl) => {
@@ -1209,14 +1208,6 @@ const HistoricalChat = () => {
               audio.play();
             }}
           />
-
-          {/* Automated Voice Cloning Pipeline */}
-          {selectedFigure && (
-            <div className="space-y-4">
-              <VoiceCloningPipeline figure={selectedFigure} />
-              <RealVoiceCloningGuide figure={selectedFigure} />
-            </div>
-          )}
 
           {/* Document Upload */}
           <DocumentUpload
