@@ -834,7 +834,7 @@ const HistoricalChat = () => {
           playAudioFromBase64(data.audioContent);
           return;
         } else {
-          console.warn('❌ Coqui TTS failed, falling back to ElevenLabs:', error);
+          console.warn('❌ ElevenLabs TTS failed, falling back to default:', error);
         }
       } else {
         console.log('❌ No cloned voice found, creating premium voice clone...');
@@ -860,6 +860,10 @@ const HistoricalChat = () => {
 
       if (error) {
         console.error('❌ ElevenLabs TTS Error:', error);
+        // Add a toast notification for quota exceeded errors
+        if (error.message?.includes('quota_exceeded') || error.message?.includes('401')) {
+          console.warn('ElevenLabs quota exceeded - voice unavailable');
+        }
         return;
       }
 
