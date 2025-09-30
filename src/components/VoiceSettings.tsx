@@ -78,6 +78,18 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
     }
   }, [selectedFigure?.id]);
 
+  // Auto-start voice cloning if no custom voice exists
+  useEffect(() => {
+    if (selectedFigure?.id && clonedVoices.length > 0) {
+      const hasRealCustomVoice = clonedVoices.some(v => v.provider === 'resemble' && !v.voice_id.includes('fallback'));
+      
+      if (!hasRealCustomVoice && !isCloning) {
+        console.log(`Auto-starting voice cloning for ${selectedFigure.name}`);
+        startVoiceCloning();
+      }
+    }
+  }, [selectedFigure?.id, clonedVoices, isCloning]);
+
   const loadClonedVoices = async () => {
     try {
       const { data, error } = await supabase
@@ -118,11 +130,6 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       if (data.success) {
         setCloningStatus("Pipeline started! Checking progress...");
         
-        toast({
-          title: "Voice Cloning Started",
-          description: `Creating custom voice for ${selectedFigure.name}`,
-        });
-        
         // Start monitoring progress
         monitorPipelineProgress(data.pipelineId);
       } else {
@@ -130,13 +137,8 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       }
     } catch (error) {
       console.error('Error starting voice cloning:', error);
-      toast({
-        title: "Voice Cloning Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
-      });
-      setIsCloning(false);
       setCloningStatus("");
+      setIsCloning(false);
     }
   };
 
@@ -174,20 +176,11 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
               setCloningStatus("Voice clone completed!");
               setIsCloning(false);
               loadClonedVoices();
-              toast({
-                title: "Voice Clone Ready!",
-                description: `Custom voice for ${selectedFigure.name} is now available`,
-              });
               setTimeout(() => setCloningStatus(""), 3000);
               return;
             case 'failed':
               setCloningStatus("Voice cloning failed");
               setIsCloning(false);
-              toast({
-                title: "Voice Cloning Failed",
-                description: pipeline.error_log || "Unknown error occurred",
-                variant: "destructive"
-              });
               setTimeout(() => setCloningStatus(""), 3000);
               return;
           }
@@ -211,15 +204,10 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
     setIsGenerating(true);
     try {
       // Check if we have a real cloned voice from the pipeline
-      const customVoice = clonedVoices.find(v => v.provider === 'resemble');
+      const customVoice = clonedVoices.find(v => v.provider === 'resemble' && !v.voice_id.includes('fallback'));
       
       if (customVoice && selectedVoice === "auto") {
         console.log('Using real cloned voice:', customVoice.voice_id);
-        
-        toast({
-          title: "Using Real Cloned Voice",
-          description: `Using actual voice clone for ${selectedFigure.name}`,
-        });
         
         // Use the actual cloned voice through Resemble AI
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
@@ -358,47 +346,32 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Button 
-            onClick={() => generateVoice("Hello, I am " + selectedFigure.name)}
-            disabled={isGenerating}
-            variant="outline"
-            size="sm"
-            className="w-full"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            {isGenerating ? "Generating..." : "Test Voice"}
-          </Button>
-          
-          {!hasCustomVoice && (
-            <div className="space-y-2">
-              <Button 
-                onClick={startVoiceCloning}
-                disabled={isCloning}
-                variant="default"
-                size="sm"
-                className="w-full"
-              >
-                <Mic className="h-4 w-4 mr-2" />
-                {isCloning ? "Creating Voice Clone..." : "Create Custom Voice"}
-              </Button>
-              
-              {cloningStatus && (
-                <div className="text-xs text-muted-foreground text-center p-2 bg-muted/50 rounded">
-                  {cloningStatus}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <Button 
+          onClick={() => generateVoice("Hello, I am " + selectedFigure.name)}
+          disabled={isGenerating}
+          variant="outline"
+          size="sm"
+          className="w-full"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          {isGenerating ? "Generating..." : "Test Voice"}
+        </Button>
+
+        {cloningStatus && (
+          <div className="text-xs text-muted-foreground text-center p-2 bg-muted/50 rounded">
+            {cloningStatus}
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground mt-3">
         {hasCustomVoice 
           ? `Using custom AI-trained voice model for ${selectedFigure.name}`
-          : figureVoice 
-            ? `Using ${figureVoice.elevenlabsVoice} voice profile for authentic ${selectedFigure.name} speech`
-            : "Custom voice profile not available, using standard TTS"
+          : isCloning
+            ? `Creating custom voice for ${selectedFigure.name}...`
+            : figureVoice 
+              ? `Using ${figureVoice.elevenlabsVoice} voice profile for authentic ${selectedFigure.name} speech`
+              : "Custom voice profile not available, using standard TTS"
         }
       </p>
     </Card>
