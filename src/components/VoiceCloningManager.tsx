@@ -139,7 +139,7 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
       if (error) throw error;
 
       // Filter for audio files from the web search results
-      const audioFiles = (data?.results || [])
+      const audioFiles = (data?.organic_results || [])
         .filter((result: any) => 
           result.link?.match(/\.(mp3|wav|m4a|ogg)$/i) ||
           result.title?.toLowerCase().includes('audio') ||
