@@ -784,7 +784,7 @@ const HistoricalChat = () => {
         'edgar-allan-poe': 'Eric',          // Dark, mysterious
         
         // Religious/Philosophical - Gentle but authoritative
-        'martin-luther-king-jr': 'Brian',   // Powerful, resonant speaking voice
+        'martin-luther-king-jr': '2ts4Q14DjMa5I5EgteS4', // Custom MLK voice from ElevenLabs
         'confucius': 'Will',                // Wise, calm
         'gandhi': 'Eric',                   // Gentle but firm
       };
