@@ -257,13 +257,23 @@ async function trainVoiceModel(cleanedAudio: any[], figureId: string, figureName
   console.log(`🎯 Creating real voice clone using Resemble AI for ${figureName}`);
   
   // Call the actual voice cloning service
-  const { data: cloneResult } = await supabase.functions.invoke('resemble-voice-clone', {
+  const { data: cloneResult, error: cloneError } = await supabase.functions.invoke('resemble-voice-clone', {
     body: {
       figureName: figureName,
       figureId: figureId,
       audioUrl: primaryAudio.audioUrl
     }
   });
+
+  if (cloneError) {
+    console.error('Voice cloning service error:', cloneError);
+    throw new Error(`Voice cloning service failed: ${cloneError.message || 'Unknown error'}`);
+  }
+
+  if (!cloneResult) {
+    console.error('Voice cloning returned null result');
+    throw new Error('Voice cloning service returned no data');
+  }
 
   if (!cloneResult.success) {
     throw new Error(`Voice cloning failed: ${cloneResult.error || 'Unknown error'}`);

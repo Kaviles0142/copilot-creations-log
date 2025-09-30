@@ -74,6 +74,12 @@ serve(async (req) => {
       processedAudioUrl
     );
 
+    console.log('Voice clone result:', voiceCloneResult);
+
+    if (!voiceCloneResult || !voiceCloneResult.voice_id) {
+      throw new Error('Voice cloning failed - no voice ID returned');
+    }
+
     // Step 3: Store in database
     const { data: newVoice, error: insertError } = await supabase
       .from('cloned_voices')
@@ -81,14 +87,15 @@ serve(async (req) => {
         figure_id: figureId,
         figure_name: figureName,
         voice_id: voiceCloneResult.voice_id,
-        voice_name: voiceCloneResult.voice_name,
+        voice_name: voiceCloneResult.voice_name || `${figureName} (Clone)`,
+        provider: voiceCloneResult.provider || 'resemble',
         source_url: audioUrl,
         source_description: `Resemble.ai cloned voice for ${figureName}`,
         audio_quality_score: qualityScore,
         is_active: true
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (insertError) {
       console.error('Database error:', insertError);
