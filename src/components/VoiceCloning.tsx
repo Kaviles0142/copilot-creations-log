@@ -52,11 +52,19 @@ export const VoiceCloning: React.FC<VoiceCloningProps> = ({ onVoiceCloned }) => 
 
       console.log('Starting voice cloning process...');
       
+      // Try Resemble.ai voice cloning first, then fallback to Coqui
       const response = await fetch(
-        'https://trclpvryrjlafacocbnd.supabase.co/functions/v1/clone-historical-voice',
+        'https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-voice-clone',
         {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            figureName: voiceName.trim(),
+            figureId: voiceName.toLowerCase().replace(/\s+/g, '-'),
+            audioUrl: null // Will use uploaded audio file in production
+          }),
         }
       );
 
