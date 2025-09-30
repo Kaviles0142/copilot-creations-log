@@ -40,6 +40,15 @@ serve(async (req) => {
     // Search for relevant knowledge from ALL sources
     console.log('Searching across all available sources...');
     let relevantKnowledge = '';
+    let sourcesUsed = {
+      books: 0,
+      documents: 0,
+      youtube: 0,
+      wikipedia: false,
+      currentEvents: 0,
+      historicalContext: 0,
+      webArticles: 0
+    };
 
     try {
       // 1. Search books related to the figure
@@ -73,6 +82,7 @@ serve(async (req) => {
       } else {
         console.log(`Found ${books?.length || 0} books for ${figure.name}`);
         if (books && books.length > 0) {
+          sourcesUsed.books = books.length;
           relevantKnowledge += '\n\n📚 RELEVANT BOOKS AND SOURCES:\n';
           books.forEach(book => {
             relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
@@ -97,6 +107,7 @@ serve(async (req) => {
         if (docsError) {
           console.log('Documents search error:', docsError);
         } else if (documents && documents.length > 0) {
+          sourcesUsed.documents = documents.length;
           relevantKnowledge += '\n\n📄 UPLOADED DOCUMENTS:\n';
           documents.forEach(doc => {
             relevantKnowledge += `- ${doc.filename}\n`;
@@ -119,6 +130,7 @@ serve(async (req) => {
 
         console.log('YouTube response:', youtubeResponse);
         if (youtubeResponse.data?.results?.length > 0) {
+          sourcesUsed.youtube = youtubeResponse.data.results.length;
           relevantKnowledge += '\n\n🎥 YOUTUBE VIDEOS & DOCUMENTARIES:\n';
           youtubeResponse.data.results.forEach((video: any) => {
             relevantKnowledge += `- "${video.title}" (${video.channelTitle})\n`;
@@ -142,6 +154,7 @@ serve(async (req) => {
         });
 
         if (wikiResponse.data?.extract) {
+          sourcesUsed.wikipedia = true;
           relevantKnowledge += '\n\n📖 WIKIPEDIA INFORMATION:\n';
           relevantKnowledge += `${wikiResponse.data.extract.substring(0, 400)}...\n`;
           if (wikiResponse.data.url) {
@@ -163,6 +176,7 @@ serve(async (req) => {
         });
 
         if (currentEventsResponse.data?.organic_results?.length > 0) {
+          sourcesUsed.currentEvents = currentEventsResponse.data.organic_results.length;
           relevantKnowledge += '\n\n📰 CURRENT EVENTS & RECENT DISCUSSIONS:\n';
           currentEventsResponse.data.organic_results.slice(0, 3).forEach((result: any) => {
             relevantKnowledge += `- "${result.title}"\n`;
@@ -462,7 +476,11 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
     console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
     console.log('Success - returning comprehensive multi-source enhanced response');
 
-    return new Response(JSON.stringify({ response, aiProvider }), {
+    return new Response(JSON.stringify({ 
+      response, 
+      aiProvider,
+      sourcesUsed 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

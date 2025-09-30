@@ -25,6 +25,15 @@ export interface Message {
   content: string;
   type: "user" | "assistant";
   timestamp: Date;
+  sourcesUsed?: {
+    books: number;
+    documents: number;
+    youtube: number;
+    wikipedia: boolean;
+    currentEvents: number;
+    historicalContext: number;
+    webArticles: number;
+  };
 }
 
 export interface HistoricalFigure {
@@ -495,12 +504,14 @@ const HistoricalChat = () => {
       const result = data;
       const aiResponse = result.response || result.message || "I apologize, but I couldn't generate a proper response.";
       const usedProvider = result.aiProvider || selectedAIProvider;
+      const sourcesUsed = result.sourcesUsed;
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: aiResponse,
         type: "assistant",
         timestamp: new Date(),
+        sourcesUsed: sourcesUsed,
       };
 
       // Start TTS generation immediately in parallel with UI update

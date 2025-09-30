@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User, Bot } from "lucide-react";
 import { Message, HistoricalFigure } from "./HistoricalChat";
+import { SourcesIndicator } from "./SourcesIndicator";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -41,43 +42,52 @@ const ChatMessages = ({ messages, selectedFigure, isLoading }: ChatMessagesProps
         )}
 
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`flex space-x-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                message.type === 'user' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-accent text-accent-foreground'
-              }`}>
-                {message.type === 'user' ? (
-                  <User className="h-4 w-4" />
-                ) : (
-                  <Bot className="h-4 w-4" />
-                )}
-              </div>
-              
-              <Card className={`p-4 ${
-                message.type === 'user' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-card'
-              }`}>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium text-sm">
-                      {message.type === 'user' ? 'You' : selectedFigure.name}
-                    </span>
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.content}
-                  </p>
+          <div key={message.id}>
+            <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`flex space-x-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  message.type === 'user' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-accent text-accent-foreground'
+                }`}>
+                  {message.type === 'user' ? (
+                    <User className="h-4 w-4" />
+                  ) : (
+                    <Bot className="h-4 w-4" />
+                  )}
                 </div>
-              </Card>
+                
+                <Card className={`p-4 ${
+                  message.type === 'user' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-card'
+                }`}>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-sm">
+                        {message.type === 'user' ? 'You' : selectedFigure.name}
+                      </span>
+                      <span className="text-xs opacity-70">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.content}
+                    </p>
+                  </div>
+                </Card>
+              </div>
             </div>
+            
+            {/* Show sources indicator for assistant messages */}
+            {message.type === 'assistant' && message.sourcesUsed && (
+              <div className="mt-2 ml-11">
+                <SourcesIndicator 
+                  sourcesUsed={message.sourcesUsed} 
+                  isVisible={true} 
+                />
+              </div>
+            )}
           </div>
         ))}
 
