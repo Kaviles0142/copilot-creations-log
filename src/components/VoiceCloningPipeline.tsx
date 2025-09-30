@@ -264,6 +264,13 @@ export const VoiceCloningPipeline: React.FC<VoiceCloningPipelineProps> = ({ figu
               </div>
             </div>
             
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> This is a demonstration pipeline that simulates the voice cloning process. 
+                For production use, the audio extraction would require an external service to handle YouTube downloads.
+              </p>
+            </div>
+            
             <Button 
               onClick={startPipeline} 
               disabled={isStarting}
