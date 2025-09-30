@@ -98,12 +98,12 @@ async function generateCoquiXTTS(text: string, voiceId: string): Promise<string>
     },
     body: JSON.stringify({
       text: text,
-      model_id: 'eleven_multilingual_v2',
+      model_id: 'eleven_turbo_v2_5', // Faster model for reduced latency
       voice_settings: {
-        stability: 0.85,
-        similarity_boost: 0.95,
-        style: 0.7,
-        use_speaker_boost: true
+        stability: 0.75, // Slightly lower for faster generation
+        similarity_boost: 0.85, // Reduced for speed
+        style: 0.5, // Lower style for faster processing
+        use_speaker_boost: false // Disable for faster processing
       }
     }),
   });
