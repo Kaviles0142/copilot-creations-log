@@ -115,7 +115,14 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
 
         setSearchResults(results);
         
-        if (results.length === 0) {
+        // Automatically select the first result if available
+        if (results.length > 0) {
+          selectFigure(results[0]);
+          toast({
+            title: "Found and selected!",
+            description: `Ready to chat with ${results[0].title}`,
+          });
+        } else {
           toast({
             title: "No results found",
             description: "Try searching for a different historical figure",
