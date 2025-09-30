@@ -187,8 +187,8 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
 
       setSelectedAudioUrl(audioUrl);
 
-      // Clone with Resemble AI
-      const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
+      // Clone with Coqui XTTS (better quality than Resemble)
+      const { data, error } = await supabase.functions.invoke('coqui-voice-clone', {
         body: {
           figureName: figureName,
           figureId: figureId,
@@ -408,7 +408,7 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={voice.provider === 'resemble' ? 'default' : 'secondary'}>
+                      <Badge variant={voice.provider === 'coqui' ? 'default' : 'secondary'}>
                         {voice.provider}
                       </Badge>
                       {voice.audio_quality_score && (
