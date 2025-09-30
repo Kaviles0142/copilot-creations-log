@@ -59,10 +59,15 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Resemble.ai API error:', errorText);
+      console.error('Resemble.ai API error:', response.status, errorText);
       
-      // Fallback to basic TTS
-      return generateFallbackSpeech(text, voice);
+      // Check if this is an HTML error page (common issue we've seen)
+      if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html')) {
+        console.error('Received HTML error page from Resemble.ai - API may be down');
+        throw new Error('Resemble.ai service unavailable - received HTML error page');
+      }
+      
+      throw new Error(`Resemble.ai API error: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();

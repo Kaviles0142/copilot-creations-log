@@ -780,56 +780,96 @@ const HistoricalChat = () => {
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voice = getFallbackVoice(figure);
-    console.log(`Using ElevenLabs voice: ${voice} for ${figure.name}`);
-    
-    // Use ElevenLabs for reliable TTS
-    const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
-      body: { 
-        text: text,
-        voice: voice
+    try {
+      // First, try to get cloned voice
+      const clonedVoiceId = await getOrCreateAuthenticVoice(figure);
+      
+      if (clonedVoiceId && clonedVoiceId.startsWith('resemble_')) {
+        console.log(`Using Resemble TTS with cloned voice: ${clonedVoiceId} for ${figure.name}`);
+        
+        // Use Resemble TTS for cloned voices
+        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+          body: { 
+            text: text,
+            voice: clonedVoiceId
+          }
+        });
+
+        // If Resemble works, use it
+        if (!error && data?.audioContent) {
+          console.log('Successfully used Resemble TTS with cloned voice');
+          playAudioFromBase64(data.audioContent);
+          return;
+        } else {
+          console.warn('Resemble TTS failed, falling back to ElevenLabs:', error);
+        }
       }
-    });
+      
+      // Fallback to ElevenLabs for reliable TTS
+      const fallbackVoice = getFallbackVoice(figure);
+      console.log(`Using ElevenLabs fallback voice: ${fallbackVoice} for ${figure.name}`);
+      
+      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+        body: { 
+          text: text,
+          voice: fallbackVoice
+        }
+      });
 
-    if (error) {
-      console.error('TTS Error:', error);
-      return;
-    }
+      if (error) {
+        console.error('ElevenLabs TTS Error:', error);
+        return;
+      }
 
-    if (!data?.audioContent) {
-      console.error('No audio content received');
-      return;
-    }
+      if (!data?.audioContent) {
+        console.error('No audio content received from ElevenLabs');
+        return;
+      }
 
-    // Convert base64 to audio blob and play
-    const binaryString = atob(data.audioContent);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+      playAudioFromBase64(data.audioContent);
+      
+    } catch (error) {
+      console.error('Error in generatePremiumSpeech:', error);
     }
-    
-    const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
-    const audioUrl = URL.createObjectURL(audioBlob);
-    
-    const audio = new Audio(audioUrl);
-    setCurrentAudio(audio);
-    setIsPlayingAudio(true);
-    
-    audio.onended = () => {
+  };
+
+  const playAudioFromBase64 = (audioContent: string) => {
+    try {
+      // Convert base64 to audio blob and play
+      const binaryString = atob(audioContent);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      setCurrentAudio(audio);
+      setIsPlayingAudio(true);
+      
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        setIsPaused(false);
+        setCurrentAudio(null);
+        console.log('Audio playback completed');
+      };
+
+      audio.onerror = () => {
+        setIsPlayingAudio(false);
+        setIsPaused(false);
+        setCurrentAudio(null);
+        console.error('Error playing audio');
+      };
+
+      audio.play();
+    } catch (error) {
+      console.error('Error in playAudioFromBase64:', error);
       setIsPlayingAudio(false);
       setIsPaused(false);
       setCurrentAudio(null);
-      console.log('Audio playback completed');
-    };
-
-    audio.onerror = () => {
-      setIsPlayingAudio(false);
-      setIsPaused(false);
-      setCurrentAudio(null);
-      console.error('Error playing audio');
-    };
-
-    await audio.play();
+    }
   };
 
   // Auto-clone voice for historical figure using authentic recordings
