@@ -193,6 +193,7 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
         </div>
       )}
       
+      {/* Always show search - even when figure is selected */}
       <div className="flex space-x-2">
         <Input
           placeholder="Search any historical figure..."
