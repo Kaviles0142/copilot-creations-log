@@ -13,6 +13,8 @@ interface VoiceSettingsProps {
 
 interface ClonedVoice {
   id: string;
+  figure_id: string;
+  figure_name: string;
   voice_id: string;
   voice_name: string;
   provider: string;
@@ -81,9 +83,12 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
   // Auto-start voice cloning if no custom voice exists
   useEffect(() => {
     if (selectedFigure?.id && clonedVoices.length > 0) {
-      const hasRealCustomVoice = clonedVoices.some(v => v.provider === 'resemble' && !v.voice_id.includes('fallback'));
+      const hasAnyVoice = clonedVoices.some(v => 
+        (v.provider === 'resemble' || v.provider === 'resemble_fallback') && 
+        v.figure_id === selectedFigure.id
+      );
       
-      if (!hasRealCustomVoice && !isCloning) {
+      if (!hasAnyVoice && !isCloning) {
         console.log(`Auto-starting voice cloning for ${selectedFigure.name}`);
         startVoiceCloning();
       }
