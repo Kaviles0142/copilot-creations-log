@@ -100,6 +100,39 @@ export default function ConversationHistory({ onSelectConversation, selectedFigu
     }
   };
 
+  const clearAllConversations = async () => {
+    try {
+      let query = supabase.from('conversations').delete();
+      
+      if (selectedFigureId) {
+        query = query.eq('figure_id', selectedFigureId);
+      } else {
+        query = query.neq('id', ''); // Delete all if no specific figure
+      }
+
+      const { error } = await query;
+
+      if (error) throw error;
+
+      setConversations([]);
+      
+      // Notify parent component about deletion
+      onConversationDelete?.();
+      
+      toast({
+        title: "Success",
+        description: selectedFigureId ? "All conversations for this figure cleared" : "All conversations cleared",
+      });
+    } catch (error) {
+      console.error('Error clearing conversations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear conversations",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -135,9 +168,21 @@ export default function ConversationHistory({ onSelectConversation, selectedFigu
         <h3 className="font-semibold">
           {selectedFigureId ? 'Figure History' : 'All Conversations'}
         </h3>
-        <Badge variant="secondary" className="ml-auto">
-          {conversations.length}
-        </Badge>
+        <div className="flex items-center space-x-2 ml-auto">
+          <Badge variant="secondary">
+            {conversations.length}
+          </Badge>
+          {conversations.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearAllConversations}
+              className="text-xs"
+            >
+              Clear All
+            </Button>
+          )}
+        </div>
       </div>
 
       <ScrollArea className="h-64">
