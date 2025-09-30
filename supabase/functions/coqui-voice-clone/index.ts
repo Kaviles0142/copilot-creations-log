@@ -82,7 +82,6 @@ serve(async (req) => {
         source_url: processedAudioUrl,
         source_description: voiceClone.source_description,
         audio_quality_score: qualityScore,
-        provider: 'coqui',
         is_active: true
       }])
       .select()

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
+import VoiceCloningManager from '@/components/VoiceCloningManager';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

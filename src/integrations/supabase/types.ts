@@ -94,6 +94,7 @@ export type Database = {
           figure_name: string
           id: string
           is_active: boolean | null
+          provider: string | null
           source_description: string | null
           source_url: string | null
           updated_at: string
@@ -107,6 +108,7 @@ export type Database = {
           figure_name: string
           id?: string
           is_active?: boolean | null
+          provider?: string | null
           source_description?: string | null
           source_url?: string | null
           updated_at?: string
@@ -120,6 +122,7 @@ export type Database = {
           figure_name?: string
           id?: string
           is_active?: boolean | null
+          provider?: string | null
           source_description?: string | null
           source_url?: string | null
           updated_at?: string
