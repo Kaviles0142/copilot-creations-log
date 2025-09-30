@@ -1285,7 +1285,7 @@ const HistoricalChat = () => {
                 }}
               />
 
-              {/* Recent Conversations with Current Figure */}
+              {/* Conversation History for Selected Figure */}
               {selectedFigure && (
                 <div className="mt-4">
                   <ConversationHistory
@@ -1301,26 +1301,6 @@ const HistoricalChat = () => {
                   />
                 </div>
               )}
-
-              {/* All Previous Chats Overview */}
-              <div className="mt-4">
-                <FigureList
-                  onSelectConversation={(conversation) => {
-                    // Find the figure for this conversation
-                    const figure: HistoricalFigure = {
-                      id: conversation.figure_id,
-                      name: conversation.figure_name,
-                      period: "", // Will be filled by search or default
-                      description: "", // Will be filled by search or default
-                      avatar: ""
-                    };
-                    
-                    setSelectedFigure(figure);
-                    setCurrentConversationId(conversation.id);
-                    loadConversation(conversation.id);
-                  }}
-                />
-              </div>
             </div>
 
           </div>
