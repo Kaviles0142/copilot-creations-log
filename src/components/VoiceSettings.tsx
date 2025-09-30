@@ -101,34 +101,28 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
 
     setIsGenerating(true);
     try {
-      // Check if we have a custom trained voice from the pipeline
-      const customVoice = clonedVoices.find(v => v.provider === 'custom_rvc');
+      // Check if we have a real cloned voice from the pipeline
+      const customVoice = clonedVoices.find(v => v.provider === 'coqui' || v.provider === 'resemble');
       
       if (customVoice && selectedVoice === "auto") {
-        // Use a more authentic voice for MLK with specific characteristics
-        const customVoiceId = selectedFigure.id === 'martin-luther-king-jr' ? 'onwK4e9ZLuTAKqWW03F9' : 'Daniel'; // Daniel has a deeper, more authoritative tone
+        console.log('Using real cloned voice:', customVoice.voice_id);
         
         toast({
-          title: "Using Custom Trained Voice",
-          description: `Applying custom voice characteristics for ${selectedFigure.name}`,
+          title: "Using Real Cloned Voice",
+          description: `Using actual voice clone for ${selectedFigure.name}`,
         });
         
-        // Enhanced prompt with voice direction and speaking style
-        const enhancedText = `[Speaking as ${selectedFigure.name} with deep conviction and rhythmic cadence] ${text}`;
-        
-        const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
-          body: {
-            text: enhancedText,
-            voice: customVoiceId,
-            model: 'eleven_multilingual_v2', // Use the highest quality model
-            voice_settings: {
-              stability: 0.8,
-              similarity_boost: 0.9,
-              style: 0.7,
-              use_speaker_boost: true
+        // Use the actual cloned voice through the appropriate TTS service
+        const { data, error } = await supabase.functions.invoke(
+          customVoice.provider === 'coqui' ? 'coqui-text-to-speech' : 'resemble-text-to-speech',
+          {
+            body: {
+              text: text,
+              voice_id: customVoice.voice_id,
+              figure_name: selectedFigure.name
             }
           }
-        });
+        );
 
         if (error) throw new Error('Voice generation failed');
         if (!data?.audioContent) throw new Error('No audio content received');
@@ -138,8 +132,8 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         onVoiceGenerated(audioUrl);
         
         toast({
-          title: "Custom Voice Generated!",
-          description: `Generated speech with enhanced ${selectedFigure.name} characteristics`,
+          title: "Real Cloned Voice Generated!",
+          description: `Generated speech with actual ${selectedFigure.name} voice clone`,
         });
         return;
       }
@@ -210,7 +204,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
   if (!selectedFigure) return null;
 
   const figureVoice = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
-  const hasCustomVoice = clonedVoices.some(v => v.provider === 'custom_rvc');
+  const hasCustomVoice = clonedVoices.some(v => v.provider === 'coqui' || v.provider === 'resemble');
 
   return (
     <Card className="p-4">
