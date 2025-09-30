@@ -476,30 +476,23 @@ const HistoricalChat = () => {
         content: msg.content
       }));
 
-      // Call the real AI chat function
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/chat-with-historical-figure', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyY2xwdnJ5cmpsYWZhY29jYm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDk5NTAsImV4cCI6MjA3NDY4NTk1MH0.noDkcnCcthJhY4WavgDDZYl__QtOq1Y9t9dTowrU2tc`,
-        },
-        signal: controller?.signal,
-        body: JSON.stringify({
+      // Call the AI chat function using Supabase client
+      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
+        body: {
           message: input,
           figure: selectedFigure,
           context: conversationHistory,
           conversationId: conversationId,
           aiProvider: selectedAIProvider
-        }),
+        }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('AI chat failed:', errorText);
-        throw new Error(`AI chat failed: ${response.status} - ${errorText}`);
+      if (error) {
+        console.error('AI chat failed:', error);
+        throw new Error(`AI chat failed: ${error.message}`);
       }
 
-      const result = await response.json();
+      const result = data;
       const aiResponse = result.response || result.message || "I apologize, but I couldn't generate a proper response.";
       const usedProvider = result.aiProvider || selectedAIProvider;
 
