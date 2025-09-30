@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Volume2, Settings } from "lucide-react";
+import { Volume2, Settings, Mic } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -65,6 +65,7 @@ const historicalVoices = {
 
 const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string>("auto");
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const { toast } = useToast();
@@ -93,6 +94,47 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       setClonedVoices(data || []);
     } catch (error) {
       console.error('Error in loadClonedVoices:', error);
+    }
+  };
+
+  const startVoiceCloning = async () => {
+    setIsCloning(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('automated-voice-pipeline', {
+        body: {
+          figureId: selectedFigure.id,
+          figureName: selectedFigure.name,
+          action: 'start_pipeline'
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Voice Cloning Started",
+          description: `Creating custom voice for ${selectedFigure.name}. This may take a few minutes.`,
+        });
+        
+        // Refresh the cloned voices after a delay
+        setTimeout(() => {
+          loadClonedVoices();
+        }, 5000);
+      } else {
+        throw new Error(data.message || 'Failed to start voice cloning');
+      }
+    } catch (error) {
+      console.error('Error starting voice cloning:', error);
+      toast({
+        title: "Voice Cloning Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCloning(false);
     }
   };
 
@@ -249,16 +291,31 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
           </Select>
         </div>
 
-        <Button 
-          onClick={() => generateVoice("Hello, I am " + selectedFigure.name)}
-          disabled={isGenerating}
-          variant="outline"
-          size="sm"
-          className="w-full"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          {isGenerating ? "Generating..." : "Test Voice"}
-        </Button>
+        <div className="space-y-2">
+          <Button 
+            onClick={() => generateVoice("Hello, I am " + selectedFigure.name)}
+            disabled={isGenerating}
+            variant="outline"
+            size="sm"
+            className="w-full"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            {isGenerating ? "Generating..." : "Test Voice"}
+          </Button>
+          
+          {!hasCustomVoice && (
+            <Button 
+              onClick={startVoiceCloning}
+              disabled={isCloning}
+              variant="default"
+              size="sm"
+              className="w-full"
+            >
+              <Mic className="h-4 w-4 mr-2" />
+              {isCloning ? "Creating Voice Clone..." : "Create Custom Voice"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground mt-3">
