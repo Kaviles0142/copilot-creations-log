@@ -82,18 +82,11 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
 
   // Auto-start voice cloning if no custom voice exists
   useEffect(() => {
-    if (selectedFigure?.id && clonedVoices.length > 0) {
-      const hasAnyVoice = clonedVoices.some(v => 
-        (v.provider === 'resemble' || v.provider === 'resemble_fallback') && 
-        v.figure_id === selectedFigure.id
-      );
-      
-      if (!hasAnyVoice && !isCloning) {
-        console.log(`Auto-starting voice cloning for ${selectedFigure.name}`);
-        startVoiceCloning();
-      }
+    if (selectedFigure?.id && clonedVoices.length === 0) {
+      console.log(`Auto-starting voice cloning for ${selectedFigure.name}`);
+      startVoiceCloning();
     }
-  }, [selectedFigure?.id, clonedVoices, isCloning]);
+  }, [selectedFigure?.id, clonedVoices.length]);
 
   const loadClonedVoices = async () => {
     try {
