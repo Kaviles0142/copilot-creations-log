@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Volume2, Settings } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface VoiceSettingsProps {
   selectedFigure: any;
@@ -69,29 +70,29 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         ? figureVoice?.voiceId || "9BWtsMINqrJLrRacOk9x" // Default to Aria
         : selectedVoice;
 
-      const response = await fetch('/api/elevenlabs-tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+        body: {
           text: text,
-          voice_id: voiceId,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.85,
-            style: 0.5,
-            use_speaker_boost: true
-          }
-        }),
+          voice: voiceId
+        }
       });
 
-      if (!response.ok) {
+      if (error) {
         throw new Error('Voice generation failed');
       }
 
-      const audioBlob = await response.blob();
+      if (!data?.audioContent) {
+        throw new Error('No audio content received');
+      }
+
+      // Convert base64 to blob
+      const audioBytes = atob(data.audioContent);
+      const audioArray = new Uint8Array(audioBytes.length);
+      for (let i = 0; i < audioBytes.length; i++) {
+        audioArray[i] = audioBytes.charCodeAt(i);
+      }
+      const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
+
       const audioUrl = URL.createObjectURL(audioBlob);
       onVoiceGenerated(audioUrl);
 
