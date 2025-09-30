@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, Play, Mic, Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Play, Mic, Download, Loader2, CheckCircle, AlertCircle, Youtube, Globe } from 'lucide-react';
 
 interface ClonedVoice {
   id: string;
@@ -24,6 +24,15 @@ interface ClonedVoice {
   figure_id: string;
 }
 
+interface AudioSource {
+  title: string;
+  url: string;
+  duration?: string;
+  description?: string;
+  source: 'youtube' | 'web';
+  thumbnail?: string;
+}
+
 interface VoiceCloningManagerProps {
   figureName?: string;
   figureId?: string;
@@ -36,9 +45,9 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
   const { toast } = useToast();
   const [isCloning, setIsCloning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string>('');
-  const [voiceName, setVoiceName] = useState<string>('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<AudioSource[]>([]);
+  const [selectedAudioUrl, setSelectedAudioUrl] = useState<string>('');
   const [testText, setTestText] = useState<string>("Hello, I am speaking with my cloned voice. This is a test of the voice cloning technology.");
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
@@ -46,6 +55,7 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
 
   useEffect(() => {
     loadClonedVoices();
+    searchForHistoricalAudio();
   }, [figureId]);
 
   const loadClonedVoices = async () => {
@@ -69,67 +79,118 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type.startsWith('audio/')) {
-        setAudioFile(file);
-        setAudioUrl(''); // Clear URL when file is selected
-        setVoiceName(file.name.replace(/\.[^/.]+$/, '') + '_clone');
-      } else {
-        toast({
-          title: "Invalid File",
-          description: "Please select an audio file",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const uploadAudioFile = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `voice-samples/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      throw new Error(`Upload failed: ${uploadError.message}`);
-    }
-
-    const { data: urlData } = await supabase.storage
-      .from('documents')
-      .getPublicUrl(filePath);
-
-    return urlData.publicUrl;
-  };
-
-  const cloneVoiceWithResemble = async () => {
-    if (!audioFile && !audioUrl) {
+  const searchForHistoricalAudio = async () => {
+    setIsSearching(true);
+    try {
+      // Search YouTube for historical speeches
+      const youtubeResults = await searchYouTube();
+      
+      // Search web for historical audio files
+      const webResults = await searchWeb();
+      
+      setSearchResults([...youtubeResults, ...webResults]);
+      
+    } catch (error) {
+      console.error('Error searching for audio:', error);
       toast({
-        title: "Missing Audio",
-        description: "Please provide an audio file or URL",
+        title: "Search Error",
+        description: "Failed to find historical audio sources",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsSearching(false);
     }
+  };
 
+  const searchYouTube = async (): Promise<AudioSource[]> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('youtube-search', {
+        body: {
+          query: `${figureName} speech original recording historical`
+        }
+      });
+
+      if (error) throw error;
+
+      return (data?.videos || []).map((video: any) => ({
+        title: video.title,
+        url: video.url,
+        duration: video.duration,
+        description: video.description,
+        source: 'youtube' as const,
+        thumbnail: video.thumbnail
+      }));
+    } catch (error) {
+      console.error('YouTube search error:', error);
+      return [];
+    }
+  };
+
+  const searchWeb = async (): Promise<AudioSource[]> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('serpapi-search', {
+        body: {
+          query: `${figureName} speech audio recording mp3 wav original historical`
+        }
+      });
+
+      if (error) throw error;
+
+      // Filter for audio files
+      const audioFiles = (data?.organic_results || [])
+        .filter((result: any) => 
+          result.link?.match(/\.(mp3|wav|m4a|ogg)$/i) ||
+          result.title?.toLowerCase().includes('audio') ||
+          result.title?.toLowerCase().includes('speech') ||
+          result.title?.toLowerCase().includes('recording')
+        )
+        .map((result: any) => ({
+          title: result.title,
+          url: result.link,
+          description: result.snippet,
+          source: 'web' as const
+        }));
+
+      return audioFiles.slice(0, 5); // Limit to top 5 results
+    } catch (error) {
+      console.error('Web search error:', error);
+      return [];
+    }
+  };
+
+  const extractYouTubeAudio = async (videoUrl: string): Promise<string> => {
+    const { data, error } = await supabase.functions.invoke('extract-youtube-audio', {
+      body: { videoUrl }
+    });
+
+    if (error) throw error;
+    if (data.error) throw new Error(data.error);
+
+    return data.audioUrl;
+  };
+
+  const cloneVoiceFromSource = async (audioSource: AudioSource) => {
     setIsCloning(true);
     try {
-      let finalAudioUrl = audioUrl;
-      
-      // Upload file if provided instead of URL
-      if (audioFile) {
-        finalAudioUrl = await uploadAudioFile(audioFile);
+      let audioUrl = audioSource.url;
+
+      // If it's a YouTube video, extract audio first
+      if (audioSource.source === 'youtube') {
+        toast({
+          title: "Extracting Audio",
+          description: "Extracting audio from YouTube video...",
+        });
+        audioUrl = await extractYouTubeAudio(audioSource.url);
       }
 
+      setSelectedAudioUrl(audioUrl);
+
+      // Clone with Resemble AI
       const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
         body: {
-          figureName: voiceName || figureName,
+          figureName: figureName,
           figureId: figureId,
-          audioUrl: finalAudioUrl
+          audioUrl: audioUrl
         }
       });
 
@@ -141,90 +202,16 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
 
       toast({
         title: "Voice Cloned Successfully!",
-        description: `Created voice: ${data.voice_name}`,
+        description: `Created voice: ${data.voice_name} from ${audioSource.title}`,
       });
 
       // Refresh the voices list
       await loadClonedVoices();
-      
-      // Clear form
-      setAudioFile(null);
-      setAudioUrl('');
-      setVoiceName('');
 
     } catch (error) {
       console.error('Voice cloning error:', error);
       toast({
         title: "Cloning Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCloning(false);
-    }
-  };
-
-  const cloneVoiceWithElevenLabs = async () => {
-    if (!audioFile && !audioUrl) {
-      toast({
-        title: "Missing Audio",
-        description: "Please provide an audio file or URL",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCloning(true);
-    try {
-      let finalAudioUrl = audioUrl;
-      
-      if (audioFile) {
-        finalAudioUrl = await uploadAudioFile(audioFile);
-      }
-
-      const { data, error } = await supabase.functions.invoke('create-voice-clone', {
-        body: {
-          audioUrl: finalAudioUrl,
-          voiceName: voiceName || `${figureName}_clone`,
-          description: `Cloned voice for ${figureName}`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      // Store in historical_voices table
-      const { error: insertError } = await supabase
-        .from('historical_voices')
-        .insert({
-          voice_id: data.voiceId,
-          voice_name: voiceName || `${figureName}_clone`,
-          description: `ElevenLabs cloned voice for ${figureName}`,
-          is_cloned: true,
-          figure_id: figureId
-        });
-
-      if (insertError) {
-        console.error('Error storing voice data:', insertError);
-      }
-
-      toast({
-        title: "Voice Cloned with ElevenLabs!",
-        description: `Created voice ID: ${data.voiceId}`,
-      });
-
-      await loadClonedVoices();
-      setAudioFile(null);
-      setAudioUrl('');
-      setVoiceName('');
-
-    } catch (error) {
-      console.error('ElevenLabs cloning error:', error);
-      toast({
-        title: "ElevenLabs Cloning Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive",
       });
@@ -302,78 +289,86 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Voice Cloning Section */}
+      {/* Auto-Discovery Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Mic className="h-5 w-5" />
-            Clone Voice for {figureName}
+            <Search className="h-5 w-5" />
+            Discover Historical Audio for {figureName}
           </CardTitle>
           <CardDescription>
-            Upload an audio sample or provide a URL to clone this historical figure's voice
+            Automatically searching YouTube and the web for authentic recordings
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="voice-name">Voice Name</Label>
-              <Input
-                id="voice-name"
-                value={voiceName}
-                onChange={(e) => setVoiceName(e.target.value)}
-                placeholder={`${figureName} Clone`}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="audio-file">Audio File</Label>
-              <Input
-                id="audio-file"
-                type="file"
-                accept="audio/*"
-                onChange={handleFileUpload}
-                className="cursor-pointer"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="audio-url">Or Audio URL</Label>
-            <Input
-              id="audio-url"
-              value={audioUrl}
-              onChange={(e) => setAudioUrl(e.target.value)}
-              placeholder="https://example.com/audio.mp3"
-              disabled={!!audioFile}
-            />
-          </div>
-
-          <div className="flex gap-2">
+        <CardContent>
+          <div className="flex gap-2 mb-4">
             <Button
-              onClick={cloneVoiceWithResemble}
-              disabled={isCloning || (!audioFile && !audioUrl)}
-              className="flex-1"
-            >
-              {isCloning ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Upload className="h-4 w-4 mr-2" />
-              )}
-              Clone with Resemble AI
-            </Button>
-            <Button
-              onClick={cloneVoiceWithElevenLabs}
-              disabled={isCloning || (!audioFile && !audioUrl)}
+              onClick={searchForHistoricalAudio}
+              disabled={isSearching}
               variant="outline"
-              className="flex-1"
             >
-              {isCloning ? (
+              {isSearching ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                <Upload className="h-4 w-4 mr-2" />
+                <Search className="h-4 w-4 mr-2" />
               )}
-              Clone with ElevenLabs
+              Refresh Search
             </Button>
           </div>
+
+          {isSearching ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <span>Searching for historical recordings...</span>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              No audio sources found. Try adjusting the search terms.
+            </p>
+          ) : (
+            <div className="grid gap-4">
+              {searchResults.map((source, index) => (
+                <div
+                  key={index}
+                  className="p-4 border rounded-lg hover:border-primary/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        {source.source === 'youtube' ? (
+                          <Youtube className="h-4 w-4 text-red-500" />
+                        ) : (
+                          <Globe className="h-4 w-4 text-blue-500" />
+                        )}
+                        <h4 className="font-medium">{source.title}</h4>
+                      </div>
+                      {source.description && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {source.description.slice(0, 150)}...
+                        </p>
+                      )}
+                      {source.duration && (
+                        <Badge variant="outline" className="text-xs">
+                          {source.duration}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() => cloneVoiceFromSource(source)}
+                      disabled={isCloning}
+                      size="sm"
+                    >
+                      {isCloning ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Clone Voice"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -388,7 +383,7 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
         <CardContent>
           {clonedVoices.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
-              No cloned voices yet. Create one using the form above.
+              No cloned voices yet. Use the discovery section above to create one.
             </p>
           ) : (
             <div className="grid gap-3">
@@ -413,9 +408,11 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
                       <Badge variant={voice.provider === 'resemble' ? 'default' : 'secondary'}>
                         {voice.provider}
                       </Badge>
-                      <Badge variant="outline">
-                        Quality: {voice.audio_quality_score}%
-                      </Badge>
+                      {voice.audio_quality_score && (
+                        <Badge variant="outline">
+                          Quality: {voice.audio_quality_score}%
+                        </Badge>
+                      )}
                       {voice.is_active ? (
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       ) : (
