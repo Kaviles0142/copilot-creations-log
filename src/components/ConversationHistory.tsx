@@ -114,10 +114,14 @@ export default function ConversationHistory({ onSelectConversation, selectedFigu
 
       if (error) throw error;
 
+      // Clear the local state immediately
       setConversations([]);
       
       // Notify parent component about deletion
       onConversationDelete?.();
+      
+      // Reload to ensure we have the latest data
+      await loadConversations();
       
       toast({
         title: "Success",
