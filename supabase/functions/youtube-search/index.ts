@@ -33,7 +33,26 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`YouTube API error: ${errorData.error?.message || response.statusText}`);
+      const errorMessage = errorData.error?.message || response.statusText;
+      
+      // Handle quota exceeded error gracefully
+      if (errorMessage.includes('quota') || response.status === 403) {
+        console.warn('YouTube API quota exceeded, returning empty results');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            query: query,
+            totalResults: 0,
+            results: [],
+            warning: 'YouTube API quota exceeded'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      throw new Error(`YouTube API error: ${errorMessage}`);
     }
 
     const data = await response.json();
