@@ -66,6 +66,7 @@ const historicalVoices = {
 const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
+  const [cloningStatus, setCloningStatus] = useState<string>("");
   const [selectedVoice, setSelectedVoice] = useState<string>("auto");
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const { toast } = useToast();
@@ -99,6 +100,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
 
   const startVoiceCloning = async () => {
     setIsCloning(true);
+    setCloningStatus("Starting voice cloning process...");
     
     try {
       const { data, error } = await supabase.functions.invoke('automated-voice-pipeline', {
@@ -114,15 +116,15 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       }
 
       if (data.success) {
+        setCloningStatus("Pipeline started! Checking progress...");
+        
         toast({
           title: "Voice Cloning Started",
-          description: `Creating custom voice for ${selectedFigure.name}. This may take a few minutes.`,
+          description: `Creating custom voice for ${selectedFigure.name}`,
         });
         
-        // Refresh the cloned voices after a delay
-        setTimeout(() => {
-          loadClonedVoices();
-        }, 5000);
+        // Start monitoring progress
+        monitorPipelineProgress(data.pipelineId);
       } else {
         throw new Error(data.message || 'Failed to start voice cloning');
       }
@@ -133,9 +135,74 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
-    } finally {
       setIsCloning(false);
+      setCloningStatus("");
     }
+  };
+
+  const monitorPipelineProgress = async (pipelineId: string) => {
+    const checkProgress = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('automated-voice-pipeline', {
+          body: {
+            figureId: selectedFigure.id,
+            figureName: selectedFigure.name,
+            action: 'get_status'
+          }
+        });
+
+        if (data?.success && data?.pipeline) {
+          const pipeline = data.pipeline;
+          
+          // Update status based on current step
+          switch (pipeline.status) {
+            case 'extracting':
+              setCloningStatus("Searching YouTube for audio...");
+              break;
+            case 'cleaning':
+              const videoCount = pipeline.youtube_videos?.length || 0;
+              setCloningStatus(`Found ${videoCount} videos, processing audio...`);
+              break;
+            case 'training':
+              const audioCount = pipeline.raw_audio_files?.length || 0;
+              setCloningStatus(`Training voice model with ${audioCount} audio files...`);
+              break;
+            case 'integrating':
+              setCloningStatus("Finalizing voice clone...");
+              break;
+            case 'completed':
+              setCloningStatus("Voice clone completed!");
+              setIsCloning(false);
+              loadClonedVoices();
+              toast({
+                title: "Voice Clone Ready!",
+                description: `Custom voice for ${selectedFigure.name} is now available`,
+              });
+              setTimeout(() => setCloningStatus(""), 3000);
+              return;
+            case 'failed':
+              setCloningStatus("Voice cloning failed");
+              setIsCloning(false);
+              toast({
+                title: "Voice Cloning Failed",
+                description: pipeline.error_log || "Unknown error occurred",
+                variant: "destructive"
+              });
+              setTimeout(() => setCloningStatus(""), 3000);
+              return;
+          }
+          
+          // Continue monitoring if still in progress
+          setTimeout(checkProgress, 3000);
+        }
+      } catch (error) {
+        console.error('Error monitoring progress:', error);
+        setIsCloning(false);
+        setCloningStatus("");
+      }
+    };
+
+    checkProgress();
   };
 
   const generateVoice = async (text: string) => {
@@ -304,16 +371,24 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
           </Button>
           
           {!hasCustomVoice && (
-            <Button 
-              onClick={startVoiceCloning}
-              disabled={isCloning}
-              variant="default"
-              size="sm"
-              className="w-full"
-            >
-              <Mic className="h-4 w-4 mr-2" />
-              {isCloning ? "Creating Voice Clone..." : "Create Custom Voice"}
-            </Button>
+            <div className="space-y-2">
+              <Button 
+                onClick={startVoiceCloning}
+                disabled={isCloning}
+                variant="default"
+                size="sm"
+                className="w-full"
+              >
+                <Mic className="h-4 w-4 mr-2" />
+                {isCloning ? "Creating Voice Clone..." : "Create Custom Voice"}
+              </Button>
+              
+              {cloningStatus && (
+                <div className="text-xs text-muted-foreground text-center p-2 bg-muted/50 rounded">
+                  {cloningStatus}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
