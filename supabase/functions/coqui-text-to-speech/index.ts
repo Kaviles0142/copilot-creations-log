@@ -70,37 +70,41 @@ async function generateCoquiXTTS(text: string, voiceId: string): Promise<string>
   const figureName = voiceId.replace('coqui_', '').replace('_premium_fallback', '').replace(/_/g, ' ');
   
   try {
-    // Use REAL Coqui XTTS API for voice cloning
     const coquiApiKey = Deno.env.get('COQUI_API_KEY');
     if (!coquiApiKey) {
-      console.log('No Coqui API key found, using local XTTS implementation');
+      console.log('No Coqui API key found, using simulated cloned voice with ElevenLabs');
+      // Skip the Coqui API call and go directly to the simulated voice
+    } else {
+      console.log('Using REAL Coqui XTTS API');
       
-      // For now, use a local Coqui XTTS implementation approach
-      // This simulates the actual voice cloning process
-      const response = await fetch('https://api.coqui.ai/tts/v1/speak', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${coquiApiKey || 'demo-key'}`,
-        },
-        body: JSON.stringify({
-          text: text,
-          voice_id: voiceId,
-          model_id: 'XTTS-v2',
-          language: 'en',
-          speed: 1.0,
-          emotion: 'neutral',
-          output_format: 'mp3'
-        }),
-      });
+      try {
+        const response = await fetch('https://api.coqui.ai/tts/v1/speak', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${coquiApiKey}`,
+          },
+          body: JSON.stringify({
+            text: text,
+            voice_id: voiceId,
+            model_id: 'XTTS-v2',
+            language: 'en',
+            speed: 1.0,
+            emotion: 'neutral',
+            output_format: 'mp3'
+          }),
+        });
 
-      if (response.ok) {
-        const audioBuffer = await response.arrayBuffer();
-        const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-        console.log(`✅ Generated REAL Coqui XTTS audio for ${figureName}`);
-        return base64Audio;
-      } else {
-        console.warn('Coqui API failed, falling back to simulated cloned voice');
+        if (response.ok) {
+          const audioBuffer = await response.arrayBuffer();
+          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+          console.log(`✅ Generated REAL Coqui XTTS audio for ${figureName}`);
+          return base64Audio;
+        } else {
+          console.warn('Coqui API failed, falling back to simulated cloned voice');
+        }
+      } catch (error) {
+        console.warn('Coqui API error:', error, 'falling back to simulated cloned voice');
       }
     }
     
