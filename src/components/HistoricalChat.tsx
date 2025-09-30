@@ -825,24 +825,24 @@ const HistoricalChat = () => {
       
       const clonedVoiceId = existingVoices?.[0]?.voice_id;
       
-      if (clonedVoiceId && clonedVoiceId.startsWith('resemble_')) {
-        console.log(`Using Resemble TTS with cloned voice: ${clonedVoiceId} for ${figure.name}`);
+      if (clonedVoiceId && (clonedVoiceId.startsWith('resemble_') || clonedVoiceId.startsWith('coqui_'))) {
+        console.log(`Using Coqui TTS with cloned voice: ${clonedVoiceId} for ${figure.name}`);
         
-        // Use Resemble TTS for cloned voices
-        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+        // Use Coqui TTS for cloned voices (handles both coqui_ and resemble_ voices)
+        const { data, error } = await supabase.functions.invoke('coqui-text-to-speech', {
           body: { 
             text: text,
             voice: clonedVoiceId
           }
         });
 
-        // If Resemble works, use it
+        // If Coqui works, use it
         if (!error && data?.audioContent) {
-          console.log('Successfully used Resemble TTS with cloned voice');
+          console.log('Successfully used Coqui TTS with cloned voice');
           playAudioFromBase64(data.audioContent);
           return;
         } else {
-          console.warn('Resemble TTS failed, falling back to ElevenLabs:', error);
+          console.warn('Coqui TTS failed, falling back to ElevenLabs:', error);
         }
       }
       
