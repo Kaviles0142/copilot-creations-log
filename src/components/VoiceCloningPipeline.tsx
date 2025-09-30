@@ -264,11 +264,18 @@ export const VoiceCloningPipeline: React.FC<VoiceCloningPipelineProps> = ({ figu
               </div>
             </div>
             
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> This is a demonstration pipeline that simulates the voice cloning process. 
-                For production use, the audio extraction would require an external service to handle YouTube downloads.
-              </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <h4 className="font-semibold text-amber-800 mb-2">⚠️ Current Limitations</h4>
+              <div className="text-sm text-amber-700 space-y-2">
+                <p><strong>Real Voice Training Requires:</strong></p>
+                <ul className="list-disc list-inside ml-4 space-y-1">
+                  <li>GPU with CUDA support for RVC/OpenVoice training</li>
+                  <li>Local file system access for model storage</li>
+                  <li>30+ minutes of high-quality audio data</li>
+                  <li>External server infrastructure (not browser-based)</li>
+                </ul>
+                <p className="mt-3"><strong>Current Demo:</strong> This pipeline simulates the process and uses enhanced preset voices with character-specific prompting.</p>
+              </div>
             </div>
             
             <Button 

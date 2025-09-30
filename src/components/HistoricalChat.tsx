@@ -16,6 +16,7 @@ import FigureRecommendations from "./FigureRecommendations";
 import VoiceSettings from "./VoiceSettings";
 import ConversationHistory from "./ConversationHistory";
 import { VoiceCloningPipeline } from "./VoiceCloningPipeline";
+import { RealVoiceCloningGuide } from "./RealVoiceCloningGuide";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -1211,7 +1212,10 @@ const HistoricalChat = () => {
 
           {/* Automated Voice Cloning Pipeline */}
           {selectedFigure && (
-            <VoiceCloningPipeline figure={selectedFigure} />
+            <div className="space-y-4">
+              <VoiceCloningPipeline figure={selectedFigure} />
+              <RealVoiceCloningGuide figure={selectedFigure} />
+            </div>
           )}
 
           {/* Document Upload */}
