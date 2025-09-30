@@ -932,8 +932,8 @@ const HistoricalChat = () => {
 
       console.log(`No cloned voice found for ${figure.name}, creating voice clone...`);
       
-      // Use Resemble AI voice cloning with fallback to premium voices
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-voice-clone', {
+      // Use Coqui XTTS voice cloning (upgraded from Resemble for better quality)
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/coqui-voice-clone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1014,8 +1014,8 @@ const HistoricalChat = () => {
     try {
       console.log(`Creating authentic voice for ${figure.name}...`);
       
-      // Use Resemble AI for authentic voice cloning from historical sources
-      const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
+      // Use Coqui XTTS for authentic voice cloning from historical sources
+      const { data, error } = await supabase.functions.invoke('coqui-voice-clone', {
         body: { 
           figureName: figure.name,
           figureId: figure.id,
