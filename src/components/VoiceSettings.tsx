@@ -310,7 +310,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
   if (!selectedFigure) return null;
 
   const figureVoice = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
-  const hasCustomVoice = clonedVoices.some(v => v.provider === 'resemble');
+  const hasCustomVoice = clonedVoices.some(v => v.provider === 'resemble' && !v.voice_id.includes('fallback'));
 
   return (
     <Card className="p-4">
