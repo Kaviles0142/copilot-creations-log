@@ -64,13 +64,26 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
 
     setIsGenerating(true);
     try {
-      // Get voice configuration for the figure
-      const figureVoice = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
+      // Get voice configuration for the figure - use ElevenLabs voices
+      const voiceMapping: Record<string, string> = {
+        'jfk': 'Daniel',
+        'john-f-kennedy': 'Daniel',
+        'albert-einstein': 'Brian',
+        'winston-churchill': 'George',
+        'abraham-lincoln': 'Will',
+        'shakespeare': 'Callum',
+        'napoleon': 'George',
+        'socrates': 'Eric',
+        'marie-curie': 'Sarah',
+        'cleopatra': 'Charlotte',
+        'joan-of-arc': 'Jessica'
+      };
+
       const voiceId = selectedVoice === "auto" 
-        ? figureVoice?.voiceId || "9BWtsMINqrJLrRacOk9x" // Default to Aria
+        ? voiceMapping[selectedFigure.id] || "Brian" // Default to Brian
         : selectedVoice;
 
-      const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
         body: {
           text: text,
           voice: voiceId

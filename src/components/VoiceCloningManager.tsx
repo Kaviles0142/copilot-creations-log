@@ -232,10 +232,11 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
 
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+      // Use ElevenLabs for reliable TTS
+      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
         body: {
           text: testText,
-          voice: selectedVoiceId
+          voice: selectedVoiceId || 'Brian' // Default to Brian if no voice selected
         }
       });
 

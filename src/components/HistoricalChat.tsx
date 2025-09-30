@@ -780,14 +780,14 @@ const HistoricalChat = () => {
   };
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    const voiceId = await getOrCreateAuthenticVoice(figure);
-    console.log(`Using voice ID: ${voiceId} for ${figure.name}`);
+    const voice = getFallbackVoice(figure);
+    console.log(`Using ElevenLabs voice: ${voice} for ${figure.name}`);
     
-    // Use Resemble AI for authentic voice cloning and TTS
-    const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+    // Use ElevenLabs for reliable TTS
+    const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
       body: { 
         text: text,
-        voice: voiceId
+        voice: voice
       }
     });
 
