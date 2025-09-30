@@ -13,6 +13,7 @@ import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import VoiceSettings from "./VoiceSettings";
+import ConversationHistory from "./ConversationHistory";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -1202,6 +1203,32 @@ const HistoricalChat = () => {
                   setBooks([]);
                 }}
               />
+
+              {/* Conversation History */}
+              <div className="mt-4">
+                <ConversationHistory
+                  onSelectConversation={(conversation) => {
+                    // Find the figure for this conversation
+                    const figure: HistoricalFigure = {
+                      id: conversation.figure_id,
+                      name: conversation.figure_name,
+                      period: "", // Will be filled by search or default
+                      description: "", // Will be filled by search or default
+                      avatar: ""
+                    };
+                    
+                    setSelectedFigure(figure);
+                    setCurrentConversationId(conversation.id);
+                    loadConversation(conversation.id);
+                  }}
+                  selectedFigureId={selectedFigure?.id}
+                  onConversationDelete={() => {
+                    // Clear current conversation if it was deleted
+                    setMessages([]);
+                    setCurrentConversationId(null);
+                  }}
+                />
+              </div>
 
               {/* Figure List with Conversations */}
               <div className="mt-4">
