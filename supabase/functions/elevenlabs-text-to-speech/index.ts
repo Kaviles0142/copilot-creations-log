@@ -49,6 +49,7 @@ serve(async (req) => {
       'Bill': 'pqHfZKP75CvOlQylNhV4',
       // Historical figures with specific voices
       'John F. Kennedy': '2vubyVoGjNJ5HPga4SkV', // Boston accent voice
+      'Martin Luther King Jr.': '2ts4Q14DjMa5I5EgteS4', // Custom MLK voice
       'default': 'nPczCjzI2devNBz1zQrb' // Brian as default
     };
 
