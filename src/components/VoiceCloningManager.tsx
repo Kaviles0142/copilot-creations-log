@@ -130,14 +130,16 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
     try {
       const { data, error } = await supabase.functions.invoke('serpapi-search', {
         body: {
-          query: `${figureName} speech audio recording mp3 wav original historical`
+          query: `${figureName} speech audio recording mp3 wav original historical`,
+          type: "web", // Use web search instead of news search
+          num: 10
         }
       });
 
       if (error) throw error;
 
-      // Filter for audio files
-      const audioFiles = (data?.organic_results || [])
+      // Filter for audio files from the web search results
+      const audioFiles = (data?.results || [])
         .filter((result: any) => 
           result.link?.match(/\.(mp3|wav|m4a|ogg)$/i) ||
           result.title?.toLowerCase().includes('audio') ||

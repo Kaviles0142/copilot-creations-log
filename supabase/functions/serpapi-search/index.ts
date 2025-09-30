@@ -53,7 +53,10 @@ Deno.serve(async (req) => {
       params.set('gl', 'us');
       params.set('hl', 'en');
     } else {
+      // Use regular Google search for better audio file discovery
       params.set('engine', 'google');
+      params.set('gl', 'us');
+      params.set('hl', 'en');
     }
 
     searchUrl += '?' + params.toString();
