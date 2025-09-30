@@ -140,6 +140,7 @@ serve(async (req) => {
             if (relevanceScore >= 20) {
               allBooks.push({
                 figure_id: figureId,
+                figure_name: figureName,
                 google_books_id: bookId,
                 title: title,
                 authors: authors,
