@@ -107,7 +107,8 @@ export default function ConversationHistory({ onSelectConversation, selectedFigu
       if (selectedFigureId) {
         query = query.eq('figure_id', selectedFigureId);
       } else {
-        query = query.neq('id', ''); // Delete all if no specific figure
+        // Delete all conversations by using a condition that's always true
+        query = query.not('id', 'is', null);
       }
 
       const { error } = await query;
