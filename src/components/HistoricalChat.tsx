@@ -833,7 +833,7 @@ const HistoricalChat = () => {
     }
   };
 
-  const playAudioFromBase64 = (audioContent: string) => {
+  const playAudioFromBase64 = async (audioContent: string) => {
     try {
       // Convert base64 to audio blob and play
       const binaryString = atob(audioContent);
@@ -863,7 +863,7 @@ const HistoricalChat = () => {
         console.error('Error playing audio');
       };
 
-      audio.play();
+      await audio.play();
     } catch (error) {
       console.error('Error in playAudioFromBase64:', error);
       setIsPlayingAudio(false);
