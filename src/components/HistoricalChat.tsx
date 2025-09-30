@@ -859,13 +859,16 @@ const HistoricalChat = () => {
         }
       }
       
-      // Use ElevenLabs as fallback
+      // Use ElevenLabs as fallback with proper voice mapping
       console.log(`🎵 Using ElevenLabs fallback for ${figure.name}`);
+      
+      // Get the mapped voice ID for this figure
+      const fallbackVoice = getFallbackVoice(figure);
       
       const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
         body: { 
           text: text,
-          voice: figure.name // Use figure name for voice mapping
+          voice: fallbackVoice // Use mapped voice ID instead of figure name
         }
       });
 
