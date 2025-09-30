@@ -270,6 +270,57 @@ export type Database = {
           },
         ]
       }
+      voice_training_pipeline: {
+        Row: {
+          api_endpoint: string | null
+          cleaned_audio_files: Json | null
+          created_at: string
+          current_step: number | null
+          error_log: string | null
+          figure_id: string
+          figure_name: string
+          id: string
+          model_path: string | null
+          raw_audio_files: Json | null
+          status: string
+          training_metrics: Json | null
+          updated_at: string
+          youtube_videos: Json | null
+        }
+        Insert: {
+          api_endpoint?: string | null
+          cleaned_audio_files?: Json | null
+          created_at?: string
+          current_step?: number | null
+          error_log?: string | null
+          figure_id: string
+          figure_name: string
+          id?: string
+          model_path?: string | null
+          raw_audio_files?: Json | null
+          status?: string
+          training_metrics?: Json | null
+          updated_at?: string
+          youtube_videos?: Json | null
+        }
+        Update: {
+          api_endpoint?: string | null
+          cleaned_audio_files?: Json | null
+          created_at?: string
+          current_step?: number | null
+          error_log?: string | null
+          figure_id?: string
+          figure_name?: string
+          id?: string
+          model_path?: string | null
+          raw_audio_files?: Json | null
+          status?: string
+          training_metrics?: Json | null
+          updated_at?: string
+          youtube_videos?: Json | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
