@@ -230,20 +230,20 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         return;
       }
 
-      // Fallback to regular ElevenLabs voices (using custom voice IDs where available)
+      // Use custom voice IDs directly for ElevenLabs
       const voiceMapping: Record<string, string> = {
         'martin-luther-king-jr': '2ts4Q14DjMa5I5EgteS4', // Custom MLK voice
-        'jfk': 'Daniel',
-        'john-f-kennedy': 'Daniel',
-        'albert-einstein': 'Brian',
-        'winston-churchill': 'George',
-        'abraham-lincoln': 'Will',
-        'shakespeare': 'Callum',
-        'napoleon': 'George',
-        'socrates': 'Eric',
-        'marie-curie': 'Sarah',
-        'cleopatra': 'Charlotte',
-        'joan-of-arc': 'Jessica'
+        'jfk': '2vubyVoGjNJ5HPga4SkV',
+        'john-f-kennedy': '2vubyVoGjNJ5HPga4SkV',
+        'albert-einstein': 'nPczCjzI2devNBz1zQrb',
+        'winston-churchill': 'JBFqnCBsd6RMkjVDRZzb',
+        'abraham-lincoln': 'bIHbv24MWmeRgasZH58o',
+        'shakespeare': 'N2lVS1w4EtoT3dr4eOWO',
+        'napoleon': 'JBFqnCBsd6RMkjVDRZzb',
+        'socrates': 'cjVigY5qzO86Huf0OWal',
+        'marie-curie': 'EXAVITQu4vr4xnSDxMaL',
+        'cleopatra': 'XB0fDUnXU5powFXDhCwa',
+        'joan-of-arc': 'cgSgspJ2msm6clMCkdW9'
       };
 
       const voiceId = selectedVoice === "auto" 
