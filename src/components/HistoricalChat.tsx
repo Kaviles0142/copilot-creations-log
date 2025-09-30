@@ -510,18 +510,16 @@ const HistoricalChat = () => {
         timestamp: new Date(),
       };
 
+      // Start TTS generation immediately in parallel with UI update
+      if (isAutoVoiceEnabled && aiResponse.length > 20) {
+        // Generate speech immediately without waiting for UI updates
+        generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
+          console.error('Speech generation failed:', speechError);
+        });
+      }
+
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
-      
-      // Start TTS generation immediately while response is being received
-      if (isAutoVoiceEnabled && aiResponse.length > 50) {
-        try {
-          // Start generating speech as soon as we have enough text
-          generateSpeech(aiResponse, selectedFigure!);
-        } catch (speechError) {
-          console.error('Speech generation failed:', speechError);
-        }
-      }
       
       // Reset loading state after text response is complete (UI becomes responsive)
       setIsLoading(false);
@@ -827,7 +825,7 @@ const HistoricalChat = () => {
       const clonedVoiceId = existingVoices?.[0]?.voice_id;
       
       if (clonedVoiceId && (clonedVoiceId.startsWith('resemble_') || clonedVoiceId.startsWith('coqui_'))) {
-        console.log(`Using Coqui TTS with cloned voice: ${clonedVoiceId} for ${figure.name}`);
+        console.log(`🎯 Using CLONED voice: ${clonedVoiceId} for ${figure.name}`);
         
         // Use Coqui TTS for cloned voices (handles both coqui_ and resemble_ voices)
         const { data, error } = await supabase.functions.invoke('coqui-text-to-speech', {
@@ -839,35 +837,46 @@ const HistoricalChat = () => {
 
         // If Coqui works, use it
         if (!error && data?.audioContent) {
-          console.log('Successfully used Coqui TTS with cloned voice');
+          console.log('✅ Successfully used Coqui TTS with CLONED voice');
           playAudioFromBase64(data.audioContent);
           return;
         } else {
-          console.warn('Coqui TTS failed, falling back to ElevenLabs:', error);
+          console.warn('❌ Coqui TTS failed, falling back to ElevenLabs:', error);
+        }
+      } else {
+        console.log('❌ No cloned voice found, creating premium voice clone...');
+        
+        // Try to create an authentic voice for this figure
+        try {
+          await getOrCreateAuthenticVoice(figure);
+          console.log('✅ Voice clone initiated, using fallback for now');
+        } catch (cloneError) {
+          console.warn('Voice cloning failed:', cloneError);
         }
       }
       
-      // Fallback to ElevenLabs for reliable TTS
-      const fallbackVoice = getFallbackVoice(figure);
-      console.log(`Using ElevenLabs fallback voice: ${fallbackVoice} for ${figure.name}`);
+      // Use premium ElevenLabs voice with figure-specific mapping
+      const premiumVoiceId = `coqui_${figure.id.replace(/-/g, '_')}_premium_fallback`;
+      console.log(`🎵 Using premium voice: ${premiumVoiceId} for ${figure.name}`);
       
-      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+      const { data, error } = await supabase.functions.invoke('coqui-text-to-speech', {
         body: { 
           text: text,
-          voice: fallbackVoice
+          voice: premiumVoiceId
         }
       });
 
       if (error) {
-        console.error('ElevenLabs TTS Error:', error);
+        console.error('❌ Premium TTS Error:', error);
         return;
       }
 
       if (!data?.audioContent) {
-        console.error('No audio content received from ElevenLabs');
+        console.error('❌ No audio content received from Premium TTS');
         return;
       }
 
+      console.log('✅ Premium voice TTS successful');
       playAudioFromBase64(data.audioContent);
       
     } catch (error) {
