@@ -512,18 +512,19 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Reset loading state after text response is complete (UI becomes responsive)
-      setIsLoading(false);
-      setAbortController(null);
-      
-      // Generate speech if auto-voice is enabled (stop button remains via isPlayingAudio)
-      if (isAutoVoiceEnabled) {
+      // Start TTS generation immediately while response is being received
+      if (isAutoVoiceEnabled && aiResponse.length > 50) {
         try {
-          await generateSpeech(aiResponse, selectedFigure!);
+          // Start generating speech as soon as we have enough text
+          generateSpeech(aiResponse, selectedFigure!);
         } catch (speechError) {
           console.error('Speech generation failed:', speechError);
         }
       }
+      
+      // Reset loading state after text response is complete (UI becomes responsive)
+      setIsLoading(false);
+      setAbortController(null);
 
       // Show toast indicating which AI was used
       toast({
@@ -574,19 +575,18 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
 
-      // Try Resemble.ai first for better quality voices
+      // Start TTS generation immediately without waiting
       console.log('🎤 Attempting Resemble.ai TTS...');
-      try {
-        await generatePremiumSpeech(text, figure);
+      generatePremiumSpeech(text, figure).then(() => {
         console.log('✅ Resemble.ai TTS successful');
-      } catch (premiumError) {
+      }).catch((premiumError) => {
         console.log('❌ Resemble.ai TTS failed, falling back to browser speech:', premiumError);
         if ('speechSynthesis' in window) {
           generateBrowserSpeech(text, figure);
         } else {
           console.error('Speech synthesis not supported in this browser');
         }
-      }
+      });
     } catch (error) {
       console.error('Error generating speech:', error);
       setIsPlayingAudio(false);
@@ -815,8 +815,15 @@ const HistoricalChat = () => {
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
     try {
-      // First, try to get cloned voice
-      const clonedVoiceId = await getOrCreateAuthenticVoice(figure);
+      // Check for existing cloned voice quickly
+      const { data: existingVoices } = await supabase
+        .from('cloned_voices')
+        .select('voice_id')
+        .eq('figure_id', figure.id)
+        .eq('is_active', true)
+        .limit(1);
+      
+      const clonedVoiceId = existingVoices?.[0]?.voice_id;
       
       if (clonedVoiceId && clonedVoiceId.startsWith('resemble_')) {
         console.log(`Using Resemble TTS with cloned voice: ${clonedVoiceId} for ${figure.name}`);
