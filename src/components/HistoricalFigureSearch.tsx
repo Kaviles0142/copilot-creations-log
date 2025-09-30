@@ -164,10 +164,10 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
 
   const clearSelection = () => {
     onSelectFigure(null as any); // Clear the selected figure
-    setSearchResults([]); // Clear search results
+    // Keep search results visible so user can select other figures from the same search
     toast({
       title: "Selection cleared",
-      description: "You can now search for another historical figure",
+      description: "You can now select another figure from your search results",
     });
   };
 
