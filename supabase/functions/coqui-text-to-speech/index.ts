@@ -23,24 +23,10 @@ serve(async (req) => {
     let audioContent: string;
     let fallback = false;
 
-    if (voice && voice.startsWith('coqui_')) {
-      console.log(`Using real Coqui XTTS for voice: ${voice} with text: "${text.slice(0, 50)}..."`);
-      
-      try {
-        audioContent = await generateCoquiXTTS(text, voice);
-        console.log('Successfully generated audio with Coqui XTTS');
-      } catch (error) {
-        console.error('Coqui XTTS error:', error);
-        console.log('Falling back to ElevenLabs');
-        audioContent = await generateElevenLabsFallback(text);
-        fallback = true;
-      }
-    } else {
-      // Use ElevenLabs as fallback for non-Coqui voices
-      console.log('Using ElevenLabs fallback for voice:', voice);
-      audioContent = await generateElevenLabsFallback(text);
-      fallback = true;
-    }
+    // Since Coqui API is unavailable, use ElevenLabs for all voice generation
+    console.log(`Generating speech with ElevenLabs for voice: ${voice || 'default'}`);
+    audioContent = await generateElevenLabsFallback(text);
+    fallback = true;
 
     return new Response(JSON.stringify({ 
       audioContent,
