@@ -230,9 +230,9 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         return;
       }
 
-      // Fallback to regular ElevenLabs voices
+      // Fallback to regular ElevenLabs voices (using custom voice IDs where available)
       const voiceMapping: Record<string, string> = {
-        'martin-luther-king-jr': 'Daniel',
+        'martin-luther-king-jr': '2ts4Q14DjMa5I5EgteS4', // Custom MLK voice
         'jfk': 'Daniel',
         'john-f-kennedy': 'Daniel',
         'albert-einstein': 'Brian',
