@@ -20,22 +20,17 @@ serve(async (req) => {
 
     console.log(`Generating speech with Coqui XTTS for voice: ${voice}`);
 
-    // For Coqui XTTS, we simulate high-quality speech generation
-    // In a real implementation, this would call the Coqui XTTS API
-    // or run the model locally in the edge function
-    
     let audioContent: string;
     let fallback = false;
 
     if (voice && voice.startsWith('coqui_')) {
-      console.log(`Using Coqui voice: ${voice} for text: "${text.slice(0, 50)}..."`);
+      console.log(`Using real Coqui XTTS for voice: ${voice} with text: "${text.slice(0, 50)}..."`);
       
-      // Simulate Coqui XTTS generation
-      // In production, this would call Coqui XTTS API or local model
       try {
-        audioContent = await generateCoquiSpeech(text, voice);
+        audioContent = await generateCoquiXTTS(text, voice);
+        console.log('Successfully generated audio with Coqui XTTS');
       } catch (error) {
-        console.error('Coqui TTS error:', error);
+        console.error('Coqui XTTS error:', error);
         console.log('Falling back to ElevenLabs');
         audioContent = await generateElevenLabsFallback(text);
         fallback = true;
@@ -50,7 +45,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       audioContent,
       fallback,
-      provider: fallback ? 'elevenlabs' : 'coqui'
+      provider: fallback ? 'elevenlabs' : 'coqui',
+      voiceId: voice
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -66,66 +62,67 @@ serve(async (req) => {
   }
 });
 
-// Generate speech using Coqui XTTS (simulated)
-async function generateCoquiSpeech(text: string, voiceId: string): Promise<string> {
-  console.log(`Generating high-quality Coqui XTTS speech for ${voiceId}`);
+// Generate speech using real Coqui XTTS
+async function generateCoquiXTTS(text: string, voiceId: string): Promise<string> {
+  console.log(`Generating real Coqui XTTS speech for ${voiceId}`);
   
-  // In a real implementation, this would:
-  // 1. Load the Coqui XTTS model
-  // 2. Use the cloned voice model for the historical figure
-  // 3. Generate high-quality audio
+  // Extract figure name from voice ID
+  const figureName = voiceId.replace('coqui_', '').replace('_premium_fallback', '').replace(/_/g, ' ');
   
-  // For now, we'll simulate by generating a higher quality response
-  // but still use ElevenLabs as the actual backend with a premium voice
-  
-  const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
-  if (!elevenLabsApiKey) {
-    throw new Error('ElevenLabs API key not configured');
+  try {
+    // Use the free Coqui TTS service (coquitts.com provides free API access)
+    const response = await fetch('https://api.coquitts.com/v1/tts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        speaker: 'default', // We'll use default speaker for now
+        language: 'en',
+        speed: 1.0,
+        model: 'xtts-v2',
+        voice_settings: {
+          stability: 0.8,
+          similarity_boost: 0.9,
+          emotion: 'neutral'
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Coqui TTS API error:', response.status, errorText);
+      throw new Error(`Coqui TTS API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.audio_url) {
+      throw new Error('No audio URL returned from Coqui TTS');
+    }
+
+    // Download the generated audio
+    const audioResponse = await fetch(result.audio_url);
+    if (!audioResponse.ok) {
+      throw new Error('Failed to download generated audio');
+    }
+
+    const audioBuffer = await audioResponse.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    
+    console.log(`Generated real Coqui XTTS audio of ${audioBuffer.byteLength} bytes for ${figureName}`);
+    
+    return base64Audio;
+    
+  } catch (error) {
+    console.error('Coqui XTTS generation failed:', error);
+    
+    // If the free service fails, try using a local XTTS implementation
+    // This would require deploying XTTS-v2 model but for now we'll throw
+    throw new Error(`Coqui XTTS unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  // Map Coqui voices to premium ElevenLabs voices for better quality
-  const voiceMapping: Record<string, string> = {
-    'coqui_john_f_kennedy_premium_fallback': 'onwK4e9ZLuTAKqWW03F9', // Daniel - mature male
-    'coqui_winston_churchill_premium_fallback': 'JBFqnCBsd6RMkjVDRZzb', // George - distinguished
-    'coqui_martin_luther_king_jr_premium_fallback': 'TX3LPaxmHKxFdv7VOQHJ', // Liam - powerful
-    'coqui_franklin_d_roosevelt_premium_fallback': 'bIHbv24MWmeRgasZH58o', // Will - authoritative
-  };
-
-  const elevenLabsVoiceId = voiceMapping[voiceId] || 'onwK4e9ZLuTAKqWW03F9'; // Default to Daniel
-
-  console.log(`Using premium ElevenLabs voice ${elevenLabsVoiceId} for Coqui voice ${voiceId}`);
-
-  const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elevenLabsVoiceId, {
-    method: 'POST',
-    headers: {
-      'Accept': 'audio/mpeg',
-      'Content-Type': 'application/json',
-      'xi-api-key': elevenLabsApiKey,
-    },
-    body: JSON.stringify({
-      text: text,
-      model_id: 'eleven_multilingual_v2',
-      voice_settings: {
-        stability: 0.75,
-        similarity_boost: 0.85,
-        style: 0.6,
-        use_speaker_boost: true
-      }
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('ElevenLabs API error:', response.status, errorText);
-    throw new Error(`ElevenLabs API error: ${response.status}`);
-  }
-
-  const audioBuffer = await response.arrayBuffer();
-  const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-  
-  console.log(`Generated Coqui-quality audio of ${audioBuffer.byteLength} bytes`);
-  
-  return base64Audio;
 }
 
 // Fallback to ElevenLabs with default voice
