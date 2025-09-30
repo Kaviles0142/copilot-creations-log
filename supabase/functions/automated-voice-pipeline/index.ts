@@ -254,10 +254,10 @@ async function trainVoiceModel(cleanedAudio: any[], figureId: string, figureName
     throw new Error('No audio files available for training');
   }
 
-  console.log(`🎯 Creating real voice clone using Coqui TTS for ${figureName}`);
+  console.log(`🎯 Creating real voice clone using Resemble AI for ${figureName}`);
   
   // Call the actual voice cloning service
-  const { data: cloneResult } = await supabase.functions.invoke('coqui-voice-clone', {
+  const { data: cloneResult } = await supabase.functions.invoke('resemble-voice-clone', {
     body: {
       figureName: figureName,
       figureId: figureId,
@@ -283,7 +283,7 @@ async function trainVoiceModel(cleanedAudio: any[], figureId: string, figureName
       training_duration: '2.5 hours',
       epochs: 150,
       dataset_size: `${cleanedAudio.length} files`,
-      model_type: 'Coqui TTS',
+      model_type: 'Resemble AI',
       sample_rate: 48000
     },
     trainedAt: new Date().toISOString()
@@ -333,7 +333,7 @@ async function registerClonedVoice(figureId: string, figureName: string, apiEndp
       voice_name: modelResult.voiceName,
       provider: modelResult.provider,
       source_url: apiEndpoint,
-      source_description: 'Trained using automated pipeline with Coqui TTS',
+      source_description: 'Trained using automated pipeline with Resemble AI',
       audio_quality_score: 95, // Higher score for actually trained voices
       is_active: true
     });

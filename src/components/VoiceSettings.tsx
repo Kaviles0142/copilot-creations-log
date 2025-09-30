@@ -102,7 +102,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
     setIsGenerating(true);
     try {
       // Check if we have a real cloned voice from the pipeline
-      const customVoice = clonedVoices.find(v => v.provider === 'coqui' || v.provider === 'resemble');
+      const customVoice = clonedVoices.find(v => v.provider === 'resemble');
       
       if (customVoice && selectedVoice === "auto") {
         console.log('Using real cloned voice:', customVoice.voice_id);
@@ -112,17 +112,14 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
           description: `Using actual voice clone for ${selectedFigure.name}`,
         });
         
-        // Use the actual cloned voice through the appropriate TTS service
-        const { data, error } = await supabase.functions.invoke(
-          customVoice.provider === 'coqui' ? 'coqui-text-to-speech' : 'resemble-text-to-speech',
-          {
-            body: {
-              text: text,
-              voice_id: customVoice.voice_id,
-              figure_name: selectedFigure.name
-            }
+        // Use the actual cloned voice through Resemble AI
+        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+          body: {
+            text: text,
+            voice: customVoice.voice_id,
+            figure_name: selectedFigure.name
           }
-        );
+        });
 
         if (error) throw new Error('Voice generation failed');
         if (!data?.audioContent) throw new Error('No audio content received');
@@ -204,7 +201,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
   if (!selectedFigure) return null;
 
   const figureVoice = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
-  const hasCustomVoice = clonedVoices.some(v => v.provider === 'coqui' || v.provider === 'resemble');
+  const hasCustomVoice = clonedVoices.some(v => v.provider === 'resemble');
 
   return (
     <Card className="p-4">
