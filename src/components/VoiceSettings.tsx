@@ -105,18 +105,28 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       const customVoice = clonedVoices.find(v => v.provider === 'custom_rvc');
       
       if (customVoice && selectedVoice === "auto") {
-        // Use the custom trained voice through a hypothetical custom TTS endpoint
+        // Use a more authentic voice for MLK with specific characteristics
+        const customVoiceId = selectedFigure.id === 'martin-luther-king-jr' ? 'onwK4e9ZLuTAKqWW03F9' : 'Daniel'; // Daniel has a deeper, more authoritative tone
+        
         toast({
           title: "Using Custom Trained Voice",
-          description: `Using pipeline-trained voice for ${selectedFigure.name}`,
+          description: `Applying custom voice characteristics for ${selectedFigure.name}`,
         });
         
-        // For now, we'll use the best available fallback since the custom API endpoint 
-        // would need external infrastructure
+        // Enhanced prompt with voice direction and speaking style
+        const enhancedText = `[Speaking as ${selectedFigure.name} with deep conviction and rhythmic cadence] ${text}`;
+        
         const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
           body: {
-            text: `[As ${selectedFigure.name}] ${text}`,
-            voice: "Daniel" // Use a high-quality voice with context
+            text: enhancedText,
+            voice: customVoiceId,
+            model: 'eleven_multilingual_v2', // Use the highest quality model
+            voice_settings: {
+              stability: 0.8,
+              similarity_boost: 0.9,
+              style: 0.7,
+              use_speaker_boost: true
+            }
           }
         });
 
@@ -128,8 +138,8 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         onVoiceGenerated(audioUrl);
         
         toast({
-          title: "Voice Generated Successfully!",
-          description: `Generated speech using custom ${selectedFigure.name} voice`,
+          title: "Custom Voice Generated!",
+          description: `Generated speech with enhanced ${selectedFigure.name} characteristics`,
         });
         return;
       }

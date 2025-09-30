@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice = "Brian" } = await req.json();
+    const { text, voice = "Brian", model = "eleven_multilingual_v2", voice_settings } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -67,8 +67,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         text: text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
+        model_id: model,
+        voice_settings: voice_settings || {
           stability: 0.5,
           similarity_boost: 0.5,
           style: 0.0,
