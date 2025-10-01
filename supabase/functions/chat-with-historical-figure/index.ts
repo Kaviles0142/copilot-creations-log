@@ -485,15 +485,41 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
       if (voiceSearchResponse.ok) {
         const voiceData = await voiceSearchResponse.json();
         
-        // Find matching voice by name
+        // Create multiple name variations for better matching
         const figureName = figure.name.toLowerCase();
-        const matchingVoice = voiceData.models?.find((v: any) => 
-          v.title.toLowerCase().includes(figureName) &&
-          v.ietf_primary_language_subtag === 'en'
-        );
+        const nameWithoutPunctuation = figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
+        const nameWords = nameWithoutPunctuation.split(' ').filter((w: string) => w.length > 0);
+        const lastName = nameWords.length > 0 ? nameWords[nameWords.length - 1] : '';
+        const firstName = nameWords.length > 0 ? nameWords[0] : '';
+        
+        // Common abbreviations and variations
+        const nameVariations: Record<string, string[]> = {
+          'john f kennedy': ['jfk', 'kennedy', 'john f kennedy', 'john kennedy', 'president kennedy'],
+          'martin luther king jr': ['mlk', 'martin luther king', 'dr king', 'king jr'],
+          'franklin d roosevelt': ['fdr', 'franklin roosevelt', 'roosevelt'],
+          'winston churchill': ['churchill', 'winston'],
+          'abraham lincoln': ['lincoln', 'abe lincoln', 'president lincoln'],
+          'albert einstein': ['einstein'],
+        };
+        
+        const searchTerms = nameVariations[nameWithoutPunctuation] || [
+          figureName,
+          nameWithoutPunctuation,
+          lastName,
+          `${firstName} ${lastName}`
+        ];
+        
+        console.log(`Searching FakeYou for: ${searchTerms.join(', ')}`);
+        
+        // Find matching voice using multiple search terms
+        const matchingVoice = voiceData.models?.find((v: any) => {
+          if (v.ietf_primary_language_subtag !== 'en') return false;
+          const voiceTitle = v.title.toLowerCase();
+          return searchTerms.some(term => voiceTitle.includes(term));
+        });
         
         if (matchingVoice) {
-          console.log(`Found FakeYou voice: ${matchingVoice.title}`);
+          console.log(`✅ Found FakeYou voice: ${matchingVoice.title} (token: ${matchingVoice.model_token})`);
           
           // Generate TTS
           const ttsResponse = await fetch('https://api.fakeyou.com/tts/inference', {
