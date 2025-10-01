@@ -207,28 +207,33 @@ const HistoricalChat = () => {
       
       const figureName = figure.name.toLowerCase();
       
-      // Simple approach: search for key identifier
-      let searchTerm = '';
+      // Build flexible search terms for common variations
+      let searchTerms: string[] = [];
       let excludeTerms: string[] = [];
       
       if (figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
+        searchTerms = ['kennedy', 'jfk'];
         excludeTerms = ['robert', 'bobby', 'rfk', 'ted', 'edward'];
-        console.log('🔍 Searching for Kennedy voices, excluding:', excludeTerms.join(', '));
+        console.log('🔍 Searching for Kennedy voices');
+      } else if (figureName.includes('trump')) {
+        // Search for Trump with common variations
+        searchTerms = ['trump', 'potus 45', '45th president', 'president trump'];
+        console.log('🔍 Searching for Trump voices with variations');
       } else {
         // For other figures, use last name
         const words = figureName.split(' ');
-        searchTerm = words[words.length - 1];
-        console.log('🔍 Searching for:', searchTerm);
+        searchTerms = [words[words.length - 1]];
+        console.log('🔍 Searching for:', searchTerms[0]);
       }
       
-      console.log(`🔎 Will search for voices containing: "${searchTerm}"`);
+      console.log(`🔎 Search terms: ${searchTerms.join(', ')}`);
       
-      // First, let's see ALL voices that contain our search term (before exclusions)
-      const candidateVoices = allVoices.filter((voice: any) => 
-        voice.title.toLowerCase().includes(searchTerm)
-      );
-      console.log(`📝 Found ${candidateVoices.length} voices containing "${searchTerm}":`);
+      // Find voices matching any search term
+      const candidateVoices = allVoices.filter((voice: any) => {
+        const voiceTitle = voice.title.toLowerCase();
+        return searchTerms.some(term => voiceTitle.includes(term));
+      });
+      console.log(`📝 Found ${candidateVoices.length} voices containing any of: ${searchTerms.join(', ')}:`);
       candidateVoices.forEach((v: any) => console.log(`  - "${v.title}"`));
       
       // Filter voices
