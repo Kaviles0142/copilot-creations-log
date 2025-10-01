@@ -237,6 +237,18 @@ const HistoricalChat = () => {
       console.log(`📝 Found ${candidateVoices.length} voices containing any of: ${searchTerms.join(', ')}:`);
       candidateVoices.forEach((v: any) => console.log(`  - "${v.title}"`));
       
+      // DEBUG: If we only found a few, let's search all 863 for any Trump-related terms
+      if (figureName.includes('trump') && candidateVoices.length < 5) {
+        console.log('🔍 Searching ALL 863 voices for Trump-related patterns...');
+        const broadSearch = allVoices.filter((v: any) => {
+          const title = v.title.toLowerCase();
+          return title.includes('donald') || title.includes('potus') || 
+                 title.includes('president 2') || title.includes('45');
+        });
+        console.log(`🔎 Found ${broadSearch.length} voices with broader Trump search:`);
+        broadSearch.forEach((v: any) => console.log(`  - "${v.title}"`));
+      }
+      
       // Filter voices
       const matchingVoices = candidateVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
