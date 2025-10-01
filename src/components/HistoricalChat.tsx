@@ -665,18 +665,39 @@ const HistoricalChat = () => {
       
       console.log(`🔍 Searching FakeYou for: ${searchTerms.join(', ')}`);
       
-      // Find matching voice using flexible search
-      const matchingVoice = voicesData.voices?.find((v: any) => {
-        const voiceTitle = v.title.toLowerCase();
-        return searchTerms.some((term: string) => {
-          // Check if voice title contains the search term
-          if (voiceTitle.includes(term)) {
-            console.log(`✓ Match found: "${v.title}" contains "${term}"`);
+      // Find matching voice using prioritized search (exact match first, then partial)
+      let matchingVoice = null;
+      
+      // First pass: Try to find exact full name matches (most specific)
+      for (const term of searchTerms.slice(0, 3)) { // Check first 3 terms (most specific)
+        matchingVoice = voicesData.voices?.find((v: any) => {
+          const voiceTitle = v.title.toLowerCase();
+          // Exact match or contains full term as a word (not just substring)
+          const termRegex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+          if (termRegex.test(voiceTitle)) {
+            console.log(`✓ Full match found: "${v.title}" matches "${term}"`);
             return true;
           }
           return false;
         });
-      });
+        
+        if (matchingVoice) break;
+      }
+      
+      // Second pass: If no exact match, try broader search
+      if (!matchingVoice) {
+        matchingVoice = voicesData.voices?.find((v: any) => {
+          const voiceTitle = v.title.toLowerCase();
+          return searchTerms.some((term: string) => {
+            // Check if voice title contains the search term
+            if (voiceTitle.includes(term)) {
+              console.log(`✓ Partial match found: "${v.title}" contains "${term}"`);
+              return true;
+            }
+            return false;
+          });
+        });
+      }
       
       if (!matchingVoice) {
         console.log('❌ No FakeYou voice found. Tried:', searchTerms);
