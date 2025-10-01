@@ -206,6 +206,7 @@ const HistoricalChat = () => {
       console.log('🔍 Sample of all voice titles:', allVoices.slice(0, 20).map((v: any) => v.title));
       
       const figureName = figure.name.toLowerCase();
+      console.log(`🎯 Figure name: "${figure.name}" (lowercase: "${figureName}")`);
       
       // Build flexible search terms for common variations
       let searchTerms: string[] = [];
