@@ -88,7 +88,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, text, voiceToken, jobToken, figureName, categoryFilter, searchTerm, audioUrl } = await req.json();
+    const body = await req.json();
+    const { action, text, voiceToken, jobToken, figureName, categoryFilter, searchTerm, audioUrl, searchTerms } = body;
 
     console.log(`FakeYou TTS action: ${action}`);
 
@@ -105,7 +106,6 @@ serve(async (req) => {
       
       case 'multi_search_voices':
         // Multi-term search for better voice discovery
-        const { searchTerms } = await req.json();
         if (!searchTerms || !Array.isArray(searchTerms)) {
           throw new Error('Missing searchTerms array for multi-search');
         }
