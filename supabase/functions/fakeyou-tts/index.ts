@@ -10,6 +10,9 @@ const corsHeaders = {
 const FAKEYOU_API_BASE = 'https://api.fakeyou.com';
 const FAKEYOU_CDN_BASE = 'https://storage.googleapis.com/vocodes-public';
 
+// Cache session cookie (persists for lifetime of function instance)
+let sessionCookie: string | null = null;
+
 interface FakeYouVoice {
   model_token: string;
   title: string;
@@ -21,6 +24,62 @@ interface FakeYouVoice {
   category_tokens: string[];
   created_at: string;
   updated_at: string;
+}
+
+// Login to FakeYou and get session cookie
+async function loginToFakeYou(): Promise<string> {
+  console.log('🔐 Logging in to FakeYou...');
+  
+  const username = Deno.env.get('FAKEYOU_USERNAME');
+  const password = Deno.env.get('FAKEYOU_PASSWORD');
+  
+  if (!username || !password) {
+    throw new Error('FakeYou credentials not configured');
+  }
+  
+  const response = await fetch(`${FAKEYOU_API_BASE}/v1/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username_or_email: username,
+      password: password,
+    }),
+  });
+  
+  const json = await response.json();
+  
+  if (!json.success) {
+    console.error('❌ FakeYou login failed:', json);
+    throw new Error('FakeYou authentication failed');
+  }
+  
+  // Extract cookie from response headers
+  const cookieHeader = response.headers.get('set-cookie');
+  const cookie = cookieHeader?.match(/session=([^;]+)/)?.[1];
+  
+  if (!cookie) {
+    throw new Error('Failed to extract session cookie');
+  }
+  
+  console.log('✅ Successfully logged in to FakeYou');
+  return cookie;
+}
+
+// Get authenticated headers for FakeYou API requests
+async function getAuthHeaders(): Promise<HeadersInit> {
+  // Use cached cookie if available
+  if (!sessionCookie) {
+    sessionCookie = await loginToFakeYou();
+  }
+  
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'credentials': 'include',
+    'cookie': `session=${sessionCookie}`,
+  };
 }
 
 serve(async (req) => {
@@ -80,10 +139,9 @@ async function listVoices(categoryFilter?: string) {
   console.log('📋 Fetching voices from FakeYou API...');
   
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${FAKEYOU_API_BASE}/tts/list`, {
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
     });
     
     if (!response.ok) {
@@ -164,12 +222,10 @@ async function generateTTS(text: string, voiceToken: string) {
     };
     
     console.log(`📤 Sending TTS request to FakeYou...`);
+    const headers = await getAuthHeaders();
     const response = await fetch(`${FAKEYOU_API_BASE}/tts/inference`, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(requestBody),
     });
 
@@ -219,10 +275,9 @@ async function checkJobStatus(jobToken: string) {
   console.log(`⏳ Checking status for job: ${jobToken}`);
   
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${FAKEYOU_API_BASE}/tts/job/${jobToken}`, {
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -282,7 +337,8 @@ async function proxyAudio(audioUrl: string) {
   console.log(`🎵 Proxying audio from: ${audioUrl}`);
   
   try {
-    const response = await fetch(audioUrl);
+    const headers = await getAuthHeaders();
+    const response = await fetch(audioUrl, { headers });
     
     if (!response.ok) {
       console.error(`❌ Failed to fetch audio: ${response.status}`);
@@ -328,8 +384,9 @@ async function syncVoicesToDatabase(figureName?: string) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Fetch all voices
-  const response = await fetch(`${FAKEYOU_API_BASE}/tts/list`);
+  // Fetch all voices with authentication
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${FAKEYOU_API_BASE}/tts/list`, { headers });
   if (!response.ok) {
     throw new Error(`Failed to fetch voices: ${response.status}`);
   }
