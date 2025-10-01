@@ -229,21 +229,9 @@ const HistoricalChat = () => {
         ...nameWords.filter(w => w.length > 3)
       ];
       
-      // Find ALL matching voices with exclusion logic
+      // Find ALL matching voices
       const matchingVoices = voicesData.voices?.filter((v: any) => {
         const voiceTitle = v.title.toLowerCase();
-        
-        // Exclude voices that contain other people's names
-        const excludeTerms = [
-          ...(figureName.includes('john f kennedy') || figureName.includes('jfk') ? ['robert', 'rfk', 'bobby'] : []),
-          ...(figureName.includes('robert') && figureName.includes('kennedy') ? ['john f', 'jfk'] : []),
-        ];
-        
-        // Check if voice should be excluded
-        const shouldExclude = excludeTerms.some(exclude => voiceTitle.includes(exclude));
-        if (shouldExclude) return false;
-        
-        // Match against search terms
         return searchTerms.some((term: string) => {
           const termRegex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
           return termRegex.test(voiceTitle) || voiceTitle.includes(term);
