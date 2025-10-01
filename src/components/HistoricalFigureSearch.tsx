@@ -244,19 +244,11 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
               className="p-3 cursor-pointer transition-all hover:shadow-md hover:bg-accent"
               onClick={() => selectFigure(result)}
             >
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                  <User className="h-5 w-5" />
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center">
+                  <User className="h-4 w-4" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm truncate">{result.title}</h4>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {extractPeriodFromText(result.extract)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {result.extract.substring(0, 150)}...
-                  </p>
-                </div>
+                <h4 className="font-medium text-sm">{result.title}</h4>
               </div>
             </Card>
           ))}
