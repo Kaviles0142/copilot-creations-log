@@ -201,67 +201,58 @@ const HistoricalChat = () => {
       const allVoices = voicesData.voices || [];
       console.log(`📋 Total voices fetched from API: ${allVoices.length}`);
       
-      // Create search terms - be very flexible
       const figureName = figure.name.toLowerCase();
       
-      // Extract key parts of the name
-      const nameWords = figureName.replace(/[.,]/g, '').split(' ').filter(w => w.length > 2);
-      console.log('🔤 Name words:', nameWords);
+      // Simple approach: search for key identifier
+      let searchTerm = '';
+      let excludeTerms: string[] = [];
       
-      // Build search terms
-      let searchTerms: string[] = [];
-      
-      // For JFK, use comprehensive search
       if (figureName.includes('kennedy')) {
-        searchTerms = ['kennedy', 'jfk', 'john f kennedy', 'john kennedy', 'president kennedy'];
-        console.log('🔍 Using Kennedy-specific search terms');
+        searchTerm = 'kennedy';
+        excludeTerms = ['robert', 'bobby', 'rfk', 'ted', 'edward'];
+        console.log('🔍 Searching for Kennedy voices, excluding:', excludeTerms.join(', '));
       } else {
-        // For other figures, use their last name (most common identifier)
-        searchTerms = nameWords.length > 0 ? [nameWords[nameWords.length - 1]] : [figureName];
+        // For other figures, use last name
+        const words = figureName.split(' ');
+        searchTerm = words[words.length - 1];
+        console.log('🔍 Searching for:', searchTerm);
       }
       
-      console.log(`🔎 Search terms: ${searchTerms.join(', ')}`);
-      
-      // Filter voices - very permissive matching
+      // Filter voices
       const matchingVoices = allVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
         
-        // Must match at least one search term
-        const hasMatch = searchTerms.some(term => voiceTitle.includes(term.toLowerCase()));
-        
-        if (hasMatch) {
-          console.log(`✅ Match: "${voice.title}"`);
+        // Must contain search term
+        if (!voiceTitle.includes(searchTerm)) {
+          return false;
         }
         
-        // Only exclude obvious wrong matches for Kennedy family
-        if (figureName.includes('kennedy') && figureName.includes('john')) {
-          // Exclude Robert Kennedy, Ted Kennedy, etc.
-          if (voiceTitle.includes('robert') || voiceTitle.includes('bobby') || 
-              voiceTitle.includes('ted') || voiceTitle.includes('edward') || voiceTitle.includes('rfk')) {
-            console.log(`❌ Excluded: "${voice.title}"`);
+        // Check exclusions
+        for (const excludeTerm of excludeTerms) {
+          if (voiceTitle.includes(excludeTerm)) {
+            console.log(`❌ Excluded: "${voice.title}" (contains "${excludeTerm}")`);
             return false;
           }
         }
         
-        return hasMatch;
+        console.log(`✅ Included: "${voice.title}"`);
+        return true;
       });
       
       console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
-      console.log('📝 All matching voice titles:', matchingVoices.map(v => v.title));
+      console.log('📝 All voices:', matchingVoices.map(v => v.title));
       
       setAvailableFakeYouVoices(matchingVoices);
       
-      // Auto-select the first voice if available
       if (matchingVoices.length > 0) {
         setSelectedFakeYouVoice(matchingVoices[0]);
         console.log(`🎙️ Auto-selected: "${matchingVoices[0].title}"`);
       } else {
         setSelectedFakeYouVoice(null);
-        console.log('⚠️ No voices found');
       }
       
     } catch (error) {
-      console.error('❌ Error fetching voices:', error);
+      console.error('❌ Error:', error);
       setAvailableFakeYouVoices([]);
       setSelectedFakeYouVoice(null);
     } finally {
