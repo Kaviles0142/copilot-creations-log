@@ -169,6 +169,70 @@ serve(async (req) => {
       // These searches have been commented out to improve response speed
       console.log('Skipping slow SerpAPI searches to prevent timeout...');
 
+      // 5. Search for current events and news articles (with timeout protection)
+      console.log(`Searching current events for ${figure.name}...`);
+      try {
+        const newsPromise = supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${figure.name} news ${new Date().getFullYear()}`,
+            type: 'news',
+            num: 3
+          }
+        });
+
+        // Race against 5 second timeout
+        const newsResponse: any = await Promise.race([
+          newsPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        ]);
+
+        if (newsResponse.data?.results?.length > 0) {
+          sourcesUsed.currentEvents = newsResponse.data.results.length;
+          relevantKnowledge += '\n\n📰 CURRENT EVENTS & NEWS:\n';
+          newsResponse.data.results.forEach((article: any) => {
+            relevantKnowledge += `- "${article.title}" (${article.date})\n`;
+            if (article.snippet) {
+              relevantKnowledge += `  ${article.snippet.substring(0, 200)}...\n`;
+            }
+          });
+          console.log(`Added ${newsResponse.data.results.length} current events to context`);
+        }
+      } catch (newsError: any) {
+        console.log('News search skipped (timeout or error):', newsError?.message || 'Unknown error');
+      }
+
+      // 6. Search web articles for historical context (with timeout protection)
+      console.log(`Searching web articles about ${figure.name}...`);
+      try {
+        const webPromise = supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${figure.name} biography history legacy`,
+            type: 'web',
+            num: 3
+          }
+        });
+
+        const webResponse: any = await Promise.race([
+          webPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        ]);
+
+        if (webResponse.data?.results?.length > 0) {
+          sourcesUsed.webArticles = webResponse.data.results.length;
+          relevantKnowledge += '\n\n🌐 WEB ARTICLES:\n';
+          webResponse.data.results.forEach((article: any) => {
+            relevantKnowledge += `- "${article.title}" (${article.source})\n`;
+            if (article.snippet) {
+              relevantKnowledge += `  ${article.snippet.substring(0, 200)}...\n`;
+            }
+          });
+          console.log(`Added ${webResponse.data.results.length} web articles to context`);
+        }
+      } catch (webError: any) {
+        console.log('Web search skipped (timeout or error):', webError?.message || 'Unknown error');
+      }
+
+
     } catch (knowledgeError) {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
