@@ -201,38 +201,54 @@ const HistoricalChat = () => {
       const allVoices = voicesData.voices || [];
       console.log(`📋 Total voices fetched: ${allVoices.length}`);
       
-      // Create broad search terms to capture all variations
+      // Create broad search terms - be more flexible
       const figureName = figure.name.toLowerCase();
-      const nameWords = figureName.split(' ').filter(w => w.length > 0);
+      const nameWords = figureName.replace(/[.,]/g, '').split(' ').filter(w => w.length > 0);
       const lastName = nameWords[nameWords.length - 1];
+      const firstName = nameWords[0];
       
       // Build comprehensive search terms
-      const searchTerms = [figureName];
+      const searchTerms: string[] = [];
       
-      // Add common variations
-      if (figureName.includes('john f. kennedy') || figureName.includes('john f kennedy')) {
-        searchTerms.push('jfk', 'kennedy', 'john kennedy', 'john f kennedy', 'john f. kennedy');
-      } else if (nameWords.length > 1) {
-        // For other figures, add last name and full name variations
+      // Add full name variations
+      searchTerms.push(figureName);
+      searchTerms.push(nameWords.join(' ')); // without punctuation
+      
+      // Add common variations based on the figure
+      if (figureName.includes('john f') && figureName.includes('kennedy')) {
+        searchTerms.push('jfk', 'kennedy', 'john kennedy', 'john f kennedy', 'president kennedy');
+      } else if (figureName.includes('abraham') && figureName.includes('lincoln')) {
+        searchTerms.push('lincoln', 'abe lincoln', 'president lincoln', 'abraham lincoln');
+      } else if (figureName.includes('martin luther king')) {
+        searchTerms.push('mlk', 'martin luther king', 'dr king', 'king jr');
+      } else if (figureName.includes('franklin') && figureName.includes('roosevelt')) {
+        searchTerms.push('fdr', 'franklin roosevelt', 'roosevelt', 'president roosevelt');
+      } else {
+        // For other figures, just add last name and variations
         searchTerms.push(lastName);
-        searchTerms.push(nameWords.join(' '));
+        if (nameWords.length >= 2) {
+          searchTerms.push(`${firstName} ${lastName}`);
+        }
       }
       
       console.log(`🔎 Searching for: ${searchTerms.join(', ')}`);
       
-      // Filter voices - be inclusive to capture all variations
+      // Filter voices - be inclusive but apply exclusions
       const matchingVoices = allVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
         
-        // Check if voice matches any search term
-        const hasMatch = searchTerms.some(term => voiceTitle.includes(term));
+        // Check if voice matches any search term (case-insensitive)
+        const hasMatch = searchTerms.some(term => voiceTitle.includes(term.toLowerCase()));
         if (!hasMatch) return false;
         
-        // Apply exclusions only for figures with common confusions
+        // Apply exclusions for figures with potential confusion
         const excludeTerms = getExcludeTermsForFigure(figure.name);
         if (excludeTerms.length > 0) {
-          const hasExclusion = excludeTerms.some(term => voiceTitle.includes(term));
-          if (hasExclusion) return false;
+          const hasExclusion = excludeTerms.some(term => voiceTitle.includes(term.toLowerCase()));
+          if (hasExclusion) {
+            console.log(`❌ Excluded "${voice.title}" due to: ${excludeTerms.join(', ')}`);
+            return false;
+          }
         }
         
         return true;
@@ -248,6 +264,7 @@ const HistoricalChat = () => {
         console.log(`🎙️ Auto-selected voice: "${matchingVoices[0].title}"`);
       } else {
         setSelectedFakeYouVoice(null);
+        console.log('⚠️ No voices found - try a different figure');
       }
       
     } catch (error) {
