@@ -505,7 +505,6 @@ const HistoricalChat = () => {
       const aiResponse = result.response || result.message || "I apologize, but I couldn't generate a proper response.";
       const usedProvider = result.aiProvider || selectedAIProvider;
       const sourcesUsed = result.sourcesUsed;
-      const audioUrl = result.audioUrl; // Get FakeYou audio URL if available
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -515,44 +514,16 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // If FakeYou audio is available, play it automatically
-      if (audioUrl && isAutoVoiceEnabled) {
-        console.log('🎙️ Playing FakeYou authentic voice:', audioUrl);
-        const audio = new Audio(audioUrl);
-        audio.onloadeddata = () => {
-          console.log('✅ FakeYou audio loaded, playing...');
-          audio.play().then(() => {
-            setIsPlayingAudio(true);
-            setCurrentAudio(audio);
-            console.log('🔊 FakeYou audio playing');
-          }).catch(err => {
-            console.error('Failed to play FakeYou audio:', err);
-            // Fallback to standard TTS
-            if (aiResponse.length > 20) {
-              generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
-                console.error('Speech generation failed:', speechError);
-              });
-            }
-          });
-        };
-        audio.onerror = () => {
-          console.error('Failed to load FakeYou audio');
+      // Generate FakeYou voice using our dedicated edge function
+      if (isAutoVoiceEnabled && aiResponse.length > 20) {
+        console.log('🎙️ Starting FakeYou voice generation for:', selectedFigure!.name);
+        
+        generateFakeYouVoice(aiResponse, selectedFigure!).catch(voiceError => {
+          console.error('FakeYou voice generation failed:', voiceError);
           // Fallback to standard TTS
-          if (aiResponse.length > 20) {
-            generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
-              console.error('Speech generation failed:', speechError);
-            });
-          }
-        };
-        audio.onended = () => {
-          setIsPlayingAudio(false);
-          setCurrentAudio(null);
-        };
-      } else if (isAutoVoiceEnabled && aiResponse.length > 20) {
-        // No FakeYou audio available, use standard TTS
-        console.log('🔊 No FakeYou audio, using standard TTS');
-        generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
-          console.error('Speech generation failed:', speechError);
+          generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
+            console.error('All speech generation failed:', speechError);
+          });
         });
       }
 
@@ -627,6 +598,114 @@ const HistoricalChat = () => {
     } catch (error) {
       console.error('Error generating speech:', error);
       setIsPlayingAudio(false);
+    }
+  };
+
+  const generateFakeYouVoice = async (text: string, figure: HistoricalFigure) => {
+    try {
+      console.log('🎤 Generating FakeYou voice for:', figure.name);
+      setIsPlayingAudio(true);
+      
+      // Step 1: Search for the figure's voice on FakeYou
+      const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
+        body: { 
+          action: 'list_voices',
+        },
+      });
+      
+      if (voicesError) throw voicesError;
+      if (!voicesData.success) throw new Error('Failed to fetch voices');
+      
+      // Step 2: Find matching voice
+      const figureName = figure.name.toLowerCase();
+      const nameVariations = [
+        figureName,
+        figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ''),
+        'jfk',
+        'kennedy'
+      ];
+      
+      const matchingVoice = voicesData.voices?.find((v: any) => 
+        nameVariations.some((term: string) => v.title.toLowerCase().includes(term))
+      );
+      
+      if (!matchingVoice) {
+        console.log('❌ No FakeYou voice found for', figure.name);
+        throw new Error('Voice not found');
+      }
+      
+      console.log('✅ Found voice:', matchingVoice.title);
+      
+      // Step 3: Generate TTS
+      const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
+        body: {
+          action: 'generate_tts',
+          text: text.substring(0, 500),
+          voiceToken: matchingVoice.voiceToken,
+        },
+      });
+      
+      if (ttsError) throw ttsError;
+      if (!ttsData.success) throw new Error('TTS generation failed');
+      
+      const jobToken = ttsData.jobToken;
+      console.log('🔄 TTS job started:', jobToken);
+      
+      // Step 4: Poll for completion
+      for (let i = 0; i < 30; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
+          body: {
+            action: 'check_status',
+            jobToken: jobToken,
+          },
+        });
+        
+        if (statusError) throw statusError;
+        if (!statusData.success) throw new Error('Status check failed');
+        
+        console.log(`Checking status (${i + 1}/30):`, statusData.status);
+        
+        if (statusData.isComplete && statusData.audioUrl) {
+          console.log('✅ FakeYou audio ready:', statusData.audioUrl);
+          
+          // Play the audio
+          const audio = new Audio(statusData.audioUrl);
+          audio.onloadeddata = () => {
+            audio.play().then(() => {
+              setCurrentAudio(audio);
+              console.log('🔊 Playing FakeYou voice');
+            }).catch(err => {
+              console.error('Failed to play audio:', err);
+              setIsPlayingAudio(false);
+              throw err;
+            });
+          };
+          audio.onerror = () => {
+            console.error('Failed to load audio');
+            setIsPlayingAudio(false);
+            throw new Error('Audio load failed');
+          };
+          audio.onended = () => {
+            setIsPlayingAudio(false);
+            setCurrentAudio(null);
+          };
+          
+          return;
+        }
+        
+        if (statusData.isFailed) {
+          throw new Error('TTS generation failed');
+        }
+      }
+      
+      throw new Error('TTS timeout');
+      
+    } catch (error) {
+      console.error('FakeYou generation failed:', error);
+      setIsPlayingAudio(false);
+      throw error;
     }
   };
 

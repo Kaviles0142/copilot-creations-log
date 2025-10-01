@@ -474,108 +474,15 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
     const response = data.choices[0].message.content;
 
     console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
-    
-    // Automatically generate FakeYou voice for the response
-    let audioUrl = null;
-    try {
-      console.log(`Attempting to generate FakeYou voice for ${figure.name}...`);
-      
-      // Search for matching voice
-      const voiceSearchResponse = await fetch('https://api.fakeyou.com/tts/list');
-      if (voiceSearchResponse.ok) {
-        const voiceData = await voiceSearchResponse.json();
-        
-        // Create multiple name variations for better matching
-        const figureName = figure.name.toLowerCase();
-        const nameWithoutPunctuation = figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
-        const nameWords = nameWithoutPunctuation.split(' ').filter((w: string) => w.length > 0);
-        const lastName = nameWords.length > 0 ? nameWords[nameWords.length - 1] : '';
-        const firstName = nameWords.length > 0 ? nameWords[0] : '';
-        
-        // Common abbreviations and variations
-        const nameVariations: Record<string, string[]> = {
-          'john f kennedy': ['jfk', 'kennedy', 'john f kennedy', 'john kennedy', 'president kennedy'],
-          'martin luther king jr': ['mlk', 'martin luther king', 'dr king', 'king jr'],
-          'franklin d roosevelt': ['fdr', 'franklin roosevelt', 'roosevelt'],
-          'winston churchill': ['churchill', 'winston'],
-          'abraham lincoln': ['lincoln', 'abe lincoln', 'president lincoln'],
-          'albert einstein': ['einstein'],
-        };
-        
-        const searchTerms = nameVariations[nameWithoutPunctuation] || [
-          figureName,
-          nameWithoutPunctuation,
-          lastName,
-          `${firstName} ${lastName}`
-        ];
-        
-        console.log(`Searching FakeYou for: ${searchTerms.join(', ')}`);
-        
-        // Find matching voice using multiple search terms
-        const matchingVoice = voiceData.models?.find((v: any) => {
-          if (v.ietf_primary_language_subtag !== 'en') return false;
-          const voiceTitle = v.title.toLowerCase();
-          return searchTerms.some(term => voiceTitle.includes(term));
-        });
-        
-        if (matchingVoice) {
-          console.log(`✅ Found FakeYou voice: ${matchingVoice.title} (token: ${matchingVoice.model_token})`);
-          
-          // Generate TTS
-          const ttsResponse = await fetch('https://api.fakeyou.com/tts/inference', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              uuid_idempotency_token: crypto.randomUUID(),
-              tts_model_token: matchingVoice.model_token,
-              inference_text: response.substring(0, 500), // Limit text length
-            }),
-          });
-          
-          if (ttsResponse.ok) {
-            const ttsData = await ttsResponse.json();
-            if (ttsData.success && ttsData.inference_job_token) {
-              const jobToken = ttsData.inference_job_token;
-              console.log(`TTS job started: ${jobToken}`);
-              
-              // Poll for completion (max 30 seconds)
-              for (let i = 0; i < 30; i++) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                const statusResponse = await fetch(`https://api.fakeyou.com/tts/job/${jobToken}`);
-                if (statusResponse.ok) {
-                  const statusData = await statusResponse.json();
-                  if (statusData.state?.status === 'complete_success' && statusData.state.maybe_public_bucket_wav_audio_path) {
-                    audioUrl = `https://storage.googleapis.com/vocodes-public${statusData.state.maybe_public_bucket_wav_audio_path}`;
-                    console.log(`TTS completed: ${audioUrl}`);
-                    break;
-                  } else if (statusData.state?.status === 'complete_failure' || statusData.state?.status === 'dead') {
-                    console.log('TTS generation failed');
-                    break;
-                  }
-                }
-              }
-            }
-          }
-        } else {
-          console.log(`No FakeYou voice found for ${figure.name}`);
-        }
-      }
-    } catch (voiceError) {
-      console.error('FakeYou voice generation error:', voiceError);
-      // Continue without audio - don't fail the whole request
-    }
-    
-    console.log('Success - returning comprehensive multi-source enhanced response with audio');
+    console.log('Success - returning comprehensive multi-source enhanced response');
 
     return new Response(JSON.stringify({ 
       response, 
       aiProvider,
       sourcesUsed,
-      audioUrl 
+      audioUrl: null, // Audio will be generated client-side to avoid timeout
+      figureId: figure.id,
+      figureName: figure.name
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
