@@ -201,39 +201,45 @@ const HistoricalChat = () => {
       const allVoices = voicesData.voices || [];
       console.log(`📋 Total voices fetched: ${allVoices.length}`);
       
-      // Create search terms - be very specific to avoid pulling related figures
+      // Create broad search terms to capture all variations
       const figureName = figure.name.toLowerCase();
+      const nameWords = figureName.split(' ').filter(w => w.length > 0);
+      const lastName = nameWords[nameWords.length - 1];
+      
+      // Build comprehensive search terms
       const searchTerms = [figureName];
       
-      // Add variations but be strict about exact matches
-      if (figureName.includes(' ')) {
-        const parts = figureName.split(' ');
-        // Only add if it's a clear identifier (like "jfk" for "john f kennedy")
-        if (parts.length >= 2) {
-          const initials = parts.map(p => p[0]).join('');
-          searchTerms.push(initials);
-        }
+      // Add common variations
+      if (figureName.includes('john f. kennedy') || figureName.includes('john f kennedy')) {
+        searchTerms.push('jfk', 'kennedy', 'john kennedy', 'john f kennedy', 'john f. kennedy');
+      } else if (nameWords.length > 1) {
+        // For other figures, add last name and full name variations
+        searchTerms.push(lastName);
+        searchTerms.push(nameWords.join(' '));
       }
       
       console.log(`🔎 Searching for: ${searchTerms.join(', ')}`);
       
-      // Filter voices with strict matching to avoid related figures
+      // Filter voices - be inclusive to capture all variations
       const matchingVoices = allVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
         
-        // Must match one of our search terms
+        // Check if voice matches any search term
         const hasMatch = searchTerms.some(term => voiceTitle.includes(term));
         if (!hasMatch) return false;
         
-        // Exclude voices that contain other related names
-        // This prevents "Robert Kennedy" from showing up when searching for "JFK"
+        // Apply exclusions only for figures with common confusions
         const excludeTerms = getExcludeTermsForFigure(figure.name);
-        const hasExclusion = excludeTerms.some(term => voiceTitle.includes(term));
+        if (excludeTerms.length > 0) {
+          const hasExclusion = excludeTerms.some(term => voiceTitle.includes(term));
+          if (hasExclusion) return false;
+        }
         
-        return !hasExclusion;
+        return true;
       });
       
       console.log(`✅ Found ${matchingVoices.length} matching voices`);
+      console.log('Voice titles:', matchingVoices.map(v => v.title));
       setAvailableFakeYouVoices(matchingVoices);
       
       // Auto-select the first voice if available
