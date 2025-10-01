@@ -199,76 +199,69 @@ const HistoricalChat = () => {
       }
 
       const allVoices = voicesData.voices || [];
-      console.log(`📋 Total voices fetched: ${allVoices.length}`);
+      console.log(`📋 Total voices fetched from API: ${allVoices.length}`);
       
-      // Create broad search terms - be more flexible
+      // Create search terms - be very flexible
       const figureName = figure.name.toLowerCase();
-      const nameWords = figureName.replace(/[.,]/g, '').split(' ').filter(w => w.length > 0);
-      const lastName = nameWords[nameWords.length - 1];
-      const firstName = nameWords[0];
       
-      // Build comprehensive search terms
-      const searchTerms: string[] = [];
+      // Extract key parts of the name
+      const nameWords = figureName.replace(/[.,]/g, '').split(' ').filter(w => w.length > 2);
+      console.log('🔤 Name words:', nameWords);
       
-      // Add full name variations
-      searchTerms.push(figureName);
-      searchTerms.push(nameWords.join(' ')); // without punctuation
+      // Build search terms
+      let searchTerms: string[] = [];
       
-      // Add common variations based on the figure
-      if (figureName.includes('john f') && figureName.includes('kennedy')) {
-        searchTerms.push('jfk', 'kennedy', 'john kennedy', 'john f kennedy', 'president kennedy');
-      } else if (figureName.includes('abraham') && figureName.includes('lincoln')) {
-        searchTerms.push('lincoln', 'abe lincoln', 'president lincoln', 'abraham lincoln');
-      } else if (figureName.includes('martin luther king')) {
-        searchTerms.push('mlk', 'martin luther king', 'dr king', 'king jr');
-      } else if (figureName.includes('franklin') && figureName.includes('roosevelt')) {
-        searchTerms.push('fdr', 'franklin roosevelt', 'roosevelt', 'president roosevelt');
+      // For JFK, use comprehensive search
+      if (figureName.includes('kennedy')) {
+        searchTerms = ['kennedy', 'jfk', 'john f kennedy', 'john kennedy', 'president kennedy'];
+        console.log('🔍 Using Kennedy-specific search terms');
       } else {
-        // For other figures, just add last name and variations
-        searchTerms.push(lastName);
-        if (nameWords.length >= 2) {
-          searchTerms.push(`${firstName} ${lastName}`);
-        }
+        // For other figures, use their last name (most common identifier)
+        searchTerms = nameWords.length > 0 ? [nameWords[nameWords.length - 1]] : [figureName];
       }
       
-      console.log(`🔎 Searching for: ${searchTerms.join(', ')}`);
+      console.log(`🔎 Search terms: ${searchTerms.join(', ')}`);
       
-      // Filter voices - be inclusive but apply exclusions
+      // Filter voices - very permissive matching
       const matchingVoices = allVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
         
-        // Check if voice matches any search term (case-insensitive)
+        // Must match at least one search term
         const hasMatch = searchTerms.some(term => voiceTitle.includes(term.toLowerCase()));
-        if (!hasMatch) return false;
         
-        // Apply exclusions for figures with potential confusion
-        const excludeTerms = getExcludeTermsForFigure(figure.name);
-        if (excludeTerms.length > 0) {
-          const hasExclusion = excludeTerms.some(term => voiceTitle.includes(term.toLowerCase()));
-          if (hasExclusion) {
-            console.log(`❌ Excluded "${voice.title}" due to: ${excludeTerms.join(', ')}`);
+        if (hasMatch) {
+          console.log(`✅ Match: "${voice.title}"`);
+        }
+        
+        // Only exclude obvious wrong matches for Kennedy family
+        if (figureName.includes('kennedy') && figureName.includes('john')) {
+          // Exclude Robert Kennedy, Ted Kennedy, etc.
+          if (voiceTitle.includes('robert') || voiceTitle.includes('bobby') || 
+              voiceTitle.includes('ted') || voiceTitle.includes('edward') || voiceTitle.includes('rfk')) {
+            console.log(`❌ Excluded: "${voice.title}"`);
             return false;
           }
         }
         
-        return true;
+        return hasMatch;
       });
       
-      console.log(`✅ Found ${matchingVoices.length} matching voices`);
-      console.log('Voice titles:', matchingVoices.map(v => v.title));
+      console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
+      console.log('📝 All matching voice titles:', matchingVoices.map(v => v.title));
+      
       setAvailableFakeYouVoices(matchingVoices);
       
       // Auto-select the first voice if available
       if (matchingVoices.length > 0) {
         setSelectedFakeYouVoice(matchingVoices[0]);
-        console.log(`🎙️ Auto-selected voice: "${matchingVoices[0].title}"`);
+        console.log(`🎙️ Auto-selected: "${matchingVoices[0].title}"`);
       } else {
         setSelectedFakeYouVoice(null);
-        console.log('⚠️ No voices found - try a different figure');
+        console.log('⚠️ No voices found');
       }
       
     } catch (error) {
-      console.error('Error fetching FakeYou voices:', error);
+      console.error('❌ Error fetching voices:', error);
       setAvailableFakeYouVoices([]);
       setSelectedFakeYouVoice(null);
     } finally {
