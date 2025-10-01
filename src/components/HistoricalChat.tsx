@@ -767,38 +767,12 @@ const HistoricalChat = () => {
             duration: 2000,
           });
           
-          // Proxy the audio through our edge function to avoid CORS issues
-          const { data: proxyData, error: proxyError } = await supabase.functions.invoke('fakeyou-tts', {
-            body: {
-              action: 'proxy_audio',
-              audioUrl: statusData.audioUrl,
-            },
-          });
+          // Try to play the audio directly
+          const audio = new Audio();
           
-          if (proxyError) {
-            console.error('Audio proxy error:', proxyError);
-            throw proxyError;
-          }
-          
-          if (!proxyData?.success || !proxyData?.audioBase64) {
-            console.error('Invalid proxy response:', proxyData);
-            throw new Error('Invalid audio proxy response');
-          }
-          
-          console.log(`📦 Received base64 audio (${proxyData.size} bytes)`);
-          
-          // Convert base64 to blob
-          const binaryString = atob(proxyData.audioBase64);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          const audioBlob = new Blob([bytes], { type: 'audio/wav' });
-          const audioBlobUrl = URL.createObjectURL(audioBlob);
-          console.log('🔗 Created blob URL for audio');
-          
-          // Play the audio
-          const audio = new Audio(audioBlobUrl);
+          // Set up cross-origin to anonymous to try to bypass CORS
+          audio.crossOrigin = 'anonymous';
+          audio.src = statusData.audioUrl;
           
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback');
@@ -814,22 +788,20 @@ const HistoricalChat = () => {
           };
           
           audio.onerror = (e) => {
-            console.error('❌ Audio load failed:', e);
+            console.error('❌ Audio load failed - CORS or network issue:', e);
             setIsPlayingAudio(false);
+            
             toast({
-              title: "Audio playback error",
-              description: "Failed to load audio file",
+              title: "Audio playback failed",
+              description: "Unable to play FakeYou voice. Contact support if this persists.",
               variant: "destructive",
             });
-            throw new Error('Audio load failed');
           };
           
           audio.onended = () => {
             console.log('✅ Audio playback completed');
             setIsPlayingAudio(false);
             setCurrentAudio(null);
-            // Clean up blob URL to avoid memory leaks
-            URL.revokeObjectURL(audioBlobUrl);
           };
           
           return; // Success!
