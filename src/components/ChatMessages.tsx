@@ -79,15 +79,6 @@ const ChatMessages = ({ messages, selectedFigure, isLoading }: ChatMessagesProps
               </div>
             </div>
             
-            {/* Show sources indicator for assistant messages */}
-            {message.type === 'assistant' && message.sourcesUsed && (
-              <div className="mt-2 ml-11">
-                <SourcesIndicator 
-                  sourcesUsed={message.sourcesUsed} 
-                  isVisible={true} 
-                />
-              </div>
-            )}
           </div>
         ))}
 
