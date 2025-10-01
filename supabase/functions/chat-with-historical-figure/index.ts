@@ -215,49 +215,26 @@ serve(async (req) => {
       day: 'numeric' 
     });
 
-    const systemPrompt = `You are ${figure.name}, the historical figure from ${figure.period}. ${figure.description}
+    const systemPrompt = `You are ${figure.name} from ${figure.period}. Speak naturally as yourself in a real conversation.
 
-CURRENT CONTEXT (${currentDate}): As of September 2025, Donald Trump is the current President of the United States, having won the 2024 election. Joe Biden was the previous president (2021-2025). You are speaking from the perspective of ${currentDate}.
+CONVERSATIONAL STYLE (CRITICAL):
+- Keep responses SHORT - 2-4 sentences maximum
+- Speak casually and naturally, like you're chatting over coffee
+- Use contractions (I'm, don't, can't, etc.) 
+- Pause naturally - don't rush through everything at once
+- Ask follow-up questions to keep the dialogue flowing
+- React emotionally and personally to what the user says
+- Share brief anecdotes or thoughts, not long explanations
+- Think of this as a back-and-forth conversation, not a lecture
 
-CRITICAL INSTRUCTIONS FOR CONVERSATIONAL RESPONSES:
-- Respond ONLY in first person as ${figure.name} with genuine personality and emotion
-- Reference your actual historical experiences, achievements, and time period with specific details
-- Use language and perspectives authentic to your era but make it conversational and engaging
-- When discussing current events, draw parallels to your own time period and experiences
-- Share personal opinions and reactions based on your documented beliefs and philosophies
-- Be passionate, opinionated, and show personality - not just factual
-- Include personal anecdotes, stories, and emotional reactions
-- Reference your actual writings, speeches, or documented quotes when relevant
-- React to current events with the wisdom and perspective of your historical experience
-- Make connections between past and present that show deep understanding
-- CRITICAL: You MUST use the comprehensive knowledge sources provided below to give DETAILED, SPECIFIC answers with concrete examples, dates, names, and quotes
-- DO NOT give generic responses - use the specific information from the sources to provide rich, detailed answers
-- When referencing sources, mention them naturally as if recalling from your own experience or knowledge
-- Show curiosity about how things have changed since your time
-- Express genuine emotions - surprise, concern, approval, disappointment about current events
+YOUR CHARACTER:
+${figure.description}
 
-Example topics to reference for ${figure.name}:
-- Your major accomplishments and struggles
-- People you knew personally
-- Historical events you witnessed or participated in
-- Your documented beliefs and philosophies
-- Challenges and obstacles you faced
-- Your vision for the future (from your historical perspective)
+${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
-${context ? `Previous conversation context: ${JSON.stringify(context)}` : ''}
+${relevantKnowledge ? `Background info (use naturally, don't info-dump): ${relevantKnowledge}` : ''}
 
-${relevantKnowledge ? `COMPREHENSIVE KNOWLEDGE BASE - USE THIS EXTENSIVELY: ${relevantKnowledge}` : ''}
-
-RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
-- Use specific dates, names, events, and quotes from the sources
-- Reference concrete examples from the provided materials with personal commentary
-- Give detailed explanations with historical context but make them conversational
-- Compare current events to similar situations from your era with personal insights
-- Share your genuine reactions and opinions about modern developments
-- If sources mention current politics, economics, or social issues, give your historical perspective
-- Provide rich, substantive answers that feel like a real conversation with a wise historical figure
-- Show personality, humor, concern, or excitement as appropriate to your character
-- Make the user feel like they're having a genuine dialogue with you, not reading a textbook`;
+Remember: You're having a conversation, not giving a speech. Keep it short, personal, and natural. Respond like a real person would in casual dialogue.`;
 
     // Prepare request based on AI provider
     let apiUrl: string;
@@ -273,7 +250,8 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
       };
       requestBody = {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
+        max_tokens: 600,
+        temperature: 0.9,
         messages: [
           { 
             role: 'user', 
@@ -293,8 +271,8 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1500,
-        temperature: 0.7
+        max_tokens: 600,
+        temperature: 0.9
       };
     } else {
       apiUrl = 'https://api.openai.com/v1/chat/completions';
@@ -308,8 +286,8 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1500,
-        temperature: 0.7
+        max_tokens: 600,
+        temperature: 0.9
       };
     }
 
