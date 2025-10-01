@@ -756,18 +756,72 @@ const HistoricalChat = () => {
         duration: 2000,
       });
       
-      // Step 3: Generate and play each chunk sequentially
-      const audioUrls: string[] = [];
+      // Step 3: Generate and play chunks with streaming - play first chunk ASAP
+      const audioQueue: string[] = [];
+      let isPlayingQueue = false;
+      let currentPlayingIndex = 0;
       
+      // Function to play next audio in queue
+      const playNextInQueue = () => {
+        if (currentPlayingIndex >= audioQueue.length) {
+          // Check if we're done generating all chunks
+          if (currentPlayingIndex >= textChunks.length) {
+            console.log('✅ All audio chunks completed');
+            setIsPlayingAudio(false);
+            setCurrentAudio(null);
+            isPlayingQueue = false;
+          }
+          return;
+        }
+        
+        const audioUrl = audioQueue[currentPlayingIndex];
+        console.log(`🔊 Playing chunk ${currentPlayingIndex + 1}`);
+        
+        const audio = new Audio();
+        audio.crossOrigin = 'anonymous';
+        audio.src = audioUrl;
+        audio.playbackRate = 0.85;
+        
+        audio.onloadeddata = () => {
+          audio.play().then(() => {
+            setIsPlayingAudio(true);
+            setCurrentAudio(audio);
+          }).catch(err => {
+            console.error(`❌ Chunk ${currentPlayingIndex + 1} playback failed:`, err);
+            currentPlayingIndex++;
+            playNextInQueue();
+          });
+        };
+        
+        audio.onerror = (e) => {
+          console.error(`❌ Chunk ${currentPlayingIndex + 1} load failed:`, e);
+          currentPlayingIndex++;
+          playNextInQueue();
+        };
+        
+        audio.onended = () => {
+          console.log(`✅ Chunk ${currentPlayingIndex + 1} completed`);
+          currentPlayingIndex++;
+          playNextInQueue();
+        };
+      };
+      
+      // Generate chunks and add to queue as they become ready
       for (let chunkIndex = 0; chunkIndex < textChunks.length; chunkIndex++) {
         const chunk = textChunks[chunkIndex];
         
         console.log(`🎤 Generating chunk ${chunkIndex + 1}/${chunkCount}: "${chunk.substring(0, 30)}..."`);
         
-        if (chunkCount > 1) {
+        if (chunkIndex === 0) {
+          toast({
+            title: "Generating voice...",
+            description: "First segment generating - this takes ~30 seconds...",
+            duration: 3000,
+          });
+        } else if (chunkCount > 1) {
           toast({
             title: `Generating part ${chunkIndex + 1}/${chunkCount}`,
-            description: "Please wait...",
+            description: "Continuing...",
             duration: 2000,
           });
         }
@@ -839,64 +893,24 @@ const HistoricalChat = () => {
           throw new Error('TTS timeout - generation took too long');
         }
         
-        audioUrls.push(audioUrl);
+        // Add to queue and start playing if this is the first chunk
+        audioQueue.push(audioUrl);
+        
+        if (chunkIndex === 0) {
+          console.log('🎵 Starting playback of first chunk immediately');
+          toast({
+            title: "Voice ready!",
+            description: chunkCount > 1 
+              ? `Playing part 1, generating remaining ${chunkCount - 1} parts...`
+              : `Playing ${figure.name}'s authentic voice`,
+            duration: 2000,
+          });
+          isPlayingQueue = true;
+          playNextInQueue();
+        }
       }
       
-      // Step 4: Play all chunks sequentially
-      console.log(`🎵 Playing ${audioUrls.length} audio chunks sequentially`);
-      
-      toast({
-        title: "Voice ready!",
-        description: chunkCount > 1 
-          ? `Playing ${chunkCount} segments...`
-          : `Playing ${figure.name}'s authentic voice`,
-        duration: 2000,
-      });
-      
-      // Play chunks one after another
-      let currentChunkIndex = 0;
-      
-      const playNextChunk = () => {
-        if (currentChunkIndex >= audioUrls.length) {
-          console.log('✅ All audio chunks completed');
-          setIsPlayingAudio(false);
-          setCurrentAudio(null);
-          return;
-        }
-        
-        const audioUrl = audioUrls[currentChunkIndex];
-        console.log(`🔊 Playing chunk ${currentChunkIndex + 1}/${audioUrls.length}`);
-        
-        const audio = new Audio();
-        audio.crossOrigin = 'anonymous';
-        audio.src = audioUrl;
-        audio.playbackRate = 0.85;
-        
-        audio.onloadeddata = () => {
-          audio.play().then(() => {
-            setIsPlayingAudio(true);
-            setCurrentAudio(audio);
-          }).catch(err => {
-            console.error(`❌ Chunk ${currentChunkIndex + 1} playback failed:`, err);
-            currentChunkIndex++;
-            playNextChunk();
-          });
-        };
-        
-        audio.onerror = (e) => {
-          console.error(`❌ Chunk ${currentChunkIndex + 1} load failed:`, e);
-          currentChunkIndex++;
-          playNextChunk();
-        };
-        
-        audio.onended = () => {
-          console.log(`✅ Chunk ${currentChunkIndex + 1} completed`);
-          currentChunkIndex++;
-          playNextChunk();
-        };
-      };
-      
-      playNextChunk();
+      console.log(`✅ All ${textChunks.length} chunks generated and queued`);
       
     } catch (error) {
       console.error('💥 FakeYou generation failed:', error);
