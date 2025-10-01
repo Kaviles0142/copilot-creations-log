@@ -75,7 +75,7 @@ serve(async (req) => {
               books.forEach(book => {
                 booksText += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
                 if (book.description) {
-                  booksText += `  ${book.description}\n`;
+                  booksText += `  ${book.description.substring(0, 200)}...\n`;
                 }
               });
               return booksText;
