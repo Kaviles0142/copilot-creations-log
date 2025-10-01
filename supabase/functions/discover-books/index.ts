@@ -153,7 +153,7 @@ serve(async (req) => {
                 info_link: infoLink,
                 relevance_score: relevanceScore,
                 search_query: query,
-                book_type: 'about_figure' // Required field - these are books about historical figures
+                book_type: 'biography' // Required field - these are biographical books about historical figures
               });
             }
           }
