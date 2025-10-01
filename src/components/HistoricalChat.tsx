@@ -185,10 +185,11 @@ const HistoricalChat = () => {
     try {
       console.log('🔍 Fetching FakeYou voices for:', figure.name);
       
+      // Don't pass figureName to backend - let it return all English voices
+      // We'll filter on the frontend for more flexible matching
       const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
         body: { 
-          action: 'list_voices',
-          figureName: figure.name
+          action: 'list_voices'
         }
       });
 
