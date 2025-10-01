@@ -606,9 +606,9 @@ const HistoricalChat = () => {
       console.log('🎤 Generating FakeYou voice for:', figure.name);
       
       toast({
-        title: "Generating authentic voice",
-        description: `Finding ${figure.name}'s voice on FakeYou...`,
-        duration: 3000,
+        title: "Preparing voice response",
+        description: `Cloning ${figure.name}'s voice - this takes about 10-15 seconds...`,
+        duration: 4000,
       });
       
       // Step 1: Search for the figure's voice on FakeYou
@@ -803,8 +803,11 @@ const HistoricalChat = () => {
           audio.crossOrigin = 'anonymous';
           audio.src = audioUrl;
           
+          // Slow down playback for more natural, conversational pacing
+          audio.playbackRate = 0.85;
+          
           audio.onloadeddata = () => {
-            console.log('📡 Audio loaded, starting playback');
+            console.log('📡 Audio loaded, starting playback at 0.85x speed for natural conversation');
             audio.play().then(() => {
               setIsPlayingAudio(true);
               setCurrentAudio(audio);
