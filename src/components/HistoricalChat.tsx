@@ -601,8 +601,8 @@ const HistoricalChat = () => {
     }
   };
 
-  // Helper function to chunk text for Elite plan 2-minute limit (~300 words = ~120 seconds)
-  const chunkTextForFakeYou = (text: string, maxWords: number = 300): string[] => {
+  // Helper function to chunk text for 10-second limit (~25 words = ~10 seconds)
+  const chunkTextForFakeYou = (text: string, maxWords: number = 25): string[] => {
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
     const chunks: string[] = [];
     let currentChunk = '';
@@ -645,8 +645,8 @@ const HistoricalChat = () => {
       toast({
         title: "Preparing voice response",
         description: chunkCount > 1 
-          ? `Generating ${chunkCount} audio segments with Elite quality...`
-          : `Cloning ${figure.name}'s voice with Elite speed - ~10 seconds...`,
+          ? `Generating ${chunkCount} audio segments...`
+          : `Cloning ${figure.name}'s voice - this takes about 10-15 seconds...`,
         duration: 4000,
       });
       
@@ -756,29 +756,116 @@ const HistoricalChat = () => {
         duration: 2000,
       });
       
-      // Step 3: Generate and play chunks with streaming - play first chunk ASAP
-      const audioQueue: string[] = [];
-      let isPlayingQueue = false;
-      let currentPlayingIndex = 0;
+      // Step 3: Generate and play each chunk sequentially
+      const audioUrls: string[] = [];
       
-      // Function to play next audio in queue
-      const playNextInQueue = () => {
-        if (currentPlayingIndex >= audioQueue.length) {
-          // Wait a bit and check again if more chunks are coming
-          if (generationComplete && currentPlayingIndex >= textChunks.length) {
-            console.log('✅ All audio chunks completed');
-            setIsPlayingAudio(false);
-            setCurrentAudio(null);
-            isPlayingQueue = false;
-          } else if (!generationComplete) {
-            // Still generating, wait and check again
-            setTimeout(() => playNextInQueue(), 500);
+      for (let chunkIndex = 0; chunkIndex < textChunks.length; chunkIndex++) {
+        const chunk = textChunks[chunkIndex];
+        
+        console.log(`🎤 Generating chunk ${chunkIndex + 1}/${chunkCount}: "${chunk.substring(0, 30)}..."`);
+        
+        if (chunkCount > 1) {
+          toast({
+            title: `Generating part ${chunkIndex + 1}/${chunkCount}`,
+            description: "Please wait...",
+            duration: 2000,
+          });
+        }
+        
+        const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
+          body: {
+            action: 'generate_tts',
+            text: chunk,
+            voiceToken: matchingVoice.voiceToken,
+          },
+        });
+        
+        if (ttsError) {
+          console.error('TTS generation request error:', ttsError);
+          throw ttsError;
+        }
+        if (!ttsData.success) {
+          console.error('TTS generation failed:', ttsData);
+          throw new Error('TTS generation failed');
+        }
+        
+        const jobToken = ttsData.jobToken;
+        console.log(`🔄 TTS job ${chunkIndex + 1} started:`, jobToken);
+        
+        // Poll for completion
+        let pollCount = 0;
+        const maxPolls = 40;
+        let audioUrl: string | null = null;
+        
+        for (let i = 0; i < maxPolls; i++) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          pollCount++;
+          
+          const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
+            body: {
+              action: 'check_status',
+              jobToken: jobToken,
+            },
+          });
+          
+          if (statusError) {
+            console.error('Status check error:', statusError);
+            throw statusError;
           }
+          if (!statusData.success) {
+            console.error('Status check failed:', statusData);
+            throw new Error('Status check failed');
+          }
+          
+          console.log(`⏳ Chunk ${chunkIndex + 1} polling (${pollCount}/${maxPolls}): ${statusData.status}`);
+          
+          if (statusData.isComplete && statusData.audioUrl) {
+            audioUrl = statusData.audioUrl;
+            if (audioUrl.includes('storage.googleapis.com/vocodes-public')) {
+              audioUrl = audioUrl.replace('https://storage.googleapis.com/vocodes-public', 'https://cdn-2.fakeyou.com');
+            }
+            console.log(`✅ Chunk ${chunkIndex + 1} audio ready:`, audioUrl);
+            break;
+          }
+          
+          if (statusData.isFailed) {
+            console.error(`❌ TTS generation failed for chunk ${chunkIndex + 1}`);
+            throw new Error('TTS generation failed');
+          }
+        }
+        
+        if (!audioUrl) {
+          console.error(`⏱️ Chunk ${chunkIndex + 1} timeout`);
+          throw new Error('TTS timeout - generation took too long');
+        }
+        
+        audioUrls.push(audioUrl);
+      }
+      
+      // Step 4: Play all chunks sequentially
+      console.log(`🎵 Playing ${audioUrls.length} audio chunks sequentially`);
+      
+      toast({
+        title: "Voice ready!",
+        description: chunkCount > 1 
+          ? `Playing ${chunkCount} segments...`
+          : `Playing ${figure.name}'s authentic voice`,
+        duration: 2000,
+      });
+      
+      // Play chunks one after another
+      let currentChunkIndex = 0;
+      
+      const playNextChunk = () => {
+        if (currentChunkIndex >= audioUrls.length) {
+          console.log('✅ All audio chunks completed');
+          setIsPlayingAudio(false);
+          setCurrentAudio(null);
           return;
         }
         
-        const audioUrl = audioQueue[currentPlayingIndex];
-        console.log(`🔊 Playing chunk ${currentPlayingIndex + 1}`);
+        const audioUrl = audioUrls[currentChunkIndex];
+        console.log(`🔊 Playing chunk ${currentChunkIndex + 1}/${audioUrls.length}`);
         
         const audio = new Audio();
         audio.crossOrigin = 'anonymous';
@@ -790,123 +877,26 @@ const HistoricalChat = () => {
             setIsPlayingAudio(true);
             setCurrentAudio(audio);
           }).catch(err => {
-            console.error(`❌ Chunk ${currentPlayingIndex + 1} playback failed:`, err);
-            currentPlayingIndex++;
-            playNextInQueue();
+            console.error(`❌ Chunk ${currentChunkIndex + 1} playback failed:`, err);
+            currentChunkIndex++;
+            playNextChunk();
           });
         };
         
         audio.onerror = (e) => {
-          console.error(`❌ Chunk ${currentPlayingIndex + 1} load failed:`, e);
-          currentPlayingIndex++;
-          playNextInQueue();
+          console.error(`❌ Chunk ${currentChunkIndex + 1} load failed:`, e);
+          currentChunkIndex++;
+          playNextChunk();
         };
         
         audio.onended = () => {
-          console.log(`✅ Chunk ${currentPlayingIndex + 1} completed`);
-          currentPlayingIndex++;
-          playNextInQueue();
+          console.log(`✅ Chunk ${currentChunkIndex + 1} completed`);
+          currentChunkIndex++;
+          playNextChunk();
         };
       };
       
-      // Show initial toast
-      toast({
-        title: "Generating voice...",
-        description: chunkCount > 1 
-          ? `Preparing ${chunkCount} segments - Elite speed, voice starting in ~10 seconds...`
-          : "Elite processing - voice will start in ~10 seconds...",
-        duration: 3000,
-      });
-      
-      // Track which chunks are ready
-      const chunkResults: Array<string | null> = new Array(textChunks.length).fill(null);
-      let firstChunkPlayed = false;
-      let generationComplete = false;
-      
-      // Function to check and queue ready chunks in order
-      const checkAndQueueChunks = () => {
-        while (audioQueue.length < chunkResults.length && chunkResults[audioQueue.length] !== null) {
-          const audioUrl = chunkResults[audioQueue.length];
-          if (audioUrl) {
-            audioQueue.push(audioUrl);
-            console.log(`📦 Queued chunk ${audioQueue.length}/${chunkResults.length}`);
-          }
-        }
-        
-        // Start playing if first chunk is ready and we haven't started yet
-        if (!firstChunkPlayed && audioQueue.length > 0 && !isPlayingQueue) {
-          firstChunkPlayed = true;
-          console.log('🎵 Starting playback immediately');
-          toast({
-            title: "Voice ready!",
-            description: chunkCount > 1 
-              ? `Playing part 1/${chunkCount}...`
-              : `Playing ${figure.name}'s voice`,
-            duration: 2000,
-          });
-          isPlayingQueue = true;
-          playNextInQueue();
-        }
-      };
-      
-      // Generate ALL chunks in parallel
-      const chunkPromises = textChunks.map(async (chunk, chunkIndex) => {
-        try {
-          console.log(`🎤 Starting chunk ${chunkIndex + 1}/${chunkCount}`);
-          
-          const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
-            body: {
-              action: 'generate_tts',
-              text: chunk,
-              voiceToken: matchingVoice.voiceToken,
-            },
-          });
-          
-          if (ttsError || !ttsData.success) {
-            console.error(`❌ Chunk ${chunkIndex + 1} generation failed`);
-            return;
-          }
-          
-          const jobToken = ttsData.jobToken;
-          console.log(`🔄 Job ${chunkIndex + 1} started:`, jobToken);
-          
-          // Poll for completion
-          for (let i = 0; i < 40; i++) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
-              body: { action: 'check_status', jobToken },
-            });
-            
-            if (statusError || !statusData.success) continue;
-            
-            if (statusData.isComplete && statusData.audioUrl) {
-              let audioUrl = statusData.audioUrl;
-              if (audioUrl.includes('storage.googleapis.com/vocodes-public')) {
-                audioUrl = audioUrl.replace('https://storage.googleapis.com/vocodes-public', 'https://cdn-2.fakeyou.com');
-              }
-              console.log(`✅ Chunk ${chunkIndex + 1} ready`);
-              
-              // Store and check queue
-              chunkResults[chunkIndex] = audioUrl;
-              checkAndQueueChunks();
-              return;
-            }
-            
-            if (statusData.isFailed) {
-              console.error(`❌ Chunk ${chunkIndex + 1} failed`);
-              return;
-            }
-          }
-        } catch (error) {
-          console.error(`❌ Chunk ${chunkIndex + 1} error:`, error);
-        }
-      });
-      
-      // Wait for all chunks to complete
-      await Promise.all(chunkPromises);
-      generationComplete = true;
-      console.log(`✅ All ${textChunks.length} chunks generated`);
+      playNextChunk();
       
     } catch (error) {
       console.error('💥 FakeYou generation failed:', error);
