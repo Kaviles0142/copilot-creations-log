@@ -202,6 +202,9 @@ const HistoricalChat = () => {
       const allVoices = voicesData.voices || [];
       console.log(`📋 Total voices fetched from API: ${allVoices.length}`);
       
+      // DEBUG: Let's see a sample of all voice titles
+      console.log('🔍 Sample of all voice titles:', allVoices.slice(0, 20).map((v: any) => v.title));
+      
       const figureName = figure.name.toLowerCase();
       
       // Simple approach: search for key identifier
