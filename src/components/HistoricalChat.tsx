@@ -86,7 +86,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
-  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok'>('grok'); // Changed to Grok due to OpenAI rate limits
+  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude'>('claude'); // Claude as default
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
@@ -536,8 +536,8 @@ const HistoricalChat = () => {
 
       // Show toast indicating which AI was used
       toast({
-        title: `Response from ${usedProvider === 'grok' ? 'Grok' : 'OpenAI'}`,
-        description: `${selectedFigure.name} responded using ${usedProvider === 'grok' ? 'X.AI Grok' : 'OpenAI GPT-4o Mini'}`,
+        title: `Response from ${usedProvider === 'claude' ? 'Claude' : usedProvider === 'grok' ? 'Grok' : 'OpenAI'}`,
+        description: `${selectedFigure.name} responded using ${usedProvider === 'claude' ? 'Anthropic Claude' : usedProvider === 'grok' ? 'X.AI Grok' : 'OpenAI GPT-4o Mini'}`,
         duration: 2000,
       });
 
@@ -1416,11 +1416,17 @@ const HistoricalChat = () => {
               <Bot className="h-4 w-4 mr-2" />
               AI Provider
             </h3>
-            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok') => setSelectedAIProvider(value)}>
+            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude') => setSelectedAIProvider(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="claude">
+                  <div className="flex items-center">
+                    <span className="mr-2">🧠</span>
+                    Claude (Anthropic)
+                  </div>
+                </SelectItem>
                 <SelectItem value="openai">
                   <div className="flex items-center">
                     <span className="mr-2">🤖</span>
@@ -1436,7 +1442,9 @@ const HistoricalChat = () => {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-2">
-              {selectedAIProvider === 'openai' 
+              {selectedAIProvider === 'claude'
+                ? 'Claude offers intelligent, nuanced responses with superior reasoning'
+                : selectedAIProvider === 'openai' 
                 ? 'OpenAI provides reliable, well-structured responses'
                 : 'Grok offers conversational, real-time aware responses'
               }

@@ -173,9 +173,10 @@ serve(async (req) => {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
 
-    // Get API keys for both providers
+    // Get API keys for all providers
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     const grokApiKey = Deno.env.get('GROK_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     
     if (aiProvider === 'grok' && !grokApiKey) {
       return new Response(JSON.stringify({ 
@@ -189,6 +190,15 @@ serve(async (req) => {
     if (aiProvider === 'openai' && !openaiApiKey) {
       return new Response(JSON.stringify({ 
         error: 'OpenAI API key not configured' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (aiProvider === 'claude' && !anthropicApiKey) {
+      return new Response(JSON.stringify({ 
+        error: 'Claude API key not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -254,7 +264,24 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
     let requestHeaders: Record<string, string>;
     let requestBody: any;
 
-    if (aiProvider === 'grok') {
+    if (aiProvider === 'claude') {
+      apiUrl = 'https://api.anthropic.com/v1/messages';
+      requestHeaders = {
+        'x-api-key': anthropicApiKey!,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      };
+      requestBody = {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [
+          { 
+            role: 'user', 
+            content: `${systemPrompt}\n\nUser: ${message}` 
+          }
+        ],
+      };
+    } else if (aiProvider === 'grok') {
       apiUrl = 'https://api.x.ai/v1/chat/completions';
       requestHeaders = {
         'Authorization': `Bearer ${grokApiKey}`,
@@ -307,7 +334,14 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
     }
 
     const data = await aiResponse.json();
-    const response = data.choices[0].message.content;
+    
+    // Extract response based on provider
+    let response: string;
+    if (aiProvider === 'claude') {
+      response = data.content[0].text;
+    } else {
+      response = data.choices[0].message.content;
+    }
 
     console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
     console.log('Success - returning comprehensive multi-source enhanced response');
