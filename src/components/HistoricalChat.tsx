@@ -812,17 +812,14 @@ const HistoricalChat = () => {
         
         console.log(`🎤 Generating chunk ${chunkIndex + 1}/${chunkCount}: "${chunk.substring(0, 30)}..."`);
         
+        // Only show toast for first chunk
         if (chunkIndex === 0) {
           toast({
             title: "Generating voice...",
-            description: "First segment generating - this takes ~30 seconds...",
+            description: chunkCount > 1 
+              ? `Preparing ${chunkCount} segments - voice will start in ~30 seconds...`
+              : "Voice will start in ~30 seconds...",
             duration: 3000,
-          });
-        } else if (chunkCount > 1) {
-          toast({
-            title: `Generating part ${chunkIndex + 1}/${chunkCount}`,
-            description: "Continuing...",
-            duration: 2000,
           });
         }
         
