@@ -156,24 +156,43 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 5. Current Events via SerpAPI
+        // 5. Current Events via SerpAPI (use cache if available)
         (async () => {
           try {
-            const currentEventsResponse = await supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: `${figure.name} news 2024 2025`,
-                type: 'news',  // Use news engine
-                num: 5 // Maximum news articles
-              }
-            });
+            // Check cache first
+            const { data: cached } = await supabase
+              .from('serpapi_cache')
+              .select('results')
+              .eq('figure_id', figure.id)
+              .eq('search_type', 'news')
+              .gt('expires_at', new Date().toISOString())
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-            if (currentEventsResponse.data?.results?.length > 0) {
-              sourcesUsed.currentEvents = currentEventsResponse.data.results.length;
+            let results;
+            if (cached?.results) {
+              console.log('📦 Using cached news results');
+              results = cached.results;
+            } else {
+              console.log('🔍 Fetching fresh news results');
+              const currentEventsResponse = await supabase.functions.invoke('serpapi-search', {
+                body: { 
+                  query: `${figure.name} news 2024 2025`,
+                  type: 'news',
+                  num: 5
+                }
+              });
+              results = currentEventsResponse.data?.results;
+            }
+
+            if (results?.length > 0) {
+              sourcesUsed.currentEvents = results.length;
               let eventsText = '\n\n📰 RECENT NEWS:\n';
-              currentEventsResponse.data.results.forEach((result: any) => {
+              results.forEach((result: any) => {
                 eventsText += `- ${result.title}\n`;
                 if (result.snippet) {
-                  eventsText += `  ${result.snippet.substring(0, 300)}...\n`; // Add snippets
+                  eventsText += `  ${result.snippet.substring(0, 300)}...\n`;
                 }
               });
               return eventsText;
@@ -184,24 +203,43 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 6. Historical Context via SerpAPI
+        // 6. Historical Context via SerpAPI (use cache if available)
         (async () => {
           try {
-            const contextResponse = await supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: `${figure.name} biography history`,
-                type: 'web',  // Use regular Google search
-                num: 5 // Maximum historical context results
-              }
-            });
+            // Check cache first
+            const { data: cached } = await supabase
+              .from('serpapi_cache')
+              .select('results')
+              .eq('figure_id', figure.id)
+              .eq('search_type', 'context')
+              .gt('expires_at', new Date().toISOString())
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-            if (contextResponse.data?.results?.length > 0) {
-              sourcesUsed.historicalContext = contextResponse.data.results.length;
+            let results;
+            if (cached?.results) {
+              console.log('📦 Using cached context results');
+              results = cached.results;
+            } else {
+              console.log('🔍 Fetching fresh context results');
+              const contextResponse = await supabase.functions.invoke('serpapi-search', {
+                body: { 
+                  query: `${figure.name} biography history`,
+                  type: 'web',
+                  num: 5
+                }
+              });
+              results = contextResponse.data?.results;
+            }
+
+            if (results?.length > 0) {
+              sourcesUsed.historicalContext = results.length;
               let contextText = '\n\n📜 HISTORICAL CONTEXT:\n';
-              contextResponse.data.results.forEach((result: any) => {
+              results.forEach((result: any) => {
                 contextText += `- ${result.title}\n`;
                 if (result.snippet) {
-                  contextText += `  ${result.snippet.substring(0, 300)}...\n`; // Add snippets
+                  contextText += `  ${result.snippet.substring(0, 300)}...\n`;
                 }
               });
               return contextText;
@@ -212,24 +250,43 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 7. Web Articles via SerpAPI
+        // 7. Web Articles via SerpAPI (use cache if available)
         (async () => {
           try {
-            const articlesResponse = await supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: `${figure.name} analysis profile`,
-                type: 'web',  // Use regular Google search
-                num: 5 // Maximum web articles
-              }
-            });
+            // Check cache first
+            const { data: cached } = await supabase
+              .from('serpapi_cache')
+              .select('results')
+              .eq('figure_id', figure.id)
+              .eq('search_type', 'articles')
+              .gt('expires_at', new Date().toISOString())
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-            if (articlesResponse.data?.results?.length > 0) {
-              sourcesUsed.webArticles = articlesResponse.data.results.length;
+            let results;
+            if (cached?.results) {
+              console.log('📦 Using cached articles results');
+              results = cached.results;
+            } else {
+              console.log('🔍 Fetching fresh articles results');
+              const articlesResponse = await supabase.functions.invoke('serpapi-search', {
+                body: { 
+                  query: `${figure.name} analysis profile`,
+                  type: 'web',
+                  num: 5
+                }
+              });
+              results = articlesResponse.data?.results;
+            }
+
+            if (results?.length > 0) {
+              sourcesUsed.webArticles = results.length;
               let articlesText = '\n\n📝 WEB ARTICLES:\n';
-              articlesResponse.data.results.forEach((result: any) => {
+              results.forEach((result: any) => {
                 articlesText += `- ${result.title}\n`;
                 if (result.snippet) {
-                  articlesText += `  ${result.snippet.substring(0, 500)}...\n`; // Increased to 500 chars
+                  articlesText += `  ${result.snippet.substring(0, 500)}...\n`;
                 }
               });
               return articlesText;
