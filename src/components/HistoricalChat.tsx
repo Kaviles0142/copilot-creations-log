@@ -721,7 +721,7 @@ const HistoricalChat = () => {
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
         body: {
           action: 'generate_tts',
-          text: text.substring(0, 500), // Limit to 500 chars for faster generation
+          text: text.substring(0, 2000), // Increased limit for longer responses
           voiceToken: matchingVoice.voiceToken,
         },
       });
