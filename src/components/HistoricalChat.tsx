@@ -219,14 +219,18 @@ const HistoricalChat = () => {
         console.log('🔍 Searching for:', searchTerm);
       }
       
+      console.log(`🔎 Will search for voices containing: "${searchTerm}"`);
+      
+      // First, let's see ALL voices that contain our search term (before exclusions)
+      const candidateVoices = allVoices.filter((voice: any) => 
+        voice.title.toLowerCase().includes(searchTerm)
+      );
+      console.log(`📝 Found ${candidateVoices.length} voices containing "${searchTerm}":`);
+      candidateVoices.forEach((v: any) => console.log(`  - "${v.title}"`));
+      
       // Filter voices
-      const matchingVoices = allVoices.filter((voice: any) => {
+      const matchingVoices = candidateVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
-        
-        // Must contain search term
-        if (!voiceTitle.includes(searchTerm)) {
-          return false;
-        }
         
         // Check exclusions
         for (const excludeTerm of excludeTerms) {
