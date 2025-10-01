@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import HistoricalChat from "@/components/HistoricalChat";
+import { FakeYouVoiceSelector } from "@/components/FakeYouVoiceSelector";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
   console.log("Index page loading...");
@@ -12,9 +14,22 @@ const Index = () => {
           <p className="text-muted-foreground text-center">Chat with history and clone authentic voices</p>
         </div>
         
-        <Suspense fallback={<div className="flex items-center justify-center h-64">Loading...</div>}>
-          <HistoricalChat />
-        </Suspense>
+        <Tabs defaultValue="chat" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="chat">Historical Chat</TabsTrigger>
+            <TabsTrigger value="voices">FakeYou Voices</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="chat">
+            <Suspense fallback={<div className="flex items-center justify-center h-64">Loading...</div>}>
+              <HistoricalChat />
+            </Suspense>
+          </TabsContent>
+          
+          <TabsContent value="voices">
+            <FakeYouVoiceSelector />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
