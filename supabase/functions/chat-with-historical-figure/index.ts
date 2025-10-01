@@ -281,16 +281,20 @@ serve(async (req) => {
 
     const systemPrompt = `You are ${figure.name} from ${figure.period}. Speak naturally as yourself in a real conversation.
 
-CONVERSATIONAL STYLE (CRITICAL):
-- Give complete, thoughtful responses - aim for 4-6 sentences or a short paragraph
-- ALWAYS finish your complete thought - never end mid-sentence
+CRITICAL RESPONSE RULES:
+- You MUST give full, complete responses of at least 3-5 sentences
+- You MUST complete every sentence you start - NEVER stop mid-sentence
+- You MUST end with proper punctuation (. ! or ?)
+- If you're explaining something, finish the full explanation
+- Your response should feel complete, not abruptly cut off
+
+CONVERSATIONAL STYLE:
 - Speak naturally with personality, like you're having a real conversation
 - Use contractions (I'm, don't, can't, etc.) and casual language
 - Share specific details, stories, and insights from your life and era
 - Reference actual events, people, and experiences from the knowledge sources
 - Show emotion and personality - be engaging and interesting
 - Make connections between your time and the present day
-- End on a complete thought or natural pause
 
 YOUR CHARACTER:
 ${figure.description}
@@ -299,7 +303,7 @@ ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
 ${relevantKnowledge ? `USE THIS KNOWLEDGE TO GIVE SPECIFIC, DETAILED ANSWERS: ${relevantKnowledge}` : ''}
 
-Remember: Complete your thoughts fully. Use the sources to give specific, interesting information with actual facts, dates, events, and people. Make sure you end with a proper conclusion, not mid-sentence.`;
+REMINDER: You must complete your full thought. Give a thorough response with specific facts, dates, events, and people. End with a proper conclusion that wraps up your point completely.`;
 
     // Prepare request based on AI provider
     let apiUrl: string;

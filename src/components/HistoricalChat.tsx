@@ -819,7 +819,7 @@ const HistoricalChat = () => {
           audio.src = audioUrl;
           
           // Slow down playback for more natural, conversational pacing
-          audio.playbackRate = 0.70;
+          audio.playbackRate = 0.80;
           
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback at 0.85x speed for natural conversation');
