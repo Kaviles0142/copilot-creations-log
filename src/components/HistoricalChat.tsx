@@ -603,7 +603,16 @@ const HistoricalChat = () => {
 
   const generateFakeYouVoice = async (text: string, figure: HistoricalFigure) => {
     try {
+      // Remove action descriptions and stage directions before voice generation
+      const cleanText = text
+        .replace(/\*[^*]+\*/g, '') // Remove *action*
+        .replace(/\([^)]+\)/g, '') // Remove (action)
+        .replace(/\[[^\]]+\]/g, '') // Remove [action]
+        .replace(/\s+/g, ' ') // Clean up extra spaces
+        .trim();
+      
       console.log('🎤 Generating FakeYou voice for:', figure.name);
+      console.log('📝 Original text length:', text.length, 'Cleaned:', cleanText.length);
       
       toast({
         title: "Preparing voice response",
@@ -717,11 +726,11 @@ const HistoricalChat = () => {
         duration: 2000,
       });
       
-      // Step 3: Generate TTS
+      // Step 3: Generate TTS with cleaned text (no action descriptions)
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
         body: {
           action: 'generate_tts',
-          text: text.substring(0, 2000), // Increased limit for longer responses
+          text: cleanText.substring(0, 2000), // Use cleaned text without stage directions
           voiceToken: matchingVoice.voiceToken,
         },
       });
