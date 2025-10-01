@@ -299,11 +299,17 @@ CONVERSATIONAL STYLE:
 YOUR CHARACTER:
 ${figure.description}
 
-${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
-
 ${relevantKnowledge ? `USE THIS KNOWLEDGE TO GIVE SPECIFIC, DETAILED ANSWERS: ${relevantKnowledge}` : ''}
 
 REMINDER: You must complete your full thought. Give a thorough response with specific facts, dates, events, and people. End with a proper conclusion that wraps up your point completely.`;
+
+    // Format conversation history as proper messages
+    const conversationMessages = context && Array.isArray(context) 
+      ? context.map((msg: any) => ({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.content
+        }))
+      : [];
 
     // Prepare request based on AI provider
     let apiUrl: string;
@@ -317,16 +323,22 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       };
+      
+      // Build messages array with conversation history
+      const messages = [
+        ...conversationMessages,
+        { 
+          role: 'user', 
+          content: message 
+        }
+      ];
+      
       requestBody = {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8192,
         temperature: 0.9,
-        messages: [
-          { 
-            role: 'user', 
-            content: `${systemPrompt}\n\nUser: ${message}` 
-          }
-        ],
+        system: systemPrompt,
+        messages: messages,
       };
     } else if (aiProvider === 'grok') {
       apiUrl = 'https://api.x.ai/v1/chat/completions';
@@ -338,6 +350,7 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
         model: 'grok-beta',
         messages: [
           { role: 'system', content: systemPrompt },
+          ...conversationMessages,
           { role: 'user', content: message }
         ],
         max_tokens: 8192,
@@ -353,6 +366,7 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
+          ...conversationMessages,
           { role: 'user', content: message }
         ],
         max_tokens: 8192,
