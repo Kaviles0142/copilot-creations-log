@@ -238,6 +238,8 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         'albert-einstein': 'nPczCjzI2devNBz1zQrb',
         'winston-churchill': 'JBFqnCBsd6RMkjVDRZzb',
         'abraham-lincoln': 'bIHbv24MWmeRgasZH58o',
+        'donald-trump': 'nPczCjzI2devNBz1zQrb', // Brian voice for Trump
+        'trump': 'nPczCjzI2devNBz1zQrb',
         'shakespeare': 'N2lVS1w4EtoT3dr4eOWO',
         'napoleon': 'JBFqnCBsd6RMkjVDRZzb',
         'socrates': 'cjVigY5qzO86Huf0OWal',

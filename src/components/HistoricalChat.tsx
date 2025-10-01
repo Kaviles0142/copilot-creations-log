@@ -1051,6 +1051,8 @@ const HistoricalChat = () => {
         'abraham-lincoln': 'Bill',          // Deep, resonant voice for Lincoln
         'winston-churchill': 'George',      // British-accented voice
         'franklin-d-roosevelt': 'Daniel',   // Confident presidential voice
+        'donald-trump': 'Brian',            // Authoritative, confident voice
+        'trump': 'Brian',
         
         // Intellectual/Scientific - Thoughtful, measured voices  
         'albert-einstein': 'Eric',          // Intellectual, slightly accented
