@@ -176,6 +176,30 @@ serve(async (req) => {
           }
           return '';
         })(),
+
+        // 6. Historical Context via SerpAPI
+        (async () => {
+          try {
+            const contextResponse = await supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: `${figure.name} historical context biography`,
+                num: 2
+              }
+            });
+
+            if (contextResponse.data?.organic_results?.length > 0) {
+              sourcesUsed.historicalContext = contextResponse.data.organic_results.length;
+              let contextText = '\n\n📜 HISTORICAL CONTEXT:\n';
+              contextResponse.data.organic_results.forEach((result: any) => {
+                contextText += `- ${result.title}\n`;
+              });
+              return contextText;
+            }
+          } catch (error) {
+            console.log('Historical context search error:', error);
+          }
+          return '';
+        })(),
       ];
 
       // Wait for all searches to complete (or fail)
