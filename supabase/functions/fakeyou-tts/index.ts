@@ -88,13 +88,20 @@ serve(async (req) => {
   }
 
   try {
-    const { action, text, voiceToken, jobToken, figureName, categoryFilter, audioUrl } = await req.json();
+    const { action, text, voiceToken, jobToken, figureName, categoryFilter, searchTerm, audioUrl } = await req.json();
 
     console.log(`FakeYou TTS action: ${action}`);
 
     switch (action) {
       case 'list_voices':
-        return await listVoices(categoryFilter);
+        return await listVoices(categoryFilter, searchTerm);
+      
+      case 'search_historical_voices':
+        // Dedicated action for searching historical figures
+        if (!figureName) {
+          throw new Error('Missing figureName for historical voice search');
+        }
+        return await listVoices(undefined, figureName);
       
       case 'generate_tts':
         if (!text || !voiceToken) {
@@ -135,12 +142,13 @@ serve(async (req) => {
   }
 });
 
-async function listVoices(categoryFilter?: string) {
-  console.log('📋 Fetching voices from FakeYou API...');
+async function listVoices(categoryFilter?: string, searchTerm?: string) {
+  console.log('📋 Fetching voices from comprehensive weights endpoint...');
   
   try {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${FAKEYOU_API_BASE}/tts/list`, {
+    // Use the comprehensive weights endpoint to get ALL 6000+ TTS voices
+    const response = await fetch(`${FAKEYOU_API_BASE}/v1/weights/list?weight_category=text_to_speech&page_size=6000`, {
       headers,
     });
     
@@ -163,7 +171,24 @@ async function listVoices(categoryFilter?: string) {
     }
     
     let voices = data.models as FakeYouVoice[];
-    console.log(`📊 Received ${voices.length} total voices`);
+    console.log(`📊 Received ${voices.length} total voices from weights endpoint`);
+    
+    // Filter for English voices only for better quality
+    const beforeLanguageFilter = voices.length;
+    voices = voices.filter(v => 
+      v.ietf_primary_language_subtag === 'en'
+    );
+    console.log(`🌐 Language filter reduced voices from ${beforeLanguageFilter} to ${voices.length}`);
+    
+    // Filter by search term if provided (for finding historical figures)
+    if (searchTerm) {
+      const beforeSearchFilter = voices.length;
+      const searchLower = searchTerm.toLowerCase();
+      voices = voices.filter(v => 
+        v.title.toLowerCase().includes(searchLower)
+      );
+      console.log(`🔍 Search filter "${searchTerm}" reduced voices from ${beforeSearchFilter} to ${voices.length}`);
+    }
     
     // Filter by category if provided
     if (categoryFilter) {
@@ -173,13 +198,6 @@ async function listVoices(categoryFilter?: string) {
       );
       console.log(`🔍 Category filter reduced voices from ${beforeFilter} to ${voices.length}`);
     }
-
-    // Filter for English voices only for better quality
-    const beforeLanguageFilter = voices.length;
-    voices = voices.filter(v => 
-      v.ietf_primary_language_subtag === 'en'
-    );
-    console.log(`🌐 Language filter reduced voices from ${beforeLanguageFilter} to ${voices.length}`);
 
     console.log(`✅ Returning ${voices.length} English voices`);
 
@@ -373,7 +391,7 @@ async function proxyAudio(audioUrl: string) {
 }
 
 async function syncVoicesToDatabase(figureName?: string) {
-  console.log('Syncing FakeYou voices to database...');
+  console.log('Syncing FakeYou voices to database using comprehensive endpoint...');
   
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -384,9 +402,9 @@ async function syncVoicesToDatabase(figureName?: string) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Fetch all voices with authentication
+  // Fetch ALL voices with authentication using the comprehensive endpoint
   const headers = await getAuthHeaders();
-  const response = await fetch(`${FAKEYOU_API_BASE}/tts/list`, { headers });
+  const response = await fetch(`${FAKEYOU_API_BASE}/v1/weights/list?weight_category=text_to_speech&page_size=6000`, { headers });
   if (!response.ok) {
     throw new Error(`Failed to fetch voices: ${response.status}`);
   }
