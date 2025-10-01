@@ -336,7 +336,7 @@ Remember: Complete your thoughts fully. Use the sources to give specific, intere
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 2000,
+        max_tokens: 4096,
         temperature: 0.9
       };
     } else {
@@ -351,7 +351,7 @@ Remember: Complete your thoughts fully. Use the sources to give specific, intere
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 2000,
+        max_tokens: 4096,
         temperature: 0.9
       };
     }
@@ -382,8 +382,11 @@ Remember: Complete your thoughts fully. Use the sources to give specific, intere
     let response: string;
     if (aiProvider === 'claude') {
       response = data.content[0].text;
+      console.log(`Claude finish_reason: ${data.stop_reason}`);
+      console.log(`Claude usage:`, data.usage);
     } else {
       response = data.choices[0].message.content;
+      console.log(`${aiProvider} finish_reason: ${data.choices[0].finish_reason}`);
     }
 
     console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
