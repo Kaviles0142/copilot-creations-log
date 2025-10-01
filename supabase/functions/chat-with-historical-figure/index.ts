@@ -159,14 +159,15 @@ serve(async (req) => {
             const currentEventsResponse = await supabase.functions.invoke('serpapi-search', {
               body: { 
                 query: `${figure.name} news 2024 2025`,
-                num: 2 // Only get 2 results for speed
+                type: 'news',  // Use news engine
+                num: 2
               }
             });
 
-            if (currentEventsResponse.data?.organic_results?.length > 0) {
-              sourcesUsed.currentEvents = currentEventsResponse.data.organic_results.length;
+            if (currentEventsResponse.data?.results?.length > 0) {
+              sourcesUsed.currentEvents = currentEventsResponse.data.results.length;
               let eventsText = '\n\n📰 RECENT NEWS:\n';
-              currentEventsResponse.data.organic_results.forEach((result: any) => {
+              currentEventsResponse.data.results.forEach((result: any) => {
                 eventsText += `- ${result.title}\n`;
               });
               return eventsText;
@@ -182,15 +183,16 @@ serve(async (req) => {
           try {
             const contextResponse = await supabase.functions.invoke('serpapi-search', {
               body: { 
-                query: `${figure.name} historical context biography`,
+                query: `${figure.name} biography history`,
+                type: 'web',  // Use regular Google search
                 num: 2
               }
             });
 
-            if (contextResponse.data?.organic_results?.length > 0) {
-              sourcesUsed.historicalContext = contextResponse.data.organic_results.length;
+            if (contextResponse.data?.results?.length > 0) {
+              sourcesUsed.historicalContext = contextResponse.data.results.length;
               let contextText = '\n\n📜 HISTORICAL CONTEXT:\n';
-              contextResponse.data.organic_results.forEach((result: any) => {
+              contextResponse.data.results.forEach((result: any) => {
                 contextText += `- ${result.title}\n`;
               });
               return contextText;
@@ -206,15 +208,16 @@ serve(async (req) => {
           try {
             const articlesResponse = await supabase.functions.invoke('serpapi-search', {
               body: { 
-                query: `${figure.name} article analysis`,
+                query: `${figure.name} analysis profile`,
+                type: 'web',  // Use regular Google search
                 num: 2
               }
             });
 
-            if (articlesResponse.data?.organic_results?.length > 0) {
-              sourcesUsed.webArticles = articlesResponse.data.organic_results.length;
+            if (articlesResponse.data?.results?.length > 0) {
+              sourcesUsed.webArticles = articlesResponse.data.results.length;
               let articlesText = '\n\n📝 WEB ARTICLES:\n';
-              articlesResponse.data.organic_results.forEach((result: any) => {
+              articlesResponse.data.results.forEach((result: any) => {
                 articlesText += `- ${result.title}\n`;
                 if (result.snippet) {
                   articlesText += `  ${result.snippet.substring(0, 150)}...\n`;
