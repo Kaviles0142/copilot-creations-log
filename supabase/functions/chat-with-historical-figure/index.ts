@@ -200,6 +200,33 @@ serve(async (req) => {
           }
           return '';
         })(),
+
+        // 7. Web Articles via SerpAPI
+        (async () => {
+          try {
+            const articlesResponse = await supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: `${figure.name} article analysis`,
+                num: 2
+              }
+            });
+
+            if (articlesResponse.data?.organic_results?.length > 0) {
+              sourcesUsed.webArticles = articlesResponse.data.organic_results.length;
+              let articlesText = '\n\n📝 WEB ARTICLES:\n';
+              articlesResponse.data.organic_results.forEach((result: any) => {
+                articlesText += `- ${result.title}\n`;
+                if (result.snippet) {
+                  articlesText += `  ${result.snippet.substring(0, 150)}...\n`;
+                }
+              });
+              return articlesText;
+            }
+          } catch (error) {
+            console.log('Web articles search error:', error);
+          }
+          return '';
+        })(),
       ];
 
       // Wait for all searches to complete (or fail)
