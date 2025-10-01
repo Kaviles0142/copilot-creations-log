@@ -91,9 +91,6 @@ const HistoricalChat = () => {
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-  const [availableFakeYouVoices, setAvailableFakeYouVoices] = useState<any[]>([]);
-  const [selectedFakeYouVoice, setSelectedFakeYouVoice] = useState<any>(null);
-  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -176,98 +173,8 @@ const HistoricalChat = () => {
       createAuthenticVoice(selectedFigure);
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
-      // Fetch available voices for this figure
-      fetchFakeYouVoicesForFigure(selectedFigure);
     }
   }, [selectedFigure]);
-
-  // Fetch all FakeYou voices for the selected figure
-  const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
-    setIsLoadingVoices(true);
-    try {
-      console.log('🔍 Fetching FakeYou voices for:', figure.name);
-      
-      const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
-        body: { 
-          action: 'list_voices',
-        },
-      });
-      
-      if (voicesError) throw voicesError;
-      if (!voicesData.success) throw new Error('Failed to fetch voices');
-      
-      // Search logic (same as generateFakeYouVoice)
-      const figureName = figure.name.toLowerCase();
-      const nameWithoutPunctuation = figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
-      const nameWords = nameWithoutPunctuation.split(' ').filter((w: string) => w.length > 0);
-      const lastName = nameWords.length > 0 ? nameWords[nameWords.length - 1] : '';
-      const firstName = nameWords.length > 0 ? nameWords[0] : '';
-      
-      const nameVariations: Record<string, string[]> = {
-        'john f kennedy': ['jfk', 'kennedy', 'john f kennedy', 'john kennedy', 'president kennedy'],
-        'martin luther king jr': ['mlk', 'martin luther king', 'dr king', 'king jr', 'martin luther king jr'],
-        'franklin d roosevelt': ['fdr', 'franklin roosevelt', 'roosevelt', 'president roosevelt'],
-        'winston churchill': ['churchill', 'winston', 'winston churchill', 'sir winston'],
-        'abraham lincoln': ['lincoln', 'abe lincoln', 'president lincoln', 'abraham lincoln'],
-        'albert einstein': ['einstein', 'albert einstein'],
-        'william shakespeare': ['shakespeare', 'william shakespeare', 'bard'],
-        'napoleon bonaparte': ['napoleon', 'bonaparte'],
-        'cleopatra': ['cleopatra', 'cleopatra vii'],
-        'leonardo da vinci': ['leonardo', 'da vinci', 'leonardo da vinci'],
-        'marie curie': ['marie curie', 'curie'],
-        'nikola tesla': ['tesla', 'nikola tesla'],
-        'george washington': ['washington', 'george washington', 'president washington'],
-        'julius caesar': ['caesar', 'julius caesar'],
-      };
-      
-      const searchTerms = nameVariations[nameWithoutPunctuation] || [
-        figureName,
-        nameWithoutPunctuation,
-        lastName,
-        firstName,
-        `${firstName} ${lastName}`,
-        ...nameWords.filter(w => w.length > 3)
-      ];
-      
-      // Find ALL matching voices
-      const matchingVoices = voicesData.voices?.filter((v: any) => {
-        const voiceTitle = v.title.toLowerCase();
-        return searchTerms.some((term: string) => {
-          const termRegex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-          return termRegex.test(voiceTitle) || voiceTitle.includes(term);
-        });
-      }) || [];
-      
-      console.log(`✅ Found ${matchingVoices.length} matching voices`);
-      setAvailableFakeYouVoices(matchingVoices);
-      
-      // Auto-select the first one as default
-      if (matchingVoices.length > 0) {
-        setSelectedFakeYouVoice(matchingVoices[0]);
-        toast({
-          title: "Voices loaded",
-          description: `Found ${matchingVoices.length} voice${matchingVoices.length > 1 ? 's' : ''} for ${figure.name}`,
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "No voices found",
-          description: `No FakeYou voices available for ${figure.name}`,
-          variant: "destructive",
-          duration: 4000,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching voices:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load voice options",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingVoices(false);
-    }
-  };
 
   const toggleVoiceRecognition = () => {
     if (!recognition) {
@@ -699,22 +606,116 @@ const HistoricalChat = () => {
     try {
       console.log('🎤 Generating FakeYou voice for:', figure.name);
       
-      // Use the selected voice from dropdown
-      if (!selectedFakeYouVoice) {
+      toast({
+        title: "Preparing voice response",
+        description: `Cloning ${figure.name}'s voice - this takes about 10-15 seconds...`,
+        duration: 4000,
+      });
+      
+      // Step 1: Search for the figure's voice on FakeYou
+      const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
+        body: { 
+          action: 'list_voices',
+        },
+      });
+      
+      if (voicesError) {
+        console.error('Voice list fetch error:', voicesError);
+        throw voicesError;
+      }
+      if (!voicesData.success) {
+        console.error('Voice list fetch failed:', voicesData);
+        throw new Error('Failed to fetch voices');
+      }
+      
+      console.log(`✅ Fetched ${voicesData.voices?.length || 0} voices from FakeYou`);
+      
+      // Step 2: Smart name matching with variations
+      const figureName = figure.name.toLowerCase();
+      const nameWithoutPunctuation = figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
+      const nameWords = nameWithoutPunctuation.split(' ').filter((w: string) => w.length > 0);
+      const lastName = nameWords.length > 0 ? nameWords[nameWords.length - 1] : '';
+      const firstName = nameWords.length > 0 ? nameWords[0] : '';
+      
+      // Common name variations and abbreviations
+      const nameVariations: Record<string, string[]> = {
+        'john f kennedy': ['jfk', 'kennedy', 'john f kennedy', 'john kennedy', 'president kennedy'],
+        'martin luther king jr': ['mlk', 'martin luther king', 'dr king', 'king jr', 'martin luther king jr'],
+        'franklin d roosevelt': ['fdr', 'franklin roosevelt', 'roosevelt', 'president roosevelt'],
+        'winston churchill': ['churchill', 'winston', 'winston churchill', 'sir winston'],
+        'abraham lincoln': ['lincoln', 'abe lincoln', 'president lincoln', 'abraham lincoln'],
+        'albert einstein': ['einstein', 'albert einstein'],
+        'william shakespeare': ['shakespeare', 'william shakespeare', 'bard'],
+        'napoleon bonaparte': ['napoleon', 'bonaparte'],
+        'cleopatra': ['cleopatra', 'cleopatra vii'],
+        'leonardo da vinci': ['leonardo', 'da vinci', 'leonardo da vinci'],
+        'marie curie': ['marie curie', 'curie'],
+        'nikola tesla': ['tesla', 'nikola tesla'],
+        'george washington': ['washington', 'george washington', 'president washington'],
+        'julius caesar': ['caesar', 'julius caesar'],
+      };
+      
+      const searchTerms = nameVariations[nameWithoutPunctuation] || [
+        figureName,
+        nameWithoutPunctuation,
+        lastName,
+        firstName,
+        `${firstName} ${lastName}`,
+        ...nameWords.filter(w => w.length > 3) // Include significant words
+      ];
+      
+      console.log(`🔍 Searching FakeYou for: ${searchTerms.join(', ')}`);
+      
+      // Find matching voice using prioritized search (exact match first, then partial)
+      let matchingVoice = null;
+      
+      // First pass: Try to find exact full name matches (most specific)
+      for (const term of searchTerms.slice(0, 3)) { // Check first 3 terms (most specific)
+        matchingVoice = voicesData.voices?.find((v: any) => {
+          const voiceTitle = v.title.toLowerCase();
+          // Exact match or contains full term as a word (not just substring)
+          const termRegex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+          if (termRegex.test(voiceTitle)) {
+            console.log(`✓ Full match found: "${v.title}" matches "${term}"`);
+            return true;
+          }
+          return false;
+        });
+        
+        if (matchingVoice) break;
+      }
+      
+      // Second pass: If no exact match, try broader search
+      if (!matchingVoice) {
+        matchingVoice = voicesData.voices?.find((v: any) => {
+          const voiceTitle = v.title.toLowerCase();
+          return searchTerms.some((term: string) => {
+            // Check if voice title contains the search term
+            if (voiceTitle.includes(term)) {
+              console.log(`✓ Partial match found: "${v.title}" contains "${term}"`);
+              return true;
+            }
+            return false;
+          });
+        });
+      }
+      
+      if (!matchingVoice) {
+        console.log('❌ No FakeYou voice found. Tried:', searchTerms);
         toast({
-          title: "No voice selected",
-          description: `Please select a voice for ${figure.name}`,
+          title: "Voice not found",
+          description: `No authentic voice available for ${figure.name}. Using fallback.`,
           variant: "destructive",
           duration: 4000,
         });
-        throw new Error('No voice selected');
+        throw new Error('Voice not found');
       }
       
-      console.log(`✅ Using selected voice: "${selectedFakeYouVoice.title}"`);
+      console.log(`✅ Found FakeYou voice: "${matchingVoice.title}"`);
       toast({
-        title: "Preparing voice response",
-        description: `Using "${selectedFakeYouVoice.title}" - this takes about 10-15 seconds...`,
-        duration: 4000,
+        title: "Voice found!",
+        description: `Using "${matchingVoice.title}" voice`,
+        duration: 2000,
       });
       
       // Step 3: Generate TTS
@@ -722,7 +723,7 @@ const HistoricalChat = () => {
         body: {
           action: 'generate_tts',
           text: text.substring(0, 2000), // Increased limit for longer responses
-          voiceToken: selectedFakeYouVoice.voiceToken,
+          voiceToken: matchingVoice.voiceToken,
         },
       });
       
@@ -1562,53 +1563,6 @@ const HistoricalChat = () => {
                 Free browser-based text-to-speech in multiple languages
               </p>
             </div>
-
-            {/* Voice Selection Dropdown */}
-            {selectedFigure && availableFakeYouVoices.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center">
-                  <Volume2 className="mr-2 h-4 w-4" />
-                  Voice Selection ({availableFakeYouVoices.length} available)
-                </label>
-                <Select 
-                  value={selectedFakeYouVoice?.voiceToken} 
-                  onValueChange={(voiceToken) => {
-                    const voice = availableFakeYouVoices.find(v => v.voiceToken === voiceToken);
-                    if (voice) {
-                      setSelectedFakeYouVoice(voice);
-                      toast({
-                        title: "Voice selected",
-                        description: `Now using: ${voice.title}`,
-                        duration: 2000,
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={isLoadingVoices ? "Loading voices..." : "Select a voice"}>
-                      {selectedFakeYouVoice?.title || "Select a voice"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px] bg-background z-50">
-                    {availableFakeYouVoices.map((voice) => (
-                      <SelectItem key={voice.voiceToken} value={voice.voiceToken}>
-                        {voice.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Choose which voice to use for {selectedFigure.name}
-                </p>
-              </div>
-            )}
-
-            {selectedFigure && isLoadingVoices && (
-              <div className="text-sm text-muted-foreground flex items-center">
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Loading available voices...
-              </div>
-            )}
 
             {showFileUpload && (
               <Card className="p-4">
