@@ -164,6 +164,36 @@ export type Database = {
         }
         Relationships: []
       }
+      data_health_logs: {
+        Row: {
+          auto_fixes_applied: number
+          check_timestamp: string
+          error_message: string | null
+          figures_checked: number
+          health_results: Json | null
+          id: string
+          status: string
+        }
+        Insert: {
+          auto_fixes_applied?: number
+          check_timestamp?: string
+          error_message?: string | null
+          figures_checked?: number
+          health_results?: Json | null
+          id?: string
+          status?: string
+        }
+        Update: {
+          auto_fixes_applied?: number
+          check_timestamp?: string
+          error_message?: string | null
+          figures_checked?: number
+          health_results?: Json | null
+          id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           conversation_id: string | null
