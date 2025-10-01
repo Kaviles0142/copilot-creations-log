@@ -51,123 +51,144 @@ serve(async (req) => {
     };
 
     try {
-      // 1. Search books related to the figure
-      console.log(`Searching books for figure: ${figure.name} (ID: ${figure.id})`);
+      console.log(`Searching all sources in parallel for ${figure.name}...`);
       
-      // First try to discover books if none exist
-      try {
-        const discoverResponse = await supabase.functions.invoke('discover-books', {
-          body: {
-            figureName: figure.name,
-            figureId: figure.id,
-            forceRefresh: false
-          }
-        });
-        
-        if (discoverResponse.data?.success) {
-          console.log(`Books discovery result: ${discoverResponse.data.books?.length || 0} books found`);
-        }
-      } catch (discoverError) {
-        console.log('Books discovery failed:', discoverError);
-      }
+      // Run all searches in parallel for maximum speed
+      const searchPromises = [
+        // 1. Books search
+        (async () => {
+          try {
+            // Try to discover books first (don't wait for this)
+            supabase.functions.invoke('discover-books', {
+              body: { figureName: figure.name, figureId: figure.id, forceRefresh: false }
+            }).catch(e => console.log('Books discovery failed:', e));
 
-      const { data: books, error: booksError } = await supabase
-        .from('books')
-        .select('title, authors, description')
-        .eq('figure_id', figure.id)
-        .limit(5);
+            const { data: books } = await supabase
+              .from('books')
+              .select('title, authors, description')
+              .eq('figure_id', figure.id)
+              .limit(3); // Reduced from 5 for speed
 
-      if (booksError) {
-        console.log('Books search error:', booksError);
-      } else {
-        console.log(`Found ${books?.length || 0} books for ${figure.name}`);
-        if (books && books.length > 0) {
-          sourcesUsed.books = books.length;
-          relevantKnowledge += '\n\n📚 RELEVANT BOOKS AND SOURCES:\n';
-          books.forEach(book => {
-            relevantKnowledge += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
-            if (book.description) {
-              relevantKnowledge += `  Summary: ${book.description.substring(0, 300)}...\n`;
+            if (books && books.length > 0) {
+              sourcesUsed.books = books.length;
+              let booksText = '\n\n📚 RELEVANT BOOKS:\n';
+              books.forEach(book => {
+                booksText += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
+                if (book.description) {
+                  booksText += `  ${book.description.substring(0, 200)}...\n`;
+                }
+              });
+              return booksText;
             }
-          });
-          console.log('Books knowledge added to context');
-        } else {
-          console.log('No books found for this figure');
-        }
-      }
-
-      // 2. Search documents if conversation ID is provided
-      if (conversationId) {
-        const { data: documents, error: docsError } = await supabase
-          .from('documents')
-          .select('filename, parsed_content')
-          .eq('conversation_id', conversationId)
-          .limit(3);
-
-        if (docsError) {
-          console.log('Documents search error:', docsError);
-        } else if (documents && documents.length > 0) {
-          sourcesUsed.documents = documents.length;
-          relevantKnowledge += '\n\n📄 UPLOADED DOCUMENTS:\n';
-          documents.forEach(doc => {
-            relevantKnowledge += `- ${doc.filename}\n`;
-            if (doc.parsed_content) {
-              relevantKnowledge += `  Content: ${doc.parsed_content.substring(0, 300)}...\n`;
-            }
-          });
-        }
-      }
-
-      // 3. Search YouTube for video content
-      console.log(`Searching YouTube for ${figure.name}...`);
-      try {
-        const youtubeResponse = await supabase.functions.invoke('youtube-search', {
-          body: { 
-            query: `${figure.name} original speech documentary interview historical`,
-            maxResults: 3
+          } catch (error) {
+            console.log('Books search error:', error);
           }
-        });
+          return '';
+        })(),
 
-        console.log('YouTube response:', youtubeResponse);
-        if (youtubeResponse.data?.results?.length > 0) {
-          sourcesUsed.youtube = youtubeResponse.data.results.length;
-          relevantKnowledge += '\n\n🎥 YOUTUBE VIDEOS & DOCUMENTARIES:\n';
-          youtubeResponse.data.results.forEach((video: any) => {
-            relevantKnowledge += `- "${video.title}" (${video.channelTitle})\n`;
-            if (video.description) {
-              relevantKnowledge += `  Description: ${video.description.substring(0, 200)}...\n`;
+        // 2. Documents search
+        conversationId ? (async () => {
+          try {
+            const { data: documents } = await supabase
+              .from('documents')
+              .select('filename, parsed_content')
+              .eq('conversation_id', conversationId)
+              .limit(2); // Reduced from 3
+
+            if (documents && documents.length > 0) {
+              sourcesUsed.documents = documents.length;
+              let docsText = '\n\n📄 UPLOADED DOCUMENTS:\n';
+              documents.forEach(doc => {
+                docsText += `- ${doc.filename}\n`;
+                if (doc.parsed_content) {
+                  docsText += `  ${doc.parsed_content.substring(0, 200)}...\n`;
+                }
+              });
+              return docsText;
             }
-            relevantKnowledge += `  URL: ${video.url}\n`;
-          });
-          console.log(`Added ${youtubeResponse.data.results.length} YouTube videos to context`);
-        } else {
-          console.log('No YouTube videos found');
-        }
-      } catch (youtubeError) {
-        console.log('YouTube search error:', youtubeError);
-      }
-
-      // 4. Search Wikipedia for detailed biographical information
-      try {
-        const wikiResponse = await supabase.functions.invoke('wikipedia-search', {
-          body: { query: figure.name }
-        });
-
-        if (wikiResponse.data?.extract) {
-          sourcesUsed.wikipedia = true;
-          relevantKnowledge += '\n\n📖 WIKIPEDIA INFORMATION:\n';
-          relevantKnowledge += `${wikiResponse.data.extract.substring(0, 400)}...\n`;
-          if (wikiResponse.data.url) {
-            relevantKnowledge += `Source: ${wikiResponse.data.url}\n`;
+          } catch (error) {
+            console.log('Documents search error:', error);
           }
-        }
-      } catch (wikiError) {
-        console.log('Wikipedia search error:', wikiError);
-      }
+          return '';
+        })() : Promise.resolve(''),
 
-      // DISABLED: Too slow, causing timeouts
-      // These searches have been commented out to improve response speed
-      console.log('Skipping slow SerpAPI searches to prevent timeout...');
+        // 3. YouTube search
+        (async () => {
+          try {
+            const youtubeResponse = await supabase.functions.invoke('youtube-search', {
+              body: { 
+                query: `${figure.name} speech interview`,
+                maxResults: 2 // Reduced from 3
+              }
+            });
+
+            if (youtubeResponse.data?.results?.length > 0) {
+              sourcesUsed.youtube = youtubeResponse.data.results.length;
+              let youtubeText = '\n\n🎥 YOUTUBE:\n';
+              youtubeResponse.data.results.forEach((video: any) => {
+                youtubeText += `- "${video.title}"\n`;
+              });
+              return youtubeText;
+            }
+          } catch (error) {
+            console.log('YouTube search error:', error);
+          }
+          return '';
+        })(),
+
+        // 4. Wikipedia search
+        (async () => {
+          try {
+            const wikiResponse = await supabase.functions.invoke('wikipedia-search', {
+              body: { query: figure.name }
+            });
+
+            if (wikiResponse.data?.extract) {
+              sourcesUsed.wikipedia = true;
+              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 300)}...\n`;
+            }
+          } catch (error) {
+            console.log('Wikipedia search error:', error);
+          }
+          return '';
+        })(),
+
+        // 5. Current Events via SerpAPI
+        (async () => {
+          try {
+            const currentEventsResponse = await supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: `${figure.name} news 2024 2025`,
+                num: 2 // Only get 2 results for speed
+              }
+            });
+
+            if (currentEventsResponse.data?.organic_results?.length > 0) {
+              sourcesUsed.currentEvents = currentEventsResponse.data.organic_results.length;
+              let eventsText = '\n\n📰 RECENT NEWS:\n';
+              currentEventsResponse.data.organic_results.forEach((result: any) => {
+                eventsText += `- ${result.title}\n`;
+              });
+              return eventsText;
+            }
+          } catch (error) {
+            console.log('Current events search error:', error);
+          }
+          return '';
+        })(),
+      ];
+
+      // Wait for all searches to complete (or fail)
+      const results = await Promise.allSettled(searchPromises);
+      
+      // Combine all successful results
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          relevantKnowledge += result.value;
+        }
+      });
+
+      console.log(`Knowledge gathering complete. Total length: ${relevantKnowledge.length} characters`);
 
     } catch (knowledgeError) {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
