@@ -767,39 +767,13 @@ const HistoricalChat = () => {
             duration: 2000,
           });
           
-          // Proxy the audio through our authenticated edge function
-          console.log('🔄 Proxying audio through authenticated server...');
-          const { data: proxyData, error: proxyError } = await supabase.functions.invoke('fakeyou-tts', {
-            body: {
-              action: 'proxy_audio',
-              audioUrl: statusData.audioUrl,
-            },
-          });
+          // Try direct access to cdn-2.fakeyou.com URLs
+          console.log('🎵 Audio URL:', statusData.audioUrl);
+          console.log('🔗 Attempting direct audio access...');
           
-          if (proxyError) {
-            console.error('Audio proxy error:', proxyError);
-            throw proxyError;
-          }
-          
-          if (!proxyData?.success || !proxyData?.audioBase64) {
-            console.error('Invalid proxy response:', proxyData);
-            throw new Error('Invalid audio proxy response');
-          }
-          
-          console.log(`📦 Received base64 audio (${proxyData.size} bytes)`);
-          
-          // Convert base64 to blob
-          const binaryString = atob(proxyData.audioBase64);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          const audioBlob = new Blob([bytes], { type: 'audio/wav' });
-          const audioBlobUrl = URL.createObjectURL(audioBlob);
-          console.log('🔗 Created blob URL for audio');
-          
-          // Play the audio
-          const audio = new Audio(audioBlobUrl);
+          const audio = new Audio();
+          audio.crossOrigin = 'anonymous';
+          audio.src = statusData.audioUrl;
           
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback');
@@ -829,8 +803,6 @@ const HistoricalChat = () => {
             console.log('✅ Audio playback completed');
             setIsPlayingAudio(false);
             setCurrentAudio(null);
-            // Clean up blob URL to avoid memory leaks
-            URL.revokeObjectURL(audioBlobUrl);
           };
           
           return; // Success!
