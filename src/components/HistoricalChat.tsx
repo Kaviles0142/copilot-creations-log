@@ -1,3 +1,4 @@
+// Checkpoint: Safe state before voice selection dropdown feature
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import VoiceCloningManager from '@/components/VoiceCloningManager';
