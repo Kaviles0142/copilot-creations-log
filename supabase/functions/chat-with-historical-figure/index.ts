@@ -315,7 +315,7 @@ Remember: Complete your thoughts fully. Use the sources to give specific, intere
       };
       requestBody = {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1200,
+        max_tokens: 2000,
         temperature: 0.9,
         messages: [
           { 
@@ -336,7 +336,7 @@ Remember: Complete your thoughts fully. Use the sources to give specific, intere
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1200,
+        max_tokens: 2000,
         temperature: 0.9
       };
     } else {
@@ -351,7 +351,7 @@ Remember: Complete your thoughts fully. Use the sources to give specific, intere
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1200,
+        max_tokens: 2000,
         temperature: 0.9
       };
     }
