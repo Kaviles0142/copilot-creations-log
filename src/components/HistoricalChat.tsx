@@ -718,19 +718,21 @@ const HistoricalChat = () => {
       });
       
       // Step 3: Generate TTS
-      // Truncate at sentence boundary if text is too long (max 2000 chars)
+      // FakeYou has a strict character limit - truncate to 800 chars max at sentence boundary
       let ttsText = text;
-      if (text.length > 2000) {
-        const truncated = text.substring(0, 2000);
+      if (text.length > 800) {
+        const truncated = text.substring(0, 800);
         const lastPeriod = truncated.lastIndexOf('.');
         const lastQuestion = truncated.lastIndexOf('?');
         const lastExclamation = truncated.lastIndexOf('!');
         const lastSentence = Math.max(lastPeriod, lastQuestion, lastExclamation);
-        if (lastSentence > 1500) {
+        if (lastSentence > 600) {
           ttsText = truncated.substring(0, lastSentence + 1);
         } else {
           ttsText = truncated;
         }
+        
+        console.log(`⚠️ Text truncated for FakeYou: ${text.length} → ${ttsText.length} characters`);
       }
       
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
