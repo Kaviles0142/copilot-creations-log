@@ -782,6 +782,13 @@ const HistoricalChat = () => {
         if (statusData.isComplete && statusData.audioUrl) {
           console.log('✅ FakeYou audio ready:', statusData.audioUrl);
           
+          // Convert old Google Storage URLs to new CDN-2 format
+          let audioUrl = statusData.audioUrl;
+          if (audioUrl.includes('storage.googleapis.com/vocodes-public')) {
+            audioUrl = audioUrl.replace('https://storage.googleapis.com/vocodes-public', 'https://cdn-2.fakeyou.com');
+            console.log('🔄 Converted to CDN URL:', audioUrl);
+          }
+          
           toast({
             title: "Voice ready!",
             description: `Playing ${figure.name}'s authentic voice`,
@@ -789,12 +796,12 @@ const HistoricalChat = () => {
           });
           
           // Try direct access to cdn-2.fakeyou.com URLs
-          console.log('🎵 Audio URL:', statusData.audioUrl);
+          console.log('🎵 Final Audio URL:', audioUrl);
           console.log('🔗 Attempting direct audio access...');
           
           const audio = new Audio();
           audio.crossOrigin = 'anonymous';
-          audio.src = statusData.audioUrl;
+          audio.src = audioUrl;
           
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback');
