@@ -601,8 +601,8 @@ const HistoricalChat = () => {
     }
   };
 
-  // Helper function to chunk text for 10-second limit (~25 words = ~10 seconds)
-  const chunkTextForFakeYou = (text: string, maxWords: number = 25): string[] => {
+  // Helper function to chunk text for Elite plan 2-minute limit (~300 words = ~120 seconds)
+  const chunkTextForFakeYou = (text: string, maxWords: number = 300): string[] => {
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
     const chunks: string[] = [];
     let currentChunk = '';
@@ -645,8 +645,8 @@ const HistoricalChat = () => {
       toast({
         title: "Preparing voice response",
         description: chunkCount > 1 
-          ? `Generating ${chunkCount} audio segments...`
-          : `Cloning ${figure.name}'s voice - this takes about 10-15 seconds...`,
+          ? `Generating ${chunkCount} audio segments with Elite quality...`
+          : `Cloning ${figure.name}'s voice with Elite speed - ~10 seconds...`,
         duration: 4000,
       });
       
@@ -813,8 +813,8 @@ const HistoricalChat = () => {
       toast({
         title: "Generating voice...",
         description: chunkCount > 1 
-          ? `Preparing ${chunkCount} segments - voice will start in ~15 seconds...`
-          : "Voice will start in ~15 seconds...",
+          ? `Preparing ${chunkCount} segments - Elite speed, voice starting in ~10 seconds...`
+          : "Elite processing - voice will start in ~10 seconds...",
         duration: 3000,
       });
       
