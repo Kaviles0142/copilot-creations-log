@@ -152,7 +152,8 @@ serve(async (req) => {
                 preview_link: previewLink,
                 info_link: infoLink,
                 relevance_score: relevanceScore,
-                search_query: query
+                search_query: query,
+                book_type: 'biography' // Required field - these are biographical books about historical figures
               });
             }
           }
