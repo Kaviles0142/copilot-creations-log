@@ -165,18 +165,18 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
 
     const data = await response.json();
     
-    if (!data.success || !data.models) {
+    if (!data.success || !data.results) {
       console.error('❌ Invalid response from FakeYou:', data);
       throw new Error('Invalid response from FakeYou API');
     }
     
-    let voices = data.models as FakeYouVoice[];
+    let voices = data.results; // Changed from data.models to data.results
     console.log(`📊 Received ${voices.length} total voices from weights endpoint`);
     
     // Filter for English voices only for better quality
     const beforeLanguageFilter = voices.length;
-    voices = voices.filter(v => 
-      v.ietf_primary_language_subtag === 'en'
+    voices = voices.filter((v: any) => 
+      v.maybe_ietf_primary_language_subtag === 'en'
     );
     console.log(`🌐 Language filter reduced voices from ${beforeLanguageFilter} to ${voices.length}`);
     
@@ -184,7 +184,7 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
     if (searchTerm) {
       const beforeSearchFilter = voices.length;
       const searchLower = searchTerm.toLowerCase();
-      voices = voices.filter(v => 
+      voices = voices.filter((v: any) => 
         v.title.toLowerCase().includes(searchLower)
       );
       console.log(`🔍 Search filter "${searchTerm}" reduced voices from ${beforeSearchFilter} to ${voices.length}`);
@@ -193,8 +193,8 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
     // Filter by category if provided
     if (categoryFilter) {
       const beforeFilter = voices.length;
-      voices = voices.filter(v => 
-        v.category_tokens?.some(cat => cat.includes(categoryFilter))
+      voices = voices.filter((v: any) => 
+        v.category_tokens?.some((cat: string) => cat.includes(categoryFilter))
       );
       console.log(`🔍 Category filter reduced voices from ${beforeFilter} to ${voices.length}`);
     }
@@ -205,13 +205,12 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
       JSON.stringify({
         success: true,
         count: voices.length,
-        voices: voices.map(v => ({
-          voiceToken: v.model_token,
+        voices: voices.map((v: any) => ({
+          voiceToken: v.weight_token, // Changed from model_token to weight_token
           title: v.title,
           creator: v.creator_display_name,
-          botCommand: v.maybe_suggested_unique_bot_command,
-          categories: v.category_tokens,
-          language: v.ietf_language_tag,
+          username: v.creator_username,
+          language: v.maybe_ietf_language_tag,
         })),
       }),
       {
@@ -410,15 +409,15 @@ async function syncVoicesToDatabase(figureName?: string) {
   }
 
   const data = await response.json();
-  let voices = data.models as FakeYouVoice[];
+  let voices = data.results; // Changed from data.models to data.results
 
   // Filter for English voices only
-  voices = voices.filter(v => v.ietf_primary_language_subtag === 'en');
+  voices = voices.filter((v: any) => v.maybe_ietf_primary_language_subtag === 'en');
 
   // If figureName provided, try to find matching voices
   if (figureName) {
     const searchTerm = figureName.toLowerCase();
-    voices = voices.filter(v => 
+    voices = voices.filter((v: any) => 
       v.title.toLowerCase().includes(searchTerm)
     );
   }
@@ -438,7 +437,7 @@ async function syncVoicesToDatabase(figureName?: string) {
       const { error } = await supabase
         .from('cloned_voices')
         .upsert({
-          voice_id: voice.model_token,
+          voice_id: voice.weight_token, // Changed from model_token to weight_token
           voice_name: voice.title,
           figure_id: figureId,
           figure_name: voice.title,
