@@ -323,7 +323,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       };
       requestBody = {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
+        max_tokens: 1200,
         temperature: 0.9,
         messages: [
           { 
@@ -344,7 +344,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 600,
+        max_tokens: 1200,
         temperature: 0.9
       };
     } else {
@@ -359,7 +359,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 600,
+        max_tokens: 1200,
         temperature: 0.9
       };
     }
