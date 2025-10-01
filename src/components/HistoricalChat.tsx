@@ -604,7 +604,6 @@ const HistoricalChat = () => {
   const generateFakeYouVoice = async (text: string, figure: HistoricalFigure) => {
     try {
       console.log('🎤 Generating FakeYou voice for:', figure.name);
-      setIsPlayingAudio(true);
       
       toast({
         title: "Generating authentic voice",
@@ -774,6 +773,7 @@ const HistoricalChat = () => {
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback');
             audio.play().then(() => {
+              setIsPlayingAudio(true);
               setCurrentAudio(audio);
               console.log('🔊 FakeYou voice playing');
             }).catch(err => {
