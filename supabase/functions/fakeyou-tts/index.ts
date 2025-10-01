@@ -29,7 +29,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, text, voiceToken, jobToken, figureName, categoryFilter } = await req.json();
+    const { action, text, voiceToken, jobToken, figureName, categoryFilter, audioUrl } = await req.json();
 
     console.log(`FakeYou TTS action: ${action}`);
 
@@ -50,7 +50,6 @@ serve(async (req) => {
         return await checkJobStatus(jobToken);
       
       case 'proxy_audio':
-        const { audioUrl } = await req.json();
         if (!audioUrl) {
           throw new Error('Missing audioUrl for proxy');
         }
@@ -293,13 +292,24 @@ async function proxyAudio(audioUrl: string) {
     const audioData = await response.arrayBuffer();
     console.log(`✅ Audio fetched successfully (${audioData.byteLength} bytes)`);
     
-    return new Response(audioData, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'audio/wav',
-        'Content-Length': audioData.byteLength.toString(),
-      },
-    });
+    // Convert to base64 for JSON transport
+    const base64Audio = btoa(
+      String.fromCharCode(...new Uint8Array(audioData))
+    );
+    
+    return new Response(
+      JSON.stringify({
+        success: true,
+        audioBase64: base64Audio,
+        size: audioData.byteLength
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('💥 proxyAudio failed:', error);
     throw error;

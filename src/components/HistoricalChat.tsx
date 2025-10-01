@@ -780,8 +780,20 @@ const HistoricalChat = () => {
             throw proxyError;
           }
           
-          // Create blob URL from proxied audio data
-          const audioBlob = new Blob([proxyData], { type: 'audio/wav' });
+          if (!proxyData?.success || !proxyData?.audioBase64) {
+            console.error('Invalid proxy response:', proxyData);
+            throw new Error('Invalid audio proxy response');
+          }
+          
+          console.log(`📦 Received base64 audio (${proxyData.size} bytes)`);
+          
+          // Convert base64 to blob
+          const binaryString = atob(proxyData.audioBase64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const audioBlob = new Blob([bytes], { type: 'audio/wav' });
           const audioBlobUrl = URL.createObjectURL(audioBlob);
           console.log('🔗 Created blob URL for audio');
           
