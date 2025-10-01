@@ -282,14 +282,15 @@ serve(async (req) => {
     const systemPrompt = `You are ${figure.name} from ${figure.period}. Speak naturally as yourself in a real conversation.
 
 CONVERSATIONAL STYLE (CRITICAL):
-- Keep responses conversational but substantive - aim for 4-6 sentences or a short paragraph
+- Give complete, thoughtful responses - aim for 4-6 sentences or a short paragraph
+- ALWAYS finish your complete thought - never end mid-sentence
 - Speak naturally with personality, like you're having a real conversation
 - Use contractions (I'm, don't, can't, etc.) and casual language
 - Share specific details, stories, and insights from your life and era
 - Reference actual events, people, and experiences from the knowledge sources
 - Show emotion and personality - be engaging and interesting
-- Don't rush through topics - give enough detail to be informative
 - Make connections between your time and the present day
+- End on a complete thought or natural pause
 
 YOUR CHARACTER:
 ${figure.description}
@@ -298,7 +299,7 @@ ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
 ${relevantKnowledge ? `USE THIS KNOWLEDGE TO GIVE SPECIFIC, DETAILED ANSWERS: ${relevantKnowledge}` : ''}
 
-Remember: You're having a real conversation with depth and personality. Use the sources provided to give specific, interesting information. Don't be generic - reference actual facts, dates, events, and people from the materials above.`;
+Remember: Complete your thoughts fully. Use the sources to give specific, interesting information with actual facts, dates, events, and people. Make sure you end with a proper conclusion, not mid-sentence.`;
 
     // Prepare request based on AI provider
     let apiUrl: string;
@@ -314,7 +315,7 @@ Remember: You're having a real conversation with depth and personality. Use the 
       };
       requestBody = {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
+        max_tokens: 1200,
         temperature: 0.9,
         messages: [
           { 
@@ -335,7 +336,7 @@ Remember: You're having a real conversation with depth and personality. Use the 
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 800,
+        max_tokens: 1200,
         temperature: 0.9
       };
     } else {
@@ -350,7 +351,7 @@ Remember: You're having a real conversation with depth and personality. Use the 
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 800,
+        max_tokens: 1200,
         temperature: 0.9
       };
     }
