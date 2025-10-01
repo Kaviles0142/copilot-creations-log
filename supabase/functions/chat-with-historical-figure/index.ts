@@ -20,7 +20,7 @@ serve(async (req) => {
     const figure = body.figure;
     const context = body.context;
     const conversationId = body.conversationId;
-    const aiProvider = body.aiProvider || 'openai'; // Default to OpenAI
+    const aiProvider = body.aiProvider || 'grok'; // Default to Grok
     
     if (!message || !figure) {
       console.log('Missing parameters:', { message: !!message, figure: !!figure });
@@ -67,7 +67,7 @@ serve(async (req) => {
               .from('books')
               .select('title, authors, description')
               .eq('figure_id', figure.id)
-              .limit(5); // Maximum books for comprehensive context
+              .limit(3); // Reduced from 5 for speed
 
             if (books && books.length > 0) {
               sourcesUsed.books = books.length;
@@ -75,7 +75,7 @@ serve(async (req) => {
               books.forEach(book => {
                 booksText += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
                 if (book.description) {
-                  booksText += `  ${book.description.substring(0, 200)}...\n`;
+                  booksText += `  ${book.description}\n`;
                 }
               });
               return booksText;
@@ -93,7 +93,7 @@ serve(async (req) => {
               .from('documents')
               .select('filename, parsed_content')
               .eq('conversation_id', conversationId)
-              .limit(5); // Maximum documents
+              .limit(2); // Reduced from 3
 
             if (documents && documents.length > 0) {
               sourcesUsed.documents = documents.length;
@@ -101,7 +101,7 @@ serve(async (req) => {
               documents.forEach(doc => {
                 docsText += `- ${doc.filename}\n`;
                 if (doc.parsed_content) {
-                  docsText += `  ${doc.parsed_content.substring(0, 1000)}...\n`; // Increased to 1000 chars
+                  docsText += `  ${doc.parsed_content.substring(0, 200)}...\n`;
                 }
               });
               return docsText;
@@ -118,7 +118,7 @@ serve(async (req) => {
             const youtubeResponse = await supabase.functions.invoke('youtube-search', {
               body: { 
                 query: `${figure.name} speech interview`,
-                maxResults: 5 // Maximum YouTube videos
+                maxResults: 2 // Reduced from 3
               }
             });
 
@@ -127,9 +127,6 @@ serve(async (req) => {
               let youtubeText = '\n\n🎥 YOUTUBE:\n';
               youtubeResponse.data.results.forEach((video: any) => {
                 youtubeText += `- "${video.title}"\n`;
-                if (video.description) {
-                  youtubeText += `  ${video.description.substring(0, 500)}...\n`; // Add descriptions
-                }
               });
               return youtubeText;
             }
@@ -148,7 +145,7 @@ serve(async (req) => {
 
             if (wikiResponse.data?.extract) {
               sourcesUsed.wikipedia = true;
-              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 2000)}...\n`; // Increased to 2000 chars
+              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 300)}...\n`;
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
@@ -163,7 +160,7 @@ serve(async (req) => {
               body: { 
                 query: `${figure.name} news 2024 2025`,
                 type: 'news',  // Use news engine
-                num: 5 // Maximum news articles
+                num: 2
               }
             });
 
@@ -172,9 +169,6 @@ serve(async (req) => {
               let eventsText = '\n\n📰 RECENT NEWS:\n';
               currentEventsResponse.data.results.forEach((result: any) => {
                 eventsText += `- ${result.title}\n`;
-                if (result.snippet) {
-                  eventsText += `  ${result.snippet.substring(0, 300)}...\n`; // Add snippets
-                }
               });
               return eventsText;
             }
@@ -191,7 +185,7 @@ serve(async (req) => {
               body: { 
                 query: `${figure.name} biography history`,
                 type: 'web',  // Use regular Google search
-                num: 5 // Maximum historical context results
+                num: 2
               }
             });
 
@@ -200,9 +194,6 @@ serve(async (req) => {
               let contextText = '\n\n📜 HISTORICAL CONTEXT:\n';
               contextResponse.data.results.forEach((result: any) => {
                 contextText += `- ${result.title}\n`;
-                if (result.snippet) {
-                  contextText += `  ${result.snippet.substring(0, 300)}...\n`; // Add snippets
-                }
               });
               return contextText;
             }
@@ -219,7 +210,7 @@ serve(async (req) => {
               body: { 
                 query: `${figure.name} analysis profile`,
                 type: 'web',  // Use regular Google search
-                num: 5 // Maximum web articles
+                num: 2
               }
             });
 
@@ -229,7 +220,7 @@ serve(async (req) => {
               articlesResponse.data.results.forEach((result: any) => {
                 articlesText += `- ${result.title}\n`;
                 if (result.snippet) {
-                  articlesText += `  ${result.snippet.substring(0, 500)}...\n`; // Increased to 500 chars
+                  articlesText += `  ${result.snippet.substring(0, 150)}...\n`;
                 }
               });
               return articlesText;

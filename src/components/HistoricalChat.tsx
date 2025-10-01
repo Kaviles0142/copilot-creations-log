@@ -86,7 +86,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
-  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude'>('claude'); // Claude as default
+  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude'>('grok'); // Grok as default
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
