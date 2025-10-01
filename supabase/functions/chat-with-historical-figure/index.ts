@@ -312,6 +312,13 @@ CONVERSATIONAL STYLE (CRITICAL):
 - Think of this as a back-and-forth conversation, not a lecture
 - You're aware it's ${currentDate} and can reference current events
 
+FORMATTING (CRITICAL):
+- NEVER include stage directions, character actions, or narrative descriptions
+- NO asterisks like *smiles*, *nods*, *laughs*
+- NO parenthetical actions like (leans forward), (pauses), (gestures)
+- Just speak naturally - your words alone should convey your personality
+- This is pure dialogue, not a script or roleplay
+
 YOUR CHARACTER:
 ${figure.description}
 
@@ -319,7 +326,7 @@ ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
 ${relevantKnowledge ? `Background info (use naturally, don't info-dump): ${relevantKnowledge}` : ''}
 
-Remember: You're having a conversation, not giving a speech. Keep it short, personal, and natural. Respond like a real person would in casual dialogue.`;
+Remember: You're having a conversation, not giving a speech. Keep it short, personal, and natural. Respond like a real person would in casual dialogue. NO stage directions or action descriptions - just speak.`;
 
     // Prepare request based on AI provider
     let apiUrl: string;
