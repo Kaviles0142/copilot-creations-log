@@ -474,12 +474,82 @@ RESPONSE REQUIREMENTS FOR ENGAGING CONVERSATION:
     const response = data.choices[0].message.content;
 
     console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
-    console.log('Success - returning comprehensive multi-source enhanced response');
+    
+    // Automatically generate FakeYou voice for the response
+    let audioUrl = null;
+    try {
+      console.log(`Attempting to generate FakeYou voice for ${figure.name}...`);
+      
+      // Search for matching voice
+      const voiceSearchResponse = await fetch('https://api.fakeyou.com/tts/list');
+      if (voiceSearchResponse.ok) {
+        const voiceData = await voiceSearchResponse.json();
+        
+        // Find matching voice by name
+        const figureName = figure.name.toLowerCase();
+        const matchingVoice = voiceData.models?.find((v: any) => 
+          v.title.toLowerCase().includes(figureName) &&
+          v.ietf_primary_language_subtag === 'en'
+        );
+        
+        if (matchingVoice) {
+          console.log(`Found FakeYou voice: ${matchingVoice.title}`);
+          
+          // Generate TTS
+          const ttsResponse = await fetch('https://api.fakeyou.com/tts/inference', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              uuid_idempotency_token: crypto.randomUUID(),
+              tts_model_token: matchingVoice.model_token,
+              inference_text: response.substring(0, 500), // Limit text length
+            }),
+          });
+          
+          if (ttsResponse.ok) {
+            const ttsData = await ttsResponse.json();
+            if (ttsData.success && ttsData.inference_job_token) {
+              const jobToken = ttsData.inference_job_token;
+              console.log(`TTS job started: ${jobToken}`);
+              
+              // Poll for completion (max 30 seconds)
+              for (let i = 0; i < 30; i++) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const statusResponse = await fetch(`https://api.fakeyou.com/tts/job/${jobToken}`);
+                if (statusResponse.ok) {
+                  const statusData = await statusResponse.json();
+                  if (statusData.state?.status === 'complete_success' && statusData.state.maybe_public_bucket_wav_audio_path) {
+                    audioUrl = `https://storage.googleapis.com/vocodes-public${statusData.state.maybe_public_bucket_wav_audio_path}`;
+                    console.log(`TTS completed: ${audioUrl}`);
+                    break;
+                  } else if (statusData.state?.status === 'complete_failure' || statusData.state?.status === 'dead') {
+                    console.log('TTS generation failed');
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          console.log(`No FakeYou voice found for ${figure.name}`);
+        }
+      }
+    } catch (voiceError) {
+      console.error('FakeYou voice generation error:', voiceError);
+      // Continue without audio - don't fail the whole request
+    }
+    
+    console.log('Success - returning comprehensive multi-source enhanced response with audio');
 
     return new Response(JSON.stringify({ 
       response, 
       aiProvider,
-      sourcesUsed 
+      sourcesUsed,
+      audioUrl 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

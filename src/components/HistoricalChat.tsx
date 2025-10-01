@@ -505,6 +505,7 @@ const HistoricalChat = () => {
       const aiResponse = result.response || result.message || "I apologize, but I couldn't generate a proper response.";
       const usedProvider = result.aiProvider || selectedAIProvider;
       const sourcesUsed = result.sourcesUsed;
+      const audioUrl = result.audioUrl; // Get FakeYou audio URL if available
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -514,9 +515,42 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // Start TTS generation immediately in parallel with UI update
-      if (isAutoVoiceEnabled && aiResponse.length > 20) {
-        // Generate speech immediately without waiting for UI updates
+      // If FakeYou audio is available, play it automatically
+      if (audioUrl && isAutoVoiceEnabled) {
+        console.log('🎙️ Playing FakeYou authentic voice:', audioUrl);
+        const audio = new Audio(audioUrl);
+        audio.onloadeddata = () => {
+          console.log('✅ FakeYou audio loaded, playing...');
+          audio.play().then(() => {
+            setIsPlayingAudio(true);
+            setCurrentAudio(audio);
+            console.log('🔊 FakeYou audio playing');
+          }).catch(err => {
+            console.error('Failed to play FakeYou audio:', err);
+            // Fallback to standard TTS
+            if (aiResponse.length > 20) {
+              generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
+                console.error('Speech generation failed:', speechError);
+              });
+            }
+          });
+        };
+        audio.onerror = () => {
+          console.error('Failed to load FakeYou audio');
+          // Fallback to standard TTS
+          if (aiResponse.length > 20) {
+            generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
+              console.error('Speech generation failed:', speechError);
+            });
+          }
+        };
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+          setCurrentAudio(null);
+        };
+      } else if (isAutoVoiceEnabled && aiResponse.length > 20) {
+        // No FakeYou audio available, use standard TTS
+        console.log('🔊 No FakeYou audio, using standard TTS');
         generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
           console.error('Speech generation failed:', speechError);
         });
