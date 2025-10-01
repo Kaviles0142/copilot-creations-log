@@ -606,6 +606,12 @@ const HistoricalChat = () => {
       console.log('🎤 Generating FakeYou voice for:', figure.name);
       setIsPlayingAudio(true);
       
+      toast({
+        title: "Generating authentic voice",
+        description: `Finding ${figure.name}'s voice on FakeYou...`,
+        duration: 3000,
+      });
+      
       // Step 1: Search for the figure's voice on FakeYou
       const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
         body: { 
@@ -613,47 +619,118 @@ const HistoricalChat = () => {
         },
       });
       
-      if (voicesError) throw voicesError;
-      if (!voicesData.success) throw new Error('Failed to fetch voices');
+      if (voicesError) {
+        console.error('Voice list fetch error:', voicesError);
+        throw voicesError;
+      }
+      if (!voicesData.success) {
+        console.error('Voice list fetch failed:', voicesData);
+        throw new Error('Failed to fetch voices');
+      }
       
-      // Step 2: Find matching voice
+      console.log(`✅ Fetched ${voicesData.voices?.length || 0} voices from FakeYou`);
+      
+      // Step 2: Smart name matching with variations
       const figureName = figure.name.toLowerCase();
-      const nameVariations = [
+      const nameWithoutPunctuation = figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
+      const nameWords = nameWithoutPunctuation.split(' ').filter((w: string) => w.length > 0);
+      const lastName = nameWords.length > 0 ? nameWords[nameWords.length - 1] : '';
+      const firstName = nameWords.length > 0 ? nameWords[0] : '';
+      
+      // Common name variations and abbreviations
+      const nameVariations: Record<string, string[]> = {
+        'john f kennedy': ['jfk', 'kennedy', 'john f kennedy', 'john kennedy', 'president kennedy'],
+        'martin luther king jr': ['mlk', 'martin luther king', 'dr king', 'king jr', 'martin luther king jr'],
+        'franklin d roosevelt': ['fdr', 'franklin roosevelt', 'roosevelt', 'president roosevelt'],
+        'winston churchill': ['churchill', 'winston', 'winston churchill', 'sir winston'],
+        'abraham lincoln': ['lincoln', 'abe lincoln', 'president lincoln', 'abraham lincoln'],
+        'albert einstein': ['einstein', 'albert einstein'],
+        'william shakespeare': ['shakespeare', 'william shakespeare', 'bard'],
+        'napoleon bonaparte': ['napoleon', 'bonaparte'],
+        'cleopatra': ['cleopatra', 'cleopatra vii'],
+        'leonardo da vinci': ['leonardo', 'da vinci', 'leonardo da vinci'],
+        'marie curie': ['marie curie', 'curie'],
+        'nikola tesla': ['tesla', 'nikola tesla'],
+        'george washington': ['washington', 'george washington', 'president washington'],
+        'julius caesar': ['caesar', 'julius caesar'],
+      };
+      
+      const searchTerms = nameVariations[nameWithoutPunctuation] || [
         figureName,
-        figureName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ''),
-        'jfk',
-        'kennedy'
+        nameWithoutPunctuation,
+        lastName,
+        firstName,
+        `${firstName} ${lastName}`,
+        ...nameWords.filter(w => w.length > 3) // Include significant words
       ];
       
-      const matchingVoice = voicesData.voices?.find((v: any) => 
-        nameVariations.some((term: string) => v.title.toLowerCase().includes(term))
-      );
+      console.log(`🔍 Searching FakeYou for: ${searchTerms.join(', ')}`);
+      
+      // Find matching voice using flexible search
+      const matchingVoice = voicesData.voices?.find((v: any) => {
+        const voiceTitle = v.title.toLowerCase();
+        return searchTerms.some((term: string) => {
+          // Check if voice title contains the search term
+          if (voiceTitle.includes(term)) {
+            console.log(`✓ Match found: "${v.title}" contains "${term}"`);
+            return true;
+          }
+          return false;
+        });
+      });
       
       if (!matchingVoice) {
-        console.log('❌ No FakeYou voice found for', figure.name);
+        console.log('❌ No FakeYou voice found. Tried:', searchTerms);
+        toast({
+          title: "Voice not found",
+          description: `No authentic voice available for ${figure.name}. Using fallback.`,
+          variant: "destructive",
+          duration: 4000,
+        });
         throw new Error('Voice not found');
       }
       
-      console.log('✅ Found voice:', matchingVoice.title);
+      console.log(`✅ Found FakeYou voice: "${matchingVoice.title}"`);
+      toast({
+        title: "Voice found!",
+        description: `Using "${matchingVoice.title}" voice`,
+        duration: 2000,
+      });
       
       // Step 3: Generate TTS
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
         body: {
           action: 'generate_tts',
-          text: text.substring(0, 500),
+          text: text.substring(0, 500), // Limit to 500 chars for faster generation
           voiceToken: matchingVoice.voiceToken,
         },
       });
       
-      if (ttsError) throw ttsError;
-      if (!ttsData.success) throw new Error('TTS generation failed');
+      if (ttsError) {
+        console.error('TTS generation request error:', ttsError);
+        throw ttsError;
+      }
+      if (!ttsData.success) {
+        console.error('TTS generation failed:', ttsData);
+        throw new Error('TTS generation failed');
+      }
       
       const jobToken = ttsData.jobToken;
       console.log('🔄 TTS job started:', jobToken);
       
-      // Step 4: Poll for completion
-      for (let i = 0; i < 30; i++) {
+      toast({
+        title: "Generating speech",
+        description: "This may take 10-30 seconds...",
+        duration: 3000,
+      });
+      
+      // Step 4: Poll for completion with progress feedback
+      let pollCount = 0;
+      const maxPolls = 40; // 40 seconds max
+      
+      for (let i = 0; i < maxPolls; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
+        pollCount++;
         
         const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
           body: {
@@ -662,50 +739,92 @@ const HistoricalChat = () => {
           },
         });
         
-        if (statusError) throw statusError;
-        if (!statusData.success) throw new Error('Status check failed');
+        if (statusError) {
+          console.error('Status check error:', statusError);
+          throw statusError;
+        }
+        if (!statusData.success) {
+          console.error('Status check failed:', statusData);
+          throw new Error('Status check failed');
+        }
         
-        console.log(`Checking status (${i + 1}/30):`, statusData.status);
+        console.log(`⏳ Polling (${pollCount}/${maxPolls}): ${statusData.status}`);
+        
+        // Show progress every 5 seconds
+        if (pollCount % 5 === 0) {
+          toast({
+            title: "Still generating",
+            description: `${pollCount} seconds elapsed...`,
+            duration: 2000,
+          });
+        }
         
         if (statusData.isComplete && statusData.audioUrl) {
           console.log('✅ FakeYou audio ready:', statusData.audioUrl);
           
+          toast({
+            title: "Voice ready!",
+            description: `Playing ${figure.name}'s authentic voice`,
+            duration: 2000,
+          });
+          
           // Play the audio
           const audio = new Audio(statusData.audioUrl);
+          
           audio.onloadeddata = () => {
+            console.log('📡 Audio loaded, starting playback');
             audio.play().then(() => {
               setCurrentAudio(audio);
-              console.log('🔊 Playing FakeYou voice');
+              console.log('🔊 FakeYou voice playing');
             }).catch(err => {
-              console.error('Failed to play audio:', err);
+              console.error('❌ Audio playback failed:', err);
               setIsPlayingAudio(false);
               throw err;
             });
           };
-          audio.onerror = () => {
-            console.error('Failed to load audio');
+          
+          audio.onerror = (e) => {
+            console.error('❌ Audio load failed:', e);
             setIsPlayingAudio(false);
+            toast({
+              title: "Audio playback error",
+              description: "Failed to load audio file",
+              variant: "destructive",
+            });
             throw new Error('Audio load failed');
           };
+          
           audio.onended = () => {
+            console.log('✅ Audio playback completed');
             setIsPlayingAudio(false);
             setCurrentAudio(null);
           };
           
-          return;
+          return; // Success!
         }
         
         if (statusData.isFailed) {
+          console.error('❌ TTS generation failed on FakeYou servers');
           throw new Error('TTS generation failed');
         }
       }
       
-      throw new Error('TTS timeout');
+      // Timeout
+      console.error('⏱️ TTS generation timeout after', maxPolls, 'seconds');
+      throw new Error('TTS timeout - generation took too long');
       
     } catch (error) {
-      console.error('FakeYou generation failed:', error);
+      console.error('💥 FakeYou generation failed:', error);
       setIsPlayingAudio(false);
-      throw error;
+      
+      toast({
+        title: "Using fallback voice",
+        description: "FakeYou unavailable, switching to backup TTS",
+        variant: "default",
+        duration: 3000,
+      });
+      
+      throw error; // Re-throw to trigger fallback
     }
   };
 
