@@ -767,8 +767,26 @@ const HistoricalChat = () => {
             duration: 2000,
           });
           
+          // Proxy the audio through our edge function to avoid CORS issues
+          const { data: proxyData, error: proxyError } = await supabase.functions.invoke('fakeyou-tts', {
+            body: {
+              action: 'proxy_audio',
+              audioUrl: statusData.audioUrl,
+            },
+          });
+          
+          if (proxyError) {
+            console.error('Audio proxy error:', proxyError);
+            throw proxyError;
+          }
+          
+          // Create blob URL from proxied audio data
+          const audioBlob = new Blob([proxyData], { type: 'audio/wav' });
+          const audioBlobUrl = URL.createObjectURL(audioBlob);
+          console.log('🔗 Created blob URL for audio');
+          
           // Play the audio
-          const audio = new Audio(statusData.audioUrl);
+          const audio = new Audio(audioBlobUrl);
           
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback');
@@ -798,6 +816,8 @@ const HistoricalChat = () => {
             console.log('✅ Audio playback completed');
             setIsPlayingAudio(false);
             setCurrentAudio(null);
+            // Clean up blob URL to avoid memory leaks
+            URL.revokeObjectURL(audioBlobUrl);
           };
           
           return; // Success!

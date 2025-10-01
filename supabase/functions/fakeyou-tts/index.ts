@@ -49,6 +49,13 @@ serve(async (req) => {
         }
         return await checkJobStatus(jobToken);
       
+      case 'proxy_audio':
+        const { audioUrl } = await req.json();
+        if (!audioUrl) {
+          throw new Error('Missing audioUrl for proxy');
+        }
+        return await proxyAudio(audioUrl);
+      
       case 'sync_voices':
         return await syncVoicesToDatabase(figureName);
       
@@ -268,6 +275,33 @@ async function checkJobStatus(jobToken: string) {
     );
   } catch (error) {
     console.error('💥 checkJobStatus failed:', error);
+    throw error;
+  }
+}
+
+async function proxyAudio(audioUrl: string) {
+  console.log(`🎵 Proxying audio from: ${audioUrl}`);
+  
+  try {
+    const response = await fetch(audioUrl);
+    
+    if (!response.ok) {
+      console.error(`❌ Failed to fetch audio: ${response.status}`);
+      throw new Error(`Failed to fetch audio: ${response.status}`);
+    }
+    
+    const audioData = await response.arrayBuffer();
+    console.log(`✅ Audio fetched successfully (${audioData.byteLength} bytes)`);
+    
+    return new Response(audioData, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'audio/wav',
+        'Content-Length': audioData.byteLength.toString(),
+      },
+    });
+  } catch (error) {
+    console.error('💥 proxyAudio failed:', error);
     throw error;
   }
 }
