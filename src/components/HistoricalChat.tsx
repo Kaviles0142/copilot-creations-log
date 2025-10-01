@@ -601,56 +601,17 @@ const HistoricalChat = () => {
     }
   };
 
-  // Helper function to chunk text for 10-second limit (~25 words = ~10 seconds)
-  const chunkTextForFakeYou = (text: string, maxWords: number = 25): string[] => {
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-    const chunks: string[] = [];
-    let currentChunk = '';
-    let wordCount = 0;
-
-    for (const sentence of sentences) {
-      const sentenceWords = sentence.trim().split(/\s+/).length;
-      
-      if (wordCount + sentenceWords <= maxWords) {
-        currentChunk += sentence;
-        wordCount += sentenceWords;
-      } else {
-        if (currentChunk) {
-          chunks.push(currentChunk.trim());
-        }
-        currentChunk = sentence;
-        wordCount = sentenceWords;
-      }
-    }
-
-    if (currentChunk) {
-      chunks.push(currentChunk.trim());
-    }
-
-    return chunks.length > 0 ? chunks : [text];
-  };
-
   const generateFakeYouVoice = async (text: string, figure: HistoricalFigure) => {
     try {
       console.log('🎤 Generating FakeYou voice for:', figure.name);
       
-      // Chunk text for 10-second limit
-      const textChunks = chunkTextForFakeYou(text);
-      const chunkCount = textChunks.length;
-      
-      if (chunkCount > 1) {
-        console.log(`📝 Split into ${chunkCount} chunks for 10-second limit`);
-      }
-      
       toast({
         title: "Preparing voice response",
-        description: chunkCount > 1 
-          ? `Generating ${chunkCount} audio segments...`
-          : `Cloning ${figure.name}'s voice - this takes about 10-15 seconds...`,
+        description: `Cloning ${figure.name}'s voice - this takes about 10-15 seconds...`,
         duration: 4000,
       });
       
-      // Step 1: Search for the figure's voice on FakeYou (only once)
+      // Step 1: Search for the figure's voice on FakeYou
       const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
         body: { 
           action: 'list_voices',
@@ -756,147 +717,137 @@ const HistoricalChat = () => {
         duration: 2000,
       });
       
-      // Step 3: Generate and play each chunk sequentially
-      const audioUrls: string[] = [];
+      // Step 3: Generate TTS
+      const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
+        body: {
+          action: 'generate_tts',
+          text: text.substring(0, 2000), // Increased limit for longer responses
+          voiceToken: matchingVoice.voiceToken,
+        },
+      });
       
-      for (let chunkIndex = 0; chunkIndex < textChunks.length; chunkIndex++) {
-        const chunk = textChunks[chunkIndex];
+      if (ttsError) {
+        console.error('TTS generation request error:', ttsError);
+        throw ttsError;
+      }
+      if (!ttsData.success) {
+        console.error('TTS generation failed:', ttsData);
+        throw new Error('TTS generation failed');
+      }
+      
+      const jobToken = ttsData.jobToken;
+      console.log('🔄 TTS job started:', jobToken);
+      
+      toast({
+        title: "Generating speech",
+        description: "This may take 10-30 seconds...",
+        duration: 3000,
+      });
+      
+      // Step 4: Poll for completion with progress feedback
+      let pollCount = 0;
+      const maxPolls = 40; // 40 seconds max
+      
+      for (let i = 0; i < maxPolls; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        pollCount++;
         
-        console.log(`🎤 Generating chunk ${chunkIndex + 1}/${chunkCount}: "${chunk.substring(0, 30)}..."`);
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
+          body: {
+            action: 'check_status',
+            jobToken: jobToken,
+          },
+        });
         
-        if (chunkCount > 1) {
+        if (statusError) {
+          console.error('Status check error:', statusError);
+          throw statusError;
+        }
+        if (!statusData.success) {
+          console.error('Status check failed:', statusData);
+          throw new Error('Status check failed');
+        }
+        
+        console.log(`⏳ Polling (${pollCount}/${maxPolls}): ${statusData.status}`);
+        
+        // Show progress every 5 seconds
+        if (pollCount % 5 === 0) {
           toast({
-            title: `Generating part ${chunkIndex + 1}/${chunkCount}`,
-            description: "Please wait...",
+            title: "Still generating",
+            description: `${pollCount} seconds elapsed...`,
             duration: 2000,
           });
         }
         
-        const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
-          body: {
-            action: 'generate_tts',
-            text: chunk,
-            voiceToken: matchingVoice.voiceToken,
-          },
-        });
-        
-        if (ttsError) {
-          console.error('TTS generation request error:', ttsError);
-          throw ttsError;
+        if (statusData.isComplete && statusData.audioUrl) {
+          console.log('✅ FakeYou audio ready:', statusData.audioUrl);
+          
+          // Convert old Google Storage URLs to new CDN-2 format
+          let audioUrl = statusData.audioUrl;
+          if (audioUrl.includes('storage.googleapis.com/vocodes-public')) {
+            audioUrl = audioUrl.replace('https://storage.googleapis.com/vocodes-public', 'https://cdn-2.fakeyou.com');
+            console.log('🔄 Converted to CDN URL:', audioUrl);
+          }
+          
+          toast({
+            title: "Voice ready!",
+            description: `Playing ${figure.name}'s authentic voice`,
+            duration: 2000,
+          });
+          
+          // Try direct access to cdn-2.fakeyou.com URLs
+          console.log('🎵 Final Audio URL:', audioUrl);
+          console.log('🔗 Attempting direct audio access...');
+          
+          const audio = new Audio();
+          audio.crossOrigin = 'anonymous';
+          audio.src = audioUrl;
+          
+          // Slow down playback for more natural, conversational pacing
+          audio.playbackRate = 0.85;
+          
+          audio.onloadeddata = () => {
+            console.log('📡 Audio loaded, starting playback at 0.85x speed for natural conversation');
+            audio.play().then(() => {
+              setIsPlayingAudio(true);
+              setCurrentAudio(audio);
+              console.log('🔊 FakeYou voice playing');
+            }).catch(err => {
+              console.error('❌ Audio playback failed:', err);
+              setIsPlayingAudio(false);
+              throw err;
+            });
+          };
+          
+          audio.onerror = (e) => {
+            console.error('❌ Audio load failed:', e);
+            setIsPlayingAudio(false);
+            
+            toast({
+              title: "Audio playback error",
+              description: "Failed to load audio file",
+              variant: "destructive",
+            });
+          };
+          
+          audio.onended = () => {
+            console.log('✅ Audio playback completed');
+            setIsPlayingAudio(false);
+            setCurrentAudio(null);
+          };
+          
+          return; // Success!
         }
-        if (!ttsData.success) {
-          console.error('TTS generation failed:', ttsData);
+        
+        if (statusData.isFailed) {
+          console.error('❌ TTS generation failed on FakeYou servers');
           throw new Error('TTS generation failed');
         }
-        
-        const jobToken = ttsData.jobToken;
-        console.log(`🔄 TTS job ${chunkIndex + 1} started:`, jobToken);
-        
-        // Poll for completion
-        let pollCount = 0;
-        const maxPolls = 40;
-        let audioUrl: string | null = null;
-        
-        for (let i = 0; i < maxPolls; i++) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          pollCount++;
-          
-          const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
-            body: {
-              action: 'check_status',
-              jobToken: jobToken,
-            },
-          });
-          
-          if (statusError) {
-            console.error('Status check error:', statusError);
-            throw statusError;
-          }
-          if (!statusData.success) {
-            console.error('Status check failed:', statusData);
-            throw new Error('Status check failed');
-          }
-          
-          console.log(`⏳ Chunk ${chunkIndex + 1} polling (${pollCount}/${maxPolls}): ${statusData.status}`);
-          
-          if (statusData.isComplete && statusData.audioUrl) {
-            audioUrl = statusData.audioUrl;
-            if (audioUrl.includes('storage.googleapis.com/vocodes-public')) {
-              audioUrl = audioUrl.replace('https://storage.googleapis.com/vocodes-public', 'https://cdn-2.fakeyou.com');
-            }
-            console.log(`✅ Chunk ${chunkIndex + 1} audio ready:`, audioUrl);
-            break;
-          }
-          
-          if (statusData.isFailed) {
-            console.error(`❌ TTS generation failed for chunk ${chunkIndex + 1}`);
-            throw new Error('TTS generation failed');
-          }
-        }
-        
-        if (!audioUrl) {
-          console.error(`⏱️ Chunk ${chunkIndex + 1} timeout`);
-          throw new Error('TTS timeout - generation took too long');
-        }
-        
-        audioUrls.push(audioUrl);
       }
       
-      // Step 4: Play all chunks sequentially
-      console.log(`🎵 Playing ${audioUrls.length} audio chunks sequentially`);
-      
-      toast({
-        title: "Voice ready!",
-        description: chunkCount > 1 
-          ? `Playing ${chunkCount} segments...`
-          : `Playing ${figure.name}'s authentic voice`,
-        duration: 2000,
-      });
-      
-      // Play chunks one after another
-      let currentChunkIndex = 0;
-      
-      const playNextChunk = () => {
-        if (currentChunkIndex >= audioUrls.length) {
-          console.log('✅ All audio chunks completed');
-          setIsPlayingAudio(false);
-          setCurrentAudio(null);
-          return;
-        }
-        
-        const audioUrl = audioUrls[currentChunkIndex];
-        console.log(`🔊 Playing chunk ${currentChunkIndex + 1}/${audioUrls.length}`);
-        
-        const audio = new Audio();
-        audio.crossOrigin = 'anonymous';
-        audio.src = audioUrl;
-        audio.playbackRate = 0.85;
-        
-        audio.onloadeddata = () => {
-          audio.play().then(() => {
-            setIsPlayingAudio(true);
-            setCurrentAudio(audio);
-          }).catch(err => {
-            console.error(`❌ Chunk ${currentChunkIndex + 1} playback failed:`, err);
-            currentChunkIndex++;
-            playNextChunk();
-          });
-        };
-        
-        audio.onerror = (e) => {
-          console.error(`❌ Chunk ${currentChunkIndex + 1} load failed:`, e);
-          currentChunkIndex++;
-          playNextChunk();
-        };
-        
-        audio.onended = () => {
-          console.log(`✅ Chunk ${currentChunkIndex + 1} completed`);
-          currentChunkIndex++;
-          playNextChunk();
-        };
-      };
-      
-      playNextChunk();
+      // Timeout
+      console.error('⏱️ TTS generation timeout after', maxPolls, 'seconds');
+      throw new Error('TTS timeout - generation took too long');
       
     } catch (error) {
       console.error('💥 FakeYou generation failed:', error);
