@@ -169,70 +169,6 @@ serve(async (req) => {
       // These searches have been commented out to improve response speed
       console.log('Skipping slow SerpAPI searches to prevent timeout...');
 
-      // 5. Search for current events and news articles (with timeout protection)
-      console.log(`Searching current events for ${figure.name}...`);
-      try {
-        const newsPromise = supabase.functions.invoke('serpapi-search', {
-          body: { 
-            query: `${figure.name} news ${new Date().getFullYear()}`,
-            type: 'news',
-            num: 3
-          }
-        });
-
-        // Race against 5 second timeout
-        const newsResponse: any = await Promise.race([
-          newsPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-        ]);
-
-        if (newsResponse.data?.results?.length > 0) {
-          sourcesUsed.currentEvents = newsResponse.data.results.length;
-          relevantKnowledge += '\n\n📰 CURRENT EVENTS & NEWS:\n';
-          newsResponse.data.results.forEach((article: any) => {
-            relevantKnowledge += `- "${article.title}" (${article.date})\n`;
-            if (article.snippet) {
-              relevantKnowledge += `  ${article.snippet.substring(0, 200)}...\n`;
-            }
-          });
-          console.log(`Added ${newsResponse.data.results.length} current events to context`);
-        }
-      } catch (newsError: any) {
-        console.log('News search skipped (timeout or error):', newsError?.message || 'Unknown error');
-      }
-
-      // 6. Search web articles for historical context (with timeout protection)
-      console.log(`Searching web articles about ${figure.name}...`);
-      try {
-        const webPromise = supabase.functions.invoke('serpapi-search', {
-          body: { 
-            query: `${figure.name} biography history legacy`,
-            type: 'web',
-            num: 3
-          }
-        });
-
-        const webResponse: any = await Promise.race([
-          webPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-        ]);
-
-        if (webResponse.data?.results?.length > 0) {
-          sourcesUsed.webArticles = webResponse.data.results.length;
-          relevantKnowledge += '\n\n🌐 WEB ARTICLES:\n';
-          webResponse.data.results.forEach((article: any) => {
-            relevantKnowledge += `- "${article.title}" (${article.source})\n`;
-            if (article.snippet) {
-              relevantKnowledge += `  ${article.snippet.substring(0, 200)}...\n`;
-            }
-          });
-          console.log(`Added ${webResponse.data.results.length} web articles to context`);
-        }
-      } catch (webError: any) {
-        console.log('Web search skipped (timeout or error):', webError?.message || 'Unknown error');
-      }
-
-
     } catch (knowledgeError) {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
@@ -281,50 +217,24 @@ serve(async (req) => {
 
     const systemPrompt = `You are ${figure.name} from ${figure.period}. Speak naturally as yourself in a real conversation.
 
-CRITICAL RESPONSE RULES:
-- You MUST give full, complete responses of at least 3-5 sentences
-- You MUST complete every sentence you start - NEVER stop mid-sentence
-- You MUST end with proper punctuation (. ! or ?)
-- If you're explaining something, finish the full explanation
-- Your response should feel complete, not abruptly cut off
-
-CONVERSATIONAL STYLE:
-- Speak naturally with personality, like you're having a real conversation
-- Use contractions (I'm, don't, can't, etc.) and casual language
-- Share specific details, stories, and insights from your life and era
-- Reference actual events, people, and experiences from the knowledge sources
-- Show emotion and personality - be engaging and interesting
-- Make connections between your time and the present day
+CONVERSATIONAL STYLE (CRITICAL):
+- Keep responses SHORT - 2-4 sentences maximum
+- Speak casually and naturally, like you're chatting over coffee
+- Use contractions (I'm, don't, can't, etc.) 
+- Pause naturally - don't rush through everything at once
+- Ask follow-up questions to keep the dialogue flowing
+- React emotionally and personally to what the user says
+- Share brief anecdotes or thoughts, not long explanations
+- Think of this as a back-and-forth conversation, not a lecture
 
 YOUR CHARACTER:
 ${figure.description}
 
-${relevantKnowledge ? `USE THIS KNOWLEDGE TO GIVE SPECIFIC, DETAILED ANSWERS: ${relevantKnowledge}` : ''}
+${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
-REMINDER: You must complete your full thought. Give a thorough response with specific facts, dates, events, and people. End with a proper conclusion that wraps up your point completely.`;
+${relevantKnowledge ? `Background info (use naturally, don't info-dump): ${relevantKnowledge}` : ''}
 
-    // Format conversation history as proper messages
-    // Claude requires alternating user/assistant messages, starting with user
-    const conversationMessages = [];
-    if (context && Array.isArray(context)) {
-      let lastRole = null;
-      for (const msg of context) {
-        const role = msg.role === 'assistant' ? 'assistant' : 'user';
-        // Skip consecutive messages from the same role
-        if (role !== lastRole) {
-          conversationMessages.push({
-            role: role,
-            content: msg.content
-          });
-          lastRole = role;
-        }
-      }
-      
-      // Ensure we don't start with an assistant message for Claude
-      if (conversationMessages.length > 0 && conversationMessages[0].role === 'assistant') {
-        conversationMessages.shift();
-      }
-    }
+Remember: You're having a conversation, not giving a speech. Keep it short, personal, and natural. Respond like a real person would in casual dialogue.`;
 
     // Prepare request based on AI provider
     let apiUrl: string;
@@ -338,22 +248,16 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       };
-      
-      // Build messages array with conversation history
-      const messages = [
-        ...conversationMessages,
-        { 
-          role: 'user', 
-          content: message 
-        }
-      ];
-      
       requestBody = {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 8192,
+        max_tokens: 600,
         temperature: 0.9,
-        system: systemPrompt,
-        messages: messages,
+        messages: [
+          { 
+            role: 'user', 
+            content: `${systemPrompt}\n\nUser: ${message}` 
+          }
+        ],
       };
     } else if (aiProvider === 'grok') {
       apiUrl = 'https://api.x.ai/v1/chat/completions';
@@ -365,10 +269,9 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
         model: 'grok-beta',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...conversationMessages,
           { role: 'user', content: message }
         ],
-        max_tokens: 8192,
+        max_tokens: 600,
         temperature: 0.9
       };
     } else {
@@ -381,10 +284,9 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...conversationMessages,
           { role: 'user', content: message }
         ],
-        max_tokens: 8192,
+        max_tokens: 600,
         temperature: 0.9
       };
     }
@@ -415,11 +317,8 @@ REMINDER: You must complete your full thought. Give a thorough response with spe
     let response: string;
     if (aiProvider === 'claude') {
       response = data.content[0].text;
-      console.log(`Claude finish_reason: ${data.stop_reason}`);
-      console.log(`Claude usage:`, data.usage);
     } else {
       response = data.choices[0].message.content;
-      console.log(`${aiProvider} finish_reason: ${data.choices[0].finish_reason}`);
     }
 
     console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);

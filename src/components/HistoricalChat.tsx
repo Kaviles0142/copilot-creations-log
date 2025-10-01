@@ -718,27 +718,10 @@ const HistoricalChat = () => {
       });
       
       // Step 3: Generate TTS
-      // FakeYou has a strict character limit - truncate to 800 chars max at sentence boundary
-      let ttsText = text;
-      if (text.length > 800) {
-        const truncated = text.substring(0, 800);
-        const lastPeriod = truncated.lastIndexOf('.');
-        const lastQuestion = truncated.lastIndexOf('?');
-        const lastExclamation = truncated.lastIndexOf('!');
-        const lastSentence = Math.max(lastPeriod, lastQuestion, lastExclamation);
-        if (lastSentence > 600) {
-          ttsText = truncated.substring(0, lastSentence + 1);
-        } else {
-          ttsText = truncated;
-        }
-        
-        console.log(`⚠️ Text truncated for FakeYou: ${text.length} → ${ttsText.length} characters`);
-      }
-      
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
         body: {
           action: 'generate_tts',
-          text: ttsText,
+          text: text.substring(0, 500), // Limit to 500 chars for faster generation
           voiceToken: matchingVoice.voiceToken,
         },
       });
@@ -821,7 +804,7 @@ const HistoricalChat = () => {
           audio.src = audioUrl;
           
           // Slow down playback for more natural, conversational pacing
-          audio.playbackRate = 0.80;
+          audio.playbackRate = 0.85;
           
           audio.onloadeddata = () => {
             console.log('📡 Audio loaded, starting playback at 0.85x speed for natural conversation');
@@ -1051,8 +1034,6 @@ const HistoricalChat = () => {
         'abraham-lincoln': 'Bill',          // Deep, resonant voice for Lincoln
         'winston-churchill': 'George',      // British-accented voice
         'franklin-d-roosevelt': 'Daniel',   // Confident presidential voice
-        'donald-trump': 'Brian',            // Authoritative, confident voice
-        'trump': 'Brian',
         
         // Intellectual/Scientific - Thoughtful, measured voices  
         'albert-einstein': 'Eric',          // Intellectual, slightly accented
