@@ -20,7 +20,7 @@ serve(async (req) => {
     const figure = body.figure;
     const context = body.context;
     const conversationId = body.conversationId;
-    const aiProvider = body.aiProvider || 'openai'; // Default to OpenAI
+    const aiProvider = body.aiProvider || 'grok'; // Default to Grok
     
     if (!message || !figure) {
       console.log('Missing parameters:', { message: !!message, figure: !!figure });
