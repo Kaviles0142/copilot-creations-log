@@ -103,6 +103,14 @@ serve(async (req) => {
         }
         return await listVoices(undefined, figureName);
       
+      case 'multi_search_voices':
+        // Multi-term search for better voice discovery
+        const { searchTerms } = await req.json();
+        if (!searchTerms || !Array.isArray(searchTerms)) {
+          throw new Error('Missing searchTerms array for multi-search');
+        }
+        return await multiSearchVoices(searchTerms);
+      
       case 'generate_tts':
         if (!text || !voiceToken) {
           throw new Error('Missing text or voiceToken for TTS generation');
@@ -141,6 +149,78 @@ serve(async (req) => {
     );
   }
 });
+
+async function multiSearchVoices(searchTerms: string[]) {
+  console.log(`🔍 Multi-search with ${searchTerms.length} terms: ${searchTerms.join(', ')}`);
+  
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${FAKEYOU_API_BASE}/v1/weights/list?weight_category=text_to_speech&page_size=6000`, {
+      headers,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ FakeYou API error: ${response.status} - ${errorText}`);
+      throw new Error(`Failed to fetch voices: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.success || !data.results) {
+      throw new Error('Invalid response from FakeYou API');
+    }
+    
+    let allVoices = data.results;
+    console.log(`📊 Received ${allVoices.length} total voices`);
+    
+    // Filter for English voices
+    allVoices = allVoices.filter((v: any) => v.maybe_ietf_primary_language_subtag === 'en');
+    console.log(`🌐 English voices: ${allVoices.length}`);
+    
+    // Search for all terms and deduplicate
+    const voiceMap = new Map();
+    
+    for (const term of searchTerms) {
+      const termLower = term.toLowerCase();
+      const matches = allVoices.filter((v: any) => 
+        v.title.toLowerCase().includes(termLower)
+      );
+      
+      console.log(`  📝 "${term}": found ${matches.length} matches`);
+      
+      // Add to map (deduplicates by weight_token)
+      for (const voice of matches) {
+        if (!voiceMap.has(voice.weight_token)) {
+          voiceMap.set(voice.weight_token, voice);
+        }
+      }
+    }
+    
+    const uniqueVoices = Array.from(voiceMap.values());
+    console.log(`✅ Found ${uniqueVoices.length} unique voices across all search terms`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        count: uniqueVoices.length,
+        voices: uniqueVoices.map((v: any) => ({
+          voiceToken: v.weight_token,
+          title: v.title,
+          creator: v.creator_display_name,
+          username: v.creator_username,
+          language: v.maybe_ietf_language_tag,
+        })),
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error) {
+    console.error('💥 multiSearchVoices failed:', error);
+    throw error;
+  }
+}
 
 async function listVoices(categoryFilter?: string, searchTerm?: string) {
   console.log('📋 Fetching voices from comprehensive weights endpoint...');

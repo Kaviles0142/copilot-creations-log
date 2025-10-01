@@ -230,23 +230,38 @@ const HistoricalChat = () => {
       console.log(`🔎 Search terms: ${searchTerms.join(', ')}`);
       
       // Find voices matching any search term
-      const candidateVoices = allVoices.filter((voice: any) => {
+      let candidateVoices = allVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
         return searchTerms.some(term => voiceTitle.includes(term));
       });
-      console.log(`📝 Found ${candidateVoices.length} voices containing any of: ${searchTerms.join(', ')}:`);
-      candidateVoices.forEach((v: any) => console.log(`  - "${v.title}"`));
+      console.log(`📝 Found ${candidateVoices.length} voices using simple filter`);
       
-      // DEBUG: If we only found a few, let's search all 863 for any Trump-related terms
-      if (figureName.includes('trump') && candidateVoices.length < 5) {
-        console.log('🔍 Searching ALL 863 voices for Trump-related patterns...');
-        const broadSearch = allVoices.filter((v: any) => {
-          const title = v.title.toLowerCase();
-          return title.includes('donald') || title.includes('potus') || 
-                 title.includes('president 2') || title.includes('45');
+      // For Trump, use multi-term search API for better discovery
+      if (figureName.toLowerCase().includes('trump')) {
+        console.log('🔍 Using multi-term search for Trump voices...');
+        const trumpSearchTerms = [
+          'Donald Trump',
+          'President Trump',
+          'DJT',
+          'Trump parody',
+          'Trump voice',
+          'Donald J. Trump',
+          'Trump impression',
+          'Trump impersonation'
+        ];
+        
+        const multiSearchResponse = await supabase.functions.invoke('fakeyou-tts', {
+          body: { 
+            action: 'multi_search_voices',
+            searchTerms: trumpSearchTerms
+          }
         });
-        console.log(`🔎 Found ${broadSearch.length} voices with broader Trump search:`);
-        broadSearch.forEach((v: any) => console.log(`  - "${v.title}"`));
+        
+        if (multiSearchResponse.data?.voices) {
+          candidateVoices = multiSearchResponse.data.voices;
+          console.log(`✅ Multi-search found ${candidateVoices.length} Trump voices`);
+          candidateVoices.forEach((v: any) => console.log(`  - "${v.title}"`));
+        }
       }
       
       // Filter voices
