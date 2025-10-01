@@ -304,12 +304,27 @@ ${relevantKnowledge ? `USE THIS KNOWLEDGE TO GIVE SPECIFIC, DETAILED ANSWERS: ${
 REMINDER: You must complete your full thought. Give a thorough response with specific facts, dates, events, and people. End with a proper conclusion that wraps up your point completely.`;
 
     // Format conversation history as proper messages
-    const conversationMessages = context && Array.isArray(context) 
-      ? context.map((msg: any) => ({
-          role: msg.role === 'assistant' ? 'assistant' : 'user',
-          content: msg.content
-        }))
-      : [];
+    // Claude requires alternating user/assistant messages, starting with user
+    const conversationMessages = [];
+    if (context && Array.isArray(context)) {
+      let lastRole = null;
+      for (const msg of context) {
+        const role = msg.role === 'assistant' ? 'assistant' : 'user';
+        // Skip consecutive messages from the same role
+        if (role !== lastRole) {
+          conversationMessages.push({
+            role: role,
+            content: msg.content
+          });
+          lastRole = role;
+        }
+      }
+      
+      // Ensure we don't start with an assistant message for Claude
+      if (conversationMessages.length > 0 && conversationMessages[0].role === 'assistant') {
+        conversationMessages.shift();
+      }
+    }
 
     // Prepare request based on AI provider
     let apiUrl: string;
