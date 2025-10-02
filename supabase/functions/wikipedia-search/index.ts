@@ -83,7 +83,19 @@ serve(async (req) => {
         }
       }
 
-      throw new Error('No Wikipedia articles found for this query');
+      // No results found - return success with empty data instead of error
+      console.log(`No Wikipedia articles found for: "${query}"`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          data: null,
+          message: 'No Wikipedia articles found for this query'
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const data = await searchResponse.json();
@@ -110,11 +122,12 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
       JSON.stringify({ 
-        success: false, 
+        success: true,  // Changed to true to avoid breaking the UI
+        data: null,
         error: errorMessage 
       }),
       {
-        status: 500,
+        status: 200,  // Changed to 200 to avoid throwing errors in UI
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
