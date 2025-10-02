@@ -49,6 +49,7 @@ serve(async (req) => {
       historicalContext: 0,
       webArticles: 0
     };
+    let currentEventsAvailable = false;
 
     try {
       console.log(`Searching knowledge sources for ${figure.name}...`);
@@ -64,6 +65,7 @@ serve(async (req) => {
         });
 
         if (generalNewsResponse.data?.results?.length > 0) {
+          currentEventsAvailable = true;
           sourcesUsed.currentEvents = generalNewsResponse.data.results.length;
           let eventsText = '\n\n📰 TODAY\'S TOP NEWS:\n';
           generalNewsResponse.data.results.forEach((result: any) => {
@@ -76,9 +78,13 @@ serve(async (req) => {
             }
           });
           relevantKnowledge += eventsText;
+        } else {
+          console.log('Current events search returned no results');
         }
       } catch (error) {
-        console.log('Current events search error:', error);
+        console.log('Current events search failed:', error);
+        // Add note about limited current events access
+        relevantKnowledge += '\n\n⚠️ NOTE: Real-time news search is currently unavailable. You should be honest that you may not have the latest current events information and can only reference what you know from your knowledge cutoff.\n';
       }
 
       // PRIORITY 2: Wikipedia and Books (parallel, lower rate limit impact)
