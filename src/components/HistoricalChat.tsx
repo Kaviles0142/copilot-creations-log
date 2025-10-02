@@ -93,6 +93,7 @@ const HistoricalChat = () => {
   const [availableFakeYouVoices, setAvailableFakeYouVoices] = useState<any[]>([]);
   const [selectedFakeYouVoice, setSelectedFakeYouVoice] = useState<any | null>(null);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
+  const [combinedVoiceList, setCombinedVoiceList] = useState<any[]>([]); // Combined FakeYou + ElevenLabs
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -254,11 +255,30 @@ const HistoricalChat = () => {
       console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
       console.log('📝 All voices:', matchingVoices.map(v => v.title));
       
-      setAvailableFakeYouVoices(matchingVoices);
+      console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
       
-      if (matchingVoices.length > 0) {
-        setSelectedFakeYouVoice(matchingVoices[0]);
-        console.log(`🎙️ Auto-selected: "${matchingVoices[0].title}"`);
+      // Add ElevenLabs voices
+      const elevenLabsVoices = [
+        { voiceToken: 'elevenlabs_brian', title: 'Brian (ElevenLabs)', provider: 'elevenlabs', voiceId: 'nPczCjzI2devNBz1zQrb' },
+        { voiceToken: 'elevenlabs_alice', title: 'Alice (ElevenLabs)', provider: 'elevenlabs', voiceId: 'Xb7hH8MSUJpSbSDYk0k2' },
+        { voiceToken: 'elevenlabs_charlie', title: 'Charlie (ElevenLabs)', provider: 'elevenlabs', voiceId: 'IKne3meq5aSn9XLyUdCD' },
+        { voiceToken: 'elevenlabs_sarah', title: 'Sarah (ElevenLabs)', provider: 'elevenlabs', voiceId: 'EXAVITQu4vr4xnSDxMaL' },
+        { voiceToken: 'elevenlabs_george', title: 'George (ElevenLabs)', provider: 'elevenlabs', voiceId: 'JBFqnCBsd6RMkjVDRZzb' },
+        { voiceToken: 'elevenlabs_roger', title: 'Roger (ElevenLabs)', provider: 'elevenlabs', voiceId: 'CwhRBWXzGAHq8TQ4Fs17' },
+      ];
+      
+      // Combine FakeYou and ElevenLabs voices
+      const allVoices = [
+        ...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' })),
+        ...elevenLabsVoices
+      ];
+      
+      setAvailableFakeYouVoices(matchingVoices);
+      setCombinedVoiceList(allVoices);
+      
+      if (allVoices.length > 0) {
+        setSelectedFakeYouVoice(allVoices[0]);
+        console.log(`🎙️ Auto-selected: "${allVoices[0].title}" (${allVoices[0].provider})`);
       } else {
         setSelectedFakeYouVoice(null);
       }
@@ -266,6 +286,7 @@ const HistoricalChat = () => {
     } catch (error) {
       console.error('❌ Error:', error);
       setAvailableFakeYouVoices([]);
+      setCombinedVoiceList([]);
       setSelectedFakeYouVoice(null);
     } finally {
       setIsLoadingVoices(false);
@@ -723,11 +744,11 @@ const HistoricalChat = () => {
 
   const generateFakeYouVoice = async (text: string, figure: HistoricalFigure) => {
     try {
-      console.log('🎤 Generating FakeYou voice for:', figure.name);
+      console.log('🎤 Generating voice for:', figure.name);
       
       // Check if a voice is selected
       if (!selectedFakeYouVoice) {
-        console.log('❌ No FakeYou voice selected');
+        console.log('❌ No voice selected');
         toast({
           title: "No voice selected",
           description: `Please select a voice for ${figure.name} from the dropdown`,
@@ -737,13 +758,46 @@ const HistoricalChat = () => {
         throw new Error('No voice selected');
       }
       
+      // Check which provider to use
+      if (selectedFakeYouVoice.provider === 'elevenlabs') {
+        console.log(`✅ Using ElevenLabs voice: "${selectedFakeYouVoice.title}"`);
+        
+        toast({
+          title: "Generating ElevenLabs voice",
+          description: `Using "${selectedFakeYouVoice.title}"...`,
+          duration: 3000,
+        });
+        
+        const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+          body: { 
+            text: text,
+            voice: selectedFakeYouVoice.voiceId // Use the voice ID directly
+          }
+        });
+
+        if (error) {
+          console.error('❌ ElevenLabs TTS Error:', error);
+          throw error;
+        }
+
+        if (!data?.audioContent) {
+          console.error('❌ No audio content received from ElevenLabs');
+          throw new Error('No audio content');
+        }
+
+        console.log('✅ ElevenLabs TTS successful');
+        playAudioFromBase64(data.audioContent);
+        return;
+      }
+      
+      // Otherwise use FakeYou
       toast({
         title: "Preparing voice response",
         description: `Using "${selectedFakeYouVoice.title}" - this takes about 10-15 seconds...`,
         duration: 4000,
       });
       
-      console.log(`✅ Using selected FakeYou voice: "${selectedFakeYouVoice.title}"`);
+      console.log(`✅ Using FakeYou voice: "${selectedFakeYouVoice.title}"`);
       
       // Step 3: Generate TTS
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
@@ -1489,23 +1543,23 @@ const HistoricalChat = () => {
             </p>
           </Card>
 
-          {/* FakeYou Voice Selection */}
+          {/* Voice Selection */}
           {selectedFigure && (
             <Card className="p-4">
               <h3 className="font-semibold mb-3 flex items-center">
                 <Volume2 className="h-4 w-4 mr-2" />
-                FakeYou Voice Selection
+                Voice Selection
               </h3>
               {isLoadingVoices ? (
                 <div className="text-sm text-muted-foreground">
                   Loading voices...
                 </div>
-              ) : availableFakeYouVoices.length > 0 ? (
+              ) : combinedVoiceList.length > 0 ? (
                 <>
                   <Select 
                     value={selectedFakeYouVoice?.voiceToken} 
                     onValueChange={(token) => {
-                      const voice = availableFakeYouVoices.find(v => v.voiceToken === token);
+                      const voice = combinedVoiceList.find(v => v.voiceToken === token);
                       setSelectedFakeYouVoice(voice);
                       toast({
                         title: "Voice selected",
@@ -1518,7 +1572,7 @@ const HistoricalChat = () => {
                       <SelectValue placeholder="Select a voice" />
                     </SelectTrigger>
                     <SelectContent className="bg-popover">
-                      {availableFakeYouVoices.map((voice) => (
+                      {combinedVoiceList.map((voice) => (
                         <SelectItem key={voice.voiceToken} value={voice.voiceToken}>
                           {voice.title}
                         </SelectItem>
@@ -1526,7 +1580,8 @@ const HistoricalChat = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-2">
-                    {availableFakeYouVoices.length} voice{availableFakeYouVoices.length !== 1 ? 's' : ''} available for {selectedFigure.name}
+                    {combinedVoiceList.length} voice{combinedVoiceList.length !== 1 ? 's' : ''} available for {selectedFigure.name}
+                    {selectedFakeYouVoice && ` • ${selectedFakeYouVoice.provider === 'elevenlabs' ? 'ElevenLabs' : 'FakeYou'}`}
                   </p>
                 </>
               ) : (
