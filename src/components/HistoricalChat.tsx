@@ -257,7 +257,7 @@ const HistoricalChat = () => {
       
       console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
       
-      // Add ElevenLabs voices - check for figure-specific voice first
+      // Add ElevenLabs voices - only figure-specific authentic voices
       const elevenLabsVoices = [];
       
       // Figure-specific ElevenLabs voices
@@ -277,18 +277,10 @@ const HistoricalChat = () => {
         });
       }
       
-      // Add generic professional voices as fallbacks
-      elevenLabsVoices.push(
-        { voiceToken: 'elevenlabs_brian', title: 'Brian (ElevenLabs)', provider: 'elevenlabs', voiceId: 'nPczCjzI2devNBz1zQrb' },
-        { voiceToken: 'elevenlabs_george', title: 'George (ElevenLabs)', provider: 'elevenlabs', voiceId: 'JBFqnCBsd6RMkjVDRZzb' },
-        { voiceToken: 'elevenlabs_roger', title: 'Roger (ElevenLabs)', provider: 'elevenlabs', voiceId: 'CwhRBWXzGAHq8TQ4Fs17' },
-        { voiceToken: 'elevenlabs_charlie', title: 'Charlie (ElevenLabs)', provider: 'elevenlabs', voiceId: 'IKne3meq5aSn9XLyUdCD' }
-      );
-      
       // Combine FakeYou and ElevenLabs voices
       const allVoices = [
-        ...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' })),
-        ...elevenLabsVoices
+        ...elevenLabsVoices, // ElevenLabs authentic voices first
+        ...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))
       ];
       
       setAvailableFakeYouVoices(matchingVoices);
