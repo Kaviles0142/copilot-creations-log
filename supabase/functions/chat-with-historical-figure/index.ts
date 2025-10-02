@@ -51,9 +51,37 @@ serve(async (req) => {
     };
 
     try {
-      console.log(`Searching all sources in parallel for ${figure.name}...`);
+      console.log(`Searching knowledge sources for ${figure.name}...`);
       
-      // Run all searches in parallel for maximum speed
+      // PRIORITY 1: Current events (run first, alone)
+      try {
+        const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: 'top news today United States',
+            type: 'news',
+            num: 5
+          }
+        });
+
+        if (generalNewsResponse.data?.results?.length > 0) {
+          sourcesUsed.currentEvents = generalNewsResponse.data.results.length;
+          let eventsText = '\n\n📰 TODAY\'S TOP NEWS:\n';
+          generalNewsResponse.data.results.forEach((result: any) => {
+            eventsText += `- ${result.title}\n`;
+            if (result.snippet) {
+              eventsText += `  ${result.snippet.substring(0, 400)}...\n`;
+            }
+            if (result.date) {
+              eventsText += `  (${result.date})\n`;
+            }
+          });
+          relevantKnowledge += eventsText;
+        }
+      } catch (error) {
+        console.log('Current events search error:', error);
+      }
+
+      // PRIORITY 2: Wikipedia and Books (parallel, lower rate limit impact)
       const searchPromises = [
         // 1. Books search
         (async () => {
@@ -139,7 +167,7 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 4. Wikipedia search
+        // 2. Wikipedia search
         (async () => {
           try {
             const wikiResponse = await supabase.functions.invoke('wikipedia-search', {
@@ -148,105 +176,10 @@ serve(async (req) => {
 
             if (wikiResponse.data?.extract) {
               sourcesUsed.wikipedia = true;
-              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 2000)}...\n`; // Increased to 2000 chars
+              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 1500)}...\n`;
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
-          }
-          return '';
-        })(),
-
-        // 5. Current Events - Always search for today's news
-        (async () => {
-          try {
-            let eventsText = '';
-            let totalResults = 0;
-
-            // Search for general current events/news (top headlines)
-            const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: 'top news today United States',
-                type: 'news',
-                num: 5
-              }
-            });
-
-            if (generalNewsResponse.data?.results?.length > 0) {
-              totalResults += generalNewsResponse.data.results.length;
-              eventsText += '\n\n📰 TODAY\'S TOP NEWS:\n';
-              generalNewsResponse.data.results.forEach((result: any) => {
-                eventsText += `- ${result.title}\n`;
-                if (result.snippet) {
-                  eventsText += `  ${result.snippet.substring(0, 400)}...\n`;
-                }
-                if (result.date) {
-                  eventsText += `  (${result.date})\n`;
-                }
-              });
-            }
-
-            if (totalResults > 0) {
-              sourcesUsed.currentEvents = totalResults;
-              return eventsText;
-            }
-          } catch (error) {
-            console.log('Current events search error:', error);
-          }
-          return '';
-        })(),
-
-        // 6. Historical Context via SerpAPI
-        (async () => {
-          try {
-            const contextResponse = await supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: `${figure.name} biography history`,
-                type: 'web',  // Use regular Google search
-                num: 5 // Maximum historical context results
-              }
-            });
-
-            if (contextResponse.data?.results?.length > 0) {
-              sourcesUsed.historicalContext = contextResponse.data.results.length;
-              let contextText = '\n\n📜 HISTORICAL CONTEXT:\n';
-              contextResponse.data.results.forEach((result: any) => {
-                contextText += `- ${result.title}\n`;
-                if (result.snippet) {
-                  contextText += `  ${result.snippet.substring(0, 300)}...\n`; // Add snippets
-                }
-              });
-              return contextText;
-            }
-          } catch (error) {
-            console.log('Historical context search error:', error);
-          }
-          return '';
-        })(),
-
-        // 7. Web Articles via SerpAPI
-        (async () => {
-          try {
-            const articlesResponse = await supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: `${figure.name} analysis profile`,
-                type: 'web',  // Use regular Google search
-                num: 5 // Maximum web articles
-              }
-            });
-
-            if (articlesResponse.data?.results?.length > 0) {
-              sourcesUsed.webArticles = articlesResponse.data.results.length;
-              let articlesText = '\n\n📝 WEB ARTICLES:\n';
-              articlesResponse.data.results.forEach((result: any) => {
-                articlesText += `- ${result.title}\n`;
-                if (result.snippet) {
-                  articlesText += `  ${result.snippet.substring(0, 500)}...\n`; // Increased to 500 chars
-                }
-              });
-              return articlesText;
-            }
-          } catch (error) {
-            console.log('Web articles search error:', error);
           }
           return '';
         })(),
