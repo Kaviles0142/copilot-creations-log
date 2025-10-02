@@ -183,9 +183,32 @@ async function multiSearchVoices(searchTerms: string[]) {
     
     for (const term of searchTerms) {
       const termLower = term.toLowerCase();
-      const matches = allVoices.filter((v: any) => 
-        v.title.toLowerCase().includes(termLower)
-      );
+      
+      // More precise matching: prioritize exact matches and require significant term overlap
+      const matches = allVoices.filter((v: any) => {
+        const titleLower = v.title.toLowerCase();
+        
+        // Exact match - highest priority
+        if (titleLower === termLower) return true;
+        
+        // Starts with the term (e.g., "Martin Luther King" matches "Martin Luther King Jr.")
+        if (titleLower.startsWith(termLower)) return true;
+        
+        // Only match if term has 3+ words AND all words appear in title
+        // This prevents "Jr" or "King" from matching everything
+        const termWords = termLower.split(/\s+/).filter(w => w.length > 2); // Filter out short words like "jr"
+        if (termWords.length >= 2) {
+          return termWords.every(word => titleLower.includes(word));
+        }
+        
+        // For single-word terms, require they're standalone (word boundaries)
+        if (termWords.length === 1 && termWords[0].length > 3) {
+          const regex = new RegExp(`\\b${termWords[0]}\\b`, 'i');
+          return regex.test(titleLower);
+        }
+        
+        return false;
+      });
       
       console.log(`  📝 "${term}": found ${matches.length} matches`);
       
@@ -264,9 +287,32 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
     if (searchTerm) {
       const beforeSearchFilter = voices.length;
       const searchLower = searchTerm.toLowerCase();
-      voices = voices.filter((v: any) => 
-        v.title.toLowerCase().includes(searchLower)
-      );
+      
+      // More precise search filtering
+      voices = voices.filter((v: any) => {
+        const titleLower = v.title.toLowerCase();
+        
+        // Exact match
+        if (titleLower === searchLower) return true;
+        
+        // Starts with search term
+        if (titleLower.startsWith(searchLower)) return true;
+        
+        // Multi-word search: all significant words must be in title
+        const searchWords = searchLower.split(/\s+/).filter(w => w.length > 2);
+        if (searchWords.length >= 2) {
+          return searchWords.every(word => titleLower.includes(word));
+        }
+        
+        // Single word: require word boundaries
+        if (searchWords.length === 1 && searchWords[0].length > 3) {
+          const regex = new RegExp(`\\b${searchWords[0]}\\b`, 'i');
+          return regex.test(titleLower);
+        }
+        
+        return titleLower.includes(searchLower);
+      });
+      
       console.log(`🔍 Search filter "${searchTerm}" reduced voices from ${beforeSearchFilter} to ${voices.length}`);
     }
     
