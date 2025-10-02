@@ -212,9 +212,15 @@ const HistoricalChat = () => {
       let searchTerms: string[] = [];
       let excludeTerms: string[] = [];
       
-      if (figureName.includes('kennedy')) {
-        searchTerms = ['kennedy', 'jfk'];
-        excludeTerms = ['robert', 'bobby', 'rfk', 'ted', 'edward'];
+      if (figureName.includes('robert') && figureName.includes('kennedy')) {
+        searchTerms = ['robert kennedy', 'rfk', 'bobby kennedy'];
+        console.log('🔍 Searching for Robert F. Kennedy voices');
+      } else if (figureName.includes('john') && figureName.includes('kennedy')) {
+        searchTerms = ['john kennedy', 'jfk', 'john f kennedy'];
+        excludeTerms = ['robert', 'bobby', 'rfk'];
+        console.log('🔍 Searching for John F. Kennedy voices');
+      } else if (figureName.includes('kennedy')) {
+        searchTerms = ['kennedy'];
         console.log('🔍 Searching for Kennedy voices');
       } else if (figureName.includes('trump')) {
         // Search for Trump with common variations
