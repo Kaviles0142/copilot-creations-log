@@ -220,10 +220,15 @@ const HistoricalChat = () => {
         // Search for Trump with common variations
         searchTerms = ['trump', 'potus 45', '45th president', 'president trump'];
         console.log('🔍 Searching for Trump voices with variations');
+      } else if (figureName.includes('martin luther king')) {
+        searchTerms = ['martin luther king', 'mlk', 'dr king'];
+        console.log('🔍 Searching for Martin Luther King Jr. voices');
       } else {
-        // For other figures, use last name
+        // For other figures, use full name and last significant word (not Jr., Sr., III, etc.)
         const words = figureName.split(' ');
-        searchTerms = [words[words.length - 1]];
+        const suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
+        const lastName = words.reverse().find(word => !suffixes.includes(word.toLowerCase()));
+        searchTerms = lastName ? [lastName] : [figureName];
         console.log('🔍 Searching for:', searchTerms[0]);
       }
       
