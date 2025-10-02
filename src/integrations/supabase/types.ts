@@ -300,6 +300,63 @@ export type Database = {
           },
         ]
       }
+      news_cache: {
+        Row: {
+          cache_key: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          news_data: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          news_data: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          news_data?: Json
+        }
+        Relationships: []
+      }
+      serpapi_cache: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          figure_id: string
+          figure_name: string
+          id: string
+          query: string
+          results: Json
+          search_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          figure_id: string
+          figure_name: string
+          id?: string
+          query: string
+          results: Json
+          search_type: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          figure_id?: string
+          figure_name?: string
+          id?: string
+          query?: string
+          results?: Json
+          search_type?: string
+        }
+        Relationships: []
+      }
       voice_training_pipeline: {
         Row: {
           api_endpoint: string | null
@@ -356,7 +413,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_expired_news_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

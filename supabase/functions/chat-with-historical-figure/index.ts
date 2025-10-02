@@ -54,21 +54,59 @@ serve(async (req) => {
     try {
       console.log(`Searching knowledge sources for ${figure.name}...`);
       
-      // PRIORITY 1: Current events (run first, alone)
+      // PRIORITY 1: Current events (with caching to reduce API calls)
       try {
-        const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
-          body: { 
-            query: 'top news today United States',
-            type: 'news',
-            num: 5
-          }
-        });
+        const cacheKey = 'top-news-us';
+        
+        // Check cache first (valid for 2 hours)
+        const { data: cachedNews } = await supabase
+          .from('news_cache')
+          .select('news_data, expires_at')
+          .eq('cache_key', cacheKey)
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle();
 
-        if (generalNewsResponse.data?.results?.length > 0) {
+        let newsData = null;
+
+        if (cachedNews && cachedNews.news_data) {
+          console.log('✅ Using cached news data');
+          newsData = cachedNews.news_data;
           currentEventsAvailable = true;
-          sourcesUsed.currentEvents = generalNewsResponse.data.results.length;
+        } else {
+          console.log('🔍 Fetching fresh news data...');
+          const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
+            body: { 
+              query: 'top news today United States',
+              type: 'news',
+              num: 5
+            }
+          });
+
+          if (generalNewsResponse.data?.results?.length > 0) {
+            newsData = generalNewsResponse.data.results;
+            currentEventsAvailable = true;
+
+            // Cache the results for 2 hours
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 2);
+
+            await supabase.from('news_cache').upsert({
+              cache_key: cacheKey,
+              news_data: newsData,
+              expires_at: expiresAt.toISOString()
+            }, {
+              onConflict: 'cache_key'
+            });
+            console.log('💾 Cached fresh news data for 2 hours');
+          } else {
+            console.log('⚠️ Current events search returned no results');
+          }
+        }
+
+        if (newsData && newsData.length > 0) {
+          sourcesUsed.currentEvents = newsData.length;
           let eventsText = '\n\n📰 TODAY\'S TOP NEWS:\n';
-          generalNewsResponse.data.results.forEach((result: any) => {
+          newsData.forEach((result: any) => {
             eventsText += `- ${result.title}\n`;
             if (result.snippet) {
               eventsText += `  ${result.snippet.substring(0, 400)}...\n`;
@@ -78,11 +116,9 @@ serve(async (req) => {
             }
           });
           relevantKnowledge += eventsText;
-        } else {
-          console.log('Current events search returned no results');
         }
       } catch (error) {
-        console.log('Current events search failed:', error);
+        console.log('❌ Current events search/cache failed:', error);
         // Add note about limited current events access
         relevantKnowledge += '\n\n⚠️ NOTE: Real-time news search is currently unavailable. You should be honest that you may not have the latest current events information and can only reference what you know from your knowledge cutoff.\n';
       }
