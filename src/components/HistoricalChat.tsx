@@ -185,11 +185,44 @@ const HistoricalChat = () => {
     try {
       console.log('🔍 Fetching FakeYou voices for:', figure.name);
       
-      // Don't pass figureName to backend - let it return all English voices
-      // We'll filter on the frontend for more flexible matching
+      const figureName = figure.name.toLowerCase();
+      console.log(`🎯 Figure name: "${figure.name}" (lowercase: "${figureName}")`);
+      
+      // Build search term for backend
+      let searchTerm = '';
+      let excludeTerms: string[] = [];
+      
+      if (figureName.includes('robert') && figureName.includes('kennedy')) {
+        searchTerm = 'kennedy';
+        excludeTerms = ['john'];
+        console.log('🔍 Searching for Robert F. Kennedy voices');
+      } else if (figureName.includes('john') && figureName.includes('kennedy')) {
+        searchTerm = 'kennedy';
+        excludeTerms = ['robert', 'bobby', 'rfk'];
+        console.log('🔍 Searching for John F. Kennedy voices');
+      } else if (figureName.includes('kennedy')) {
+        searchTerm = 'kennedy';
+        console.log('🔍 Searching for Kennedy voices');
+      } else if (figureName.includes('trump')) {
+        searchTerm = 'trump';
+        console.log('🔍 Searching for Trump voices');
+      } else if (figureName.includes('martin luther king')) {
+        searchTerm = 'martin luther king';
+        console.log('🔍 Searching for Martin Luther King Jr. voices');
+      } else {
+        // For other figures, use last significant word
+        const words = figureName.split(' ');
+        const suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
+        const lastName = words.reverse().find(word => !suffixes.includes(word.toLowerCase()));
+        searchTerm = lastName || figureName;
+        console.log('🔍 Searching for:', searchTerm);
+      }
+      
+      // Pass search term to backend for more efficient filtering
       const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
         body: { 
-          action: 'list_voices'
+          action: 'list_voices',
+          searchTerm: searchTerm
         }
       });
 
@@ -199,83 +232,10 @@ const HistoricalChat = () => {
         return;
       }
 
-      const allVoices = voicesData.voices || [];
-      console.log(`📋 Total voices fetched from API: ${allVoices.length}`);
+      let candidateVoices = voicesData.voices || [];
+      console.log(`📋 Backend returned ${candidateVoices.length} voices for "${searchTerm}"`);
       
-      // DEBUG: Let's see a sample of all voice titles
-      console.log('🔍 Sample of all voice titles:', allVoices.slice(0, 20).map((v: any) => v.title));
-      
-      const figureName = figure.name.toLowerCase();
-      console.log(`🎯 Figure name: "${figure.name}" (lowercase: "${figureName}")`);
-      
-      // Build flexible search terms for common variations
-      let searchTerms: string[] = [];
-      let excludeTerms: string[] = [];
-      
-      if (figureName.includes('robert') && figureName.includes('kennedy')) {
-        searchTerms = ['robert kennedy', 'rfk', 'bobby kennedy'];
-        console.log('🔍 Searching for Robert F. Kennedy voices');
-      } else if (figureName.includes('john') && figureName.includes('kennedy')) {
-        searchTerms = ['john kennedy', 'jfk', 'john f kennedy'];
-        excludeTerms = ['robert', 'bobby', 'rfk'];
-        console.log('🔍 Searching for John F. Kennedy voices');
-      } else if (figureName.includes('kennedy')) {
-        searchTerms = ['kennedy'];
-        console.log('🔍 Searching for Kennedy voices');
-      } else if (figureName.includes('trump')) {
-        // Search for Trump with common variations
-        searchTerms = ['trump', 'potus 45', '45th president', 'president trump'];
-        console.log('🔍 Searching for Trump voices with variations');
-      } else if (figureName.includes('martin luther king')) {
-        searchTerms = ['martin luther king', 'mlk', 'dr king'];
-        console.log('🔍 Searching for Martin Luther King Jr. voices');
-      } else {
-        // For other figures, use full name and last significant word (not Jr., Sr., III, etc.)
-        const words = figureName.split(' ');
-        const suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
-        const lastName = words.reverse().find(word => !suffixes.includes(word.toLowerCase()));
-        searchTerms = lastName ? [lastName] : [figureName];
-        console.log('🔍 Searching for:', searchTerms[0]);
-      }
-      
-      console.log(`🔎 Search terms: ${searchTerms.join(', ')}`);
-      
-      // Find voices matching any search term
-      let candidateVoices = allVoices.filter((voice: any) => {
-        const voiceTitle = voice.title.toLowerCase();
-        return searchTerms.some(term => voiceTitle.includes(term));
-      });
-      console.log(`📝 Found ${candidateVoices.length} voices using simple filter`);
-      
-      // For Trump, use multi-term search API for better discovery
-      if (figureName.toLowerCase().includes('trump')) {
-        console.log('🔍 Using multi-term search for Trump voices...');
-        const trumpSearchTerms = [
-          'Donald Trump',
-          'President Trump',
-          'DJT',
-          'Trump parody',
-          'Trump voice',
-          'Donald J. Trump',
-          'Trump impression',
-          'Trump impersonation'
-        ];
-        
-        const multiSearchResponse = await supabase.functions.invoke('fakeyou-tts', {
-          body: { 
-            action: 'multi_search_voices',
-            searchTerms: trumpSearchTerms
-          }
-        });
-        
-        if (multiSearchResponse.data?.voices) {
-          candidateVoices = multiSearchResponse.data.voices;
-          console.log(`✅ Multi-search found ${candidateVoices.length} Trump voices`);
-          candidateVoices.forEach((v: any) => console.log(`  - "${v.title}"`));
-        }
-      }
-      
-      // Filter voices
+      // Apply client-side exclusions if needed
       const matchingVoices = candidateVoices.filter((voice: any) => {
         const voiceTitle = voice.title.toLowerCase();
         
