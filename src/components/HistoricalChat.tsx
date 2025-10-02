@@ -257,15 +257,33 @@ const HistoricalChat = () => {
       
       console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
       
-      // Add ElevenLabs voices
-      const elevenLabsVoices = [
+      // Add ElevenLabs voices - check for figure-specific voice first
+      const elevenLabsVoices = [];
+      
+      // Figure-specific ElevenLabs voices
+      const figureSpecificVoices: Record<string, { voiceId: string; title: string }> = {
+        'john-f-kennedy': { voiceId: '2vubyVoGjNJ5HPga4SkV', title: `${figure.name} (ElevenLabs - Authentic)` },
+        'martin-luther-king-jr': { voiceId: '2ts4Q14DjMa5I5EgteS4', title: `${figure.name} (ElevenLabs - Authentic)` },
+      };
+      
+      // Add figure-specific voice if available
+      if (figureSpecificVoices[figure.id]) {
+        const specificVoice = figureSpecificVoices[figure.id];
+        elevenLabsVoices.push({
+          voiceToken: `elevenlabs_${figure.id}_authentic`,
+          title: specificVoice.title,
+          provider: 'elevenlabs',
+          voiceId: specificVoice.voiceId
+        });
+      }
+      
+      // Add generic professional voices as fallbacks
+      elevenLabsVoices.push(
         { voiceToken: 'elevenlabs_brian', title: 'Brian (ElevenLabs)', provider: 'elevenlabs', voiceId: 'nPczCjzI2devNBz1zQrb' },
-        { voiceToken: 'elevenlabs_alice', title: 'Alice (ElevenLabs)', provider: 'elevenlabs', voiceId: 'Xb7hH8MSUJpSbSDYk0k2' },
-        { voiceToken: 'elevenlabs_charlie', title: 'Charlie (ElevenLabs)', provider: 'elevenlabs', voiceId: 'IKne3meq5aSn9XLyUdCD' },
-        { voiceToken: 'elevenlabs_sarah', title: 'Sarah (ElevenLabs)', provider: 'elevenlabs', voiceId: 'EXAVITQu4vr4xnSDxMaL' },
         { voiceToken: 'elevenlabs_george', title: 'George (ElevenLabs)', provider: 'elevenlabs', voiceId: 'JBFqnCBsd6RMkjVDRZzb' },
         { voiceToken: 'elevenlabs_roger', title: 'Roger (ElevenLabs)', provider: 'elevenlabs', voiceId: 'CwhRBWXzGAHq8TQ4Fs17' },
-      ];
+        { voiceToken: 'elevenlabs_charlie', title: 'Charlie (ElevenLabs)', provider: 'elevenlabs', voiceId: 'IKne3meq5aSn9XLyUdCD' }
+      );
       
       // Combine FakeYou and ElevenLabs voices
       const allVoices = [
