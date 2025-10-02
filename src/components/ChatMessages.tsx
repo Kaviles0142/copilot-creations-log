@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +13,16 @@ interface ChatMessagesProps {
 }
 
 const ChatMessages = ({ messages, selectedFigure, isLoading }: ChatMessagesProps) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
   if (!selectedFigure) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -112,6 +123,8 @@ const ChatMessages = ({ messages, selectedFigure, isLoading }: ChatMessagesProps
             </div>
           </div>
         )}
+        
+        <div ref={messagesEndRef} />
       </div>
     </ScrollArea>
   );
