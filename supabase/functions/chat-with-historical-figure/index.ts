@@ -156,61 +156,33 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 5. Current Events via SerpAPI (searches for both figure-related news AND general current events)
+        // 5. Current Events - Always search for today's news
         (async () => {
           try {
-            // Check if user is asking about current events (government, politics, shutdown, etc.)
-            const messageLower = message.toLowerCase();
-            const currentEventKeywords = ['shutdown', 'government', 'congress', 'senate', 'politics', 'current', 'today', 'now', 'happening', 'news', 'recent'];
-            const isAskingAboutCurrentEvents = currentEventKeywords.some(keyword => messageLower.includes(keyword));
-            
             let eventsText = '';
             let totalResults = 0;
 
-            // Always search for news about the figure
-            const figureNewsResponse = await supabase.functions.invoke('serpapi-search', {
+            // Search for general current events/news (top headlines)
+            const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
               body: { 
-                query: `${figure.name} news 2024 2025`,
+                query: 'top news today United States',
                 type: 'news',
-                num: 3
+                num: 5
               }
             });
 
-            if (figureNewsResponse.data?.results?.length > 0) {
-              totalResults += figureNewsResponse.data.results.length;
-              eventsText += '\n\n📰 RECENT NEWS ABOUT ' + figure.name.toUpperCase() + ':\n';
-              figureNewsResponse.data.results.forEach((result: any) => {
+            if (generalNewsResponse.data?.results?.length > 0) {
+              totalResults += generalNewsResponse.data.results.length;
+              eventsText += '\n\n📰 TODAY\'S TOP NEWS:\n';
+              generalNewsResponse.data.results.forEach((result: any) => {
                 eventsText += `- ${result.title}\n`;
                 if (result.snippet) {
-                  eventsText += `  ${result.snippet.substring(0, 300)}...\n`;
+                  eventsText += `  ${result.snippet.substring(0, 400)}...\n`;
+                }
+                if (result.date) {
+                  eventsText += `  (${result.date})\n`;
                 }
               });
-            }
-
-            // If user is asking about current events, also search for general current events
-            if (isAskingAboutCurrentEvents) {
-              console.log('User is asking about current events, searching for general news...');
-              const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
-                body: { 
-                  query: message, // Search directly for what the user is asking about
-                  type: 'news',
-                  num: 5
-                }
-              });
-
-              if (generalNewsResponse.data?.results?.length > 0) {
-                totalResults += generalNewsResponse.data.results.length;
-                eventsText += '\n\n📰 CURRENT EVENTS/NEWS:\n';
-                generalNewsResponse.data.results.forEach((result: any) => {
-                  eventsText += `- ${result.title}\n`;
-                  if (result.snippet) {
-                    eventsText += `  ${result.snippet.substring(0, 400)}...\n`;
-                  }
-                  if (result.date) {
-                    eventsText += `  (${result.date})\n`;
-                  }
-                });
-              }
             }
 
             if (totalResults > 0) {
