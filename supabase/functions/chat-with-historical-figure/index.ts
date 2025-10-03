@@ -389,7 +389,9 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
           temperature: 0.9
         };
       } else if (provider === 'azure') {
-        apiUrl = 'https://api.bing.microsoft.com/v7.0/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-01';
+        const azureResourceName = Deno.env.get('AZURE_RESOURCE_NAME') || 'copilotsearch';
+        const azureDeploymentName = Deno.env.get('AZURE_DEPLOYMENT_NAME') || 'Copilotsearch';
+        apiUrl = `https://${azureResourceName}.openai.azure.com/openai/deployments/${azureDeploymentName}/chat/completions?api-version=2024-08-01-preview`;
         requestHeaders = {
           'api-key': azureApiKey!,
           'Content-Type': 'application/json',
