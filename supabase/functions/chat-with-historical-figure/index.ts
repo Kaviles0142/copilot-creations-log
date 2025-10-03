@@ -247,6 +247,7 @@ serve(async (req) => {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     const grokApiKey = Deno.env.get('GROK_API_KEY');
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    const azureApiKey = Deno.env.get('AZURE_OPENAI_API_KEY');
     
     if (aiProvider === 'grok' && !grokApiKey) {
       return new Response(JSON.stringify({ 
@@ -269,6 +270,15 @@ serve(async (req) => {
     if (aiProvider === 'claude' && !anthropicApiKey) {
       return new Response(JSON.stringify({ 
         error: 'Claude API key not configured' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (aiProvider === 'azure' && !azureApiKey) {
+      return new Response(JSON.stringify({ 
+        error: 'Azure OpenAI API key not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -345,6 +355,21 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       };
       requestBody = {
         model: 'grok-beta',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 1200,
+        temperature: 0.9
+      };
+    } else if (aiProvider === 'azure') {
+      apiUrl = 'https://api.openai.com/v1/chat/completions';
+      requestHeaders = {
+        'Authorization': `Bearer ${azureApiKey}`,
+        'Content-Type': 'application/json',
+      };
+      requestBody = {
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
