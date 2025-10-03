@@ -378,11 +378,10 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
     console.log(`${aiProvider.toUpperCase()} request completed. Status: ${aiResponse.status}`);
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
 
-    // If Claude fails (timeout, 5xx errors), automatically fallback to OpenAI
+    // Auto-fallback from Claude to OpenAI on any error
     if (!aiResponse.ok && aiProvider === 'claude' && openaiApiKey) {
-      console.log(`⚠️ Claude failed with ${aiResponse.status}, falling back to OpenAI...`);
+      console.log(`⚠️ Claude API unavailable (${aiResponse.status}), switching to OpenAI...`);
       
-      // Switch to OpenAI
       apiUrl = 'https://api.openai.com/v1/chat/completions';
       requestHeaders = {
         'Authorization': `Bearer ${openaiApiKey}`,
@@ -398,20 +397,23 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
         temperature: 0.9
       };
       
-      aiResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: requestHeaders,
-        body: JSON.stringify(requestBody),
-      });
-      
-      console.log(`OpenAI fallback completed. Status: ${aiResponse.status}`);
+      try {
+        aiResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify(requestBody),
+        });
+        console.log(`✅ OpenAI fallback successful: ${aiResponse.status}`);
+      } catch (fallbackError) {
+        console.error('❌ OpenAI fallback also failed:', fallbackError);
+      }
     }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error(`${aiProvider.toUpperCase()} error:`, errorText);
+      console.error(`Final AI error (${aiResponse.status}):`, errorText);
       return new Response(JSON.stringify({ 
-        error: `AI API error: ${aiResponse.status}. Please try again.` 
+        error: `I'm having trouble connecting to the AI service. Please try again in a moment.` 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
