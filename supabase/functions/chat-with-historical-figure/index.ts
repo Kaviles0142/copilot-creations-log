@@ -369,7 +369,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       };
     }
 
-    let aiResponse = await fetch(apiUrl, {
+    const aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: requestHeaders,
       body: JSON.stringify(requestBody),
@@ -378,42 +378,11 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
     console.log(`${aiProvider.toUpperCase()} request completed. Status: ${aiResponse.status}`);
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
 
-    // Auto-fallback from Claude to OpenAI on any error
-    if (!aiResponse.ok && aiProvider === 'claude' && openaiApiKey) {
-      console.log(`⚠️ Claude API unavailable (${aiResponse.status}), switching to OpenAI...`);
-      
-      apiUrl = 'https://api.openai.com/v1/chat/completions';
-      requestHeaders = {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      };
-      requestBody = {
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 1200,
-        temperature: 0.9
-      };
-      
-      try {
-        aiResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: requestHeaders,
-          body: JSON.stringify(requestBody),
-        });
-        console.log(`✅ OpenAI fallback successful: ${aiResponse.status}`);
-      } catch (fallbackError) {
-        console.error('❌ OpenAI fallback also failed:', fallbackError);
-      }
-    }
-
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error(`Final AI error (${aiResponse.status}):`, errorText);
+      console.error(`${aiProvider.toUpperCase()} error:`, errorText);
       return new Response(JSON.stringify({ 
-        error: `I'm having trouble connecting to the AI service. Please try again in a moment.` 
+        error: `${aiProvider.toUpperCase()} API error: ${aiResponse.status}` 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
