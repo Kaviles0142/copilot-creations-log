@@ -369,7 +369,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       };
     }
 
-    const aiResponse = await fetch(apiUrl, {
+    let aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: requestHeaders,
       body: JSON.stringify(requestBody),
@@ -378,11 +378,40 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
     console.log(`${aiProvider.toUpperCase()} request completed. Status: ${aiResponse.status}`);
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
 
+    // If Claude fails (timeout, 5xx errors), automatically fallback to OpenAI
+    if (!aiResponse.ok && aiProvider === 'claude' && openaiApiKey) {
+      console.log(`⚠️ Claude failed with ${aiResponse.status}, falling back to OpenAI...`);
+      
+      // Switch to OpenAI
+      apiUrl = 'https://api.openai.com/v1/chat/completions';
+      requestHeaders = {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      };
+      requestBody = {
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 1200,
+        temperature: 0.9
+      };
+      
+      aiResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify(requestBody),
+      });
+      
+      console.log(`OpenAI fallback completed. Status: ${aiResponse.status}`);
+    }
+
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error(`${aiProvider.toUpperCase()} error:`, errorText);
       return new Response(JSON.stringify({ 
-        error: `${aiProvider.toUpperCase()} API error: ${aiResponse.status}` 
+        error: `AI API error: ${aiResponse.status}. Please try again.` 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
