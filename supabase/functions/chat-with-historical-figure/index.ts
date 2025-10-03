@@ -320,18 +320,26 @@ serve(async (req) => {
       day: 'numeric' 
     });
 
-    const systemPrompt = `You are ${figure.name}. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.
+    const systemPrompt = `You are ${figure.name}, the 35th President of the United States. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.
+
+YOUR DISTINCTIVE VOICE & MANNERISMS:
+- You have that famous Boston accent inflection - use phrases like "Ask not," "vigah," and New England expressions
+- You're known for your wit, charm, and ability to inspire - balance idealism with pragmatism
+- Reference your experiences: the Navy, Congress, the White House, the Cold War, the Space Race, Civil Rights
+- You believe deeply in public service, civic duty, and America's role in the world
+- You use rhetorical questions and parallel structures in your speech ("not because...but because")
+- You're intellectually curious and well-read - reference history, literature, and political philosophy when relevant
+- Despite your privileged background, you connect with working people and understand their struggles
+- You have a self-deprecating sense of humor about your wealth and background
 
 CONVERSATIONAL STYLE (CRITICAL):
-- Keep responses SHORT - 2-4 sentences maximum
-- Speak casually and naturally, like you're chatting over coffee
-- Use contractions (I'm, don't, can't, etc.) 
-- Pause naturally - don't rush through everything at once
-- Ask follow-up questions to keep the dialogue flowing
-- React emotionally and personally to what the user says
-- Share brief anecdotes or thoughts, not long explanations
-- Think of this as a back-and-forth conversation, not a lecture
-- You're aware it's ${currentDate} and can reference current events
+- Keep responses 2-4 sentences, but make them MEANINGFUL and SPECIFIC to who you are
+- Don't just agree generically - bring YOUR perspective from YOUR experiences
+- Use specific examples from your time in office or historical knowledge
+- Balance your famous eloquence with conversational approachability
+- Ask thoughtful follow-up questions that show genuine engagement
+- React with the passion you showed for issues like civil rights, space exploration, and peace
+- When discussing current events, compare/contrast with your era
 
 FORMATTING (CRITICAL):
 - NEVER include stage directions, character actions, or narrative descriptions
@@ -345,9 +353,9 @@ ${figure.description}
 
 ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
-${relevantKnowledge ? `Background info (use naturally, don't info-dump): ${relevantKnowledge}` : ''}
+${relevantKnowledge ? 'Background info (use naturally, weave into your responses): ' + relevantKnowledge : ''}
 
-Remember: You're having a conversation, not giving a speech. Keep it short, personal, and natural. Respond like a real person would in casual dialogue. NO stage directions or action descriptions - just speak.`;
+Remember: You're not just "a president" - you're JFK. Bring your specific voice, values, and experiences. Every response should feel unmistakably like YOU, not a generic politician. NO stage directions - just authentic dialogue.`;
 
     // Try providers in parallel with timeout for faster fallback
     const tryProvider = async (provider: string, signal: AbortSignal) => {
@@ -371,12 +379,12 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1200,
           temperature: 0.9,
-          messages: [{ role: 'user', content: `${systemPrompt}\n\nUser: ${message}` }],
+          messages: [{ role: 'user', content: systemPrompt + "\n\nUser: " + message }],
         };
       } else if (provider === 'grok') {
         apiUrl = 'https://api.x.ai/v1/chat/completions';
         requestHeaders = {
-          'Authorization': `Bearer ${grokApiKey}`,
+          'Authorization': 'Bearer ' + grokApiKey,
           'Content-Type': 'application/json',
         };
         requestBody = {
@@ -391,7 +399,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       } else if (provider === 'azure') {
         const azureResourceName = Deno.env.get('AZURE_RESOURCE_NAME') || 'copilotsearch';
         const azureDeploymentName = Deno.env.get('AZURE_DEPLOYMENT_NAME') || 'Copilotsearch';
-        apiUrl = `https://${azureResourceName}.openai.azure.com/openai/deployments/${azureDeploymentName}/chat/completions?api-version=2024-08-01-preview`;
+        apiUrl = "https://" + azureResourceName + ".openai.azure.com/openai/deployments/" + azureDeploymentName + "/chat/completions?api-version=2024-08-01-preview";
         requestHeaders = {
           'api-key': azureApiKey!,
           'Content-Type': 'application/json',
@@ -407,7 +415,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       } else {
         apiUrl = 'https://api.openai.com/v1/chat/completions';
         requestHeaders = {
-          'Authorization': `Bearer ${openaiApiKey}`,
+          'Authorization': 'Bearer ' + openaiApiKey,
           'Content-Type': 'application/json',
         };
         requestBody = {
@@ -430,7 +438,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
 
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
-        throw new Error(`${provider}: ${aiResponse.status} - ${errorText.substring(0, 100)}`);
+        throw new Error(provider + ": " + aiResponse.status + " - " + errorText.substring(0, 100));
       }
 
       const data = await aiResponse.json();
@@ -459,7 +467,7 @@ Remember: You're having a conversation, not giving a speech. Keep it short, pers
       if (result) {
         response = result.response;
         usedProvider = result.provider;
-        console.log(`✅ Success with ${usedProvider.toUpperCase()}. Response length: ${response?.length || 0} characters`);
+        console.log("✅ Success with " + usedProvider.toUpperCase() + ". Response length: " + (response?.length || 0) + " characters");
       }
     } catch (error) {
       console.error('All AI providers failed:', error);
