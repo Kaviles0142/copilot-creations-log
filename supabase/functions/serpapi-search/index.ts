@@ -36,10 +36,7 @@ async function searchWithGoogleCustomSearch(query: string, type: string, num: nu
     const response = await fetch(searchUrl);
     
     if (!response.ok) {
-      const errorBody = await response.text();
       console.error('Google Custom Search failed:', response.status, response.statusText);
-      console.error('Error response:', errorBody);
-      console.error('Request URL:', searchUrl);
       return null;
     }
 
@@ -66,9 +63,6 @@ async function searchWithGoogleCustomSearch(query: string, type: string, num: nu
     return processedResults;
   } catch (error) {
     console.error('Google Custom Search error:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message);
-    }
     return null;
   }
 }
@@ -223,8 +217,8 @@ Deno.serve(async (req) => {
 
 function calculateRelevanceScore(item: any, query: string): number {
   const queryLower = query.toLowerCase();
-  const title = (item.title || item.name || '').toLowerCase();
-  const snippet = (item.snippet || item.description || '').toLowerCase();
+  const title = (item.title || '').toLowerCase();
+  const snippet = (item.snippet || '').toLowerCase();
   
   let score = 0;
   
