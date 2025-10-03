@@ -349,113 +349,159 @@ ${relevantKnowledge ? `Background info (use naturally, don't info-dump): ${relev
 
 Remember: You're having a conversation, not giving a speech. Keep it short, personal, and natural. Respond like a real person would in casual dialogue. NO stage directions or action descriptions - just speak.`;
 
-    // Prepare request based on AI provider
-    let apiUrl: string;
-    let requestHeaders: Record<string, string>;
-    let requestBody: any;
+    // Define provider priority order (will try in this order)
+    const providerOrder = [aiProvider, 'azure', 'claude', 'openai', 'grok'].filter(
+      (p, i, arr) => arr.indexOf(p) === i // Remove duplicates
+    );
 
-    if (aiProvider === 'claude') {
-      apiUrl = 'https://api.anthropic.com/v1/messages';
-      requestHeaders = {
-        'x-api-key': anthropicApiKey!,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      };
-      requestBody = {
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1200,
-        temperature: 0.9,
-        messages: [
-          { 
-            role: 'user', 
-            content: `${systemPrompt}\n\nUser: ${message}` 
+    let response: string | null = null;
+    let usedProvider = '';
+    let lastError = '';
+
+    // Try each provider in order until one succeeds
+    for (const provider of providerOrder) {
+      try {
+        console.log(`Attempting to use ${provider.toUpperCase()}...`);
+        
+        // Prepare request based on AI provider
+        let apiUrl: string;
+        let requestHeaders: Record<string, string>;
+        let requestBody: any;
+
+        if (provider === 'claude') {
+          if (!anthropicApiKey) {
+            console.log('Claude API key not configured, skipping...');
+            continue;
           }
-        ],
-      };
-    } else if (aiProvider === 'grok') {
-      apiUrl = 'https://api.x.ai/v1/chat/completions';
-      requestHeaders = {
-        'Authorization': `Bearer ${grokApiKey}`,
-        'Content-Type': 'application/json',
-      };
-      requestBody = {
-        model: 'grok-beta',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 1200,
-        temperature: 0.9
-      };
-    } else if (aiProvider === 'azure') {
-      apiUrl = 'https://api.bing.microsoft.com/v7.0/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-01';
-      requestHeaders = {
-        'api-key': azureApiKey!,
-        'Content-Type': 'application/json',
-      };
-      requestBody = {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 1200,
-        temperature: 0.9
-      };
-    } else {
-      apiUrl = 'https://api.openai.com/v1/chat/completions';
-      requestHeaders = {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      };
-      requestBody = {
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 1200,
-        temperature: 0.9
-      };
+          apiUrl = 'https://api.anthropic.com/v1/messages';
+          requestHeaders = {
+            'x-api-key': anthropicApiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          };
+          requestBody = {
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1200,
+            temperature: 0.9,
+            messages: [
+              { 
+                role: 'user', 
+                content: `${systemPrompt}\n\nUser: ${message}` 
+              }
+            ],
+          };
+        } else if (provider === 'grok') {
+          if (!grokApiKey) {
+            console.log('Grok API key not configured, skipping...');
+            continue;
+          }
+          apiUrl = 'https://api.x.ai/v1/chat/completions';
+          requestHeaders = {
+            'Authorization': `Bearer ${grokApiKey}`,
+            'Content-Type': 'application/json',
+          };
+          requestBody = {
+            model: 'grok-beta',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: message }
+            ],
+            max_tokens: 1200,
+            temperature: 0.9
+          };
+        } else if (provider === 'azure') {
+          if (!azureApiKey) {
+            console.log('Azure API key not configured, skipping...');
+            continue;
+          }
+          apiUrl = 'https://api.bing.microsoft.com/v7.0/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-01';
+          requestHeaders = {
+            'api-key': azureApiKey,
+            'Content-Type': 'application/json',
+          };
+          requestBody = {
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: message }
+            ],
+            max_tokens: 1200,
+            temperature: 0.9
+          };
+        } else {
+          if (!openaiApiKey) {
+            console.log('OpenAI API key not configured, skipping...');
+            continue;
+          }
+          apiUrl = 'https://api.openai.com/v1/chat/completions';
+          requestHeaders = {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          };
+          requestBody = {
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: message }
+            ],
+            max_tokens: 1200,
+            temperature: 0.9
+          };
+        }
+
+        const aiResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log(`${provider.toUpperCase()} request completed. Status: ${aiResponse.status}`);
+
+        if (!aiResponse.ok) {
+          const errorText = await aiResponse.text();
+          console.error(`${provider.toUpperCase()} error:`, errorText);
+          lastError = `${provider}: ${aiResponse.status} - ${errorText.substring(0, 100)}`;
+          continue; // Try next provider
+        }
+
+        const data = await aiResponse.json();
+        
+        // Extract response based on provider
+        if (provider === 'claude') {
+          response = data.content[0].text;
+        } else {
+          response = data.choices[0].message.content;
+        }
+
+        usedProvider = provider;
+        console.log(`✅ Success with ${provider.toUpperCase()}. Response length: ${response?.length || 0} characters`);
+        break; // Success! Exit the loop
+        
+      } catch (error) {
+        console.error(`${provider.toUpperCase()} exception:`, error);
+        lastError = `${provider}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        continue; // Try next provider
+      }
     }
 
-    const aiResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: requestHeaders,
-      body: JSON.stringify(requestBody),
-    });
-
-    console.log(`${aiProvider.toUpperCase()} request completed. Status: ${aiResponse.status}`);
-    console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error(`${aiProvider.toUpperCase()} error:`, errorText);
+    // If all providers failed
+    if (!response) {
+      console.error('All AI providers failed. Last error:', lastError);
       return new Response(JSON.stringify({ 
-        error: `${aiProvider.toUpperCase()} API error: ${aiResponse.status}` 
+        error: 'All AI providers are currently unavailable',
+        details: lastError
       }), {
-        status: 500,
+        status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const data = await aiResponse.json();
-    
-    // Extract response based on provider
-    let response: string;
-    if (aiProvider === 'claude') {
-      response = data.content[0].text;
-    } else {
-      response = data.choices[0].message.content;
-    }
-
-    console.log(`Response generated using ${aiProvider.toUpperCase()}. Length: ${response.length} characters`);
-    console.log('Success - returning comprehensive multi-source enhanced response');
-
     return new Response(JSON.stringify({ 
       response, 
-      aiProvider,
+      aiProvider: usedProvider,
+      requestedProvider: aiProvider,
+      fallbackUsed: usedProvider !== aiProvider,
       sourcesUsed,
-      audioUrl: null, // Audio will be generated client-side to avoid timeout
+      audioUrl: null,
       figureId: figure.id,
       figureName: figure.name
     }), {
