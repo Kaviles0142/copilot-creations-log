@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-console.log("Multi-provider Search function loaded (Google Custom Search + SerpApi fallback)");
+console.log("Multi-provider Search function loaded (Google Custom Search + Bing Search + SerpApi fallback)");
 
 // Helper function to search using Google Custom Search
 async function searchWithGoogleCustomSearch(query: string, type: string, num: number) {
@@ -63,6 +63,78 @@ async function searchWithGoogleCustomSearch(query: string, type: string, num: nu
     return processedResults;
   } catch (error) {
     console.error('Google Custom Search error:', error);
+    return null;
+  }
+}
+
+
+// Helper function to search using Bing Search API
+async function searchWithBingSearch(query: string, type: string, num: number) {
+  const apiKey = Deno.env.get('AZURE_BING_SEARCH_API_KEY');
+  
+  if (!apiKey) {
+    console.log('Bing Search API key not available');
+    return null;
+  }
+
+  try {
+    const endpoint = type === 'news' 
+      ? 'https://api.bing.microsoft.com/v7.0/news/search'
+      : 'https://api.bing.microsoft.com/v7.0/search';
+    
+    const params = new URLSearchParams({
+      q: query.trim(),
+      count: Math.min(num, 50).toString(), // Bing max is 50
+      mkt: 'en-US',
+    });
+
+    if (type === 'news') {
+      params.set('freshness', 'Week');
+    }
+
+    const searchUrl = `${endpoint}?${params.toString()}`;
+    console.log('Trying Bing Search API...');
+    
+    const response = await fetch(searchUrl, {
+      headers: {
+        'Ocp-Apim-Subscription-Key': apiKey,
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Bing Search failed:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    let processedResults = [];
+    
+    if (type === 'news' && data.value) {
+      processedResults = data.value.slice(0, num).map((item: any) => ({
+        title: item.name || '',
+        snippet: item.description || '',
+        link: item.url || '',
+        source: item.provider?.[0]?.name || extractDomain(item.url || ''),
+        date: item.datePublished || '',
+        thumbnail: item.image?.thumbnail?.contentUrl || '',
+        relevance_score: calculateRelevanceScore(item, query)
+      }));
+    } else if (data.webPages?.value) {
+      processedResults = data.webPages.value.slice(0, num).map((item: any) => ({
+        title: item.name || '',
+        snippet: item.snippet || '',
+        link: item.url || '',
+        source: extractDomain(item.url || ''),
+        relevance_score: calculateRelevanceScore(item, query)
+      }));
+    }
+
+    processedResults.sort((a: any, b: any) => b.relevance_score - a.relevance_score);
+    console.log(`Bing Search: Found ${processedResults.length} results`);
+    
+    return processedResults;
+  } catch (error) {
+    console.error('Bing Search error:', error);
     return null;
   }
 }
@@ -162,14 +234,21 @@ Deno.serve(async (req) => {
     let results = await searchWithGoogleCustomSearch(query, type, num);
     let provider = 'google-custom-search';
     
-    // If Google Custom Search fails, fallback to SerpApi
+    // If Google Custom Search fails, try Bing Search
+    if (results === null) {
+      console.log('Falling back to Bing Search...');
+      results = await searchWithBingSearch(query, type, num);
+      provider = 'bing-search';
+    }
+    
+    // If both fail, fallback to SerpApi
     if (results === null) {
       console.log('Falling back to SerpApi...');
       results = await searchWithSerpApi(query, type, location, num);
       provider = 'serpapi';
     }
     
-    // If both fail, return error
+    // If all fail, return error
     if (results === null) {
       console.error('All search providers failed');
       return new Response(
@@ -217,8 +296,8 @@ Deno.serve(async (req) => {
 
 function calculateRelevanceScore(item: any, query: string): number {
   const queryLower = query.toLowerCase();
-  const title = (item.title || '').toLowerCase();
-  const snippet = (item.snippet || '').toLowerCase();
+  const title = (item.title || item.name || '').toLowerCase();
+  const snippet = (item.snippet || item.description || '').toLowerCase();
   
   let score = 0;
   
