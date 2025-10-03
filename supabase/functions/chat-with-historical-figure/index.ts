@@ -398,8 +398,11 @@ Remember: You're not just "a president" - you're JFK. Bring your specific voice,
         };
       } else if (provider === 'azure') {
         const azureResourceName = Deno.env.get('AZURE_RESOURCE_NAME') || 'copilotsearch';
-        const azureDeploymentName = Deno.env.get('AZURE_DEPLOYMENT_NAME') || 'Copilotsearch';
-        apiUrl = "https://" + azureResourceName + ".openai.azure.com/openai/deployments/" + azureDeploymentName + "/chat/completions?api-version=2024-08-01-preview";
+        const azureDeploymentName = Deno.env.get('AZURE_DEPLOYMENT_NAME') || 'firstProject';
+        
+        // Azure AI Foundry endpoint format (based on services.ai.azure.com)
+        apiUrl = "https://" + azureResourceName + ".services.ai.azure.com/api/projects/" + azureDeploymentName + "/chat/completions?api-version=2024-05-01-preview";
+        
         requestHeaders = {
           'api-key': azureApiKey!,
           'Content-Type': 'application/json',
