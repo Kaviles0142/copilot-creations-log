@@ -67,6 +67,77 @@ async function searchWithGoogleCustomSearch(query: string, type: string, num: nu
   }
 }
 
+// Helper function to search using Bing as fallback
+async function searchWithBing(query: string, type: string, num: number) {
+  const apiKey = Deno.env.get('AZURE_BING_SEARCH_API_KEY');
+  
+  if (!apiKey) {
+    console.log('Bing API key not available');
+    return null;
+  }
+
+  try {
+    const endpoint = type === 'news' 
+      ? 'https://api.bing.microsoft.com/v7.0/news/search'
+      : 'https://api.bing.microsoft.com/v7.0/search';
+    
+    const params = new URLSearchParams({
+      q: query.trim(),
+      count: num.toString(),
+      mkt: 'en-US'
+    });
+
+    if (type === 'news') {
+      params.set('freshness', 'Week');
+    }
+
+    const searchUrl = `${endpoint}?${params.toString()}`;
+    console.log('Trying Bing fallback...');
+
+    const response = await fetch(searchUrl, {
+      headers: {
+        'Ocp-Apim-Subscription-Key': apiKey
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Bing request failed:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    let processedResults = [];
+    
+    if (type === 'news' && data.value) {
+      processedResults = data.value.slice(0, num).map((item: any) => ({
+        title: item.name || '',
+        snippet: item.description || '',
+        link: item.url || '',
+        source: item.provider?.[0]?.name || extractDomain(item.url || ''),
+        date: item.datePublished || '',
+        thumbnail: item.image?.thumbnail?.contentUrl || '',
+        relevance_score: calculateRelevanceScore({ title: item.name, snippet: item.description }, query)
+      }));
+    } else if (data.webPages?.value) {
+      processedResults = data.webPages.value.slice(0, num).map((item: any) => ({
+        title: item.name || '',
+        snippet: item.snippet || '',
+        link: item.url || '',
+        source: extractDomain(item.url || ''),
+        relevance_score: calculateRelevanceScore({ title: item.name, snippet: item.snippet }, query)
+      }));
+    }
+
+    processedResults.sort((a: any, b: any) => b.relevance_score - a.relevance_score);
+    console.log(`Bing: Found ${processedResults.length} results`);
+    
+    return processedResults;
+  } catch (error) {
+    console.error('Bing error:', error);
+    return null;
+  }
+}
+
 // Helper function to search using SerpApi as fallback
 async function searchWithSerpApi(query: string, type: string, location: string, num: number) {
   const apiKey = Deno.env.get('SERPAPI_API_KEY');
@@ -162,14 +233,21 @@ Deno.serve(async (req) => {
     let results = await searchWithGoogleCustomSearch(query, type, num);
     let provider = 'google-custom-search';
     
-    // If Google Custom Search fails, fallback to SerpApi
+    // If Google Custom Search fails, fallback to Bing
+    if (results === null) {
+      console.log('Falling back to Bing...');
+      results = await searchWithBing(query, type, num);
+      provider = 'bing';
+    }
+    
+    // If Bing fails, fallback to SerpApi
     if (results === null) {
       console.log('Falling back to SerpApi...');
       results = await searchWithSerpApi(query, type, location, num);
       provider = 'serpapi';
     }
     
-    // If both fail, return error
+    // If all fail, return error
     if (results === null) {
       console.error('All search providers failed');
       return new Response(
