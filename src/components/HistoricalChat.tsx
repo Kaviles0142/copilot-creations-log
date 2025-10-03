@@ -86,7 +86,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
-  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude'>('claude'); // Claude as default
+  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude' | 'azure'>('claude'); // Claude as default
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
@@ -1518,11 +1518,11 @@ const HistoricalChat = () => {
               <Bot className="h-4 w-4 mr-2" />
               AI Provider
             </h3>
-            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude') => setSelectedAIProvider(value)}>
+            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude' | 'azure') => setSelectedAIProvider(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-card z-50">
                 <SelectItem value="claude">
                   <div className="flex items-center">
                     <span className="mr-2">🧠</span>
@@ -1541,6 +1541,12 @@ const HistoricalChat = () => {
                     Grok (X.AI)
                   </div>
                 </SelectItem>
+                <SelectItem value="azure">
+                  <div className="flex items-center">
+                    <span className="mr-2">🔷</span>
+                    Azure OpenAI (Bing)
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-2">
@@ -1548,6 +1554,8 @@ const HistoricalChat = () => {
                 ? 'Claude offers intelligent, nuanced responses with superior reasoning'
                 : selectedAIProvider === 'openai' 
                 ? 'OpenAI provides reliable, well-structured responses'
+                : selectedAIProvider === 'azure'
+                ? 'Azure OpenAI powered by Bing for enterprise-grade AI'
                 : 'Grok offers conversational, real-time aware responses'
               }
             </p>
