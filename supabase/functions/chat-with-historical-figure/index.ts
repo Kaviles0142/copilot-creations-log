@@ -75,8 +75,8 @@ serve(async (req) => {
         } else {
           console.log('🔍 Fetching fresh news data...');
           
-          // Fetch both general news AND political/government context
-          const [generalNewsResponse, politicalNewsResponse] = await Promise.all([
+          // Fetch general news, political context, AND recent deaths in parallel
+          const [generalNewsResponse, politicalNewsResponse, deathNewsResponse] = await Promise.all([
             supabase.functions.invoke('serpapi-search', {
               body: { 
                 query: 'top news today United States',
@@ -90,12 +90,20 @@ serve(async (req) => {
                 type: 'news',
                 num: 2
               }
+            }),
+            supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: 'recent deaths obituaries 2025 notable figures',
+                type: 'news',
+                num: 5
+              }
             })
           ]);
 
           const allNews = [
             ...(generalNewsResponse.data?.results || []),
-            ...(politicalNewsResponse.data?.results || [])
+            ...(politicalNewsResponse.data?.results || []),
+            ...(deathNewsResponse.data?.results || [])
           ];
 
           if (allNews.length > 0) {
@@ -113,7 +121,7 @@ serve(async (req) => {
             }, {
               onConflict: 'cache_key'
             });
-            console.log('💾 Cached fresh news data (including political context) for 24 hours');
+            console.log('💾 Cached fresh news data (including political context and recent deaths) for 24 hours');
           } else {
             console.log('⚠️ Current events search returned no results');
           }
