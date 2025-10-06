@@ -74,16 +74,32 @@ serve(async (req) => {
           currentEventsAvailable = true;
         } else {
           console.log('🔍 Fetching fresh news data...');
-          const generalNewsResponse = await supabase.functions.invoke('serpapi-search', {
-            body: { 
-              query: 'top news today United States',
-              type: 'news',
-              num: 5
-            }
-          });
+          
+          // Fetch both general news AND political/government context
+          const [generalNewsResponse, politicalNewsResponse] = await Promise.all([
+            supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: 'top news today United States',
+                type: 'news',
+                num: 3
+              }
+            }),
+            supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: 'US President current administration 2025',
+                type: 'news',
+                num: 2
+              }
+            })
+          ]);
 
-          if (generalNewsResponse.data?.results?.length > 0) {
-            newsData = generalNewsResponse.data.results;
+          const allNews = [
+            ...(generalNewsResponse.data?.results || []),
+            ...(politicalNewsResponse.data?.results || [])
+          ];
+
+          if (allNews.length > 0) {
+            newsData = allNews;
             currentEventsAvailable = true;
 
             // Cache the results for 24 hours to reduce API calls
@@ -97,7 +113,7 @@ serve(async (req) => {
             }, {
               onConflict: 'cache_key'
             });
-            console.log('💾 Cached fresh news data for 24 hours');
+            console.log('💾 Cached fresh news data (including political context) for 24 hours');
           } else {
             console.log('⚠️ Current events search returned no results');
           }
@@ -319,6 +335,12 @@ serve(async (req) => {
       month: 'long', 
       day: 'numeric' 
     });
+    
+    // Add explicit current political context
+    const currentPoliticalContext = `\n\n🏛️ CURRENT POLITICAL CONTEXT (October 2025):
+- Current U.S. President: Donald Trump (inaugurated January 20, 2025 for his second term)
+- Previous President: Joe Biden (2021-2025)
+- This information is essential for answering questions about current events and who is in office.`;
 
     const systemPrompt = `You are ${figure.name}, the 35th President of the United States. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.
 
@@ -352,6 +374,8 @@ YOUR CHARACTER:
 ${figure.description}
 
 ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
+
+${currentPoliticalContext}
 
 ${relevantKnowledge ? 'Background info (use naturally, weave into your responses): ' + relevantKnowledge : ''}
 
