@@ -347,10 +347,15 @@ serve(async (req) => {
     const periodLower = (figure.period || '').toLowerCase();
     const descLower = (figure.description || '').toLowerCase();
     
-    // Check if deceased (has death date, "died", or year range without "since")
+    // Check if deceased - look for multiple death indicators
     const isDeceased = periodLower.includes('died') || 
                        descLower.includes('died') ||
-                       (periodLower.match(/\d{4}[-–]\d{4}/) && !periodLower.includes('since') && !descLower.includes('since'));
+                       descLower.includes('death') ||
+                       descLower.includes('deceased') ||
+                       descLower.includes('passed away') ||
+                       periodLower.includes('death') ||
+                       // Year range like (1993-2025) without "since" or "born"
+                       (periodLower.match(/\d{4}[-–]\d{4}/) && !periodLower.includes('since') && !descLower.includes('since') && !periodLower.includes('born'));
     
     // Check if currently active in something
     const isCurrentlyActive = descLower.includes('since 2025') || 
