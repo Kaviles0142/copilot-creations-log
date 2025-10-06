@@ -283,6 +283,8 @@ const HistoricalChat = () => {
         'donald-trump': { voiceId: '1d49f394', title: `${figure.name} (Resemble AI - Custom)` },
       };
       
+      console.log(`🎙️ Checking Resemble voices for figure ID: "${figure.id}"`);
+      
       // Add figure-specific Resemble voice if available
       if (figureSpecificResembleVoices[figure.id]) {
         const specificVoice = figureSpecificResembleVoices[figure.id];
@@ -292,6 +294,9 @@ const HistoricalChat = () => {
           provider: 'resemble',
           voiceId: specificVoice.voiceId
         });
+        console.log(`✅ Added Resemble AI voice: "${specificVoice.title}"`);
+      } else {
+        console.log(`⚠️ No Resemble AI voice found for figure ID: "${figure.id}"`);
       }
       
       // Combine Resemble AI, ElevenLabs, and FakeYou voices
@@ -300,6 +305,11 @@ const HistoricalChat = () => {
         ...elevenLabsVoices, // ElevenLabs authentic voices second
         ...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))
       ];
+      
+      console.log(`📋 Combined voice list: ${allVoices.length} voices total`);
+      console.log(`   - Resemble AI: ${resembleVoices.length}`);
+      console.log(`   - ElevenLabs: ${elevenLabsVoices.length}`);
+      console.log(`   - FakeYou: ${matchingVoices.length}`);
       
       setAvailableFakeYouVoices(matchingVoices);
       setCombinedVoiceList(allVoices);
