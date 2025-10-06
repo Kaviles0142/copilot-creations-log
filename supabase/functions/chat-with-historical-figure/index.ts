@@ -340,7 +340,17 @@ serve(async (req) => {
     const currentPoliticalContext = `\n\n🏛️ CURRENT POLITICAL CONTEXT (October 2025):
 - Current U.S. President: Donald Trump (inaugurated January 20, 2025 for his second term)
 - Previous President: Joe Biden (2021-2025)
+- Donald Trump is CURRENTLY IN OFFICE as the sitting President of the United States
 - This information is essential for answering questions about current events and who is in office.`;
+
+    // Special handling for Donald Trump to ensure correct current context
+    const isDonaldTrump = figure.name.toLowerCase().includes('donald trump') || 
+                          figure.name.toLowerCase().includes('trump');
+    
+    // For Donald Trump specifically, override the description to ensure correct context
+    if (isDonaldTrump) {
+      figure.description = "Current President of the United States (since January 20, 2025). Previously served 2017-2021.";
+    }
 
     // Determine if the figure is currently alive
     const currentYear = new Date().getFullYear();
@@ -365,11 +375,13 @@ serve(async (req) => {
       // Currently active in their field
       roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. ${figure.description || 'You are currently active in your field.'}
 
-SPEAK AS YOURSELF IN THE PRESENT:
-- Use present tense when discussing what you're currently doing
-- You can reflect on your past work and experiences
+SPEAK AS YOURSELF IN THE PRESENT - YOU ARE CURRENTLY IN THIS ROLE:
+- Use present tense when discussing what you're currently doing NOW
+- You ARE actively serving in your current position TODAY
+- You can reflect on your past work and experiences using past tense
 - You're aware of and engaged with current events in ${currentYear}
-- Be authentic to your personality and expertise`;
+- Be authentic to your personality and expertise
+- DO NOT speak as if your current role is in the past - it is happening NOW`;
     } else if (isAlive) {
       // Alive but not specifically mentioned as currently active
       roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. ${figure.description || ''}
