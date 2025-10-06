@@ -288,7 +288,7 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
       const beforeSearchFilter = voices.length;
       const searchLower = searchTerm.toLowerCase();
       
-      // More precise search filtering
+      // More flexible search filtering
       voices = voices.filter((v: any) => {
         const titleLower = v.title.toLowerCase();
         
@@ -298,19 +298,16 @@ async function listVoices(categoryFilter?: string, searchTerm?: string) {
         // Starts with search term
         if (titleLower.startsWith(searchLower)) return true;
         
+        // Contains search term (simple includes for better results)
+        if (titleLower.includes(searchLower)) return true;
+        
         // Multi-word search: all significant words must be in title
         const searchWords = searchLower.split(/\s+/).filter(w => w.length > 2);
         if (searchWords.length >= 2) {
           return searchWords.every(word => titleLower.includes(word));
         }
         
-        // Single word: require word boundaries
-        if (searchWords.length === 1 && searchWords[0].length > 3) {
-          const regex = new RegExp(`\\b${searchWords[0]}\\b`, 'i');
-          return regex.test(titleLower);
-        }
-        
-        return titleLower.includes(searchLower);
+        return false;
       });
       
       console.log(`🔍 Search filter "${searchTerm}" reduced voices from ${beforeSearchFilter} to ${voices.length}`);
