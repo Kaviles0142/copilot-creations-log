@@ -78,27 +78,65 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
 
     setIsSearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke('wikipedia-search', {
-        body: { 
-          query: searchQuery,
-          limit: 5
+      // Search Wikipedia AND Google in parallel for more comprehensive results
+      const [wikipediaResponse, googleResponse] = await Promise.all([
+        supabase.functions.invoke('wikipedia-search', {
+          body: { 
+            query: searchQuery,
+            limit: 5
+          }
+        }),
+        supabase.functions.invoke('serpapi-search', {
+          body: { 
+            query: `${searchQuery} biography death born`,
+            type: 'web',
+            num: 3
+          }
+        })
+      ]);
+
+      if (wikipediaResponse.error) throw wikipediaResponse.error;
+
+      const results: WikipediaData[] = [];
+      
+      // Process Wikipedia results first
+      if (wikipediaResponse.data.success) {
+        // Add main Wikipedia result if available
+        if (wikipediaResponse.data.data) {
+          const wikiData = wikipediaResponse.data.data;
+          
+          // Enhance with Google search results for death detection
+          let enhancedDescription = wikiData.description || wikiData.extract.substring(0, 200);
+          
+          if (googleResponse.data?.success && googleResponse.data.results) {
+            const googleSnippets = googleResponse.data.results
+              .map((r: any) => r.snippet || '')
+              .join(' ')
+              .toLowerCase();
+            
+            // Check Google results for death indicators
+            if (googleSnippets.includes('died') || 
+                googleSnippets.includes('death') || 
+                googleSnippets.includes('deceased') ||
+                googleSnippets.includes('passed away')) {
+              
+              // Extract death info from Google if Wikipedia doesn't have it
+              const deathMatch = googleSnippets.match(/(died|passed away|death)[\s\w,]*(\d{1,2}[\s\w,]*\d{4})/i);
+              if (deathMatch && !enhancedDescription.toLowerCase().includes('died')) {
+                enhancedDescription = `${enhancedDescription} (Recent reports indicate passed away)`;
+              }
+            }
+          }
+          
+          results.push({
+            ...wikiData,
+            description: enhancedDescription
+          });
         }
-      });
 
-      if (error) throw error;
-
-      if (data.success) {
-        const results: WikipediaData[] = [];
-        
-        // Add main result if available
-        if (data.data) {
-          results.push(data.data);
-        }
-
-        // Add search results if available
-        if (data.searchResults) {
-          for (const result of data.searchResults.slice(0, 4)) {
-            // Get detailed info for each search result
+        // Add additional Wikipedia search results
+        if (wikipediaResponse.data.searchResults) {
+          for (const result of wikipediaResponse.data.searchResults.slice(0, 4)) {
             try {
               const detailResponse = await supabase.functions.invoke('wikipedia-search', {
                 body: { query: result.title }
@@ -130,7 +168,7 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
           });
         }
       } else {
-        throw new Error(data.error || 'Search failed');
+        throw new Error(wikipediaResponse.data.error || 'Search failed');
       }
     } catch (error) {
       console.error('Search error:', error);
