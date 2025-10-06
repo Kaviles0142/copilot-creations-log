@@ -277,9 +277,27 @@ const HistoricalChat = () => {
         });
       }
       
-      // Combine FakeYou and ElevenLabs voices
+      // Add Resemble AI voices - figure-specific
+      const resembleVoices = [];
+      const figureSpecificResembleVoices: Record<string, { voiceId: string; title: string }> = {
+        'donald-trump': { voiceId: '1d49f394', title: `${figure.name} (Resemble AI - Custom)` },
+      };
+      
+      // Add figure-specific Resemble voice if available
+      if (figureSpecificResembleVoices[figure.id]) {
+        const specificVoice = figureSpecificResembleVoices[figure.id];
+        resembleVoices.push({
+          voiceToken: `resemble_${figure.id}_custom`,
+          title: specificVoice.title,
+          provider: 'resemble',
+          voiceId: specificVoice.voiceId
+        });
+      }
+      
+      // Combine Resemble AI, ElevenLabs, and FakeYou voices
       const allVoices = [
-        ...elevenLabsVoices, // ElevenLabs authentic voices first
+        ...resembleVoices, // Resemble AI custom voices first
+        ...elevenLabsVoices, // ElevenLabs authentic voices second
         ...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))
       ];
       
@@ -769,6 +787,38 @@ const HistoricalChat = () => {
       }
       
       // Check which provider to use
+      if (selectedFakeYouVoice.provider === 'resemble') {
+        console.log(`✅ Using Resemble AI voice: "${selectedFakeYouVoice.title}"`);
+        
+        toast({
+          title: "Generating Resemble AI voice",
+          description: `Using "${selectedFakeYouVoice.title}"...`,
+          duration: 3000,
+        });
+        
+        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+          body: { 
+            text: text,
+            voice: selectedFakeYouVoice.voiceId,
+            figure_name: figure.name
+          }
+        });
+
+        if (error) {
+          console.error('❌ Resemble AI TTS Error:', error);
+          throw error;
+        }
+
+        if (!data?.audioContent) {
+          console.error('❌ No audio content received from Resemble AI');
+          throw new Error('No audio content');
+        }
+
+        console.log('✅ Resemble AI TTS successful');
+        playAudioFromBase64(data.audioContent);
+        return;
+      }
+      
       if (selectedFakeYouVoice.provider === 'elevenlabs') {
         console.log(`✅ Using ElevenLabs voice: "${selectedFakeYouVoice.title}"`);
         
@@ -1599,7 +1649,7 @@ const HistoricalChat = () => {
                   </Select>
                   <p className="text-xs text-muted-foreground mt-2">
                     {combinedVoiceList.length} voice{combinedVoiceList.length !== 1 ? 's' : ''} available for {selectedFigure.name}
-                    {selectedFakeYouVoice && ` • ${selectedFakeYouVoice.provider === 'elevenlabs' ? 'ElevenLabs' : 'FakeYou'}`}
+                    {selectedFakeYouVoice && ` • ${selectedFakeYouVoice.provider === 'resemble' ? 'Resemble AI' : selectedFakeYouVoice.provider === 'elevenlabs' ? 'ElevenLabs' : 'FakeYou'}`}
                   </p>
                 </>
               ) : (
