@@ -39,9 +39,8 @@ serve(async (req) => {
 
     console.log(`Using Resemble.ai voice ID: ${voiceId} for text: "${text.substring(0, 50)}..."`);
 
-    // Call Resemble.ai TTS API - using proper project setup
-    const projectId = Deno.env.get('RESEMBLE_PROJECT_ID') || 'default';
-    const apiUrl = `https://app.resemble.ai/api/v2/projects/${projectId}/clips`;
+    // Call Resemble.ai TTS API - using direct synthesis endpoint
+    const apiUrl = `https://p.cluster.resemble.ai/synthesize`;
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -50,63 +49,77 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        body: text,
         voice_uuid: voiceId,
-        precision: 'PCM_22050',
-        output_format: 'mp3',
-        is_public: false,
-        is_archived: false
+        data: text
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Resemble.ai API error:', response.status, errorText);
+      console.error('Resemble.ai API error:', response.status, errorText.substring(0, 500));
       
       // Check if this is an HTML error page (common issue we've seen)
       if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html')) {
-        console.error('Received HTML error page from Resemble.ai - API may be down');
+        console.error('Received HTML error page from Resemble.ai - API may be down or wrong endpoint');
         throw new Error('Resemble.ai service unavailable - received HTML error page');
       }
       
-      throw new Error(`Resemble.ai API error: ${response.status} - ${errorText}`);
+      throw new Error(`Resemble.ai API error: ${response.status}`);
     }
 
+    console.log('✅ Resemble.ai API responded successfully');
     const result = await response.json();
+    console.log('Response structure:', Object.keys(result));
     
-    // Resemble.ai returns a URL to the generated audio
-    if (result.audio_url) {
-      // Download the audio and convert to base64
-      const audioResponse = await fetch(result.audio_url);
+    // The direct synthesis endpoint returns the audio directly or as a URL
+    // Check for different possible response formats
+    let audioBuffer: ArrayBuffer;
+    
+    if (result.audio_url || result.url) {
+      // If it returns a URL, download it
+      const audioUrl = result.audio_url || result.url;
+      console.log('Downloading audio from URL:', audioUrl);
+      const audioResponse = await fetch(audioUrl);
       if (!audioResponse.ok) {
         throw new Error('Failed to download generated audio');
       }
-
-      const audioBuffer = await audioResponse.arrayBuffer();
-      const uint8Array = new Uint8Array(audioBuffer);
-      
-      // Convert to base64 in chunks
-      let binary = '';
-      const chunkSize = 0x8000;
-      
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      audioBuffer = await audioResponse.arrayBuffer();
+    } else if (result.audio || result.data) {
+      // If it returns base64 audio directly
+      const audioData = result.audio || result.data;
+      console.log('Using direct audio data from response');
+      const binaryString = atob(audioData);
+      const uint8 = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        uint8[i] = binaryString.charCodeAt(i);
       }
-      
-      const base64Audio = btoa(binary);
-
-      console.log(`Successfully generated Resemble.ai audio of ${audioBuffer.byteLength} bytes`);
-
-      return new Response(
-        JSON.stringify({ audioContent: base64Audio }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      audioBuffer = uint8.buffer;
     } else {
-      throw new Error('No audio URL returned from Resemble.ai');
+      console.error('Unexpected response format:', JSON.stringify(result).substring(0, 200));
+      throw new Error('Unexpected response format from Resemble.ai');
     }
+
+    const uint8Array = new Uint8Array(audioBuffer);
+    
+    // Convert to base64 in chunks
+    let binary = '';
+    const chunkSize = 0x8000;
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    
+    const base64Audio = btoa(binary);
+
+    console.log(`✅ Successfully generated Resemble.ai audio of ${audioBuffer.byteLength} bytes`);
+
+    return new Response(
+      JSON.stringify({ audioContent: base64Audio }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
 
   } catch (error) {
     console.error('Error in resemble-text-to-speech:', error);
