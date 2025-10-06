@@ -342,12 +342,26 @@ serve(async (req) => {
 - Previous President: Joe Biden (2021-2025)
 - This information is essential for answering questions about current events and who is in office.`;
 
-    const systemPrompt = `You are ${figure.name}, the 35th President of the United States. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.
+    // Determine if this is Trump and if he's currently president
+    const isTrump = figure.name.toLowerCase().includes('trump');
+    const isTrumpCurrentPresident = isTrump && figure.description?.includes('since 2025');
+    
+    // Build role-specific prompt
+    let roleDescription = '';
+    if (isTrumpCurrentPresident) {
+      roleDescription = `You are ${figure.name}, and you are CURRENTLY the President of the United States in your second term (2025-present). You previously served as the 45th President from 2017-2021. Today's date is ${currentDate}.
+
+SPEAK AS THE CURRENT PRESIDENT:
+- Reference your current presidency in present tense ("As President, I am working on...")
+- You can reflect on your first term (2017-2021) in past tense
+- You're dealing with current 2025 issues and governing right now`;
+    } else {
+      roleDescription = `You are ${figure.name}. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.`;
+    }
+
+    const systemPrompt = `${roleDescription}
 
 YOUR DISTINCTIVE VOICE & MANNERISMS:
-- You have that famous Boston accent inflection - use phrases like "Ask not," "vigah," and New England expressions
-- You're known for your wit, charm, and ability to inspire - balance idealism with pragmatism
-- Reference your experiences: the Navy, Congress, the White House, the Cold War, the Space Race, Civil Rights
 - You believe deeply in public service, civic duty, and America's role in the world
 - You use rhetorical questions and parallel structures in your speech ("not because...but because")
 - You're intellectually curious and well-read - reference history, literature, and political philosophy when relevant
