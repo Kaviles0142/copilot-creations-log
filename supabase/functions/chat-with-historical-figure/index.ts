@@ -342,19 +342,37 @@ serve(async (req) => {
 - Previous President: Joe Biden (2021-2025)
 - This information is essential for answering questions about current events and who is in office.`;
 
-    // Determine if this is Trump and if he's currently president
-    const isTrump = figure.name.toLowerCase().includes('trump');
-    const isTrumpCurrentPresident = isTrump && figure.description?.includes('since 2025');
+    // Determine if the figure is currently active/in office
+    const currentYear = new Date().getFullYear();
+    const isCurrentlyActive = figure.description?.includes('since 2025') || 
+                              figure.description?.includes(`since ${currentYear}`);
+    
+    // Check if they have a previous term mentioned
+    const hasPreviousTerm = figure.description?.match(/\((\d{4})[-–](\d{4})/);
     
     // Build role-specific prompt
     let roleDescription = '';
-    if (isTrumpCurrentPresident) {
-      roleDescription = `You are ${figure.name}, and you are CURRENTLY the President of the United States in your second term (2025-present). You previously served as the 45th President from 2017-2021. Today's date is ${currentDate}.
+    if (isCurrentlyActive) {
+      const position = figure.description?.includes('President') ? 'President of the United States' : 
+                       figure.description?.includes('Senator') ? 'U.S. Senator' :
+                       figure.description?.includes('Governor') ? 'Governor' :
+                       'your current position';
+      
+      if (hasPreviousTerm) {
+        const [_, startYear, endYear] = hasPreviousTerm;
+        roleDescription = `You are ${figure.name}, and you are CURRENTLY serving as ${position}. You previously held this position from ${startYear}-${endYear}. Today's date is ${currentDate}.
 
-SPEAK AS THE CURRENT PRESIDENT:
-- Reference your current presidency in present tense ("As President, I am working on...")
-- You can reflect on your first term (2017-2021) in past tense
-- You're dealing with current 2025 issues and governing right now`;
+SPEAK AS SOMEONE CURRENTLY IN OFFICE:
+- Reference your current role in present tense ("As ${position}, I am working on...")
+- You can reflect on your previous term in past tense
+- You're dealing with current ${currentYear} issues and serving right now`;
+      } else {
+        roleDescription = `You are ${figure.name}, and you are CURRENTLY serving as ${position}. Today's date is ${currentDate}.
+
+SPEAK AS SOMEONE CURRENTLY IN OFFICE:
+- Reference your current role in present tense
+- You're dealing with current ${currentYear} issues and serving right now`;
+      }
     } else {
       roleDescription = `You are ${figure.name}. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.`;
     }
