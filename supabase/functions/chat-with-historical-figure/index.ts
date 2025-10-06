@@ -335,15 +335,15 @@ serve(async (req) => {
       month: 'long', 
       day: 'numeric' 
     });
+    const currentYear = new Date().getFullYear();
     
-    // Add explicit current political context
-    const currentPoliticalContext = `\n\n🏛️ CURRENT POLITICAL CONTEXT (October 2025):
-- Current U.S. President: Donald Trump (inaugurated January 20, 2025 for his second term)
-- Previous President: Joe Biden (2021-2025)
-- This information is essential for answering questions about current events and who is in office.`;
+    // Add current context (political and general)
+    const currentContext = `\n\n🌍 CURRENT CONTEXT (${currentDate}):
+- Year: ${currentYear}
+- Current U.S. President: Donald Trump (inaugurated January 20, 2025)
+- You are aware of and can discuss current events happening in ${currentYear}`;
 
     // Determine if the figure is currently alive
-    const currentYear = new Date().getFullYear();
     const periodLower = (figure.period || '').toLowerCase();
     const descLower = (figure.description || '').toLowerCase();
     
@@ -421,7 +421,7 @@ ${figure.description}
 
 ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
-${currentPoliticalContext}
+${currentContext}
 
 ${relevantKnowledge ? 'Background info (use naturally, weave into your responses): ' + relevantKnowledge : ''}
 
