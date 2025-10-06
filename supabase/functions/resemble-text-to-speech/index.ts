@@ -75,7 +75,17 @@ serve(async (req) => {
     // Check for different possible response formats
     let audioBuffer: ArrayBuffer;
     
-    if (result.audio_url || result.url) {
+    if (result.audio_content) {
+      // Resemble returns base64 audio in audio_content field
+      console.log('Using audio_content from Resemble.ai response');
+      const audioData = result.audio_content;
+      const binaryString = atob(audioData);
+      const uint8 = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        uint8[i] = binaryString.charCodeAt(i);
+      }
+      audioBuffer = uint8.buffer;
+    } else if (result.audio_url || result.url) {
       // If it returns a URL, download it
       const audioUrl = result.audio_url || result.url;
       console.log('Downloading audio from URL:', audioUrl);
