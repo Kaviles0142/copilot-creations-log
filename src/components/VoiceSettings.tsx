@@ -62,6 +62,12 @@ const historicalVoices = {
     description: "1960s American, laid-back musician",
     elevenlabsVoice: "Will",
     voiceId: "bIHbv24MWmeRgasZH58o"
+  },
+  "donald-trump": {
+    description: "New York accent, bold and direct",
+    resembleVoice: "Donald Trump",
+    voiceId: "1d49f394",
+    provider: "resemble"
   }
 };
 
@@ -201,17 +207,29 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
 
     setIsGenerating(true);
     try {
+      // Check if we should use Resemble AI voice
+      const figureVoiceConfig = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
+      const shouldUseResemble = (figureVoiceConfig && 'provider' in figureVoiceConfig && figureVoiceConfig.provider === 'resemble') || selectedVoice.startsWith('resemble-');
+      
       // Check if we have a real cloned voice from the pipeline
       const customVoice = clonedVoices.find(v => v.provider === 'resemble' && !v.voice_id.includes('fallback'));
       
-      if (customVoice && selectedVoice === "auto") {
-        console.log('Using real cloned voice:', customVoice.voice_id);
+      if ((customVoice && selectedVoice === "auto") || shouldUseResemble || selectedVoice.startsWith('resemble-')) {
+        console.log('Using Resemble AI voice');
         
-        // Use the actual cloned voice through Resemble AI
+        // Determine which voice ID to use
+        let resembleVoiceId = customVoice?.voice_id;
+        if (selectedVoice.startsWith('resemble-')) {
+          resembleVoiceId = selectedVoice.replace('resemble-', '');
+        } else if (figureVoiceConfig && 'provider' in figureVoiceConfig && figureVoiceConfig.provider === 'resemble') {
+          resembleVoiceId = figureVoiceConfig.voiceId;
+        }
+        
+        // Use Resemble AI
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
           body: {
             text: text,
-            voice: customVoice.voice_id,
+            voice: resembleVoiceId,
             figure_name: selectedFigure.name
           }
         });
@@ -224,8 +242,8 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
         onVoiceGenerated(audioUrl);
         
         toast({
-          title: "Real Cloned Voice Generated!",
-          description: `Generated speech with actual ${selectedFigure.name} voice clone`,
+          title: "Resemble AI Voice Generated!",
+          description: `Generated speech with ${selectedFigure.name} voice`,
         });
         return;
       }
@@ -328,6 +346,13 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
               <SelectItem value="auto">
                 {hasCustomVoice ? "🤖 Auto (Custom Trained)" : "🎭 Auto (Historical Match)"}
               </SelectItem>
+              
+              {/* Resemble AI Voices */}
+              <SelectItem value="resemble-1d49f394">
+                🎙️ Donald Trump (Resemble AI)
+              </SelectItem>
+              
+              {/* ElevenLabs Voices */}
               <SelectItem value="9BWtsMINqrJLrRacOk9x">
                 👩 Aria (Female, Warm)
               </SelectItem>
@@ -368,7 +393,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
           : isCloning
             ? `Creating custom voice for ${selectedFigure.name}...`
             : figureVoice 
-              ? `Using ${figureVoice.elevenlabsVoice} voice profile for authentic ${selectedFigure.name} speech`
+              ? `Using ${figureVoice && 'elevenlabsVoice' in figureVoice ? figureVoice.elevenlabsVoice : figureVoice && 'resembleVoice' in figureVoice ? figureVoice.resembleVoice : 'voice'} profile for authentic ${selectedFigure.name} speech`
               : "Custom voice profile not available, using standard TTS"
         }
       </p>
