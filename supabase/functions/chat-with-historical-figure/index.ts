@@ -344,57 +344,49 @@ serve(async (req) => {
 
     // Determine if the figure is currently alive
     const currentYear = new Date().getFullYear();
-    const isCurrentlyActive = figure.description?.includes('since 2025') || 
-                              figure.description?.includes(`since ${currentYear}`);
-    
-    // Check if the period indicates they're deceased (has end date or "died" mentioned)
     const periodLower = (figure.period || '').toLowerCase();
     const descLower = (figure.description || '').toLowerCase();
+    
+    // Check if deceased (has death date, "died", or year range without "since")
     const isDeceased = periodLower.includes('died') || 
-                       periodLower.includes('–') && !periodLower.includes('since') ||
                        descLower.includes('died') ||
-                       (periodLower.match(/\d{4}[-–]\d{4}/) && !descLower.includes('since'));
+                       (periodLower.match(/\d{4}[-–]\d{4}/) && !periodLower.includes('since') && !descLower.includes('since'));
     
-    const isAlive = !isDeceased || isCurrentlyActive;
+    // Check if currently active in something
+    const isCurrentlyActive = descLower.includes('since 2025') || 
+                              descLower.includes(`since ${currentYear}`) ||
+                              descLower.includes('current');
     
-    // Check if they have a previous term/position mentioned
-    const hasPreviousTerm = figure.description?.match(/\((\d{4})[-–](\d{4})/);
+    const isAlive = !isDeceased;
     
     // Build role-specific prompt
     let roleDescription = '';
     if (isAlive && isCurrentlyActive) {
-      // Currently holding a position
-      const position = figure.description?.includes('President') ? 'President of the United States' : 
-                       figure.description?.includes('Senator') ? 'U.S. Senator' :
-                       figure.description?.includes('Governor') ? 'Governor' :
-                       'your current position';
-      
-      if (hasPreviousTerm) {
-        const [_, startYear, endYear] = hasPreviousTerm;
-        roleDescription = `You are ${figure.name}, and you are CURRENTLY serving as ${position}. You previously held this position from ${startYear}-${endYear}. Today's date is ${currentDate}.
-
-SPEAK AS SOMEONE CURRENTLY IN OFFICE:
-- Reference your current role in present tense ("As ${position}, I am working on...")
-- You can reflect on your previous term in past tense
-- You're dealing with current ${currentYear} issues and serving right now`;
-      } else {
-        roleDescription = `You are ${figure.name}, and you are CURRENTLY serving as ${position}. Today's date is ${currentDate}.
-
-SPEAK AS SOMEONE CURRENTLY IN OFFICE:
-- Reference your current role in present tense
-- You're dealing with current ${currentYear} issues and serving right now`;
-      }
-    } else if (isAlive) {
-      // Alive but not currently in a specific position
-      roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. You are currently alive and engaged with current events.
+      // Currently active in their field
+      roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. ${figure.description || 'You are currently active in your field.'}
 
 SPEAK AS YOURSELF IN THE PRESENT:
-- Use present tense when discussing yourself and current events
+- Use present tense when discussing what you're currently doing
+- You can reflect on your past work and experiences
+- You're aware of and engaged with current events in ${currentYear}
+- Be authentic to your personality and expertise`;
+    } else if (isAlive) {
+      // Alive but not specifically mentioned as currently active
+      roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. ${figure.description || ''}
+
+SPEAK AS YOURSELF IN THE PRESENT:
+- Use present tense when discussing yourself
 - You're aware of and can comment on what's happening in ${currentYear}
-- Reflect on your past experiences but speak as someone living today`;
+- Reflect on your life experiences but speak as someone living today
+- Be authentic to your personality and background`;
     } else {
       // Historical figure who has passed
-      roleDescription = `You are ${figure.name}. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.`;
+      roleDescription = `You are ${figure.name}. Today's date is ${currentDate}, and you're speaking in the present day. You were prominent ${figure.period}, but you're fully aware of everything that has happened since then up to today.
+
+SPEAK FROM YOUR HISTORICAL PERSPECTIVE:
+- You can reference your lifetime and experiences
+- You're aware of modern events and can comment on them
+- Be authentic to your personality and era`;
     }
 
     const systemPrompt = `${roleDescription}
