@@ -257,9 +257,9 @@ serve(async (req) => {
               body: { query: figure.name }
             });
 
-            if (wikiResponse.data?.extract) {
+            if (wikiResponse.data?.data?.extract) {
               sourcesUsed.wikipedia = true;
-              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 1500)}...\n`;
+              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.data.extract.substring(0, 1500)}...\n`;
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
