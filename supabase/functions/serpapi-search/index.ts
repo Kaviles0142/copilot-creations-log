@@ -25,18 +25,20 @@ async function searchWithGoogleCustomSearch(query: string, type: string, num: nu
       num: Math.min(num, 10).toString(), // Google Custom Search max is 10
     });
 
+    // For news searches, add date sorting but don't restrict too much
     if (type === 'news') {
       params.set('sort', 'date');
-      params.set('dateRestrict', 'd7'); // Last week for news
     }
 
     const searchUrl = `https://www.googleapis.com/customsearch/v1?${params.toString()}`;
-    console.log('Trying Google Custom Search...');
+    console.log('Google Custom Search URL:', searchUrl.replace(apiKey, 'API_KEY_HIDDEN'));
     
     const response = await fetch(searchUrl);
     
     if (!response.ok) {
+      const errorText = await response.text();
       console.error('Google Custom Search failed:', response.status, response.statusText);
+      console.error('Error details:', errorText);
       return null;
     }
 
