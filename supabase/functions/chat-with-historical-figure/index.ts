@@ -340,17 +340,7 @@ serve(async (req) => {
     const currentPoliticalContext = `\n\n🏛️ CURRENT POLITICAL CONTEXT (October 2025):
 - Current U.S. President: Donald Trump (inaugurated January 20, 2025 for his second term)
 - Previous President: Joe Biden (2021-2025)
-- Donald Trump is CURRENTLY IN OFFICE as the sitting President of the United States
 - This information is essential for answering questions about current events and who is in office.`;
-
-    // Special handling for Donald Trump to ensure correct current context
-    const isDonaldTrump = figure.name.toLowerCase().includes('donald trump') || 
-                          figure.name.toLowerCase().includes('trump');
-    
-    // For Donald Trump specifically, override the description to ensure correct context
-    if (isDonaldTrump) {
-      figure.description = "Current President of the United States (since January 20, 2025). Previously served 2017-2021.";
-    }
 
     // Determine if the figure is currently alive
     const currentYear = new Date().getFullYear();
