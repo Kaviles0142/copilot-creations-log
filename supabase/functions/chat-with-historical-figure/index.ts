@@ -257,9 +257,9 @@ serve(async (req) => {
               body: { query: figure.name }
             });
 
-            if (wikiResponse.data?.data?.extract) {
+            if (wikiResponse.data?.extract) {
               sourcesUsed.wikipedia = true;
-              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.data.extract.substring(0, 1500)}...\n`;
+              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 1500)}...\n`;
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
@@ -335,15 +335,15 @@ serve(async (req) => {
       month: 'long', 
       day: 'numeric' 
     });
-    const currentYear = new Date().getFullYear();
     
-    // Add current context (political and general)
-    const currentContext = `\n\n🌍 CURRENT CONTEXT (${currentDate}):
-- Year: ${currentYear}
-- Current U.S. President: Donald Trump (inaugurated January 20, 2025)
-- You are aware of and can discuss current events happening in ${currentYear}`;
+    // Add explicit current political context
+    const currentPoliticalContext = `\n\n🏛️ CURRENT POLITICAL CONTEXT (October 2025):
+- Current U.S. President: Donald Trump (inaugurated January 20, 2025 for his second term)
+- Previous President: Joe Biden (2021-2025)
+- This information is essential for answering questions about current events and who is in office.`;
 
     // Determine if the figure is currently alive
+    const currentYear = new Date().getFullYear();
     const periodLower = (figure.period || '').toLowerCase();
     const descLower = (figure.description || '').toLowerCase();
     
@@ -365,13 +365,11 @@ serve(async (req) => {
       // Currently active in their field
       roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. ${figure.description || 'You are currently active in your field.'}
 
-SPEAK AS YOURSELF IN THE PRESENT - YOU ARE CURRENTLY IN THIS ROLE:
-- Use present tense when discussing what you're currently doing NOW
-- You ARE actively serving in your current position TODAY
-- You can reflect on your past work and experiences using past tense
+SPEAK AS YOURSELF IN THE PRESENT:
+- Use present tense when discussing what you're currently doing
+- You can reflect on your past work and experiences
 - You're aware of and engaged with current events in ${currentYear}
-- Be authentic to your personality and expertise
-- DO NOT speak as if your current role is in the past - it is happening NOW`;
+- Be authentic to your personality and expertise`;
     } else if (isAlive) {
       // Alive but not specifically mentioned as currently active
       roleDescription = `You are ${figure.name}, speaking today on ${currentDate}. ${figure.description || ''}
@@ -421,7 +419,7 @@ ${figure.description}
 
 ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
-${currentContext}
+${currentPoliticalContext}
 
 ${relevantKnowledge ? 'Background info (use naturally, weave into your responses): ' + relevantKnowledge : ''}
 

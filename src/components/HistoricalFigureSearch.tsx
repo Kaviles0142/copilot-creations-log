@@ -147,15 +147,11 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
   const selectFigure = (result: WikipediaData) => {
     const period = extractPeriodFromText(result.extract);
     
-    // Use the full description from Wikipedia, not just first 100 chars of extract
-    // This ensures we capture important context like "since 2025" or current roles
-    const fullDescription = result.description || result.extract.substring(0, 200);
-    
     const figure: HistoricalFigure = {
       id: generateFigureId(result.title),
       name: result.title,
       period: period,
-      description: fullDescription,
+      description: result.description || result.extract.substring(0, 100) + "...",
       avatar: "🎭" // Default avatar
     };
 
