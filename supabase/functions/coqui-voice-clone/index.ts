@@ -286,8 +286,64 @@ async function findHistoricalAudio(figureName: string): Promise<string | null> {
   return null;
 }
 
-// Create fallback voice when cloning fails
+// Gender detection function based on historical figure names
+function detectGender(figureName: string): 'male' | 'female' {
+  const name = figureName.toLowerCase();
+  
+  // Known female figures
+  const femaleNames = [
+    'cleopatra', 'joan of arc', 'marie curie', 'rosa parks', 'harriet tubman',
+    'anne frank', 'helen keller', 'amelia earhart', 'mother teresa',
+    'queen elizabeth', 'queen victoria', 'ada lovelace', 'florence nightingale',
+    'frida kahlo', 'simone de beauvoir', 'virginia woolf', 'jane austen',
+    'emily dickinson', 'margaret thatcher', 'indira gandhi', 'golda meir',
+    'ruth bader ginsburg', 'malala', 'maya angelou', 'oprah', 'billie holiday',
+    'ella fitzgerald', 'aretha franklin', 'diana ross', 'madonna', 'beyonce'
+  ];
+  
+  // Check if the name contains any known female figure names
+  for (const femaleName of femaleNames) {
+    if (name.includes(femaleName)) {
+      return 'female';
+    }
+  }
+  
+  // Default to male for historical figures (majority are male in records)
+  return 'male';
+}
+
+// Create fallback voice when cloning fails - now uses Resemble AI marketplace voices
 function createFallbackVoice(figureName: string) {
+  const gender = detectGender(figureName);
+  console.log(`Creating Resemble AI fallback voice for ${figureName} (detected gender: ${gender})`);
+  
+  // Use real Resemble AI marketplace voices as fallbacks instead of Coqui/ElevenLabs
+  // This avoids additional API costs
+  const fallbackVoices = {
+    male: {
+      voice_id: 'arthur_marketplace',
+      voice_name: `${figureName} (Resemble AI Voice)`,
+      source_description: 'Professional male narrator voice from Resemble AI marketplace'
+    },
+    female: {
+      voice_id: 'niki_marketplace',
+      voice_name: `${figureName} (Resemble AI Voice)`,
+      source_description: 'Professional female conversational voice from Resemble AI marketplace'
+    }
+  };
+  
+  const selectedVoice = fallbackVoices[gender];
+  
+  return {
+    voice_id: selectedVoice.voice_id,
+    voice_name: selectedVoice.voice_name,
+    provider: 'resemble_marketplace',
+    source_description: selectedVoice.source_description
+  };
+}
+
+// Legacy code below - keeping for reference but no longer used
+function createOldFallbackVoice(figureName: string) {
   console.log(`Creating fallback voice for ${figureName}`);
   
   // High-quality fallback voices for different types of figures

@@ -134,22 +134,20 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in resemble-text-to-speech:', error);
     
-    // Try fallback speech generation with ElevenLabs
-    try {
-      return await generateFallbackSpeech(
-        requestData?.text || 'Error occurred',
-        requestData?.voice || 'default'
-      );
-    } catch (fallbackError) {
-      console.error('Fallback speech generation failed:', fallbackError);
-      return new Response(
-        JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+    // No longer using expensive ElevenLabs fallback - return error instead
+    // The frontend can handle the error and use browser TTS as a free fallback
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(
+      JSON.stringify({ 
+        error: errorMessage,
+        fallback_available: false,
+        message: 'Resemble AI failed. Please try browser text-to-speech as a free alternative.'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });
 
