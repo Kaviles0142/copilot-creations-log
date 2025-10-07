@@ -64,7 +64,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Found ${books.length} books, fetching content from Project Gutenberg and OpenLibrary...`);
+    console.log(`Found ${books.length} books, fetching content from multiple sources...`);
     const bookContents = [];
 
     for (const book of books) {
@@ -115,10 +115,76 @@ serve(async (req) => {
             }
           }
         } catch (gutenbergError) {
-          console.log(`Could not fetch from Gutenberg for ${book.title}, trying OpenLibrary...`);
+          console.log(`Could not fetch from Gutenberg for ${book.title}, trying other sources...`);
         }
 
-        // If Project Gutenberg didn't work, try OpenLibrary/Internet Archive
+        // Try Wikisource (good for historical texts)
+        if (!fullText) {
+          try {
+            const wikisourceQuery = encodeURIComponent(`${book.title} ${book.authors.join(' ')}`);
+            const wikisourceUrl = `https://en.wikisource.org/w/api.php?action=query&list=search&srsearch=${wikisourceQuery}&format=json&origin=*`;
+            
+            console.log(`Searching Wikisource: ${book.title}`);
+            const wikisourceResponse = await fetch(wikisourceUrl);
+            const wikisourceData = await wikisourceResponse.json();
+
+            if (wikisourceData.query?.search?.length > 0) {
+              const pageTitle = wikisourceData.query.search[0].title;
+              const contentUrl = `https://en.wikisource.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=extracts&explaintext=true&format=json&origin=*`;
+              
+              const contentResponse = await fetch(contentUrl);
+              const contentData = await contentResponse.json();
+              const pages = contentData.query.pages;
+              const pageId = Object.keys(pages)[0];
+              
+              if (pages[pageId].extract) {
+                fullText = pages[pageId].extract;
+                
+                // Extract relevant excerpt
+                const lowerText = fullText.toLowerCase();
+                const figureIndex = lowerText.indexOf(figureName.toLowerCase());
+                if (figureIndex !== -1) {
+                  const start = Math.max(0, figureIndex - 500);
+                  const end = Math.min(fullText.length, figureIndex + 1500);
+                  excerpt = fullText.substring(start, end);
+                } else {
+                  excerpt = fullText.substring(0, 2000);
+                }
+                
+                source = 'wikisource';
+                console.log(`Found Wikisource content for ${book.title}`);
+              }
+            }
+          } catch (wikisourceError) {
+            console.log(`Could not fetch from Wikisource for ${book.title}`);
+          }
+        }
+
+        // Try Chronicling America (for historical newspapers and periodicals)
+        if (!fullText && book.published_date && parseInt(book.published_date) < 1924) {
+          try {
+            const chronAmQuery = encodeURIComponent(figureName);
+            const chronAmUrl = `https://chroniclingamerica.loc.gov/search/pages/results/?andtext=${chronAmQuery}&format=json&rows=5`;
+            
+            console.log(`Searching Chronicling America: ${figureName}`);
+            const chronAmResponse = await fetch(chronAmUrl);
+            const chronAmData = await chronAmResponse.json();
+
+            if (chronAmData.items && chronAmData.items.length > 0) {
+              const item = chronAmData.items[0];
+              if (item.ocr_eng) {
+                fullText = item.ocr_eng;
+                excerpt = fullText.substring(0, 2000);
+                source = 'chronicling_america';
+                console.log(`Found Chronicling America content for ${figureName}`);
+              }
+            }
+          } catch (chronAmError) {
+            console.log(`Could not fetch from Chronicling America`);
+          }
+        }
+
+        // If still no content, try OpenLibrary/Internet Archive
         if (!fullText) {
           const searchQuery = encodeURIComponent(`${book.title} ${book.authors.join(' ')}`);
           const searchUrl = `https://openlibrary.org/search.json?q=${searchQuery}&limit=1`;
