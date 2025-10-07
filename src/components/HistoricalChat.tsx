@@ -851,12 +851,36 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
 
-      // Start TTS generation immediately without waiting
-      console.log('🎤 Attempting Resemble.ai TTS...');
+      // Priority 1: Check if FakeYou has a voice for this figure
+      if (availableFakeYouVoices && availableFakeYouVoices.length > 0) {
+        console.log(`🎯 FakeYou voices available (${availableFakeYouVoices.length}), using FakeYou as PRIMARY`);
+        
+        // Use the first FakeYou voice (or selected one if available)
+        const voiceToUse = selectedFakeYouVoice || availableFakeYouVoices[0];
+        
+        try {
+          // Temporarily set selected voice if not already set
+          const wasSelected = selectedFakeYouVoice;
+          if (!wasSelected) {
+            setSelectedFakeYouVoice(voiceToUse);
+          }
+          
+          await generateFakeYouVoice(text, figure);
+          console.log('✅ FakeYou TTS successful');
+          return;
+        } catch (fakeYouError) {
+          console.log('❌ FakeYou TTS failed, falling back to Resemble AI:', fakeYouError);
+        }
+      } else {
+        console.log('ℹ️ No FakeYou voices available, will use Resemble AI fallback');
+      }
+
+      // Priority 2: Fallback to Resemble AI marketplace voices
+      console.log('🎤 Using Resemble AI marketplace voice as fallback...');
       generatePremiumSpeech(text, figure).then(() => {
-        console.log('✅ Resemble.ai TTS successful');
+        console.log('✅ Resemble AI TTS successful');
       }).catch((premiumError) => {
-        console.log('❌ Resemble.ai TTS failed, falling back to browser speech:', premiumError);
+        console.log('❌ Resemble AI TTS failed, falling back to browser speech:', premiumError);
         if ('speechSynthesis' in window) {
           generateBrowserSpeech(text, figure);
         } else {
@@ -1327,79 +1351,71 @@ const HistoricalChat = () => {
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
     try {
-      // Check for existing cloned voice quickly
+      // Check for existing cloned Resemble voice
       const { data: existingVoices } = await supabase
         .from('cloned_voices')
-        .select('voice_id')
+        .select('voice_id, provider')
         .eq('figure_id', figure.id)
         .eq('is_active', true)
         .limit(1);
       
-      const clonedVoiceId = existingVoices?.[0]?.voice_id;
+      const clonedVoice = existingVoices?.[0];
       
-      if (clonedVoiceId && clonedVoiceId.startsWith('resemble_')) {
-        console.log(`🎯 Using CLONED voice: ${clonedVoiceId} for ${figure.name}`);
+      // If we have a Resemble cloned voice, use it
+      if (clonedVoice && clonedVoice.provider === 'resemble') {
+        console.log(`🎯 Using Resemble CLONED voice: ${clonedVoice.voice_id} for ${figure.name}`);
         
-        // Use ElevenLabs TTS for cloned voices
-        const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
           body: { 
             text: text,
-            voice: figure.name // Use figure name for voice mapping
+            voice: clonedVoice.voice_id,
+            figure_name: figure.name
           }
         });
 
-        // If ElevenLabs works, use it
+        // If Resemble works, use it
         if (!error && data?.audioContent) {
-          console.log('✅ Successfully used ElevenLabs TTS');
+          console.log('✅ Successfully used Resemble cloned voice');
           playAudioFromBase64(data.audioContent);
           return;
         } else {
-          console.warn('❌ ElevenLabs TTS failed, falling back to default:', error);
-        }
-      } else {
-        console.log('❌ No cloned voice found, creating premium voice clone...');
-        
-        // Try to create an authentic voice for this figure
-        try {
-          await getOrCreateAuthenticVoice(figure);
-          console.log('✅ Voice clone initiated, using fallback for now');
-        } catch (cloneError) {
-          console.warn('Voice cloning failed:', cloneError);
+          console.warn('❌ Resemble cloned voice failed, trying marketplace:', error);
         }
       }
       
-      // Use ElevenLabs as fallback with proper voice mapping
-      console.log(`🎵 Using ElevenLabs fallback for ${figure.name}`);
+      // No cloned voice, use Resemble marketplace fallback voices
+      console.log(`🎵 Using Resemble AI marketplace fallback for ${figure.name}`);
       
-      // Get the mapped voice ID for this figure
-      const fallbackVoice = getFallbackVoice(figure);
+      // Detect gender for marketplace voice selection
+      const isMale = detectGender(figure);
+      const marketplaceVoice = isMale ? 'arthur_marketplace' : 'niki_marketplace';
       
-      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+      console.log(`🎭 Detected gender: ${isMale ? 'male' : 'female'}, using ${marketplaceVoice}`);
+      
+      const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
         body: { 
           text: text,
-          voice: fallbackVoice // Use mapped voice ID instead of figure name
+          voice: marketplaceVoice,
+          figure_name: figure.name
         }
       });
 
       if (error) {
-        console.error('❌ ElevenLabs TTS Error:', error);
-        // Add a toast notification for quota exceeded errors
-        if (error.message?.includes('quota_exceeded') || error.message?.includes('401')) {
-          console.warn('ElevenLabs quota exceeded - voice unavailable');
-        }
-        return;
+        console.error('❌ Resemble marketplace TTS Error:', error);
+        throw error;
       }
 
       if (!data?.audioContent) {
-        console.error('❌ No audio content received from Premium TTS');
-        return;
+        console.error('❌ No audio content received from Resemble TTS');
+        throw new Error('No audio content');
       }
 
-      console.log('✅ Premium voice TTS successful');
+      console.log('✅ Resemble marketplace voice TTS successful');
       playAudioFromBase64(data.audioContent);
       
     } catch (error) {
       console.error('Error in generatePremiumSpeech:', error);
+      throw error;
     }
   };
 
