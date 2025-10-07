@@ -184,6 +184,52 @@ serve(async (req) => {
           }
         }
 
+        // Try Sacred Texts Archive (for religious/mythological texts)
+        if (!fullText) {
+          try {
+            const sacredQuery = encodeURIComponent(`${book.title} ${figureName}`);
+            const searchUrl = `https://www.google.com/search?q=site:sacred-texts.com+${sacredQuery}`;
+            
+            console.log(`Searching Sacred Texts Archive: ${book.title}`);
+            const searchResponse = await fetch(searchUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; HistoricalFigureBot/1.0)'
+              }
+            });
+            
+            if (searchResponse.ok) {
+              const html = await searchResponse.text();
+              const urlMatch = html.match(/https?:\/\/(?:www\.)?sacred-texts\.com\/[^\s"'<>]+/);
+              
+              if (urlMatch) {
+                const pageUrl = urlMatch[0];
+                const pageResponse = await fetch(pageUrl);
+                const pageHtml = await pageResponse.text();
+                
+                // Extract text content from the page
+                const textMatch = pageHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                if (textMatch) {
+                  let pageText = textMatch[1]
+                    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  
+                  if (pageText.length > 100) {
+                    fullText = pageText;
+                    excerpt = pageText.substring(0, 2000);
+                    source = 'sacred_texts';
+                    console.log(`Found Sacred Texts content for ${book.title}`);
+                  }
+                }
+              }
+            }
+          } catch (sacredError) {
+            console.log(`Could not fetch from Sacred Texts Archive for ${book.title}`);
+          }
+        }
+
         // If still no content, try OpenLibrary/Internet Archive
         if (!fullText) {
           const searchQuery = encodeURIComponent(`${book.title} ${book.authors.join(' ')}`);
