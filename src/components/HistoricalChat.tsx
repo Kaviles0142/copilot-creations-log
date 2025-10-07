@@ -1004,7 +1004,7 @@ const HistoricalChat = () => {
         body: {
           action: 'generate_tts',
           text: text.substring(0, 2000), // Increased limit for longer responses
-          voiceToken: selectedFakeYouVoice.voiceToken,
+          voiceToken: selectedFakeYouVoice.voiceId, // Use voiceId instead of voiceToken
         },
       });
       
