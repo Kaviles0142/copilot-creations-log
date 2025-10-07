@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface VoiceSettingsProps {
   selectedFigure: any;
   onVoiceGenerated: (audioUrl: string) => void;
+  onVoiceSelected?: (voiceId: string) => void;
 }
 
 interface ClonedVoice {
@@ -71,7 +72,7 @@ const historicalVoices = {
   }
 };
 
-const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps) => {
+const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: VoiceSettingsProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [cloningStatus, setCloningStatus] = useState<string>("");
@@ -338,7 +339,10 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated }: VoiceSettingsProps)
       <div className="space-y-3">
         <div>
           <label className="text-xs font-medium">Voice Style</label>
-          <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+          <Select value={selectedVoice} onValueChange={(value) => {
+            setSelectedVoice(value);
+            onVoiceSelected?.(value);
+          }}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>

@@ -94,6 +94,7 @@ const HistoricalChat = () => {
   const [selectedFakeYouVoice, setSelectedFakeYouVoice] = useState<any | null>(null);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const [combinedVoiceList, setCombinedVoiceList] = useState<any[]>([]); // Combined FakeYou + ElevenLabs
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -693,12 +694,19 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // Generate FakeYou voice using our dedicated edge function
+      // Generate voice using the selected voice from VoiceSettings
       if (isAutoVoiceEnabled && aiResponse.length > 20) {
-        console.log('🎙️ Starting FakeYou voice generation for:', selectedFigure!.name);
+        console.log('🎙️ Starting voice generation for:', selectedFigure!.name);
+        console.log('🎯 Using voice ID:', selectedVoiceId);
         
-        generateFakeYouVoice(aiResponse, selectedFigure!).catch(voiceError => {
-          console.error('FakeYou voice generation failed:', voiceError);
+        generateVoiceWithSelection(aiResponse, selectedFigure!, selectedVoiceId).catch(voiceError => {
+          console.error('Voice generation failed:', voiceError);
+          toast({
+            title: "FakeYou unavailable, switching to backup TTS",
+            description: "Using fallback voice",
+            variant: "default",
+            duration: 3000,
+          });
           // Fallback to standard TTS
           generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
             console.error('All speech generation failed:', speechError);
@@ -745,6 +753,84 @@ const HistoricalChat = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  // New function to generate voice with the selected voice from VoiceSettings
+  const generateVoiceWithSelection = async (text: string, figure: HistoricalFigure, voiceId: string) => {
+    console.log('🎯 Generating voice with selected ID:', voiceId);
+    
+    if (!isAutoVoiceEnabled) {
+      console.log('🔇 Auto voice is disabled, skipping speech');
+      return;
+    }
+
+    try {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      // If voice starts with "resemble-", use Resemble AI
+      if (voiceId.startsWith('resemble-')) {
+        const resembleVoiceId = voiceId.replace('resemble-', '');
+        console.log('🎤 Using Resemble AI with voice:', resembleVoiceId);
+        
+        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
+          body: { 
+            text: text,
+            voice: resembleVoiceId,
+            figure_name: figure.name
+          }
+        });
+
+        if (error || !data?.audioContent) {
+          throw new Error('Resemble AI TTS failed');
+        }
+
+        console.log('✅ Successfully used Resemble AI TTS');
+        playAudioFromBase64(data.audioContent);
+        return;
+      }
+
+      // Otherwise use ElevenLabs (or check for cloned voice if "auto")
+      if (voiceId === "auto") {
+        // Check for cloned voice
+        const { data: clonedVoiceData } = await supabase
+          .from('cloned_voices')
+          .select('voice_id')
+          .eq('figure_id', figure.id)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (clonedVoiceData && clonedVoiceData.length > 0) {
+          voiceId = clonedVoiceData[0].voice_id;
+          console.log('🎯 Using CLONED voice:', voiceId, 'for', figure.name);
+        } else {
+          // Use default voice for this figure from VoiceSettings mapping
+          voiceId = figure.name; // This will be mapped in elevenlabs-text-to-speech
+        }
+      }
+
+      console.log('🎤 Using ElevenLabs TTS with voice:', voiceId);
+      
+      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+        body: { 
+          text: text,
+          voice: voiceId
+        }
+      });
+
+      if (error || !data?.audioContent) {
+        throw new Error('ElevenLabs TTS failed');
+      }
+
+      console.log('✅ Successfully used ElevenLabs TTS');
+      playAudioFromBase64(data.audioContent);
+      
+    } catch (error) {
+      console.error('Error generating voice with selection:', error);
+      throw error;
     }
   };
 
@@ -1705,6 +1791,10 @@ const HistoricalChat = () => {
             onVoiceGenerated={(audioUrl) => {
               const audio = new Audio(audioUrl);
               audio.play();
+            }}
+            onVoiceSelected={(voiceId) => {
+              console.log('Voice selected:', voiceId);
+              setSelectedVoiceId(voiceId);
             }}
           />
 
