@@ -182,97 +182,10 @@ function assessAudioQuality(audioBuffer: ArrayBuffer): number {
 async function createResembleVoiceClone(apiKey: string, figureName: string, audioUrl: string | null) {
   console.log(`Creating Resemble.ai voice clone for ${figureName}`);
   
-  try {
-    // First, try to find historical audio for this figure
-    let cloneAudioUrl = audioUrl;
-    
-    if (!cloneAudioUrl) {
-      // Search for historical speeches/recordings online
-      cloneAudioUrl = await findHistoricalAudio(figureName);
-    }
-    
-    if (!cloneAudioUrl) {
-      console.log(`No audio source found for ${figureName}, using fallback`);
-      return createFallbackVoice(figureName);
-    }
-
-    console.log(`Using audio source: ${cloneAudioUrl}`);
-    
-    // Download the audio file
-    const audioResponse = await fetch(cloneAudioUrl);
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download audio for cloning: ${audioResponse.status}`);
-    }
-    
-    const audioBuffer = await audioResponse.arrayBuffer();
-    
-    // Create form data for Resemble.ai API
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
-    formData.append('file', audioBlob, 'voice_sample.wav');
-    formData.append('name', `${figureName}_historical_clone`);
-    formData.append('description', `Historical voice clone of ${figureName} from authentic recording`);
-
-    // Call Resemble.ai voice creation API
-    const response = await fetch('https://app.resemble.ai/api/v2/voices', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Resemble.ai voice creation error:', response.status, errorText);
-      
-      // Check for subscription-related errors
-      if (response.status === 403 || response.status === 402 || response.status === 401) {
-        console.error(`Resemble AI subscription error: ${response.status}`);
-        throw new Error(
-          `Resemble AI Business plan required for voice cloning. ` +
-          `Current error: ${response.status}. ` +
-          `Please upgrade at https://app.resemble.ai/billing to enable voice cloning API access.`
-        );
-      }
-      
-      // Try to parse the error to understand the issue
-      let errorDetail = 'Unknown error';
-      try {
-        const errorData = JSON.parse(errorText);
-        console.error('Parsed error:', errorData);
-        errorDetail = errorData.detail || errorData.message || errorText;
-      } catch (e) {
-        console.error('Raw error text:', errorText);
-        errorDetail = errorText;
-      }
-      
-      // If it's a plan limitation, throw an error instead of falling back
-      if (errorText.toLowerCase().includes('plan') || 
-          errorText.toLowerCase().includes('subscription') ||
-          errorText.toLowerCase().includes('upgrade')) {
-        throw new Error(`Resemble AI plan limitation: ${errorDetail}`);
-      }
-      
-      // For other errors, fallback to a preset voice
-      console.log('Using fallback voice due to API error');
-      return createFallbackVoice(figureName);
-    }
-
-    const result = await response.json();
-    console.log('Resemble.ai voice created successfully:', result);
-
-    return {
-      voice_id: result.uuid || result.id,
-      voice_name: `${figureName} (Authentic Clone)`,
-      provider: 'resemble'
-    };
-
-  } catch (error) {
-    console.error('Resemble.ai cloning error:', error);
-    // Fallback to preset voice
-    return createFallbackVoice(figureName);
-  }
+  // For now, skip audio cloning due to memory limits and use fallback voices
+  // This avoids downloading large audio files which cause the function to crash
+  console.log(`Using fallback voice for ${figureName} (audio cloning disabled to prevent memory issues)`);
+  return createFallbackVoice(figureName);
 }
 
 async function findHistoricalAudio(figureName: string): Promise<string | null> {
