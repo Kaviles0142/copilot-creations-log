@@ -290,7 +290,7 @@ function createFallbackVoice(figureName: string) {
       description: 'Professional male narrator voice from FakeYou'
     },
     female: {
-      id: 'weight_cvwnagsfbb4v0fag8c84sqat1',
+      id: 'weight_kprmcy9ws4r8zczbtyt6x5ede',
       name: `${figureName} (FakeYou Voice)`,
       description: 'Professional female narrator voice from FakeYou'
     }
