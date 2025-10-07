@@ -64,84 +64,134 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Found ${books.length} books, fetching content from OpenLibrary...`);
+    console.log(`Found ${books.length} books, fetching content from Project Gutenberg and OpenLibrary...`);
     const bookContents = [];
 
     for (const book of books) {
       try {
-        // Search OpenLibrary for the book
-        const searchQuery = encodeURIComponent(`${book.title} ${book.authors.join(' ')}`);
-        const searchUrl = `https://openlibrary.org/search.json?q=${searchQuery}&limit=1`;
-        
-        console.log(`Searching OpenLibrary: ${book.title}`);
-        const searchResponse = await fetch(searchUrl);
-        const searchData = await searchResponse.json();
+        let fullText = '';
+        let excerpt = book.description || '';
+        let source = 'openlibrary';
 
-        if (searchData.docs && searchData.docs.length > 0) {
-          const olBook = searchData.docs[0];
-          const olid = olBook.key?.split('/').pop();
+        // Try Project Gutenberg first (best for public domain books)
+        try {
+          const gutenbergQuery = encodeURIComponent(`${book.title} ${book.authors.join(' ')}`);
+          const gutenbergUrl = `https://gutendex.com/books/?search=${gutenbergQuery}`;
+          
+          console.log(`Searching Project Gutenberg: ${book.title}`);
+          const gutenbergResponse = await fetch(gutenbergUrl);
+          const gutenbergData = await gutenbergResponse.json();
 
-          if (olid) {
-            // Try to fetch full text from Internet Archive
-            const iaUrl = `https://archive.org/metadata/${olBook.ia?.[0] || ''}`;
-            let fullText = '';
-            let excerpt = book.description || '';
-
-            try {
-              const iaResponse = await fetch(iaUrl);
-              const iaData = await iaResponse.json();
+          if (gutenbergData.results && gutenbergData.results.length > 0) {
+            const gutenbergBook = gutenbergData.results[0];
+            
+            // Get plain text format if available
+            const textFormat = gutenbergBook.formats['text/plain'] || 
+                              gutenbergBook.formats['text/plain; charset=utf-8'] ||
+                              gutenbergBook.formats['text/html'];
+            
+            if (textFormat) {
+              console.log(`Found Gutenberg text for ${book.title}`);
+              const textResponse = await fetch(textFormat);
+              fullText = await textResponse.text();
               
-              // If available, try to get a text file
-              if (iaData.files) {
-                const textFile = iaData.files.find((f: any) => 
-                  f.name?.endsWith('.txt') || f.format === 'Text'
-                );
+              // Clean HTML if needed
+              if (textFormat.includes('html')) {
+                fullText = fullText.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ');
+              }
+              
+              // Extract relevant excerpt
+              const lowerText = fullText.toLowerCase();
+              const figureIndex = lowerText.indexOf(figureName.toLowerCase());
+              if (figureIndex !== -1) {
+                const start = Math.max(0, figureIndex - 500);
+                const end = Math.min(fullText.length, figureIndex + 1500);
+                excerpt = fullText.substring(start, end);
+              } else {
+                excerpt = fullText.substring(0, 2000);
+              }
+              
+              source = 'gutenberg';
+            }
+          }
+        } catch (gutenbergError) {
+          console.log(`Could not fetch from Gutenberg for ${book.title}, trying OpenLibrary...`);
+        }
+
+        // If Project Gutenberg didn't work, try OpenLibrary/Internet Archive
+        if (!fullText) {
+          const searchQuery = encodeURIComponent(`${book.title} ${book.authors.join(' ')}`);
+          const searchUrl = `https://openlibrary.org/search.json?q=${searchQuery}&limit=1`;
+          
+          console.log(`Searching OpenLibrary: ${book.title}`);
+          const searchResponse = await fetch(searchUrl);
+          const searchData = await searchResponse.json();
+
+          if (searchData.docs && searchData.docs.length > 0) {
+            const olBook = searchData.docs[0];
+            
+            // Try to fetch full text from Internet Archive
+            if (olBook.ia && olBook.ia[0]) {
+              const iaUrl = `https://archive.org/metadata/${olBook.ia[0]}`;
+              
+              try {
+                const iaResponse = await fetch(iaUrl);
+                const iaData = await iaResponse.json();
                 
-                if (textFile) {
-                  const textUrl = `https://archive.org/download/${olBook.ia[0]}/${textFile.name}`;
-                  const textResponse = await fetch(textUrl);
-                  fullText = await textResponse.text();
+                if (iaData.files) {
+                  const textFile = iaData.files.find((f: any) => 
+                    f.name?.endsWith('.txt') || f.format === 'Text'
+                  );
                   
-                  // Extract relevant excerpt (first 2000 chars that mention the figure)
-                  const lowerText = fullText.toLowerCase();
-                  const figureIndex = lowerText.indexOf(figureName.toLowerCase());
-                  if (figureIndex !== -1) {
-                    const start = Math.max(0, figureIndex - 500);
-                    const end = Math.min(fullText.length, figureIndex + 1500);
-                    excerpt = fullText.substring(start, end);
-                  } else {
-                    // Just take beginning if figure not mentioned
-                    excerpt = fullText.substring(0, 2000);
+                  if (textFile) {
+                    const textUrl = `https://archive.org/download/${olBook.ia[0]}/${textFile.name}`;
+                    const textResponse = await fetch(textUrl);
+                    fullText = await textResponse.text();
+                    
+                    // Extract relevant excerpt
+                    const lowerText = fullText.toLowerCase();
+                    const figureIndex = lowerText.indexOf(figureName.toLowerCase());
+                    if (figureIndex !== -1) {
+                      const start = Math.max(0, figureIndex - 500);
+                      const end = Math.min(fullText.length, figureIndex + 1500);
+                      excerpt = fullText.substring(start, end);
+                    } else {
+                      excerpt = fullText.substring(0, 2000);
+                    }
+                    
+                    source = 'internet_archive';
                   }
                 }
+              } catch (iaError) {
+                console.log(`Could not fetch IA content for ${book.title}:`, iaError);
               }
-            } catch (iaError) {
-              console.log(`Could not fetch IA content for ${book.title}:`, iaError);
             }
-
-            // Store in cache
-            const contentData = {
-              book_id: book.google_books_id || book.id,
-              figure_id: figureId,
-              figure_name: figureName,
-              book_title: book.title,
-              content_excerpt: excerpt,
-              full_content: fullText || null,
-              source: 'openlibrary',
-              relevance_score: book.relevance_score || 0,
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-            };
-
-            const { error: insertError } = await supabase
-              .from('book_content_cache')
-              .insert(contentData);
-
-            if (insertError) {
-              console.error('Error caching book content:', insertError);
-            }
-
-            bookContents.push(contentData);
           }
+        }
+
+        // Store in cache if we got any content
+        if (excerpt) {
+          const contentData = {
+            book_id: book.google_books_id || book.id,
+            figure_id: figureId,
+            figure_name: figureName,
+            book_title: book.title,
+            content_excerpt: excerpt,
+            full_content: fullText || null,
+            source: source,
+            relevance_score: book.relevance_score || 0,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          };
+
+          const { error: insertError } = await supabase
+            .from('book_content_cache')
+            .insert(contentData);
+
+          if (insertError) {
+            console.error('Error caching book content:', insertError);
+          }
+
+          bookContents.push(contentData);
         }
       } catch (bookError) {
         console.error(`Error fetching content for ${book.title}:`, bookError);
