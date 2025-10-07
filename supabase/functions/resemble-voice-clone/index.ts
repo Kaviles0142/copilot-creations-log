@@ -285,12 +285,12 @@ function createFallbackVoice(figureName: string) {
   
   const fallbackVoices = {
     male: {
-      id: 'FAKEYOU_MALE_TOKEN', // Replace with actual FakeYou male voice token
+      id: 'weight_56sw5vw4aj7y3xs217f2md54x',
       name: `${figureName} (FakeYou Voice)`,
       description: 'Professional male narrator voice from FakeYou'
     },
     female: {
-      id: 'FAKEYOU_FEMALE_TOKEN', // Replace with actual FakeYou female voice token
+      id: 'FAKEYOU_FEMALE_TOKEN', // Still need a female voice token
       name: `${figureName} (FakeYou Voice)`,
       description: 'Professional female narrator voice from FakeYou'
     }
