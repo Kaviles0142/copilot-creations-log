@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import VoiceCloningManager from '@/components/VoiceCloningManager';
 import { Button } from "@/components/ui/button";
@@ -172,8 +172,11 @@ const HistoricalChat = () => {
   }, []);
 
   // Auto-create authentic voice when figure is selected
+  const voiceCreatedForFigure = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (selectedFigure) {
+    if (selectedFigure && voiceCreatedForFigure.current !== selectedFigure.id) {
+      voiceCreatedForFigure.current = selectedFigure.id;
       createAuthenticVoice(selectedFigure);
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
