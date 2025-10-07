@@ -280,21 +280,19 @@ function createFallbackVoice(figureName: string) {
   const gender = detectGender(figureName);
   console.log(`Creating fallback voice for ${figureName} (detected gender: ${gender})`);
   
-  // Use real Resemble AI marketplace voices as fallbacks
-  // These are actual voice IDs from Resemble AI's marketplace
-  // Male voices: Arthur (narrator), Blade (urban), Pete (old narrator)
-  // Female voices: Niki (conversational), Vicky (teenager)
+  // Use FakeYou stock voices as fallbacks (no credits needed)
+  // You'll need to search FakeYou for good voice tokens and update these
   
   const fallbackVoices = {
     male: {
-      id: 'arthur_marketplace', // Arthur - Narrator voice from Resemble marketplace
-      name: `${figureName} (Resemble AI Voice)`,
-      description: 'Professional male narrator voice from Resemble AI marketplace'
+      id: 'FAKEYOU_MALE_TOKEN', // Replace with actual FakeYou male voice token
+      name: `${figureName} (FakeYou Voice)`,
+      description: 'Professional male narrator voice from FakeYou'
     },
     female: {
-      id: '0967ee26', // Premium female voice from Resemble AI
-      name: `${figureName} (Resemble AI Voice)`,
-      description: 'Premium female voice from Resemble AI'
+      id: 'FAKEYOU_FEMALE_TOKEN', // Replace with actual FakeYou female voice token
+      name: `${figureName} (FakeYou Voice)`,
+      description: 'Professional female narrator voice from FakeYou'
     }
   };
 
@@ -303,7 +301,7 @@ function createFallbackVoice(figureName: string) {
   return {
     voice_id: selectedVoice.id,
     voice_name: selectedVoice.name,
-    provider: 'resemble_marketplace',
+    provider: 'fakeyou',
     description: selectedVoice.description
   };
 }
