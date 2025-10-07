@@ -42,6 +42,7 @@ serve(async (req) => {
     let relevantKnowledge = '';
     let sourcesUsed = {
       books: 0,
+      bookContent: 0,
       documents: 0,
       youtube: 0,
       wikipedia: false,
@@ -197,6 +198,30 @@ serve(async (req) => {
                   booksText += `  ${book.description.substring(0, 200)}...\n`;
                 }
               });
+
+              // Fetch actual book content from OpenLibrary
+              try {
+                const bookContentResponse = await supabase.functions.invoke('fetch-book-content', {
+                  body: { 
+                    figureName: figure.name,
+                    figureId: figure.id,
+                    maxBooks: 3
+                  }
+                });
+
+                if (bookContentResponse.data?.content && bookContentResponse.data.content.length > 0) {
+                  sourcesUsed.bookContent = bookContentResponse.data.content.length;
+                  booksText += '\n\n📖 BOOK EXCERPTS (Full Text):\n';
+                  bookContentResponse.data.content.forEach((content: any) => {
+                    booksText += `\nFrom "${content.book_title}":\n`;
+                    booksText += content.content_excerpt.substring(0, 1500);
+                    booksText += '...\n';
+                  });
+                }
+              } catch (bookContentError) {
+                console.log('Book content fetch error:', bookContentError);
+              }
+
               return booksText;
             }
           } catch (error) {

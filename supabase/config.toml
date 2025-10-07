@@ -28,6 +28,9 @@ verify_jwt = false
 [functions.youtube-search]
 verify_jwt = false
 
+[functions.fetch-book-content]
+verify_jwt = false
+
 [functions.create-voice-clone]
 verify_jwt = false
 

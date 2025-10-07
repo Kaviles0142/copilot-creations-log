@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      book_content_cache: {
+        Row: {
+          book_id: string
+          book_title: string
+          content_excerpt: string
+          created_at: string
+          expires_at: string | null
+          figure_id: string
+          figure_name: string
+          full_content: string | null
+          id: string
+          relevance_score: number | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          book_id: string
+          book_title: string
+          content_excerpt: string
+          created_at?: string
+          expires_at?: string | null
+          figure_id: string
+          figure_name: string
+          full_content?: string | null
+          id?: string
+          relevance_score?: number | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          book_id?: string
+          book_title?: string
+          content_excerpt?: string
+          created_at?: string
+          expires_at?: string | null
+          figure_id?: string
+          figure_name?: string
+          full_content?: string | null
+          id?: string
+          relevance_score?: number | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       books: {
         Row: {
           authors: string[]
