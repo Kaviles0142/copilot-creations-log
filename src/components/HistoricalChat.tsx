@@ -93,7 +93,7 @@ const HistoricalChat = () => {
   const [availableFakeYouVoices, setAvailableFakeYouVoices] = useState<any[]>([]);
   const [selectedFakeYouVoice, setSelectedFakeYouVoice] = useState<any | null>(null);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
-  const [combinedVoiceList, setCombinedVoiceList] = useState<any[]>([]); // Combined FakeYou + ElevenLabs
+  
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const { toast } = useToast();
 
@@ -259,64 +259,83 @@ const HistoricalChat = () => {
       console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
       console.log('📝 All voices:', matchingVoices.map(v => v.title));
       
+      
       console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
       
-      // Add ElevenLabs voices - only figure-specific authentic voices
-      const elevenLabsVoices = [];
+      // Combine all voices from different providers
+      const allVoices = [...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))];
       
-      // Figure-specific ElevenLabs voices
-      const figureSpecificVoices: Record<string, { voiceId: string; title: string }> = {
-        'john-f-kennedy': { voiceId: '2vubyVoGjNJ5HPga4SkV', title: `${figure.name} (ElevenLabs - Authentic)` },
-        'martin-luther-king-jr': { voiceId: '2ts4Q14DjMa5I5EgteS4', title: `${figure.name} (ElevenLabs - Authentic)` },
-      };
-      
-      // Add figure-specific voice if available
-      if (figureSpecificVoices[figure.id]) {
-        const specificVoice = figureSpecificVoices[figure.id];
-        elevenLabsVoices.push({
-          voiceToken: `elevenlabs_${figure.id}_authentic`,
-          title: specificVoice.title,
-          provider: 'elevenlabs',
-          voiceId: specificVoice.voiceId
-        });
+      // Add ElevenLabs voices - search their library dynamically
+      try {
+        console.log('🔍 Searching ElevenLabs for:', figure.name);
+        // Note: ElevenLabs voice search would go here when API supports it
+        // For now, keeping hardcoded authentic voices for specific figures
+        const figureSpecificVoices: Record<string, { voiceId: string; title: string }> = {
+          'john-f-kennedy': { voiceId: '2vubyVoGjNJ5HPga4SkV', title: `${figure.name} (ElevenLabs - Authentic)` },
+          'martin-luther-king-jr': { voiceId: '2ts4Q14DjMa5I5EgteS4', title: `${figure.name} (ElevenLabs - Authentic)` },
+        };
+        
+        if (figureSpecificVoices[figure.id]) {
+          const specificVoice = figureSpecificVoices[figure.id];
+          allVoices.push({
+            voiceToken: `elevenlabs_${figure.id}_authentic`,
+            title: specificVoice.title,
+            provider: 'elevenlabs',
+            voiceId: specificVoice.voiceId
+          });
+          console.log(`✅ Added ElevenLabs voice for ${figure.name}`);
+        } else {
+          console.log('ℹ️ No ElevenLabs voices configured for', figure.name);
+        }
+      } catch (error) {
+        console.log('⚠️ ElevenLabs search failed (possibly no credits):', error);
       }
       
-      // Add Resemble AI voices - figure-specific
-      const resembleVoices = [];
-      const figureSpecificResembleVoices: Record<string, { voiceId: string; title: string }> = {
-        'donald-trump': { voiceId: '1d49f394', title: `${figure.name} (Resemble AI - Custom)` },
-      };
+      // Add Resemble AI cloned voices from database
+      try {
+        console.log('🔍 Searching Resemble AI database for:', figure.name);
+        const { data: resembleVoices, error: resembleError } = await supabase
+          .from('cloned_voices')
+          .select('voice_id, voice_name, provider')
+          .eq('figure_id', figure.id)
+          .eq('is_active', true);
+
+        if (!resembleError && resembleVoices && resembleVoices.length > 0) {
+          console.log(`✅ Found ${resembleVoices.length} Resemble AI cloned voices for ${figure.name}`);
+          resembleVoices.forEach((voice: any) => {
+            if (voice.provider === 'resemble' || voice.provider === 'resemble_marketplace') {
+              allVoices.push({
+                voiceToken: `resemble_${voice.voice_id}`,
+                title: `${voice.voice_name} (Resemble AI)`,
+                provider: 'resemble',
+                voiceId: voice.voice_id
+              });
+            }
+          });
+        } else {
+          console.log('ℹ️ No Resemble AI cloned voices found for', figure.name);
+        }
+      } catch (error) {
+        console.log('⚠️ Resemble AI search failed:', error);
+      }
       
-      console.log(`🎙️ Checking Resemble voices for figure ID: "${figure.id}"`);
-      
-      // Add figure-specific Resemble voice if available
-      if (figureSpecificResembleVoices[figure.id]) {
-        const specificVoice = figureSpecificResembleVoices[figure.id];
-        resembleVoices.push({
-          voiceToken: `resemble_${figure.id}_custom`,
-          title: specificVoice.title,
+      // Only add marketplace fallback voices if NO voices found from any service
+      if (allVoices.length === 0) {
+        console.log('⚠️ No voices found in any service, adding marketplace fallback voices');
+        const isMale = detectGender(figure);
+        
+        allVoices.push({
+          voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
+          title: `${figure.name} (Resemble AI Marketplace - ${isMale ? 'Male' : 'Female'})`,
           provider: 'resemble',
-          voiceId: specificVoice.voiceId
+          voiceId: isMale ? 'arthur_marketplace' : 'niki_marketplace'
         });
-        console.log(`✅ Added Resemble AI voice: "${specificVoice.title}"`);
-      } else {
-        console.log(`⚠️ No Resemble AI voice found for figure ID: "${figure.id}"`);
+        console.log(`📢 Added marketplace fallback: ${isMale ? 'Arthur (male)' : 'Niki (female)'}`);
       }
       
-      // Combine Resemble AI, ElevenLabs, and FakeYou voices
-      const allVoices = [
-        ...resembleVoices, // Resemble AI custom voices first
-        ...elevenLabsVoices, // ElevenLabs authentic voices second
-        ...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))
-      ];
+      console.log(`📊 Total voices from all providers: ${allVoices.length}`);
       
-      console.log(`📋 Combined voice list: ${allVoices.length} voices total`);
-      console.log(`   - Resemble AI: ${resembleVoices.length}`);
-      console.log(`   - ElevenLabs: ${elevenLabsVoices.length}`);
-      console.log(`   - FakeYou: ${matchingVoices.length}`);
-      
-      setAvailableFakeYouVoices(matchingVoices);
-      setCombinedVoiceList(allVoices);
+      setAvailableFakeYouVoices(allVoices);
       
       if (allVoices.length > 0) {
         setSelectedFakeYouVoice(allVoices[0]);
@@ -325,10 +344,10 @@ const HistoricalChat = () => {
         setSelectedFakeYouVoice(null);
       }
       
+      
     } catch (error) {
       console.error('❌ Error:', error);
       setAvailableFakeYouVoices([]);
-      setCombinedVoiceList([]);
       setSelectedFakeYouVoice(null);
     } finally {
       setIsLoadingVoices(false);
@@ -1737,12 +1756,12 @@ const HistoricalChat = () => {
                 <div className="text-sm text-muted-foreground">
                   Loading voices...
                 </div>
-              ) : combinedVoiceList.length > 0 ? (
+              ) : availableFakeYouVoices.length > 0 ? (
                 <>
                   <Select 
                     value={selectedFakeYouVoice?.voiceToken} 
                     onValueChange={(token) => {
-                      const voice = combinedVoiceList.find(v => v.voiceToken === token);
+                      const voice = availableFakeYouVoices.find(v => v.voiceToken === token);
                       setSelectedFakeYouVoice(voice);
                       toast({
                         title: "Voice selected",
@@ -1754,8 +1773,8 @@ const HistoricalChat = () => {
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select a voice" />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover">
-                      {combinedVoiceList.map((voice) => (
+                    <SelectContent className="bg-popover z-50">
+                      {availableFakeYouVoices.map((voice) => (
                         <SelectItem key={voice.voiceToken} value={voice.voiceToken}>
                           {voice.title}
                         </SelectItem>
@@ -1763,7 +1782,7 @@ const HistoricalChat = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-2">
-                    {combinedVoiceList.length} voice{combinedVoiceList.length !== 1 ? 's' : ''} available for {selectedFigure.name}
+                    {availableFakeYouVoices.length} voice{availableFakeYouVoices.length !== 1 ? 's' : ''} available for {selectedFigure.name}
                     {selectedFakeYouVoice && ` • ${selectedFakeYouVoice.provider === 'resemble' ? 'Resemble AI' : selectedFakeYouVoice.provider === 'elevenlabs' ? 'ElevenLabs' : 'FakeYou'}`}
                   </p>
                 </>
