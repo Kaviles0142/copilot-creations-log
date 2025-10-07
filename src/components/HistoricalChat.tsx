@@ -291,32 +291,36 @@ const HistoricalChat = () => {
         console.log('⚠️ ElevenLabs search failed (possibly no credits):', error);
       }
       
-      // Add Resemble AI cloned voices from database
+      // Add cloned voices from database (all providers)
       try {
-        console.log('🔍 Searching Resemble AI database for:', figure.name);
-        const { data: resembleVoices, error: resembleError } = await supabase
+        console.log('🔍 Searching database for cloned voices:', figure.name);
+        const { data: clonedVoices, error: clonedError } = await supabase
           .from('cloned_voices')
           .select('voice_id, voice_name, provider')
           .eq('figure_id', figure.id)
           .eq('is_active', true);
 
-        if (!resembleError && resembleVoices && resembleVoices.length > 0) {
-          console.log(`✅ Found ${resembleVoices.length} Resemble AI cloned voices for ${figure.name}`);
-          resembleVoices.forEach((voice: any) => {
-            if (voice.provider === 'resemble' || voice.provider === 'resemble_marketplace') {
-              allVoices.push({
-                voiceToken: `resemble_${voice.voice_id}`,
-                title: `${voice.voice_name} (Resemble AI)`,
-                provider: 'resemble',
-                voiceId: voice.voice_id
-              });
-            }
+        if (!clonedError && clonedVoices && clonedVoices.length > 0) {
+          console.log(`✅ Found ${clonedVoices.length} cloned voices for ${figure.name}`);
+          clonedVoices.forEach((voice: any) => {
+            const providerName = voice.provider === 'resemble' || voice.provider === 'resemble_marketplace' 
+              ? 'Resemble AI' 
+              : voice.provider === 'elevenlabs' 
+              ? 'ElevenLabs' 
+              : 'FakeYou';
+            
+            allVoices.push({
+              voiceToken: `${voice.provider}_${voice.voice_id}`,
+              title: `${figure.name} (${providerName})`,
+              provider: voice.provider,
+              voiceId: voice.voice_id
+            });
           });
         } else {
-          console.log('ℹ️ No Resemble AI cloned voices found for', figure.name);
+          console.log('ℹ️ No cloned voices found for', figure.name);
         }
       } catch (error) {
-        console.log('⚠️ Resemble AI search failed:', error);
+        console.log('⚠️ Database voice search failed:', error);
       }
       
       // Only add marketplace fallback voices if NO voices found from any service
