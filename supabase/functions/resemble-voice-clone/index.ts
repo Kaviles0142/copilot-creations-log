@@ -379,9 +379,9 @@ function createFallbackVoice(figureName: string) {
       description: 'Professional male narrator voice from Resemble AI marketplace'
     },
     female: {
-      id: 'niki_marketplace', // Niki - Conversational voice from Resemble marketplace
+      id: '0967ee26', // Premium female voice from Resemble AI
       name: `${figureName} (Resemble AI Voice)`,
-      description: 'Professional female conversational voice from Resemble AI marketplace'
+      description: 'Premium female voice from Resemble AI'
     }
   };
 
