@@ -436,14 +436,16 @@ YOUR DISTINCTIVE VOICE & MANNERISMS:
 - Despite your privileged background, you connect with working people and understand their struggles
 - You have a self-deprecating sense of humor about your wealth and background
 
-CONVERSATIONAL STYLE (CRITICAL):
-- Keep responses 2-4 sentences, but make them MEANINGFUL and SPECIFIC to who you are
+CONVERSATIONAL STYLE - EFFICIENCY WITH DEPTH:
+- Aim for 3-5 thoughtful sentences that demonstrate both breadth and depth
+- When you have rich source material (books, historical texts), synthesize it meaningfully - don't just summarize
 - Don't just agree generically - bring YOUR perspective from YOUR experiences
-- Use specific examples from your time in office or historical knowledge
+- Use specific examples from your time in office or historical knowledge, including direct quotes when relevant
 - Balance your famous eloquence with conversational approachability
+- When multiple sources are available, weave them together to show connections and deeper insights
 - Ask thoughtful follow-up questions that show genuine engagement
 - React with the passion you showed for issues like civil rights, space exploration, and peace
-- When discussing current events, compare/contrast with your era
+- When discussing current events, compare/contrast with your era and reflect on what has changed or remained constant
 
 FORMATTING (CRITICAL):
 - NEVER include stage directions, character actions, or narrative descriptions
@@ -483,8 +485,8 @@ Remember: You're not just "a president" - you're JFK. Bring your specific voice,
         };
         requestBody = {
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 1200,
-          temperature: 0.9,
+          max_tokens: 2000,
+          temperature: 0.8,
           messages: [{ role: 'user', content: systemPrompt + "\n\nUser: " + message }],
         };
       } else if (provider === 'grok') {
@@ -499,8 +501,8 @@ Remember: You're not just "a president" - you're JFK. Bring your specific voice,
             { role: 'system', content: systemPrompt },
             { role: 'user', content: message }
           ],
-          max_tokens: 1200,
-          temperature: 0.9
+          max_tokens: 2000,
+          temperature: 0.8
         };
       } else if (provider === 'azure') {
         const azureResourceName = Deno.env.get('AZURE_RESOURCE_NAME') || 'copilotsearch';
@@ -518,8 +520,8 @@ Remember: You're not just "a president" - you're JFK. Bring your specific voice,
             { role: 'system', content: systemPrompt },
             { role: 'user', content: message }
           ],
-          max_tokens: 1200,
-          temperature: 0.9
+          max_tokens: 2000,
+          temperature: 0.8
         };
       } else {
         apiUrl = 'https://api.openai.com/v1/chat/completions';
@@ -533,8 +535,8 @@ Remember: You're not just "a president" - you're JFK. Bring your specific voice,
             { role: 'system', content: systemPrompt },
             { role: 'user', content: message }
           ],
-          max_tokens: 1200,
-          temperature: 0.9
+          max_tokens: 2000,
+          temperature: 0.8
         };
       }
 
