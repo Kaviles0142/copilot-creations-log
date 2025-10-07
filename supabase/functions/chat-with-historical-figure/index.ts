@@ -317,42 +317,12 @@ serve(async (req) => {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
 
-    // Get API keys for all providers
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    const grokApiKey = Deno.env.get('GROK_API_KEY');
-    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    const azureApiKey = Deno.env.get('AZURE_OPENAI_API_KEY');
+    // Get Lovable AI API key
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
-    if (aiProvider === 'grok' && !grokApiKey) {
+    if (!lovableApiKey) {
       return new Response(JSON.stringify({ 
-        error: 'Grok API key not configured' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
-    if (aiProvider === 'openai' && !openaiApiKey) {
-      return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (aiProvider === 'claude' && !anthropicApiKey) {
-      return new Response(JSON.stringify({ 
-        error: 'Claude API key not configured' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (aiProvider === 'azure' && !azureApiKey) {
-      return new Response(JSON.stringify({ 
-        error: 'Azure OpenAI API key not configured' 
+        error: 'Lovable AI is not configured. Please check your secrets.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -360,7 +330,7 @@ serve(async (req) => {
     }
 
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
-    console.log(`Making ${aiProvider.toUpperCase()} request with comprehensive multi-source context...`);
+    console.log(`Making Lovable AI (Gemini) request with comprehensive multi-source context...`);
 
     // Get current date for context
     const currentDate = new Date().toLocaleDateString('en-US', { 
@@ -465,143 +435,85 @@ ${relevantKnowledge ? 'Background info (use naturally, weave into your responses
 
 Remember: You're not just "a president" - you're JFK. Bring your specific voice, values, and experiences. Every response should feel unmistakably like YOU, not a generic politician. NO stage directions - just authentic dialogue.`;
 
-    // Try providers in parallel with timeout for faster fallback
-    const tryProvider = async (provider: string, signal: AbortSignal) => {
-      if (provider === 'claude' && !anthropicApiKey) return null;
-      if (provider === 'grok' && !grokApiKey) return null;
-      if (provider === 'azure' && !azureApiKey) return null;
-      if (provider === 'openai' && !openaiApiKey) return null;
-
-      let apiUrl: string;
-      let requestHeaders: Record<string, string>;
-      let requestBody: any;
-
-      if (provider === 'claude') {
-        apiUrl = 'https://api.anthropic.com/v1/messages';
-        requestHeaders = {
-          'x-api-key': anthropicApiKey!,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        };
-        requestBody = {
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          temperature: 0.8,
-          messages: [{ role: 'user', content: systemPrompt + "\n\nUser: " + message }],
-        };
-      } else if (provider === 'grok') {
-        apiUrl = 'https://api.x.ai/v1/chat/completions';
-        requestHeaders = {
-          'Authorization': 'Bearer ' + grokApiKey,
-          'Content-Type': 'application/json',
-        };
-        requestBody = {
-          model: 'grok-beta',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message }
-          ],
-          max_tokens: 2000,
-          temperature: 0.8
-        };
-      } else if (provider === 'azure') {
-        const azureResourceName = Deno.env.get('AZURE_RESOURCE_NAME') || 'copilotsearch';
-        const azureDeploymentName = Deno.env.get('AZURE_DEPLOYMENT_NAME') || 'firstProject';
-        
-        // Azure AI Foundry endpoint format (based on services.ai.azure.com)
-        apiUrl = "https://" + azureResourceName + ".services.ai.azure.com/api/projects/" + azureDeploymentName + "/chat/completions?api-version=2024-05-01-preview";
-        
-        requestHeaders = {
-          'api-key': azureApiKey!,
-          'Content-Type': 'application/json',
-        };
-        requestBody = {
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message }
-          ],
-          max_tokens: 2000,
-          temperature: 0.8
-        };
-      } else {
-        apiUrl = 'https://api.openai.com/v1/chat/completions';
-        requestHeaders = {
-          'Authorization': 'Bearer ' + openaiApiKey,
-          'Content-Type': 'application/json',
-        };
-        requestBody = {
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message }
-          ],
-          max_tokens: 2000,
-          temperature: 0.8
-        };
-      }
-
-      const aiResponse = await fetch(apiUrl, {
+    // Call Lovable AI with Gemini
+    let response: string | null = null;
+    
+    try {
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
-        headers: requestHeaders,
-        body: JSON.stringify(requestBody),
-        signal,
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: message }
+          ],
+          max_tokens: 2000,
+          temperature: 0.8
+        }),
       });
 
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
-        throw new Error(provider + ": " + aiResponse.status + " - " + errorText.substring(0, 100));
+        
+        // Handle specific error codes
+        if (aiResponse.status === 429) {
+          console.error('Rate limit exceeded');
+          return new Response(JSON.stringify({ 
+            error: 'Rate limit exceeded. Please wait a moment and try again.' 
+          }), {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (aiResponse.status === 402) {
+          console.error('Payment required');
+          return new Response(JSON.stringify({ 
+            error: 'Usage credits depleted. Please add credits to your Lovable workspace.' 
+          }), {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        console.error('Lovable AI error:', aiResponse.status, errorText);
+        throw new Error(`Lovable AI error: ${aiResponse.status}`);
       }
 
       const data = await aiResponse.json();
-      return {
-        provider,
-        response: provider === 'claude' ? data.content[0].text : data.choices[0].message.content
-      };
-    };
-
-    // Race all available providers with 10s timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const providers = [aiProvider, 'claude', 'openai', 'azure', 'grok'].filter(
-      (p, i, arr) => arr.indexOf(p) === i
-    );
-
-    let response: string | null = null;
-    let usedProvider = '';
-
-    try {
-      const result = await Promise.any(
-        providers.map(p => tryProvider(p, controller.signal))
-      );
+      response = data.choices[0].message.content;
+      console.log("✅ Success with Lovable AI (Gemini). Response length: " + (response?.length || 0) + " characters");
       
-      if (result) {
-        response = result.response;
-        usedProvider = result.provider;
-        console.log("✅ Success with " + usedProvider.toUpperCase() + ". Response length: " + (response?.length || 0) + " characters");
-      }
     } catch (error) {
-      console.error('All AI providers failed:', error);
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    // If all providers failed
-    if (!response) {
-      console.error('All AI providers failed');
+      console.error('Lovable AI request failed:', error);
       return new Response(JSON.stringify({ 
-        error: 'All AI providers are currently unavailable. Please try again.'
+        error: 'AI service is currently unavailable. Please try again.'
       }), {
         status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    if (!response) {
+      console.error('No response from AI');
+      return new Response(JSON.stringify({ 
+        error: 'Failed to generate response. Please try again.'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ 
       response, 
-      aiProvider: usedProvider,
-      requestedProvider: aiProvider,
-      fallbackUsed: usedProvider !== aiProvider,
+      aiProvider: 'lovable-ai',
+      requestedProvider: 'lovable-ai',
+      fallbackUsed: false,
+      model: 'google/gemini-2.5-flash',
       sourcesUsed,
       audioUrl: null,
       figureId: figure.id,
