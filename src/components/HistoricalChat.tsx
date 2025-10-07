@@ -303,15 +303,9 @@ const HistoricalChat = () => {
         if (!clonedError && clonedVoices && clonedVoices.length > 0) {
           console.log(`✅ Found ${clonedVoices.length} cloned voices for ${figure.name}`);
           clonedVoices.forEach((voice: any) => {
-            const providerName = voice.provider === 'resemble' || voice.provider === 'resemble_marketplace' 
-              ? 'Resemble AI' 
-              : voice.provider === 'elevenlabs' 
-              ? 'ElevenLabs' 
-              : 'FakeYou';
-            
             allVoices.push({
               voiceToken: `${voice.provider}_${voice.voice_id}`,
-              title: `${figure.name} (${providerName})`,
+              title: voice.voice_name, // Use the voice_name from database directly
               provider: voice.provider,
               voiceId: voice.voice_id
             });
