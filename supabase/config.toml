@@ -52,11 +52,6 @@ verify_jwt = false
 [functions.process-audio-for-cloning]
 verify_jwt = false
 
-[functions.coqui-voice-clone]
-verify_jwt = false
-
-[functions.coqui-text-to-speech]
-verify_jwt = false
 
 [functions.automated-voice-pipeline]
 verify_jwt = false

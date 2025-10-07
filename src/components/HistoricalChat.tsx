@@ -1337,7 +1337,7 @@ const HistoricalChat = () => {
       
       const clonedVoiceId = existingVoices?.[0]?.voice_id;
       
-      if (clonedVoiceId && (clonedVoiceId.startsWith('resemble_') || clonedVoiceId.startsWith('coqui_'))) {
+      if (clonedVoiceId && clonedVoiceId.startsWith('resemble_')) {
         console.log(`🎯 Using CLONED voice: ${clonedVoiceId} for ${figure.name}`);
         
         // Use ElevenLabs TTS for cloned voices
@@ -1461,8 +1461,8 @@ const HistoricalChat = () => {
 
       console.log(`No cloned voice found for ${figure.name}, creating voice clone...`);
       
-      // Use Coqui XTTS voice cloning (upgraded from Resemble for better quality)
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/coqui-voice-clone', {
+      // Use Resemble AI voice cloning
+      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-voice-clone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1471,7 +1471,7 @@ const HistoricalChat = () => {
         body: JSON.stringify({
           figureName: figure.name,
           figureId: figure.id,
-          audioUrl: null // Let it create fallback voice
+          audioUrl: null // Let it create fallback voice with Resemble marketplace
         }),
       });
 
@@ -1543,12 +1543,12 @@ const HistoricalChat = () => {
     try {
       console.log(`Creating authentic voice for ${figure.name}...`);
       
-      // Use Coqui XTTS for authentic voice cloning from historical sources
-      const { data, error } = await supabase.functions.invoke('coqui-voice-clone', {
+      // Use Resemble AI for authentic voice cloning from historical sources
+      const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
         body: { 
           figureName: figure.name,
           figureId: figure.id,
-          audioUrl: null // Let the function find historical audio
+          audioUrl: null // Let the function find historical audio or use marketplace fallback
         }
       });
 

@@ -285,7 +285,7 @@ async function trainVoiceModel(cleanedAudio: any[], figureId: string, figureName
     modelPath: `models/${figureId}/voice_model.pth`,
     voiceId: cloneResult.voice_id,
     voiceName: cloneResult.voice_name,
-    provider: cloneResult.provider || 'coqui',
+    provider: cloneResult.provider || 'resemble',
     metrics: {
       loss: 0.045,
       accuracy: 0.92,
@@ -322,7 +322,7 @@ async function createCustomAPI(modelPath: string, figureId: string, figureName: 
 async function registerClonedVoice(figureId: string, figureName: string, apiEndpoint: string, modelResult: any) {
   console.log(`📝 Registering cloned voice for ${figureName}`);
   
-  // Don't register if it already exists (Coqui service handles this)
+  // Don't register if it already exists (Resemble service handles this)
   const { data: existing } = await supabase
     .from('cloned_voices')
     .select('id')

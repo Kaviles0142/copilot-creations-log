@@ -52,7 +52,7 @@ export const VoiceCloning: React.FC<VoiceCloningProps> = ({ onVoiceCloned }) => 
 
       console.log('Starting voice cloning process...');
       
-      // Try Resemble.ai voice cloning first, then fallback to Coqui
+      // Use Resemble AI voice cloning
       const response = await fetch(
         'https://trclpvryrjlafacocbnd.supabase.co/functions/v1/resemble-voice-clone',
         {
