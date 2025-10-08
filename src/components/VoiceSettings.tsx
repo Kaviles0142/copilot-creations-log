@@ -109,7 +109,17 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
         return;
       }
 
-      setClonedVoices(data || []);
+      // Filter out old automated fallback voices - only show real matches
+      const realMatches = (data || []).filter(voice => {
+        // Exclude old automated fallback providers
+        const isOldFallback = voice.provider === 'resemble_fallback' || 
+                             voice.provider === 'fakeyou' ||
+                             voice.voice_name.includes('(Premium Voice)');
+        return !isOldFallback;
+      });
+
+      console.log(`Filtered ${data?.length || 0} voices to ${realMatches.length} real matches`);
+      setClonedVoices(realMatches);
     } catch (error) {
       console.error('Error in loadClonedVoices:', error);
     }
