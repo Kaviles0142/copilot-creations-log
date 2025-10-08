@@ -477,8 +477,8 @@ async function proxyAudio(audioUrl: string) {
   console.log(`🎵 Proxying audio from: ${audioUrl}`);
   
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(audioUrl, { headers });
+    // FIX 1: Don't use auth headers for public CDN - can cause CORS issues
+    const response = await fetch(audioUrl);
     
     if (!response.ok) {
       console.error(`❌ Failed to fetch audio: ${response.status}`);
@@ -488,16 +488,46 @@ async function proxyAudio(audioUrl: string) {
     const audioData = await response.arrayBuffer();
     console.log(`✅ Audio fetched successfully (${audioData.byteLength} bytes)`);
     
-    // Convert to base64 for JSON transport
-    const base64Audio = btoa(
-      String.fromCharCode(...new Uint8Array(audioData))
-    );
+    // FIX 2: Validate audio data before processing
+    if (audioData.byteLength === 0) {
+      console.error('❌ Audio data is empty');
+      throw new Error('Received empty audio file');
+    }
+    
+    if (audioData.byteLength < 1000) {
+      console.error(`❌ Audio file suspiciously small: ${audioData.byteLength} bytes`);
+      throw new Error('Audio file appears to be corrupted or incomplete');
+    }
+    
+    // Check for WAV header (first 4 bytes should be "RIFF")
+    const header = new Uint8Array(audioData.slice(0, 4));
+    const headerString = String.fromCharCode(...header);
+    if (headerString !== 'RIFF') {
+      console.error(`❌ Invalid audio format. Expected WAV (RIFF), got: ${headerString}`);
+      throw new Error('Invalid audio format - expected WAV file');
+    }
+    
+    console.log('✅ Audio validation passed');
+    
+    // FIX 3: Use safer base64 encoding for binary data
+    const uint8Array = new Uint8Array(audioData);
+    let binary = '';
+    const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binary += String.fromCharCode(...chunk);
+    }
+    
+    const base64Audio = btoa(binary);
     
     return new Response(
       JSON.stringify({
         success: true,
         audioBase64: base64Audio,
-        size: audioData.byteLength
+        size: audioData.byteLength,
+        format: 'wav',
+        validated: true
       }),
       {
         headers: {
@@ -508,7 +538,20 @@ async function proxyAudio(audioUrl: string) {
     );
   } catch (error) {
     console.error('💥 proxyAudio failed:', error);
-    throw error;
+    
+    // FIX 4: Better error handling with descriptive messages
+    const errorMessage = error instanceof Error ? error.message : 'Unknown audio fetch error';
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: errorMessage,
+        details: 'Failed to fetch or validate audio from FakeYou CDN'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 }
 
