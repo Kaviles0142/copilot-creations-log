@@ -854,6 +854,7 @@ const HistoricalChat = () => {
         const fakeyouFallbackVoices: Record<string, string> = {
           'fakeyou-fallback-american': 'weight_56sw5vw4aj7y3xs217f2md54x',
           'fakeyou-fallback-british': 'weight_a8s9s0qzbfsw523rr1ypxdxca',
+          'fakeyou-fallback-female': 'weight_pf8y55rx5e3prbzhahxxn6qf1',
         };
         
         const voiceToken = fakeyouFallbackVoices[voiceId];

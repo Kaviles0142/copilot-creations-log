@@ -267,6 +267,7 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
         const fakeyouFallbackVoices: Record<string, string> = {
           'fakeyou-fallback-american': 'weight_56sw5vw4aj7y3xs217f2md54x', // Professional Male Narrator
           'fakeyou-fallback-british': 'weight_a8s9s0qzbfsw523rr1ypxdxca', // British Male Voice
+          'fakeyou-fallback-female': 'weight_pf8y55rx5e3prbzhahxxn6qf1', // Professional Female Narrator
         };
         
         const voiceToken = fakeyouFallbackVoices[selectedVoice];
@@ -362,6 +363,39 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
 
   if (!selectedFigure) return null;
 
+  // Detect gender for appropriate fallback voices
+  const detectGender = (figure: any): boolean => {
+    const maleNames = [
+      'einstein', 'churchill', 'napoleon', 'shakespeare', 'socrates',
+      'aristotle', 'plato', 'darwin', 'newton', 'tesla', 'edison',
+      'washington', 'lincoln', 'kennedy', 'gandhi', 'luther', 'trump',
+      'obama', 'beethoven', 'mozart', 'picasso', 'van gogh'
+    ];
+    
+    const femaleNames = [
+      'marie curie', 'cleopatra', 'joan of arc', 'anne frank', 'mother teresa',
+      'rosa parks', 'amelia earhart', 'virginia woolf', 'jane austen',
+      'frida kahlo', 'coco chanel', 'oprah winfrey', 'malala yousafzai',
+      'elizabeth', 'victoria', 'catherine', 'mary', 'helen keller'
+    ];
+    
+    const figureName = figure.name.toLowerCase();
+    const figureDesc = figure.description?.toLowerCase() || '';
+    
+    if (maleNames.some(name => figureName.includes(name))) return true;
+    if (femaleNames.some(name => figureName.includes(name))) return false;
+    
+    // Check for gender indicators in description
+    if (figureDesc.includes('she ') || figureDesc.includes('her ') || 
+        figureDesc.includes('woman') || figureDesc.includes('queen') ||
+        figureDesc.includes('empress') || figureDesc.includes('female')) {
+      return false;
+    }
+    
+    return true; // Default to male
+  };
+
+  const isMale = detectGender(selectedFigure);
   const figureVoice = historicalVoices[selectedFigure.id as keyof typeof historicalVoices];
   const hasCustomVoice = clonedVoices.some(v => v.provider === 'resemble' && !v.voice_id.includes('fallback'));
 
@@ -406,16 +440,29 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
                 </SelectItem>
               ))}
               
-              {/* Always show fallback voices for any figure */}
-              <SelectItem value="resemble-fallback-british">
-                🎙️ British Male (Resemble AI Fallback)
-              </SelectItem>
-              <SelectItem value="fakeyou-fallback-american">
-                🎙️ American Male (FakeYou Fallback)
-              </SelectItem>
-              <SelectItem value="fakeyou-fallback-british">
-                🎙️ British Male (FakeYou Fallback)
-              </SelectItem>
+              {/* Show gender-appropriate fallback voices */}
+              {isMale ? (
+                <>
+                  <SelectItem value="resemble-fallback-british">
+                    🎙️ British Male (Resemble AI Fallback)
+                  </SelectItem>
+                  <SelectItem value="fakeyou-fallback-american">
+                    🎙️ American Male (FakeYou Fallback)
+                  </SelectItem>
+                  <SelectItem value="fakeyou-fallback-british">
+                    🎙️ British Male (FakeYou Fallback)
+                  </SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="resemble-fallback-female">
+                    🎙️ Female Voice (Resemble AI Fallback)
+                  </SelectItem>
+                  <SelectItem value="fakeyou-fallback-female">
+                    🎙️ Female Voice (FakeYou Fallback)
+                  </SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
