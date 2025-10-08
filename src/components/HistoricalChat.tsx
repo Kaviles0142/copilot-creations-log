@@ -2073,15 +2073,25 @@ const HistoricalChat = () => {
                   <Square className="h-4 w-4" />
                 </Button>
               ) : isPlayingAudio ? (
-                // Show pause button during audio playback
-                <Button 
-                  onClick={handlePauseAudio}
-                  size="icon"
-                  variant="secondary"
-                  className="h-[60px] w-[60px]"
-                >
-                  <Pause className="h-4 w-4" />
-                </Button>
+                // Show pause and stop buttons during audio playback
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handlePauseAudio}
+                    size="icon"
+                    variant="secondary"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <Pause className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={handleStopGeneration}
+                    size="icon"
+                    variant="destructive"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <Square className="h-4 w-4" />
+                  </Button>
+                </div>
               ) : isPaused ? (
                 // Show play and replay buttons when paused
                 <div className="flex gap-2">
