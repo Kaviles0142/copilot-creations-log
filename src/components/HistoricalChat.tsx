@@ -264,31 +264,8 @@ const HistoricalChat = () => {
       // Combine all voices from different providers
       const allVoices = [...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))];
       
-      // Add ElevenLabs voices - search their library dynamically
-      try {
-        console.log('🔍 Searching ElevenLabs for:', figure.name);
-        // Note: ElevenLabs voice search would go here when API supports it
-        // For now, keeping hardcoded authentic voices for specific figures
-        const figureSpecificVoices: Record<string, { voiceId: string; title: string }> = {
-          'john-f-kennedy': { voiceId: '2vubyVoGjNJ5HPga4SkV', title: `${figure.name} (ElevenLabs - Authentic)` },
-          'martin-luther-king-jr': { voiceId: '2ts4Q14DjMa5I5EgteS4', title: `${figure.name} (ElevenLabs - Authentic)` },
-        };
-        
-        if (figureSpecificVoices[figure.id]) {
-          const specificVoice = figureSpecificVoices[figure.id];
-          allVoices.push({
-            voiceToken: `elevenlabs_${figure.id}_authentic`,
-            title: specificVoice.title,
-            provider: 'elevenlabs',
-            voiceId: specificVoice.voiceId
-          });
-          console.log(`✅ Added ElevenLabs voice for ${figure.name}`);
-        } else {
-          console.log('ℹ️ No ElevenLabs voices configured for', figure.name);
-        }
-      } catch (error) {
-        console.log('⚠️ ElevenLabs search failed (possibly no credits):', error);
-      }
+      // ElevenLabs voices - only from database cloned_voices (no hardcoded voices)
+      console.log('ℹ️ ElevenLabs voices will be loaded from database only (no hardcoded entries)');
       
       // Add cloned voices from database (all providers)
       try {
