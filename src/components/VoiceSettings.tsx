@@ -375,6 +375,9 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
               <SelectItem value="fakeyou-fallback-american">
                 🎙️ American Male (FakeYou Fallback)
               </SelectItem>
+              <SelectItem value="fakeyou-fallback-british">
+                🎙️ British Male (FakeYou Fallback)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
