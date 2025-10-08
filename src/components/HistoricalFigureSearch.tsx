@@ -78,22 +78,13 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
 
     setIsSearching(true);
     try {
-      // Search Wikipedia AND Google in parallel for more comprehensive results
-      const [wikipediaResponse, googleResponse] = await Promise.all([
-        supabase.functions.invoke('wikipedia-search', {
-          body: { 
-            query: searchQuery,
-            limit: 5
-          }
-        }),
-        supabase.functions.invoke('serpapi-search', {
-          body: { 
-            query: `${searchQuery} biography death born`,
-            type: 'web',
-            num: 3
-          }
-        })
-      ]);
+      // Search Wikipedia only (removed SerpAPI dependency)
+      const wikipediaResponse = await supabase.functions.invoke('wikipedia-search', {
+        body: { 
+          query: searchQuery,
+          limit: 5
+        }
+      });
 
       if (wikipediaResponse.error) throw wikipediaResponse.error;
 
@@ -105,28 +96,8 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
         if (wikipediaResponse.data.data) {
           const wikiData = wikipediaResponse.data.data;
           
-          // Enhance with Google search results for death detection
+          // Use Wikipedia description directly
           let enhancedDescription = wikiData.description || wikiData.extract.substring(0, 200);
-          
-          if (googleResponse.data?.success && googleResponse.data.results) {
-            const googleSnippets = googleResponse.data.results
-              .map((r: any) => r.snippet || '')
-              .join(' ')
-              .toLowerCase();
-            
-            // Check Google results for death indicators
-            if (googleSnippets.includes('died') || 
-                googleSnippets.includes('death') || 
-                googleSnippets.includes('deceased') ||
-                googleSnippets.includes('passed away')) {
-              
-              // Extract death info from Google if Wikipedia doesn't have it
-              const deathMatch = googleSnippets.match(/(died|passed away|death)[\s\w,]*(\d{1,2}[\s\w,]*\d{4})/i);
-              if (deathMatch && !enhancedDescription.toLowerCase().includes('died')) {
-                enhancedDescription = `${enhancedDescription} (Recent reports indicate passed away)`;
-              }
-            }
-          }
           
           results.push({
             ...wikiData,

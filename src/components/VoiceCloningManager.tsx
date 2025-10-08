@@ -127,37 +127,10 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
   };
 
   const searchWeb = async (): Promise<AudioSource[]> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('serpapi-search', {
-        body: {
-          query: `${figureName} speech audio recording mp3 wav original historical`,
-          type: "web", // Use web search instead of news search
-          num: 10
-        }
-      });
-
-      if (error) throw error;
-
-      // Filter for audio files from the web search results
-      const audioFiles = (data?.organic_results || [])
-        .filter((result: any) => 
-          result.link?.match(/\.(mp3|wav|m4a|ogg)$/i) ||
-          result.title?.toLowerCase().includes('audio') ||
-          result.title?.toLowerCase().includes('speech') ||
-          result.title?.toLowerCase().includes('recording')
-        )
-        .map((result: any) => ({
-          title: result.title,
-          url: result.link,
-          description: result.snippet,
-          source: 'web' as const
-        }));
-
-      return audioFiles.slice(0, 5); // Limit to top 5 results
-    } catch (error) {
-      console.error('Web search error:', error);
-      return [];
-    }
+    // Web search for audio removed (SerpAPI dependency removed)
+    // Users can manually upload audio files instead
+    console.log('Web search for audio is no longer available - use manual upload instead');
+    return [];
   };
 
   const extractYouTubeAudio = async (videoUrl: string): Promise<string> => {

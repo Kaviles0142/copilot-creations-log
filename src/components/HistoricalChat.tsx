@@ -410,13 +410,12 @@ const HistoricalChat = () => {
     return figureLanguages[figure.id] || 'en-US';
   };
 
-  // Handle current events search using SerpApi
+  // Handle current events search using RSS scraper
   const handleCurrentEventsSearch = async (query: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('serpapi-search', {
+      const { data, error } = await supabase.functions.invoke('rss-news-scraper', {
         body: { 
-          query: query + " current events news",
-          type: "news",
+          query: query,
           num: 5
         }
       });
