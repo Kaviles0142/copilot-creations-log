@@ -343,7 +343,7 @@ const HistoricalChat = () => {
           voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (FakeYou - American Voice)`,
           provider: 'fakeyou',
-          voiceId: isMale ? 'weight_pr6qyqxgc1h0pg4rd8xystpq9' : 'TM:a3b2c1d4e5f6'
+          voiceId: isMale ? 'weight_bwwcc97maa9cb3k4zm36229y5' : 'TM:a3b2c1d4e5f6'
         });
         console.log(`📢 Added FakeYou generic fallback voice`);
       }
@@ -659,6 +659,12 @@ const HistoricalChat = () => {
       setAbortController(null);
     }
 
+    // If audio is playing, pause it instead of stopping
+    if (isPlayingAudio) {
+      handlePauseAudio();
+      return;
+    }
+
     // Complete stop - reset everything
     if (currentAudio) {
       currentAudio.pause();
@@ -672,30 +678,6 @@ const HistoricalChat = () => {
 
     // Reset all states
     setIsLoading(false);
-    setIsPlayingAudio(false);
-    setIsPaused(false);
-
-    toast({
-      title: "Stopped",
-      description: "Audio playback and generation stopped",
-      duration: 2000,
-    });
-  };
-
-  const handleStopAudio = () => {
-    // Complete stop - for when user wants to stop audio and ask new question
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-      setCurrentAudio(null);
-    }
-
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-
-    // Reset audio states
-    setIsPlayingAudio(false);
     setIsPlayingAudio(false);
     setIsPaused(false);
     setRetryCount(0);
@@ -2082,27 +2064,17 @@ const HistoricalChat = () => {
                   <Square className="h-4 w-4" />
                 </Button>
               ) : isPlayingAudio ? (
-                // Show pause and stop buttons during audio playback
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handlePauseAudio}
-                    size="icon"
-                    variant="secondary"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <Pause className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    onClick={handleStopAudio}
-                    size="icon"
-                    variant="destructive"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                </div>
+                // Show pause button during audio playback
+                <Button 
+                  onClick={handlePauseAudio}
+                  size="icon"
+                  variant="secondary"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
               ) : isPaused ? (
-                // Show play, replay and stop buttons when paused
+                // Show play and replay buttons when paused
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleResumeAudio}
@@ -2119,14 +2091,6 @@ const HistoricalChat = () => {
                     className="h-[60px] w-[60px]"
                   >
                     <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    onClick={handleStopAudio}
-                    size="icon"
-                    variant="destructive"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <Square className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
