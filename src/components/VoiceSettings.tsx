@@ -368,16 +368,20 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
                 </SelectItem>
               ))}
               
-              {/* Always show fallback voices */}
-              <SelectItem value="resemble-fallback-british">
-                🎙️ British Male (Resemble AI Fallback)
-              </SelectItem>
-              <SelectItem value="fakeyou-fallback-american">
-                🎙️ American Male (FakeYou Fallback)
-              </SelectItem>
-              <SelectItem value="fakeyou-fallback-british">
-                🎙️ British Male (FakeYou Fallback)
-              </SelectItem>
+              {/* Only show fallback voices if no matched voices exist */}
+              {clonedVoices.length === 0 && (
+                <>
+                  <SelectItem value="resemble-fallback-british">
+                    🎙️ British Male (Resemble AI Fallback)
+                  </SelectItem>
+                  <SelectItem value="fakeyou-fallback-american">
+                    🎙️ American Male (FakeYou Fallback)
+                  </SelectItem>
+                  <SelectItem value="fakeyou-fallback-british">
+                    🎙️ British Male (FakeYou Fallback)
+                  </SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
