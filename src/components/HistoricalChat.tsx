@@ -324,35 +324,26 @@ const HistoricalChat = () => {
       const hasResembleMarketplace = allVoices.some(v => v.provider === 'resemble' && v.voiceId.includes('marketplace'));
       
       if (!hasResembleMarketplace) {
-        // Add primary Resemble AI fallback voice
+        // Add Resemble AI fallback voice (British accent)
         allVoices.push({
-          voiceToken: `resemble_marketplace_${isMale ? 'male_primary' : 'female_primary'}`,
-          title: `${figure.name} (Resemble AI - Premium)`,
+          voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
+          title: `${figure.name} (Resemble AI - British Voice)`,
           provider: 'resemble',
           voiceId: isMale ? '0f2e6952' : '02fc35a6'
         });
-        console.log(`📢 Added Resemble AI primary voice: ${isMale ? '0f2e6952 (male)' : '02fc35a6 (female)'}`);
-        
-        // Add secondary Resemble AI fallback voice with different voice
-        allVoices.push({
-          voiceToken: `resemble_marketplace_${isMale ? 'male_alt' : 'female_alt'}`,
-          title: `${figure.name} (Resemble AI - Alternative)`,
-          provider: 'resemble',
-          voiceId: isMale ? 'arthur_marketplace' : 'claire_marketplace'
-        });
-        console.log(`📢 Added Resemble AI alternative voice: ${isMale ? 'arthur_marketplace (male)' : 'claire_marketplace (female)'}`);
+        console.log(`📢 Added Resemble AI voice: ${isMale ? '0f2e6952 (male British)' : '02fc35a6 (female)'}`);
       }
       
       // Add FakeYou generic fallback voices (not character-specific)
       const hasFakeYouGeneric = allVoices.some(v => v.provider === 'fakeyou' && v.voiceToken.includes('generic'));
       
       if (!hasFakeYouGeneric) {
-        // Add a generic male/female FakeYou voice as last resort fallback
+        // Add a generic male/female FakeYou voice (American accent)
         allVoices.push({
           voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (FakeYou - Standard Voice)`,
+          title: `${figure.name} (FakeYou - American Voice)`,
           provider: 'fakeyou',
-          voiceId: isMale ? 'TM:9b78n5tqk2c5' : 'TM:a3b2c1d4e5f6' // Generic professional voices
+          voiceId: isMale ? 'TM:9b78n5tqk2c5' : 'TM:a3b2c1d4e5f6' // Placeholder - awaiting new voice code
         });
         console.log(`📢 Added FakeYou generic fallback voice`);
       }
