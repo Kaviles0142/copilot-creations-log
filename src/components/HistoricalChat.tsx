@@ -95,6 +95,7 @@ const HistoricalChat = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false); // Track voice generation state
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -721,19 +722,31 @@ const HistoricalChat = () => {
         console.log('🎙️ Starting voice generation for:', selectedFigure!.name);
         console.log('🎯 Using voice ID:', selectedVoiceId);
         
-        generateVoiceWithSelection(aiResponse, selectedFigure!, selectedVoiceId).catch(voiceError => {
-          console.error('Voice generation failed:', voiceError);
-          toast({
-            title: "FakeYou unavailable, switching to backup TTS",
-            description: "Using fallback voice",
-            variant: "default",
-            duration: 3000,
-          });
-          // Fallback to standard TTS
-          generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
-            console.error('All speech generation failed:', speechError);
-          });
+        setIsGeneratingVoice(true);
+        toast({
+          title: "Generating voice...",
+          description: "Please wait while we generate the audio response",
+          duration: 3000,
         });
+        
+        generateVoiceWithSelection(aiResponse, selectedFigure!, selectedVoiceId)
+          .then(() => {
+            setIsGeneratingVoice(false);
+          })
+          .catch(voiceError => {
+            console.error('Voice generation failed:', voiceError);
+            setIsGeneratingVoice(false);
+            toast({
+              title: "FakeYou unavailable, switching to backup TTS",
+              description: "Using fallback voice",
+              variant: "default",
+              duration: 3000,
+            });
+            // Fallback to standard TTS
+            generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
+              console.error('All speech generation failed:', speechError);
+            });
+          });
       }
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -797,6 +810,7 @@ const HistoricalChat = () => {
       if (voiceId.startsWith('resemble-')) {
         const resembleVoiceId = voiceId.replace('resemble-', '');
         console.log('🎤 Using Resemble AI with voice:', resembleVoiceId);
+        console.log('⏳ Resemble AI synthesis may take 30-60 seconds...');
         
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
           body: { 
@@ -807,10 +821,12 @@ const HistoricalChat = () => {
         });
 
         if (error || !data?.audioContent) {
+          setIsGeneratingVoice(false);
           throw new Error('Resemble AI TTS failed');
         }
 
         console.log('✅ Successfully used Resemble AI TTS');
+        setIsGeneratingVoice(false);
         playAudioFromBase64(data.audioContent);
         return;
       }
