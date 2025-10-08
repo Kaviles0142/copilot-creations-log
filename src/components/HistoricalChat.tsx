@@ -317,18 +317,20 @@ const HistoricalChat = () => {
         console.log('⚠️ Database voice search failed:', error);
       }
       
-      // Only add marketplace fallback voices if NO voices found from any service
-      if (allVoices.length === 0) {
-        console.log('⚠️ No voices found in any service, adding marketplace fallback voices');
-        const isMale = detectGender(figure);
-        
+      // Always add Resemble marketplace voices as a premium option
+      const isMale = detectGender(figure);
+      
+      // Check if Resemble marketplace voice already exists
+      const hasResembleMarketplace = allVoices.some(v => v.provider === 'resemble' && v.voiceId.includes('marketplace'));
+      
+      if (!hasResembleMarketplace) {
         allVoices.push({
           voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (Resemble AI Marketplace - ${isMale ? 'Male' : 'Female'})`,
+          title: `${figure.name} (Resemble AI Voice)`,
           provider: 'resemble',
           voiceId: isMale ? '0f2e6952' : '0967ee26'
         });
-        console.log(`📢 Added marketplace fallback: ${isMale ? '0f2e6952 (male)' : '0967ee26 (female)'}`);
+        console.log(`📢 Added Resemble marketplace voice: ${isMale ? '0f2e6952 (male)' : '0967ee26 (female)'}`);
       }
       
       console.log(`📊 Total voices from all providers: ${allVoices.length}`);
