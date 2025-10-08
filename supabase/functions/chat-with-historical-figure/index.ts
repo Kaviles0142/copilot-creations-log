@@ -84,6 +84,12 @@ serve(async (req) => {
             }
           });
 
+          console.log('📰 RSS News Response:', { 
+            error: rssNewsResponse.error, 
+            hasData: !!rssNewsResponse.data,
+            articlesCount: rssNewsResponse.data?.articles?.length || 0 
+          });
+
           const allNews = rssNewsResponse.data?.articles || [];
 
           if (allNews.length > 0) {
