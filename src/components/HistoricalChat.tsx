@@ -343,7 +343,7 @@ const HistoricalChat = () => {
           voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (FakeYou - American Voice)`,
           provider: 'fakeyou',
-          voiceId: isMale ? 'TM:9b78n5tqk2c5' : 'TM:a3b2c1d4e5f6' // Placeholder - awaiting new voice code
+          voiceId: isMale ? 'm_5v39rbr52cg708zn7rk94wf3bg3rqr' : 'TM:a3b2c1d4e5f6'
         });
         console.log(`📢 Added FakeYou generic fallback voice`);
       }
