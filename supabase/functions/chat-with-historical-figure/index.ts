@@ -74,37 +74,36 @@ serve(async (req) => {
           newsData = cachedNews.news_data;
           currentEventsAvailable = true;
         } else {
-          console.log('🔍 Fetching fresh news data...');
+          console.log('🔍 Fetching fresh news data from RSS feeds...');
           
-          // Fetch general news, political context, AND recent deaths in parallel
-          const [generalNewsResponse, politicalNewsResponse, deathNewsResponse] = await Promise.all([
+          // Fetch news from RSS feeds and supplement with political context
+          const [rssNewsResponse, politicalNewsResponse] = await Promise.all([
+            supabase.functions.invoke('rss-news-scraper', {
+              body: { 
+                searchTerm: message.toLowerCase() // Pass the user's message to find relevant news
+              }
+            }),
             supabase.functions.invoke('serpapi-search', {
               body: { 
-                query: 'top news today United States',
+                query: 'US government current administration 2025 politics',
                 type: 'news',
                 num: 3
-              }
-            }),
-            supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: 'US President current administration 2025',
-                type: 'news',
-                num: 2
-              }
-            }),
-            supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: 'recent deaths obituaries 2025 notable figures',
-                type: 'news',
-                num: 5
               }
             })
           ]);
 
+          const rssNews = rssNewsResponse.data?.articles || [];
+          const politicalNews = politicalNewsResponse.data?.results || [];
+          
           const allNews = [
-            ...(generalNewsResponse.data?.results || []),
-            ...(politicalNewsResponse.data?.results || []),
-            ...(deathNewsResponse.data?.results || [])
+            ...rssNews.map((article: any) => ({
+              title: article.title,
+              snippet: article.description || article.content?.substring(0, 400),
+              date: article.pubDate,
+              source: article.source,
+              link: article.link
+            })),
+            ...politicalNews
           ];
 
           if (allNews.length > 0) {
