@@ -309,14 +309,14 @@ const HistoricalChat = () => {
         });
         console.log(`📢 Added Resemble AI British voice: ${isMale ? '0f2e6952 (male British)' : '02fc35a6 (female)'}`);
 
-        // Add Resemble AI American voice
+        // Add Resemble AI American voice (gender-specific)
         allVoices.push({
-          voiceToken: 'resemble_marketplace_american',
+          voiceToken: `resemble_marketplace_american_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (Resemble AI - American Voice)`,
           provider: 'resemble',
-          voiceId: 'b605397b'
+          voiceId: isMale ? 'b605397b' : '02fc35a6' // Use gender-appropriate voice
         });
-        console.log('📢 Added Resemble AI American voice: b605397b');
+        console.log(`📢 Added Resemble AI American voice: ${isMale ? 'b605397b (male)' : '02fc35a6 (female)'}`);
       }
       
       // Add FakeYou generic fallback voices (not character-specific)
@@ -331,15 +331,15 @@ const HistoricalChat = () => {
           voiceId: isMale ? 'weight_pr6qyqxgc1h0pg4rd8xystpq9' : 'TM:a3b2c1d4e5f6'
         });
         
-        // Add a British FakeYou voice
+        // Add a British FakeYou voice (gender-specific)
         allVoices.push({
-          voiceToken: 'fakeyou_generic_british',
+          voiceToken: `fakeyou_generic_british_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (FakeYou - British Voice)`,
           provider: 'fakeyou',
-          voiceId: 'weight_a8s9s0qzbfsw523rr1ypxdxca'
+          voiceId: isMale ? 'weight_a8s9s0qzbfsw523rr1ypxdxca' : 'TM:f1e2d3c4b5a6' // Gender-appropriate British voices
         });
         
-        console.log(`📢 Added FakeYou generic fallback voices (American & British)`);
+        console.log(`📢 Added FakeYou generic fallback voices (${isMale ? 'male' : 'female'} American & British)`);
       }
       
       console.log(`📊 Total voices from all providers: ${allVoices.length}`);
