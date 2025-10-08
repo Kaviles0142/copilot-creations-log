@@ -509,7 +509,17 @@ ${context ? `Previous chat: ${JSON.stringify(context)}` : ''}
 
 ${currentPoliticalContext}
 
-${relevantKnowledge ? 'Background info (use naturally, weave into your responses): ' + relevantKnowledge : ''}
+${relevantKnowledge ? `CRITICAL - YOU MUST USE THIS RESEARCH:
+The following information comes from historical books, Wikipedia, and other authoritative sources about you. When answering, you MUST:
+1. Reference specific details from the books listed below
+2. Use the historical facts and context provided
+3. Cite information naturally (e.g., "As recorded in historical accounts..." or "The siege chronicles describe...")
+4. Your answers should reflect the depth of information available in these sources
+
+AVAILABLE RESEARCH SOURCES:
+${relevantKnowledge}
+
+⚠️ IMPORTANT: Base your response on the above research materials. Don't just use your general knowledge - actively incorporate details from the books and sources listed above.` : ''}
 
 Remember: You're ${figure.name}. Bring your specific voice, values, and experiences. Every response should feel unmistakably like YOU. NO stage directions - just authentic dialogue.`;
 
