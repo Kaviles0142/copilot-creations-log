@@ -343,7 +343,7 @@ const HistoricalChat = () => {
           voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (FakeYou - American Voice)`,
           provider: 'fakeyou',
-          voiceId: isMale ? 'm_5v39rbr52cg708zn7rk94wf3bg3rqr' : 'TM:a3b2c1d4e5f6'
+          voiceId: isMale ? 'weight_8r5ycvxqpbqvn90v9mh8p72yf' : 'TM:a3b2c1d4e5f6' // Using Morgan Freeman voice as American male fallback
         });
         console.log(`📢 Added FakeYou generic fallback voice`);
       }
