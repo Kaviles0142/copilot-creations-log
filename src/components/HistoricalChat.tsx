@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import VoiceCloningManager from '@/components/VoiceCloningManager';
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,230 @@ const HistoricalChat = () => {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const { toast } = useToast();
 
+  // Get native language for historical figure - wrapped in useCallback to prevent re-renders
+  const getFigureLanguage = useCallback((figure: HistoricalFigure): string => {
+    const figureLanguages: Record<string, string> = {
+      'winston-churchill': 'en-GB',
+      'albert-einstein': 'de-DE',
+      'marie-curie': 'fr-FR',
+      'leonardo-da-vinci': 'it-IT',
+      'cleopatra': 'ar-SA',
+      'socrates': 'el-GR',
+      'shakespeare': 'en-GB',
+      'napoleon': 'fr-FR',
+      'abraham-lincoln': 'en-US',
+      'julius-caesar': 'la',
+      'joan-of-arc': 'fr-FR',
+      'galileo': 'it-IT'
+    };
+    return figureLanguages[figure.id] || 'en-US';
+  }, []);
+
+  // Fetch available FakeYou voices for the selected figure - wrapped in useCallback
+  const fetchFakeYouVoicesForFigure = useCallback(async (figure: HistoricalFigure) => {
+    setIsLoadingVoices(true);
+    try {
+      console.log('🔍 Fetching FakeYou voices for:', figure.name);
+      
+      const figureName = figure.name.toLowerCase();
+      console.log(`🎯 Figure name: "${figure.name}" (lowercase: "${figureName}")`);
+      
+      // Build search term for backend
+      let searchTerm = '';
+      let excludeTerms: string[] = [];
+      
+      if (figureName.includes('robert') && figureName.includes('kennedy')) {
+        searchTerm = 'kennedy';
+        excludeTerms = ['john'];
+        console.log('🔍 Searching for Robert F. Kennedy voices');
+      } else if (figureName.includes('john') && figureName.includes('kennedy')) {
+        searchTerm = 'kennedy';
+        excludeTerms = ['robert', 'bobby', 'rfk'];
+        console.log('🔍 Searching for John F. Kennedy voices');
+      } else if (figureName.includes('kennedy')) {
+        searchTerm = 'kennedy';
+        console.log('🔍 Searching for Kennedy voices');
+      } else if (figureName.includes('trump')) {
+        searchTerm = 'trump';
+        console.log('🔍 Searching for Trump voices');
+      } else if (figureName.includes('martin luther king')) {
+        searchTerm = 'martin luther king';
+        console.log('🔍 Searching for Martin Luther King Jr. voices');
+      } else {
+        // For other figures, use last significant word
+        const words = figureName.split(' ');
+        const suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
+        const lastName = words.reverse().find(word => !suffixes.includes(word.toLowerCase()));
+        searchTerm = lastName || figureName;
+        console.log('🔍 Searching for:', searchTerm);
+      }
+      
+      // Pass search term to backend for more efficient filtering
+      const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
+        body: { 
+          action: 'list_voices',
+          searchTerm: searchTerm
+        }
+      });
+
+      if (voicesError) {
+        console.error('Error fetching voices:', voicesError);
+        setAvailableFakeYouVoices([]);
+        return;
+      }
+
+      let candidateVoices = voicesData.voices || [];
+      console.log(`📋 Backend returned ${candidateVoices.length} voices for "${searchTerm}"`);
+      
+      // Apply client-side exclusions if needed
+      const matchingVoices = candidateVoices.filter((voice: any) => {
+        const voiceTitle = voice.title.toLowerCase();
+        
+        // Check exclusions
+        for (const excludeTerm of excludeTerms) {
+          if (voiceTitle.includes(excludeTerm)) {
+            console.log(`❌ Excluded: "${voice.title}" (contains "${excludeTerm}")`);
+            return false;
+          }
+        }
+        
+        console.log(`✅ Included: "${voice.title}"`);
+        return true;
+      });
+      
+      console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
+      console.log('📝 All voices:', matchingVoices.map((v: any) => v.title));
+      
+      
+      console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
+      
+      // Combine all voices from different providers
+      const allVoices = [...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))];
+      
+      // Add ElevenLabs voices - search their library dynamically
+      try {
+        console.log('🔍 Searching ElevenLabs for:', figure.name);
+        // Note: ElevenLabs voice search would go here when API supports it
+        // For now, keeping hardcoded authentic voices for specific figures
+        const figureSpecificVoices: Record<string, { voiceId: string; title: string }> = {
+          'john-f-kennedy': { voiceId: '2vubyVoGjNJ5HPga4SkV', title: `${figure.name} (ElevenLabs - Authentic)` },
+          'martin-luther-king-jr': { voiceId: '2ts4Q14DjMa5I5EgteS4', title: `${figure.name} (ElevenLabs - Authentic)` },
+        };
+        
+        if (figureSpecificVoices[figure.id]) {
+          const specificVoice = figureSpecificVoices[figure.id];
+          allVoices.push({
+            voiceToken: `elevenlabs_${figure.id}_authentic`,
+            title: specificVoice.title,
+            provider: 'elevenlabs',
+            voiceId: specificVoice.voiceId
+          });
+          console.log(`✅ Added ElevenLabs voice for ${figure.name}`);
+        } else {
+          console.log('ℹ️ No ElevenLabs voices configured for', figure.name);
+        }
+      } catch (error) {
+        console.log('⚠️ ElevenLabs search failed (possibly no credits):', error);
+      }
+      
+      // Add cloned voices from database (all providers)
+      try {
+        console.log('🔍 Searching database for cloned voices:', figure.name);
+        const { data: clonedVoices, error: clonedError } = await supabase
+          .from('cloned_voices')
+          .select('voice_id, voice_name, provider')
+          .eq('figure_id', figure.id)
+          .eq('is_active', true)
+          .order('audio_quality_score', { ascending: false });
+
+        if (!clonedError && clonedVoices && clonedVoices.length > 0) {
+          clonedVoices.forEach(cv => {
+            allVoices.push({
+              voiceToken: cv.voice_id,
+              title: `${cv.voice_name} (Cloned - ${cv.provider})`,
+              provider: cv.provider,
+              voiceId: cv.voice_id
+            });
+            console.log(`✅ Added cloned voice: ${cv.voice_name}`);
+          });
+        } else {
+          console.log('ℹ️ No cloned voices found for', figure.name);
+        }
+      } catch (error) {
+        console.log('⚠️ Database query failed:', error);
+      }
+      
+      // Add Resemble AI marketplace voices as fallback
+      const resembleVoiceMap: Record<string, { voiceId: string; gender: string }> = {
+        'abraham-lincoln': { voiceId: '0f2e6952', gender: 'male' },
+        'winston-churchill': { voiceId: '0f2e6952', gender: 'male' },
+        'marie-curie': { voiceId: 'e3827ec5', gender: 'female' },
+        'joan-of-arc': { voiceId: 'e3827ec5', gender: 'female' },
+      };
+      
+      if (resembleVoiceMap[figure.id]) {
+        const resembleVoice = resembleVoiceMap[figure.id];
+        allVoices.push({
+          voiceToken: `resemble_${figure.id}_marketplace`,
+          title: `${figure.name} (Resemble AI Voice)`,
+          provider: 'resemble',
+          voiceId: resembleVoice.voiceId
+        });
+        console.log(`📢 Added Resemble marketplace voice: ${resembleVoice.voiceId} (${resembleVoice.gender})`);
+      }
+      
+      console.log(`📊 Total voices from all providers: ${allVoices.length}`);
+      
+      setAvailableFakeYouVoices(allVoices);
+      
+      // Auto-select the first available voice
+      if (allVoices.length > 0) {
+        const firstVoice = allVoices[0];
+        setSelectedFakeYouVoice(firstVoice);
+        console.log(`🎙️ Auto-selected: "${firstVoice.title}" (${firstVoice.provider})`);
+      }
+    } catch (error) {
+      console.error('Error fetching FakeYou voices:', error);
+      setAvailableFakeYouVoices([]);
+    } finally {
+      setIsLoadingVoices(false);
+    }
+  }, []); // No dependencies needed - only uses parameters and state setters
+
+  // Create authentic voice - wrapped in useCallback
+  const createAuthenticVoice = useCallback(async (figure: HistoricalFigure) => {
+    try {
+      console.log(`Creating authentic voice for ${figure.name}...`);
+      
+      // Use Resemble AI for authentic voice cloning from historical sources
+      const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
+        body: { 
+          figureName: figure.name,
+          figureId: figure.id,
+          audioUrl: null // Let the function find historical audio or use marketplace fallback
+        }
+      });
+
+      if (error) {
+        console.error('Voice cloning error:', error);
+        return;
+      }
+      
+      if (data?.success) {
+        const voiceCreationMessage: Message = {
+          id: Date.now().toString(),
+          content: `🎭 **Authentic Voice Ready**: Created an AI voice profile for ${figure.name} using advanced voice synthesis! I'm now using speech patterns and characteristics designed to match how ${figure.name} might have sounded based on historical records.`,
+          type: "assistant",
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, voiceCreationMessage]);
+        console.log(`Successfully created voice for ${figure.name}`);
+      }
+    } catch (error) {
+      console.error('Error creating authentic voice:', error);
+    }
+  }, []); // No dependencies needed - uses only its parameters
+
   // Initialize speech recognition with enhanced settings
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -182,177 +406,8 @@ const HistoricalChat = () => {
       setSelectedLanguage(figureLanguage);
       fetchFakeYouVoicesForFigure(selectedFigure);
     }
-  }, [selectedFigure]);
+  }, [selectedFigure, createAuthenticVoice, getFigureLanguage, fetchFakeYouVoicesForFigure]); // Add all function dependencies
 
-  // Fetch available FakeYou voices for the selected figure
-  const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
-    setIsLoadingVoices(true);
-    try {
-      console.log('🔍 Fetching FakeYou voices for:', figure.name);
-      
-      const figureName = figure.name.toLowerCase();
-      console.log(`🎯 Figure name: "${figure.name}" (lowercase: "${figureName}")`);
-      
-      // Build search term for backend
-      let searchTerm = '';
-      let excludeTerms: string[] = [];
-      
-      if (figureName.includes('robert') && figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
-        excludeTerms = ['john'];
-        console.log('🔍 Searching for Robert F. Kennedy voices');
-      } else if (figureName.includes('john') && figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
-        excludeTerms = ['robert', 'bobby', 'rfk'];
-        console.log('🔍 Searching for John F. Kennedy voices');
-      } else if (figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
-        console.log('🔍 Searching for Kennedy voices');
-      } else if (figureName.includes('trump')) {
-        searchTerm = 'trump';
-        console.log('🔍 Searching for Trump voices');
-      } else if (figureName.includes('martin luther king')) {
-        searchTerm = 'martin luther king';
-        console.log('🔍 Searching for Martin Luther King Jr. voices');
-      } else {
-        // For other figures, use last significant word
-        const words = figureName.split(' ');
-        const suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
-        const lastName = words.reverse().find(word => !suffixes.includes(word.toLowerCase()));
-        searchTerm = lastName || figureName;
-        console.log('🔍 Searching for:', searchTerm);
-      }
-      
-      // Pass search term to backend for more efficient filtering
-      const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
-        body: { 
-          action: 'list_voices',
-          searchTerm: searchTerm
-        }
-      });
-
-      if (voicesError) {
-        console.error('Error fetching voices:', voicesError);
-        setAvailableFakeYouVoices([]);
-        return;
-      }
-
-      let candidateVoices = voicesData.voices || [];
-      console.log(`📋 Backend returned ${candidateVoices.length} voices for "${searchTerm}"`);
-      
-      // Apply client-side exclusions if needed
-      const matchingVoices = candidateVoices.filter((voice: any) => {
-        const voiceTitle = voice.title.toLowerCase();
-        
-        // Check exclusions
-        for (const excludeTerm of excludeTerms) {
-          if (voiceTitle.includes(excludeTerm)) {
-            console.log(`❌ Excluded: "${voice.title}" (contains "${excludeTerm}")`);
-            return false;
-          }
-        }
-        
-        console.log(`✅ Included: "${voice.title}"`);
-        return true;
-      });
-      
-      console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
-      console.log('📝 All voices:', matchingVoices.map(v => v.title));
-      
-      
-      console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
-      
-      // Combine all voices from different providers
-      const allVoices = [...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))];
-      
-      // Add ElevenLabs voices - search their library dynamically
-      try {
-        console.log('🔍 Searching ElevenLabs for:', figure.name);
-        // Note: ElevenLabs voice search would go here when API supports it
-        // For now, keeping hardcoded authentic voices for specific figures
-        const figureSpecificVoices: Record<string, { voiceId: string; title: string }> = {
-          'john-f-kennedy': { voiceId: '2vubyVoGjNJ5HPga4SkV', title: `${figure.name} (ElevenLabs - Authentic)` },
-          'martin-luther-king-jr': { voiceId: '2ts4Q14DjMa5I5EgteS4', title: `${figure.name} (ElevenLabs - Authentic)` },
-        };
-        
-        if (figureSpecificVoices[figure.id]) {
-          const specificVoice = figureSpecificVoices[figure.id];
-          allVoices.push({
-            voiceToken: `elevenlabs_${figure.id}_authentic`,
-            title: specificVoice.title,
-            provider: 'elevenlabs',
-            voiceId: specificVoice.voiceId
-          });
-          console.log(`✅ Added ElevenLabs voice for ${figure.name}`);
-        } else {
-          console.log('ℹ️ No ElevenLabs voices configured for', figure.name);
-        }
-      } catch (error) {
-        console.log('⚠️ ElevenLabs search failed (possibly no credits):', error);
-      }
-      
-      // Add cloned voices from database (all providers)
-      try {
-        console.log('🔍 Searching database for cloned voices:', figure.name);
-        const { data: clonedVoices, error: clonedError } = await supabase
-          .from('cloned_voices')
-          .select('voice_id, voice_name, provider')
-          .eq('figure_id', figure.id)
-          .eq('is_active', true);
-
-        if (!clonedError && clonedVoices && clonedVoices.length > 0) {
-          console.log(`✅ Found ${clonedVoices.length} cloned voices for ${figure.name}`);
-          clonedVoices.forEach((voice: any) => {
-            allVoices.push({
-              voiceToken: `${voice.provider}_${voice.voice_id}`,
-              title: voice.voice_name, // Use the voice_name from database directly
-              provider: voice.provider,
-              voiceId: voice.voice_id
-            });
-          });
-        } else {
-          console.log('ℹ️ No cloned voices found for', figure.name);
-        }
-      } catch (error) {
-        console.log('⚠️ Database voice search failed:', error);
-      }
-      
-      // Always add Resemble marketplace voices as a premium option
-      const isMale = detectGender(figure);
-      
-      // Check if Resemble marketplace voice already exists
-      const hasResembleMarketplace = allVoices.some(v => v.provider === 'resemble' && v.voiceId.includes('marketplace'));
-      
-      if (!hasResembleMarketplace) {
-        allVoices.push({
-          voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (Resemble AI Voice)`,
-          provider: 'resemble',
-          voiceId: isMale ? '0f2e6952' : '02fc35a6'
-        });
-        console.log(`📢 Added Resemble marketplace voice: ${isMale ? '0f2e6952 (male)' : '02fc35a6 (female)'}`);
-      }
-      
-      console.log(`📊 Total voices from all providers: ${allVoices.length}`);
-      
-      setAvailableFakeYouVoices(allVoices);
-      
-      if (allVoices.length > 0) {
-        setSelectedFakeYouVoice(allVoices[0]);
-        console.log(`🎙️ Auto-selected: "${allVoices[0].title}" (${allVoices[0].provider})`);
-      } else {
-        setSelectedFakeYouVoice(null);
-      }
-      
-      
-    } catch (error) {
-      console.error('❌ Error:', error);
-      setAvailableFakeYouVoices([]);
-      setSelectedFakeYouVoice(null);
-    } finally {
-      setIsLoadingVoices(false);
-    }
-  };
 
   // Get exclusion terms to filter out related but different figures
   const getExcludeTermsForFigure = (figureName: string): string[] => {
@@ -391,24 +446,6 @@ const HistoricalChat = () => {
     }
   };
 
-  // Get native language for historical figure
-  const getFigureLanguage = (figure: HistoricalFigure): string => {
-    const figureLanguages: Record<string, string> = {
-      'winston-churchill': 'en-GB',
-      'albert-einstein': 'de-DE',
-      'marie-curie': 'fr-FR',
-      'leonardo-da-vinci': 'it-IT',
-      'cleopatra': 'ar-SA',
-      'socrates': 'el-GR',
-      'shakespeare': 'en-GB',
-      'napoleon': 'fr-FR',
-      'abraham-lincoln': 'en-US',
-      'julius-caesar': 'la',
-      'joan-of-arc': 'fr-FR',
-      'galileo': 'it-IT'
-    };
-    return figureLanguages[figure.id] || 'en-US';
-  };
 
   // Handle current events search using RSS scraper
   const handleCurrentEventsSearch = async (query: string) => {
@@ -1573,38 +1610,6 @@ const HistoricalChat = () => {
   };
 
 
-  const createAuthenticVoice = async (figure: HistoricalFigure) => {
-    try {
-      console.log(`Creating authentic voice for ${figure.name}...`);
-      
-      // Use Resemble AI for authentic voice cloning from historical sources
-      const { data, error } = await supabase.functions.invoke('resemble-voice-clone', {
-        body: { 
-          figureName: figure.name,
-          figureId: figure.id,
-          audioUrl: null // Let the function find historical audio or use marketplace fallback
-        }
-      });
-
-      if (error) {
-        console.error('Voice cloning error:', error);
-        return;
-      }
-      
-      if (data?.success) {
-        const voiceCreationMessage: Message = {
-          id: Date.now().toString(),
-          content: `🎭 **Authentic Voice Ready**: Created an AI voice profile for ${figure.name} using advanced voice synthesis! I'm now using speech patterns and characteristics designed to match how ${figure.name} might have sounded based on historical records.`,
-          type: "assistant",
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, voiceCreationMessage]);
-        console.log(`Successfully created voice for ${figure.name}`);
-      }
-    } catch (error) {
-      console.error('Error creating authentic voice:', error);
-    }
-  };
 
   const toggleAudio = () => {
     if (currentAudio) {
