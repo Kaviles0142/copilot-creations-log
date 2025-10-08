@@ -111,9 +111,9 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
 
       // Filter out old automated fallback voices - only show real matches
       const realMatches = (data || []).filter(voice => {
-        // Exclude old automated fallback providers
+        // Exclude ONLY old automated fallback providers and generic premium voices
         const isOldFallback = voice.provider === 'resemble_fallback' || 
-                             voice.provider === 'fakeyou' ||
+                             voice.provider === 'resemble_marketplace' ||
                              voice.voice_name.includes('(Premium Voice)');
         return !isOldFallback;
       });
