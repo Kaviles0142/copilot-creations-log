@@ -1777,55 +1777,6 @@ const HistoricalChat = () => {
             </p>
           </Card>
 
-          {/* Voice Selection */}
-          {selectedFigure && (
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center">
-                <Volume2 className="h-4 w-4 mr-2" />
-                Voice Selection
-              </h3>
-              {isLoadingVoices ? (
-                <div className="text-sm text-muted-foreground">
-                  Loading voices...
-                </div>
-              ) : availableFakeYouVoices.length > 0 ? (
-                <>
-                  <Select 
-                    value={selectedFakeYouVoice?.voiceToken} 
-                    onValueChange={(token) => {
-                      const voice = availableFakeYouVoices.find(v => v.voiceToken === token);
-                      setSelectedFakeYouVoice(voice);
-                      toast({
-                        title: "Voice selected",
-                        description: `Now using "${voice?.title}"`,
-                        duration: 2000,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Select a voice" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover z-50">
-                      {availableFakeYouVoices.map((voice) => (
-                        <SelectItem key={voice.voiceToken} value={voice.voiceToken}>
-                          {voice.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {availableFakeYouVoices.length} voice{availableFakeYouVoices.length !== 1 ? 's' : ''} available for {selectedFigure.name}
-                    {selectedFakeYouVoice && ` • ${selectedFakeYouVoice.provider === 'resemble' ? 'Resemble AI' : selectedFakeYouVoice.provider === 'elevenlabs' ? 'ElevenLabs' : 'FakeYou'}`}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No FakeYou voices found for {selectedFigure.name}
-                </p>
-              )}
-            </Card>
-          )}
-
           {/* Conversation Export */}
           <ConversationExport
             messages={messages}
