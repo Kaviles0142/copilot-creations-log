@@ -847,6 +847,38 @@ const HistoricalChat = () => {
         return;
       }
 
+      // Handle FakeYou fallback voices
+      if (voiceId.startsWith('fakeyou-fallback-')) {
+        console.log('🎤 Using FakeYou fallback voice:', voiceId);
+        
+        const fakeyouFallbackVoices: Record<string, string> = {
+          'fakeyou-fallback-american': 'weight_56sw5vw4aj7y3xs217f2md54x',
+          'fakeyou-fallback-british': 'weight_a8s9s0qzbfsw523rr1ypxdxca',
+        };
+        
+        const voiceToken = fakeyouFallbackVoices[voiceId];
+        
+        if (!voiceToken) {
+          throw new Error('Invalid FakeYou fallback voice');
+        }
+        
+        const { data, error } = await supabase.functions.invoke('fakeyou-tts', {
+          body: {
+            text: text,
+            voiceToken: voiceToken,
+            action: 'generate'
+          }
+        });
+
+        if (error || !data?.audioContent) {
+          throw new Error('FakeYou TTS failed');
+        }
+
+        console.log('✅ Successfully used FakeYou TTS');
+        playAudioFromBase64(data.audioContent);
+        return;
+      }
+
       // Otherwise use ElevenLabs (or check for cloned voice if "auto")
       if (voiceId === "auto") {
         // Check for cloned voice
