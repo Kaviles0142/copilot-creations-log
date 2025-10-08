@@ -350,25 +350,6 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
               <SelectItem value="auto">
                 {hasCustomVoice ? "🤖 Auto (Custom Trained)" : "🎭 Auto (Historical Match)"}
               </SelectItem>
-              
-              {/* Resemble AI Voices */}
-              <SelectItem value="resemble-1d49f394">
-                🎙️ Donald Trump (Resemble AI)
-              </SelectItem>
-              
-              {/* ElevenLabs Voices */}
-              <SelectItem value="9BWtsMINqrJLrRacOk9x">
-                👩 Aria (Female, Warm)
-              </SelectItem>
-              <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">
-                👨 Roger (Male, Authoritative)
-              </SelectItem>
-              <SelectItem value="EXAVITQu4vr4xnSDxMaL">
-                👩 Sarah (Female, Clear)
-              </SelectItem>
-              <SelectItem value="JBFqnCBsd6RMkjVDRZzb">
-                👨 George (Male, Deep)
-              </SelectItem>
             </SelectContent>
           </Select>
         </div>
