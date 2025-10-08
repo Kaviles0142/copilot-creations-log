@@ -345,7 +345,16 @@ const HistoricalChat = () => {
           provider: 'fakeyou',
           voiceId: isMale ? 'weight_pr6qyqxgc1h0pg4rd8xystpq9' : 'TM:a3b2c1d4e5f6'
         });
-        console.log(`📢 Added FakeYou generic fallback voice`);
+        
+        // Add a British FakeYou voice
+        allVoices.push({
+          voiceToken: 'fakeyou_generic_british',
+          title: `${figure.name} (FakeYou - British Voice)`,
+          provider: 'fakeyou',
+          voiceId: 'weight_a8s9s0qzbfsw523rr1ypxdxca'
+        });
+        
+        console.log(`📢 Added FakeYou generic fallback voices (American & British)`);
       }
       
       console.log(`📊 Total voices from all providers: ${allVoices.length}`);
