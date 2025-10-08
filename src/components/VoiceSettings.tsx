@@ -351,23 +351,19 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
                 {hasCustomVoice ? "🤖 Auto (Custom Trained)" : "🎭 Auto (Historical Match)"}
               </SelectItem>
               
-              {/* Resemble AI Voices */}
-              <SelectItem value="resemble-1d49f394">
-                🎙️ Donald Trump (Resemble AI)
-              </SelectItem>
+              {/* Show matched voices for this figure */}
+              {clonedVoices.map((voice) => (
+                <SelectItem key={voice.id} value={`${voice.provider}-${voice.voice_id}`}>
+                  🎯 {voice.voice_name} ({voice.provider === 'resemble' ? 'Resemble AI' : voice.provider === 'fakeyou' ? 'FakeYou' : 'ElevenLabs'}) - Match
+                </SelectItem>
+              ))}
               
-              {/* ElevenLabs Voices */}
-              <SelectItem value="9BWtsMINqrJLrRacOk9x">
-                👩 Aria (Female, Warm)
+              {/* Always show fallback voices */}
+              <SelectItem value="resemble-fallback-british">
+                🎙️ British Male (Resemble AI Fallback)
               </SelectItem>
-              <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">
-                👨 Roger (Male, Authoritative)
-              </SelectItem>
-              <SelectItem value="EXAVITQu4vr4xnSDxMaL">
-                👩 Sarah (Female, Clear)
-              </SelectItem>
-              <SelectItem value="JBFqnCBsd6RMkjVDRZzb">
-                👨 George (Male, Deep)
+              <SelectItem value="fakeyou-fallback-american">
+                🎙️ American Male (FakeYou Fallback)
               </SelectItem>
             </SelectContent>
           </Select>
