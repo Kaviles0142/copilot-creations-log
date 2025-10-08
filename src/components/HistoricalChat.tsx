@@ -1841,6 +1841,17 @@ const HistoricalChat = () => {
               setDocuments([]);
             }}
           />
+
+          {/* Figure Recommendations */}
+          <FigureRecommendations
+            selectedFigure={selectedFigure}
+            onSelectFigure={(figure) => {
+              setSelectedFigure(figure);
+              setMessages([]);
+              setCurrentConversationId(null);
+              setDocuments([]);
+            }}
+          />
           {/* Document Upload */}
           <DocumentUpload
             conversationId={currentConversationId}
