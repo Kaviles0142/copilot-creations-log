@@ -1267,7 +1267,7 @@ const HistoricalChat = () => {
     
     // Check explicit lists first
     if (maleNames.some(name => figureName.includes(name))) return true;
-    if (femaleNames.some(name => figureName.includes(name))) return true;
+    if (femaleNames.some(name => figureName.includes(name))) return false;
     
     // Check for gender indicators in description
     if (figureDesc.includes('he ') || figureDesc.includes('his ') || 
