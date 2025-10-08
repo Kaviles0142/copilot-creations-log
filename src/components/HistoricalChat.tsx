@@ -317,20 +317,44 @@ const HistoricalChat = () => {
         console.log('⚠️ Database voice search failed:', error);
       }
       
-      // Always add Resemble marketplace voices as a premium option
+      // Always add fallback voices from multiple providers
       const isMale = detectGender(figure);
       
       // Check if Resemble marketplace voice already exists
       const hasResembleMarketplace = allVoices.some(v => v.provider === 'resemble' && v.voiceId.includes('marketplace'));
       
       if (!hasResembleMarketplace) {
+        // Add primary Resemble AI fallback voice
         allVoices.push({
-          voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (Resemble AI Voice)`,
+          voiceToken: `resemble_marketplace_${isMale ? 'male_primary' : 'female_primary'}`,
+          title: `${figure.name} (Resemble AI - Premium)`,
           provider: 'resemble',
           voiceId: isMale ? '0f2e6952' : '02fc35a6'
         });
-        console.log(`📢 Added Resemble marketplace voice: ${isMale ? '0f2e6952 (male)' : '02fc35a6 (female)'}`);
+        console.log(`📢 Added Resemble AI primary voice: ${isMale ? '0f2e6952 (male)' : '02fc35a6 (female)'}`);
+        
+        // Add secondary Resemble AI fallback voice with different voice
+        allVoices.push({
+          voiceToken: `resemble_marketplace_${isMale ? 'male_alt' : 'female_alt'}`,
+          title: `${figure.name} (Resemble AI - Alternative)`,
+          provider: 'resemble',
+          voiceId: isMale ? 'arthur_marketplace' : 'claire_marketplace'
+        });
+        console.log(`📢 Added Resemble AI alternative voice: ${isMale ? 'arthur_marketplace (male)' : 'claire_marketplace (female)'}`);
+      }
+      
+      // Add FakeYou generic fallback voices (not character-specific)
+      const hasFakeYouGeneric = allVoices.some(v => v.provider === 'fakeyou' && v.voiceToken.includes('generic'));
+      
+      if (!hasFakeYouGeneric) {
+        // Add a generic male/female FakeYou voice as last resort fallback
+        allVoices.push({
+          voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
+          title: `${figure.name} (FakeYou - Standard Voice)`,
+          provider: 'fakeyou',
+          voiceId: isMale ? 'TM:9b78n5tqk2c5' : 'TM:a3b2c1d4e5f6' // Generic professional voices
+        });
+        console.log(`📢 Added FakeYou generic fallback voice`);
       }
       
       console.log(`📊 Total voices from all providers: ${allVoices.length}`);
