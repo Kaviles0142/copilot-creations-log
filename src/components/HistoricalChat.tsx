@@ -1843,16 +1843,6 @@ const HistoricalChat = () => {
             }}
           />
 
-          {/* Figure Recommendations */}
-          <FigureRecommendations
-            selectedFigure={selectedFigure}
-            onSelectFigure={(figure) => {
-              setSelectedFigure(figure);
-              setMessages([]);
-              setCurrentConversationId(null);
-              setDocuments([]);
-            }}
-          />
 
 
           {/* Voice Settings - Clean User Interface */}
