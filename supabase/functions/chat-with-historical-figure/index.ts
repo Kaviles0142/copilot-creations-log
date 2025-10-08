@@ -175,9 +175,11 @@ serve(async (req) => {
               .limit(5); // Maximum books for comprehensive context
 
             if (books && books.length > 0) {
+              console.log(`📚 Found ${books.length} books for ${figure.name}`);
               sourcesUsed.books = books.length;
               let booksText = '\n\n📚 RELEVANT BOOKS:\n';
               books.forEach(book => {
+                console.log(`  - "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}`);
                 booksText += `- "${book.title}" by ${book.authors?.join(', ') || 'Unknown'}\n`;
                 if (book.description) {
                   booksText += `  ${book.description.substring(0, 200)}...\n`;
