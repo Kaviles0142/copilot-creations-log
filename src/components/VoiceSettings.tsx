@@ -259,6 +259,44 @@ const VoiceSettings = ({ selectedFigure, onVoiceGenerated, onVoiceSelected }: Vo
         return;
       }
 
+      // Handle FakeYou fallback voices
+      if (selectedVoice.startsWith('fakeyou-fallback-')) {
+        console.log('Using FakeYou fallback voice:', selectedVoice);
+        
+        // Map fallback selections to actual FakeYou voice IDs
+        const fakeyouFallbackVoices: Record<string, string> = {
+          'fakeyou-fallback-american': 'weight_56sw5vw4aj7y3xs217f2md54x', // Professional Male Narrator
+          'fakeyou-fallback-british': 'weight_a8s9s0qzbfsw523rr1ypxdxca', // British Male Voice
+        };
+        
+        const voiceToken = fakeyouFallbackVoices[selectedVoice];
+        
+        if (!voiceToken) {
+          throw new Error('Invalid FakeYou fallback voice selected');
+        }
+        
+        const { data, error } = await supabase.functions.invoke('fakeyou-tts', {
+          body: {
+            text: text,
+            voiceToken: voiceToken,
+            action: 'generate'
+          }
+        });
+
+        if (error) throw new Error('FakeYou voice generation failed');
+        if (!data?.audioContent) throw new Error('No audio content received from FakeYou');
+
+        const audioBlob = new Blob([Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        onVoiceGenerated(audioUrl);
+        
+        toast({
+          title: "FakeYou Voice Generated!",
+          description: `Generated speech with ${selectedVoice.includes('british') ? 'British' : 'American'} voice`,
+        });
+        return;
+      }
+
       // Use custom voice IDs directly for ElevenLabs
       const voiceMapping: Record<string, string> = {
         'martin-luther-king-jr': '2ts4Q14DjMa5I5EgteS4', // Custom MLK voice
