@@ -326,9 +326,9 @@ const HistoricalChat = () => {
           voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (Resemble AI Marketplace - ${isMale ? 'Male' : 'Female'})`,
           provider: 'resemble',
-          voiceId: isMale ? '0f2e6952' : 'niki_marketplace'
+          voiceId: isMale ? '0f2e6952' : '0967ee26'
         });
-        console.log(`📢 Added marketplace fallback: ${isMale ? '0f2e6952 (male)' : 'Niki (female)'}`);
+        console.log(`📢 Added marketplace fallback: ${isMale ? '0f2e6952 (male)' : '0967ee26 (female)'}`);
       }
       
       console.log(`📊 Total voices from all providers: ${allVoices.length}`);
