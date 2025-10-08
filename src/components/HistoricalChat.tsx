@@ -13,7 +13,6 @@ import FigureList from "./FigureList";
 import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
-import VoiceSettings from "./VoiceSettings";
 import ConversationHistory from "./ConversationHistory";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
@@ -1844,21 +1843,6 @@ const HistoricalChat = () => {
               setDocuments([]);
             }}
           />
-
-
-          {/* Voice Settings - Clean User Interface */}
-          <VoiceSettings
-            selectedFigure={selectedFigure}
-            onVoiceGenerated={(audioUrl) => {
-              const audio = new Audio(audioUrl);
-              audio.play();
-            }}
-            onVoiceSelected={(voiceId) => {
-              console.log('Voice selected:', voiceId);
-              setSelectedVoiceId(voiceId);
-            }}
-          />
-
           {/* Document Upload */}
           <DocumentUpload
             conversationId={currentConversationId}
