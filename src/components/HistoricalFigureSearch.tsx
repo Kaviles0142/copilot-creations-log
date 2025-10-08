@@ -105,23 +105,6 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
           });
         }
 
-        // Add additional Wikipedia search results
-        if (wikipediaResponse.data.searchResults) {
-          for (const result of wikipediaResponse.data.searchResults.slice(0, 4)) {
-            try {
-              const detailResponse = await supabase.functions.invoke('wikipedia-search', {
-                body: { query: result.title }
-              });
-              
-              if (detailResponse.data?.success && detailResponse.data.data) {
-                results.push(detailResponse.data.data);
-              }
-            } catch (detailError) {
-              console.error('Error getting detail for:', result.title, detailError);
-            }
-          }
-        }
-
         setSearchResults(results);
         
         // Automatically select the first result if available
