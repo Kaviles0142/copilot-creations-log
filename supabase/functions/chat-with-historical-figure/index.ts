@@ -55,11 +55,11 @@ serve(async (req) => {
     try {
       console.log(`Searching knowledge sources for ${figure.name}...`);
       
-      // PRIORITY 1: Current events (with caching to reduce API calls)
+      // PRIORITY 1: Current events from RSS feeds (completely free!)
       try {
-        const cacheKey = 'top-news-us';
+        const cacheKey = 'rss-news';
         
-        // Check cache first (valid for 2 hours)
+        // Check cache first (valid for 1 hour)
         const { data: cachedNews } = await supabase
           .from('news_cache')
           .select('news_data, expires_at')
@@ -70,41 +70,21 @@ serve(async (req) => {
         let newsData = null;
 
         if (cachedNews && cachedNews.news_data) {
-          console.log('✅ Using cached news data');
+          console.log('✅ Using cached RSS news data');
           newsData = cachedNews.news_data;
           currentEventsAvailable = true;
         } else {
-          console.log('🔍 Fetching fresh news data from RSS feeds...');
+          console.log('🔍 Fetching fresh news from RSS feeds...');
           
-          // Fetch news from RSS feeds and supplement with political context
-          const [rssNewsResponse, politicalNewsResponse] = await Promise.all([
-            supabase.functions.invoke('rss-news-scraper', {
-              body: { 
-                searchTerm: message.toLowerCase() // Pass the user's message to find relevant news
-              }
-            }),
-            supabase.functions.invoke('serpapi-search', {
-              body: { 
-                query: 'US government current administration 2025 politics',
-                type: 'news',
-                num: 3
-              }
-            })
-          ]);
+          // Fetch news from RSS feeds only (BBC, Reuters, NPR, Guardian, AP)
+          const rssNewsResponse = await supabase.functions.invoke('rss-news-scraper', {
+            body: { 
+              query: message.toLowerCase(), // Pass the user's message to find relevant news
+              num: 10
+            }
+          });
 
-          const rssNews = rssNewsResponse.data?.articles || [];
-          const politicalNews = politicalNewsResponse.data?.results || [];
-          
-          const allNews = [
-            ...rssNews.map((article: any) => ({
-              title: article.title,
-              snippet: article.description || article.content?.substring(0, 400),
-              date: article.pubDate,
-              source: article.source,
-              link: article.link
-            })),
-            ...politicalNews
-          ];
+          const allNews = rssNewsResponse.data?.articles || [];
 
           if (allNews.length > 0) {
             newsData = allNews;
