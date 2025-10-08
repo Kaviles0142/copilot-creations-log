@@ -337,9 +337,9 @@ const HistoricalChat = () => {
           voiceToken: 'resemble_marketplace_american',
           title: `${figure.name} (Resemble AI - American Voice)`,
           provider: 'resemble',
-          voiceId: '49cc457e'
+          voiceId: 'b605397b'
         });
-        console.log('📢 Added Resemble AI American voice: 49cc457e');
+        console.log('📢 Added Resemble AI American voice: b605397b');
       }
       
       // Add FakeYou generic fallback voices (not character-specific)
