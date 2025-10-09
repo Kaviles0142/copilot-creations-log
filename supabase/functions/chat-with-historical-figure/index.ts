@@ -48,7 +48,8 @@ serve(async (req) => {
       wikipedia: false,
       currentEvents: 0,
       historicalContext: 0,
-      webArticles: 0
+      webArticles: 0,
+      googleSearch: 0
     };
     let currentEventsAvailable = false;
 
@@ -313,6 +314,35 @@ serve(async (req) => {
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
+          }
+          return '';
+        })(),
+
+        // 3. Google Custom Search for additional web context
+        (async () => {
+          try {
+            const searchResponse = await supabase.functions.invoke('serpapi-search', {
+              body: { 
+                query: `${figure.name} ${message}`,
+                type: 'news',
+                num: 5
+              }
+            });
+
+            if (searchResponse.data?.results?.length > 0) {
+              sourcesUsed.googleSearch = searchResponse.data.results.length;
+              let searchText = '\n\n🌐 WEB SEARCH RESULTS:\n';
+              searchResponse.data.results.forEach((result: any) => {
+                searchText += `- ${result.title}\n`;
+                if (result.snippet) {
+                  searchText += `  ${result.snippet.substring(0, 300)}...\n`;
+                }
+                searchText += `  Source: ${result.source}\n`;
+              });
+              return searchText;
+            }
+          } catch (error) {
+            console.log('Google Custom Search error (daily limit may be reached):', error);
           }
           return '';
         })(),
