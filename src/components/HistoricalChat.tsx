@@ -14,7 +14,6 @@ import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import ConversationHistory from "./ConversationHistory";
-import AnimatedAvatar from "./AnimatedAvatar";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -1981,26 +1980,12 @@ const HistoricalChat = () => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 flex">
-          {/* Animated Avatar Section */}
-          {selectedFigure && (
-            <div className="w-96 border-r border-border bg-gradient-to-b from-card to-background flex items-center justify-center">
-              <AnimatedAvatar 
-                figure={selectedFigure}
-                isSpeaking={isPlayingAudio}
-                isLoading={isLoading}
-              />
-            </div>
-          )}
-          
-          {/* Chat Messages Section */}
-          <div className="flex-1">
-            <ChatMessages 
-              messages={messages} 
-              selectedFigure={selectedFigure}
-              isLoading={isLoading}
-            />
-          </div>
+        <div className="flex-1">
+          <ChatMessages 
+            messages={messages} 
+            selectedFigure={selectedFigure}
+            isLoading={isLoading}
+          />
         </div>
 
         {/* Input */}
