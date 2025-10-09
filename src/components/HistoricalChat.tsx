@@ -314,9 +314,9 @@ const HistoricalChat = () => {
           voiceToken: `resemble_marketplace_american_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (Resemble AI - American Voice)`,
           provider: 'resemble',
-          voiceId: isMale ? 'b605397b' : 'b605397b' // Use gender-appropriate voice
+          voiceId: isMale ? 'b605397b' : '02fc35a6' // Use gender-appropriate voice
         });
-        console.log(`📢 Added Resemble AI American voice: ${isMale ? 'b605397b (male)' : 'b605397b (female American)'}`);
+        console.log(`📢 Added Resemble AI American voice: ${isMale ? 'b605397b (male)' : '02fc35a6 (female American)'}`);
       }
       
       // Add FakeYou generic fallback voices (not character-specific)
