@@ -453,6 +453,42 @@ export type Database = {
         }
         Relationships: []
       }
+      youtube_transcripts: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          expires_at: string | null
+          figure_id: string | null
+          figure_name: string | null
+          id: string
+          transcript: string
+          video_id: string
+          video_title: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          expires_at?: string | null
+          figure_id?: string | null
+          figure_name?: string | null
+          id?: string
+          transcript: string
+          video_id: string
+          video_title?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          expires_at?: string | null
+          figure_id?: string | null
+          figure_name?: string | null
+          id?: string
+          transcript?: string
+          video_id?: string
+          video_title?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

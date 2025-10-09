@@ -243,7 +243,7 @@ serve(async (req) => {
           return '';
         })() : Promise.resolve(''),
 
-        // 3. YouTube search
+        // 3. YouTube search + transcripts
         (async () => {
           try {
             const youtubeResponse = await supabase.functions.invoke('youtube-search', {
@@ -256,12 +256,42 @@ serve(async (req) => {
             if (youtubeResponse.data?.results?.length > 0) {
               sourcesUsed.youtube = youtubeResponse.data.results.length;
               let youtubeText = '\n\n🎥 YOUTUBE:\n';
+              
+              // Check for existing transcripts
+              const videoIds = youtubeResponse.data.results.map((v: any) => v.videoId);
+              const { data: transcripts } = await supabase
+                .from('youtube_transcripts')
+                .select('video_id, transcript, video_title')
+                .in('video_id', videoIds)
+                .gt('expires_at', new Date().toISOString());
+
+              const transcriptMap = new Map(
+                transcripts?.map(t => [t.video_id, t.transcript]) || []
+              );
+
               youtubeResponse.data.results.forEach((video: any) => {
                 youtubeText += `- "${video.title}"\n`;
-                if (video.description) {
-                  youtubeText += `  ${video.description.substring(0, 500)}...\n`; // Add descriptions
+                
+                // Use transcript if available, otherwise use description
+                if (transcriptMap.has(video.videoId)) {
+                  const transcript = transcriptMap.get(video.videoId);
+                  youtubeText += `  [FULL TRANSCRIPT]: ${transcript.substring(0, 2000)}...\n`;
+                  console.log(`Using cached transcript for ${video.videoId}`);
+                } else if (video.description) {
+                  youtubeText += `  ${video.description.substring(0, 500)}...\n`;
+                  
+                  // Trigger background transcription (non-blocking)
+                  supabase.functions.invoke('youtube-transcribe', {
+                    body: { 
+                      videoId: video.videoId,
+                      videoTitle: video.title,
+                      figureId: figure.id,
+                      figureName: figure.name
+                    }
+                  }).catch(err => console.log(`Background transcription failed for ${video.videoId}:`, err));
                 }
               });
+              
               return youtubeText;
             }
           } catch (error) {
