@@ -305,18 +305,18 @@ const HistoricalChat = () => {
           voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (Resemble AI - British Voice)`,
           provider: 'resemble',
-          voiceId: isMale ? '0f2e6952' : '02fc35a6'
+          voiceId: isMale ? '0f2e6952' : 'c16f90a5'
         });
-        console.log(`📢 Added Resemble AI British voice: ${isMale ? '0f2e6952 (male British)' : '02fc35a6 (female)'}`);
+        console.log(`📢 Added Resemble AI British voice: ${isMale ? '0f2e6952 (male British)' : 'c16f90a5 (female)'}`);
 
         // Add Resemble AI American voice (gender-specific)
         allVoices.push({
           voiceToken: `resemble_marketplace_american_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (Resemble AI - American Voice)`,
           provider: 'resemble',
-          voiceId: isMale ? 'b605397b' : '02fc35a6' // Use gender-appropriate voice
+          voiceId: isMale ? 'b605397b' : 'b605397b' // Use gender-appropriate voice
         });
-        console.log(`📢 Added Resemble AI American voice: ${isMale ? 'b605397b (male)' : '02fc35a6 (female)'}`);
+        console.log(`📢 Added Resemble AI American voice: ${isMale ? 'b605397b (male)' : 'b605397b (female American)'}`);
       }
       
       // Add FakeYou generic fallback voices (not character-specific)
