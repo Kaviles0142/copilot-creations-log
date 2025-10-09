@@ -257,8 +257,8 @@ serve(async (req) => {
               sourcesUsed.youtube = youtubeResponse.data.results.length;
               let youtubeText = '\n\n🎥 YOUTUBE:\n';
               
-              // Check for existing transcripts
-              const videoIds = youtubeResponse.data.results.map((v: any) => v.videoId);
+              // Check for existing transcripts (use 'id' field from YouTube response)
+              const videoIds = youtubeResponse.data.results.map((v: any) => v.id);
               const { data: transcripts } = await supabase
                 .from('youtube_transcripts')
                 .select('video_id, transcript, video_title')
@@ -273,22 +273,22 @@ serve(async (req) => {
                 youtubeText += `- "${video.title}"\n`;
                 
                 // Use transcript if available, otherwise use description
-                if (transcriptMap.has(video.videoId)) {
-                  const transcript = transcriptMap.get(video.videoId);
+                if (transcriptMap.has(video.id)) {
+                  const transcript = transcriptMap.get(video.id);
                   youtubeText += `  [FULL TRANSCRIPT]: ${transcript.substring(0, 2000)}...\n`;
-                  console.log(`Using cached transcript for ${video.videoId}`);
+                  console.log(`Using cached transcript for ${video.id}`);
                 } else if (video.description) {
                   youtubeText += `  ${video.description.substring(0, 500)}...\n`;
                   
                   // Trigger background transcription (non-blocking)
                   supabase.functions.invoke('youtube-transcribe', {
                     body: { 
-                      videoId: video.videoId,
+                      videoId: video.id,
                       videoTitle: video.title,
                       figureId: figure.id,
                       figureName: figure.name
                     }
-                  }).catch(err => console.log(`Background transcription failed for ${video.videoId}:`, err));
+                  }).catch(err => console.log(`Background transcription failed for ${video.id}:`, err));
                 }
               });
               
