@@ -336,7 +336,7 @@ const HistoricalChat = () => {
           voiceToken: `fakeyou_generic_british_${isMale ? 'male' : 'female'}`,
           title: `${figure.name} (FakeYou - British Voice)`,
           provider: 'fakeyou',
-          voiceId: isMale ? 'weight_a8s9s0qzbfsw523rr1ypxdxca' : 'TM:f1e2d3c4b5a6' // Gender-appropriate British voices
+          voiceId: isMale ? 'weight_a8s9s0qzbfsw523rr1ypxdxca' : 'weight_9j9s0sdz9z9gp4hjre3kcndmc'
         });
         
         console.log(`📢 Added FakeYou generic fallback voices (${isMale ? 'male' : 'female'} American & British)`);
