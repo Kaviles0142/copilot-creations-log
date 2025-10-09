@@ -653,13 +653,7 @@ const HistoricalChat = () => {
       setAbortController(null);
     }
 
-    // If audio is playing, pause it instead of stopping
-    if (isPlayingAudio) {
-      handlePauseAudio();
-      return;
-    }
-
-    // Complete stop - reset everything
+    // Complete stop - reset everything (don't pause, actually stop)
     if (currentAudio) {
       currentAudio.pause();
       currentAudio.currentTime = 0;
@@ -670,7 +664,7 @@ const HistoricalChat = () => {
       window.speechSynthesis.cancel();
     }
 
-    // Reset all states
+    // Reset all states to allow new questions
     setIsLoading(false);
     setIsPlayingAudio(false);
     setIsPaused(false);
@@ -680,7 +674,7 @@ const HistoricalChat = () => {
     
     toast({
       title: "Stopped",
-      description: "Generation and voice playback have been stopped",
+      description: "Voice playback stopped. You can now ask a new question.",
       duration: 2000,
     });
   };
