@@ -47,56 +47,90 @@ serve(async (req) => {
       );
     }
 
-    // Download audio from YouTube using yt-dlp
-    console.log(`Downloading audio for ${videoId}...`);
-    const ytDlpProcess = new Deno.Command("yt-dlp", {
-      args: [
-        "-f", "bestaudio",
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "5",
-        "-o", "-",
-        `https://www.youtube.com/watch?v=${videoId}`
-      ],
-      stdout: "piped",
-      stderr: "piped",
-    });
-
-    const ytDlpOutput = await ytDlpProcess.output();
-    
-    if (!ytDlpOutput.success) {
-      const errorText = new TextDecoder().decode(ytDlpOutput.stderr);
-      console.error('yt-dlp error:', errorText);
-      throw new Error(`Failed to download audio: ${errorText}`);
-    }
-
-    const audioData = ytDlpOutput.stdout;
-    console.log(`Downloaded ${audioData.length} bytes of audio`);
-
-    // Prepare form data for OpenAI Whisper
-    const formData = new FormData();
-    const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
-    formData.append('file', audioBlob, 'audio.mp3');
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'text');
-
-    // Send to OpenAI Whisper
-    console.log('Sending to OpenAI Whisper...');
-    const openaiResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
+    // Fetch video page to extract transcript data
+    console.log(`Fetching YouTube page for ${videoId}...`);
+    const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const pageResponse = await fetch(videoPageUrl, {
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-      },
-      body: formData,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
     });
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error('OpenAI error:', errorText);
-      throw new Error(`OpenAI transcription failed: ${errorText}`);
+    if (!pageResponse.ok) {
+      throw new Error(`Failed to fetch video page: ${pageResponse.status}`);
     }
 
-    const transcript = await openaiResponse.text();
+    const html = await pageResponse.text();
+
+    // Extract captions/transcript URL from page
+    const captionTrackMatch = html.match(/"captions".*?"captionTracks":(\[.*?\])/);
+    
+    if (!captionTrackMatch) {
+      console.log(`No captions found for video ${videoId}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'No captions available for this video',
+          videoId
+        }),
+        { 
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const captionTracks = JSON.parse(captionTrackMatch[1]);
+    
+    // Prefer English captions
+    let captionTrack = captionTracks.find((track: any) => 
+      track.languageCode === 'en' || track.languageCode === 'en-US'
+    );
+    
+    // Fallback to first available
+    if (!captionTrack && captionTracks.length > 0) {
+      captionTrack = captionTracks[0];
+    }
+
+    if (!captionTrack) {
+      throw new Error('No caption track found');
+    }
+
+    // Fetch the caption data
+    console.log(`Fetching caption track...`);
+    const captionResponse = await fetch(captionTrack.baseUrl);
+    
+    if (!captionResponse.ok) {
+      throw new Error(`Failed to fetch captions: ${captionResponse.status}`);
+    }
+
+    const captionXml = await captionResponse.text();
+
+    // Parse XML and extract text
+    const textMatches = captionXml.matchAll(/<text[^>]*>(.*?)<\/text>/g);
+    let transcript = '';
+    
+    for (const match of textMatches) {
+      const text = match[1]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n/g, ' ')
+        .trim();
+      
+      if (text) {
+        transcript += text + ' ';
+      }
+    }
+
+    transcript = transcript.trim();
+    
+    if (!transcript) {
+      throw new Error('Failed to extract transcript text');
+    }
+
     console.log(`Transcription complete: ${transcript.length} characters`);
 
     // Save to database
