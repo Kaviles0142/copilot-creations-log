@@ -28,27 +28,102 @@ serve(async (req) => {
     console.log(`Generating Azure TTS for ${figure_name || 'figure'} with voice: ${voice}`);
     console.log(`Text length: ${text.length} characters`);
 
-    // Voice mapping for different figures
-    const voiceMapping: { [key: string]: string } = {
-      // German-accented English voices (perfect for Einstein)
-      'german-male': 'de-DE-ConradNeural',
-      'german-male-2': 'de-DE-KlausNeural',
+    // Comprehensive figure-to-region detection
+    const detectRegion = (name: string): string => {
+      const nameLower = name.toLowerCase();
       
-      // British English voices
-      'british-male': 'en-GB-RyanNeural',
-      'british-female': 'en-GB-SoniaNeural',
+      // German figures
+      if (nameLower.includes('einstein') || nameLower.includes('bach') || 
+          nameLower.includes('beethoven') || nameLower.includes('goethe') ||
+          nameLower.includes('nietzsche') || nameLower.includes('kant') ||
+          nameLower.includes('marx') || nameLower.includes('bismarck')) {
+        return 'german';
+      }
       
-      // American voices (fallback)
-      'american-male': 'en-US-GuyNeural',
-      'american-female': 'en-US-JennyNeural',
+      // British figures
+      if (nameLower.includes('churchill') || nameLower.includes('shakespeare') ||
+          nameLower.includes('newton') || nameLower.includes('darwin') ||
+          nameLower.includes('dickens') || nameLower.includes('austen') ||
+          nameLower.includes('victoria') || nameLower.includes('elizabeth')) {
+        return 'british';
+      }
+      
+      // French figures
+      if (nameLower.includes('napoleon') || nameLower.includes('joan of arc') ||
+          nameLower.includes('voltaire') || nameLower.includes('rousseau') ||
+          nameLower.includes('descartes') || nameLower.includes('pasteur') ||
+          nameLower.includes('de gaulle') || nameLower.includes('marie curie')) {
+        return 'french';
+      }
+      
+      // Italian figures
+      if (nameLower.includes('da vinci') || nameLower.includes('galileo') ||
+          nameLower.includes('michelangelo') || nameLower.includes('caesar') ||
+          nameLower.includes('dante') || nameLower.includes('machiavelli')) {
+        return 'italian';
+      }
+      
+      // Spanish figures
+      if (nameLower.includes('cervantes') || nameLower.includes('picasso') ||
+          nameLower.includes('goya') || nameLower.includes('columbus')) {
+        return 'spanish';
+      }
+      
+      // Russian figures
+      if (nameLower.includes('tolstoy') || nameLower.includes('dostoyevsky') ||
+          nameLower.includes('tchaikovsky') || nameLower.includes('lenin') ||
+          nameLower.includes('stalin') || nameLower.includes('catherine')) {
+        return 'russian';
+      }
+      
+      // Japanese figures
+      if (nameLower.includes('hirohito') || nameLower.includes('akira') ||
+          nameLower.includes('musashi') || nameLower.includes('tokugawa')) {
+        return 'japanese';
+      }
+      
+      // Chinese figures
+      if (nameLower.includes('confucius') || nameLower.includes('mao') ||
+          nameLower.includes('sun tzu') || nameLower.includes('lao tzu')) {
+        return 'chinese';
+      }
+      
+      // Indian figures
+      if (nameLower.includes('gandhi') || nameLower.includes('tagore') ||
+          nameLower.includes('nehru') || nameLower.includes('ashoka')) {
+        return 'indian';
+      }
+      
+      // Greek figures (Ancient)
+      if (nameLower.includes('plato') || nameLower.includes('aristotle') ||
+          nameLower.includes('socrates') || nameLower.includes('alexander')) {
+        return 'greek';
+      }
+      
+      return 'american'; // Default fallback
     };
 
-    // Auto-select voice based on figure if not specified
+    // Region-to-voice mapping with Azure Neural Voices
+    const regionVoiceMap: { [key: string]: string } = {
+      'german': 'de-DE-ConradNeural',          // German male
+      'british': 'en-GB-RyanNeural',           // British male
+      'french': 'fr-FR-HenriNeural',           // French male
+      'italian': 'it-IT-DiegoNeural',          // Italian male
+      'spanish': 'es-ES-AlvaroNeural',         // Spanish male
+      'russian': 'ru-RU-DmitryNeural',         // Russian male
+      'japanese': 'ja-JP-KeitaNeural',         // Japanese male
+      'chinese': 'zh-CN-YunxiNeural',          // Chinese male
+      'indian': 'en-IN-PrabhatNeural',         // Indian English male
+      'greek': 'el-GR-NestorasNeural',         // Greek male
+      'american': 'en-US-GuyNeural',           // American male (default)
+    };
+
+    // Auto-select voice based on figure's region
     let selectedVoice = voice;
-    if (figure_name?.toLowerCase().includes('einstein')) {
-      selectedVoice = 'de-DE-ConradNeural'; // German accent
-    } else if (figure_name?.toLowerCase().includes('churchill')) {
-      selectedVoice = 'en-GB-RyanNeural'; // British
+    if (figure_name) {
+      const detectedRegion = detectRegion(figure_name);
+      selectedVoice = regionVoiceMap[detectedRegion];
+      console.log(`🌍 Detected region: ${detectedRegion} → Voice: ${selectedVoice}`);
     }
 
     // Build SSML for better control
