@@ -787,7 +787,8 @@ const HistoricalChat = () => {
             body: { 
               text: text,
               voice: resembleVoiceId,
-              figure_name: figure.name
+              figure_name: figure.name,
+              figure_id: figure.id
             }
           });
 
