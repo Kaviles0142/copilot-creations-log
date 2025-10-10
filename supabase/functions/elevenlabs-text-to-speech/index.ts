@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,6 +62,38 @@ serve(async (req) => {
     
     console.log(`Using ElevenLabs voice ID: ${voiceId} for voice: ${voice}`);
 
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check cache first
+    const { data: cachedAudio } = await supabase
+      .from('audio_cache')
+      .select('cached_audio, expires_at')
+      .eq('text', text)
+      .eq('voice_id', voiceId)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (cachedAudio?.cached_audio) {
+      console.log('✅ Using cached audio');
+      return new Response(
+        JSON.stringify({ 
+          audioContent: cachedAudio.cached_audio,
+          voice: voice,
+          voiceId: voiceId,
+          provider: 'elevenlabs',
+          cached: true
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('🔍 Cache miss, generating new audio...');
+
     // Call ElevenLabs TTS API
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
@@ -104,12 +137,30 @@ serve(async (req) => {
 
     console.log(`Successfully generated ElevenLabs audio of ${audioBuffer.byteLength} bytes`);
 
+    // Cache the generated audio
+    try {
+      await supabase
+        .from('audio_cache')
+        .upsert({
+          text,
+          voice_id: voiceId,
+          cached_audio: base64Audio,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+        }, {
+          onConflict: 'text,voice_id'
+        });
+      console.log('💾 Audio cached successfully');
+    } catch (cacheError) {
+      console.error('Cache write error (non-fatal):', cacheError);
+    }
+
     return new Response(
       JSON.stringify({ 
         audioContent: base64Audio,
         voice: voice,
         voiceId: voiceId,
-        provider: 'elevenlabs'
+        provider: 'elevenlabs',
+        cached: false
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

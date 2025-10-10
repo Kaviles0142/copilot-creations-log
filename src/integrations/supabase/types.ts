@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      audio_cache: {
+        Row: {
+          cached_audio: string
+          created_at: string
+          expires_at: string
+          id: string
+          text: string
+          voice_id: string
+        }
+        Insert: {
+          cached_audio: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          text: string
+          voice_id: string
+        }
+        Update: {
+          cached_audio?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          text?: string
+          voice_id?: string
+        }
+        Relationships: []
+      }
       book_content_cache: {
         Row: {
           book_id: string
