@@ -1722,51 +1722,84 @@ const HistoricalChat = () => {
           </Card>
 
           {/* Azure Voice Selection */}
-          {selectedFigure && (
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center">
-                <Volume2 className="h-4 w-4 mr-2" />
-                Azure Voice Selection
-              </h3>
-              <Select 
-                value={selectedVoiceId} 
-                onValueChange={(voiceId) => {
-                  setSelectedVoiceId(voiceId);
-                  const azureVoices = [
-                    { id: 'auto', name: 'Auto (Region-Based)', description: 'Automatically selects based on figure nationality' },
-                    { id: 'en-US-AndrewNeural', name: 'Andrew (US Male)', description: 'Clear American English, professional' },
-                    { id: 'en-GB-RyanNeural', name: 'Ryan (British Male)', description: 'British English, refined accent' },
-                    { id: 'en-US-JennyNeural', name: 'Jenny (US Female)', description: 'Warm American English, conversational' },
-                    { id: 'fr-FR-HenriNeural', name: 'Henri (French Male)', description: 'Native French speaker' },
-                    { id: 'de-DE-ConradNeural', name: 'Conrad (German Male)', description: 'Native German speaker' },
-                  ];
-                  const voice = azureVoices.find(v => v.id === voiceId);
-                  toast({
-                    title: "Voice selected",
-                    description: voice?.description || `Now using ${voiceId}`,
-                    duration: 2000,
-                  });
-                }}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select Azure voice" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover z-50">
-                  <SelectItem value="auto">Auto (Region-Based)</SelectItem>
-                  <SelectItem value="en-US-AndrewNeural">Andrew (US Male)</SelectItem>
-                  <SelectItem value="en-GB-RyanNeural">Ryan (British Male)</SelectItem>
-                  <SelectItem value="en-US-JennyNeural">Jenny (US Female)</SelectItem>
-                  <SelectItem value="fr-FR-HenriNeural">Henri (French Male)</SelectItem>
-                  <SelectItem value="de-DE-ConradNeural">Conrad (German Male)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-2">
-                {selectedVoiceId === 'auto' 
-                  ? `Auto mode will select the best voice based on ${selectedFigure.name}'s nationality` 
-                  : 'Manual voice selection overrides auto-detection'}
-              </p>
-            </Card>
-          )}
+          {selectedFigure && (() => {
+            // Detect gender based on figure name
+            const detectGender = (name: string): 'male' | 'female' => {
+              const maleTitles = ['king', 'emperor', 'sir', 'lord', 'prince', 'mr', 'president', 'pope', 'sultan', 'khan', 'tsar', 'caesar'];
+              const femaleTitles = ['queen', 'empress', 'lady', 'princess', 'mrs', 'ms', 'miss', 'tsarina'];
+              const nameLower = name.toLowerCase();
+              
+              if (maleTitles.some(title => nameLower.includes(title))) return 'male';
+              if (femaleTitles.some(title => nameLower.includes(title))) return 'female';
+              
+              const femaleNames = ['cleopatra', 'elizabeth', 'victoria', 'catherine', 'marie', 'joan', 'rosa', 'ada', 'jane', 'harriet', 'susan', 'amelia', 'florence', 'frida'];
+              const maleNames = ['alexander', 'napoleon', 'julius', 'augustus', 'leonardo', 'william', 'charles', 'henry', 'george', 'albert', 'winston', 'abraham', 'thomas', 'benjamin'];
+              
+              if (femaleNames.some(n => nameLower.includes(n))) return 'female';
+              if (maleNames.some(n => nameLower.includes(n))) return 'male';
+              
+              return 'male'; // default
+            };
+            
+            const gender = detectGender(selectedFigure.name);
+            
+            // Define all Azure voices with gender
+            const allAzureVoices = [
+              { id: 'en-US-AndrewNeural', name: 'Andrew (US Male)', description: 'Clear American English, professional', gender: 'male' },
+              { id: 'en-GB-RyanNeural', name: 'Ryan (British Male)', description: 'British English, refined accent', gender: 'male' },
+              { id: 'fr-FR-HenriNeural', name: 'Henri (French Male)', description: 'Native French speaker', gender: 'male' },
+              { id: 'de-DE-ConradNeural', name: 'Conrad (German Male)', description: 'Native German speaker', gender: 'male' },
+              { id: 'es-ES-AlvaroNeural', name: 'Alvaro (Spanish Male)', description: 'Native Spanish speaker', gender: 'male' },
+              { id: 'en-US-JennyNeural', name: 'Jenny (US Female)', description: 'Warm American English, conversational', gender: 'female' },
+              { id: 'en-GB-SoniaNeural', name: 'Sonia (British Female)', description: 'British English, elegant accent', gender: 'female' },
+              { id: 'fr-FR-DeniseNeural', name: 'Denise (French Female)', description: 'Native French speaker', gender: 'female' },
+              { id: 'de-DE-KatjaNeural', name: 'Katja (German Female)', description: 'Native German speaker', gender: 'female' },
+              { id: 'es-ES-ElviraNeural', name: 'Elvira (Spanish Female)', description: 'Native Spanish speaker', gender: 'female' },
+            ];
+            
+            // Filter voices by gender and limit to 5
+            const genderFilteredVoices = allAzureVoices
+              .filter(v => v.gender === gender)
+              .slice(0, 5);
+            
+            return (
+              <Card className="p-4">
+                <h3 className="font-semibold mb-3 flex items-center">
+                  <Volume2 className="h-4 w-4 mr-2" />
+                  Azure Voice Selection
+                </h3>
+                <Select 
+                  value={selectedVoiceId} 
+                  onValueChange={(voiceId) => {
+                    setSelectedVoiceId(voiceId);
+                    const voice = [...genderFilteredVoices].find(v => v.id === voiceId);
+                    toast({
+                      title: "Voice selected",
+                      description: voiceId === 'auto' ? `Auto mode for ${selectedFigure.name}` : voice?.description || `Now using ${voiceId}`,
+                      duration: 2000,
+                    });
+                  }}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Azure voice" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    <SelectItem value="auto">Auto (Region-Based)</SelectItem>
+                    {genderFilteredVoices.map(voice => (
+                      <SelectItem key={voice.id} value={voice.id}>
+                        {voice.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {selectedVoiceId === 'auto' 
+                    ? `Auto mode will select the best ${gender} voice based on ${selectedFigure.name}'s nationality` 
+                    : 'Manual voice selection overrides auto-detection'}
+                </p>
+              </Card>
+            );
+          })()}
 
           {/* Conversation Export */}
           <ConversationExport
