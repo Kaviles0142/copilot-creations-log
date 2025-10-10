@@ -82,43 +82,7 @@ serve(async (req) => {
         figureResult.errors.push(`Books sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
-      // 2. Ensure current events are available
-      try {
-        console.log(`📰 Syncing current events for ${figure.figure_name}...`);
-        
-        await supabase.functions.invoke('serpapi-search', {
-          body: {
-            query: `"${figure.figure_name}" current events recent news 2024 2025`,
-            type: 'news',
-            location: 'United States',
-            num: 5
-          }
-        });
-        
-        figureResult.current_events_synced = true;
-      } catch (error) {
-        console.error(`Failed to sync current events for ${figure.figure_name}:`, error);
-        figureResult.errors.push(`Current events sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-
-      // 3. Ensure historical context is available
-      try {
-        console.log(`📜 Syncing historical context for ${figure.figure_name}...`);
-        
-        await supabase.functions.invoke('serpapi-search', {
-          body: {
-            query: `"${figure.figure_name}" historical impact legacy influence modern society`,
-            type: 'news',
-            location: 'United States',
-            num: 5
-          }
-        });
-        
-        figureResult.historical_context_synced = true;
-      } catch (error) {
-        console.error(`Failed to sync historical context for ${figure.figure_name}:`, error);
-        figureResult.errors.push(`Historical context sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      // SerpAPI removed - using Wikipedia and books for context
 
       // 4. Ensure YouTube content is cached
       try {

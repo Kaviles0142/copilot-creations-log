@@ -34,8 +34,6 @@ verify_jwt = false
 [functions.create-voice-clone]
 verify_jwt = false
 
-[functions.serpapi-search]
-verify_jwt = false
 
 [functions.discover-books]
 verify_jwt = false
