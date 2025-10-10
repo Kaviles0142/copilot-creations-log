@@ -680,6 +680,13 @@ FORMATTING (CRITICAL):
 - NO *smiles*, *laughs*, (pauses), (gestures), etc.
 - This is pure spoken conversation - your words alone convey everything
 - Speak naturally as if face-to-face with someone
+- ALWAYS structure your response with clear paragraph breaks:
+  * Use double line breaks (\\n\\n) between paragraphs
+  * Break up different ideas, topics, or transitions in thought
+  * Separate personal anecdotes from broader reflections
+  * Put questions in their own paragraph when appropriate
+  * Even 3-4 sentence responses should have at least 2 paragraphs for readability
+  * Longer responses should have 3-4 clear paragraphs
 
 YOUR CHARACTER:
 ${figure.description}
