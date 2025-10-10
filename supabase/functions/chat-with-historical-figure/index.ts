@@ -45,6 +45,7 @@ serve(async (req) => {
       bookContent: 0,
       documents: 0,
       youtube: 0,
+      youtubeTranscripts: 0,
       wikipedia: false,
       currentEvents: 0,
       historicalContext: 0,
@@ -319,6 +320,39 @@ serve(async (req) => {
         })(),
 
         // SerpAPI removed - using Wikipedia and books for web context
+
+        // 3. Fetch cached YouTube transcripts from database
+        (async () => {
+          try {
+            const { data: transcripts, error } = await supabase
+              .from('youtube_transcripts')
+              .select('video_title, transcript')
+              .eq('figure_id', figure.id)
+              .gt('expires_at', new Date().toISOString())
+              .order('created_at', { ascending: false })
+              .limit(3); // Use top 3 most recent transcripts
+
+            if (error) {
+              console.log('YouTube transcripts query error:', error);
+              return '';
+            }
+
+            if (transcripts && transcripts.length > 0) {
+              sourcesUsed.youtubeTranscripts = transcripts.length;
+              let transcriptText = '\n\n🎥 YOUTUBE TRANSCRIPTS:\n';
+              transcripts.forEach((t) => {
+                transcriptText += `\n📹 ${t.video_title || 'Video'}:\n`;
+                // Include first 1000 chars of transcript
+                transcriptText += `${t.transcript.substring(0, 1000)}...\n`;
+              });
+              console.log(`Found ${transcripts.length} cached YouTube transcripts`);
+              return transcriptText;
+            }
+          } catch (error) {
+            console.log('YouTube transcripts fetch error:', error);
+          }
+          return '';
+        })(),
       ];
 
       // Wait for all searches to complete (or fail)
