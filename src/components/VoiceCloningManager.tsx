@@ -59,24 +59,9 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
   }, [figureId]);
 
   const loadClonedVoices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('cloned_voices')
-        .select('*')
-        .eq('figure_id', figureId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setClonedVoices(data || []);
-    } catch (error) {
-      console.error('Error loading cloned voices:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load cloned voices",
-        variant: "destructive",
-      });
-    }
+    // Option B: Don't load from database - cloned voices are not stored
+    // Only fresh API searches + 4 fallbacks are used
+    setClonedVoices([]);
   };
 
   const searchForHistoricalAudio = async () => {

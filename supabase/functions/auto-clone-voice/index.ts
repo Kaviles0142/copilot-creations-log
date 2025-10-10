@@ -21,37 +21,8 @@ serve(async (req) => {
 
     console.log(`Starting Resemble.ai voice cloning for ${figureName}...`);
 
-    // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Check if we already have a cloned voice for this figure
-    const { data: existingVoice, error: dbError } = await supabase
-      .from('cloned_voices')
-      .select('*')
-      .eq('figure_id', figureId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (dbError) {
-      console.error('Database error:', dbError);
-    }
-
-    if (existingVoice && existingVoice.length > 0) {
-      console.log(`Found existing voice for ${figureName}: ${existingVoice[0].voice_id}`);
-      return new Response(JSON.stringify({
-        success: true,
-        voice_id: existingVoice[0].voice_id,
-        voice_name: existingVoice[0].voice_name,
-        source: existingVoice[0].source_url,
-        message: `Using existing Resemble.ai voice for ${figureName}`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Option B: No database check - always use fresh API searches
+    console.log(`Using fresh voice search for ${figureName} (no database cache)`);
 
     // Check if we have required API keys
     const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
@@ -147,36 +118,14 @@ serve(async (req) => {
       const errorText = await resembleResponse.text();
       console.error('Resemble.ai cloning failed:', errorText);
       
-      // Create a fallback Resemble.ai voice ID
-      const fallbackVoiceId = `resemble_${figureId}_fallback_${Date.now()}`;
-      
-      // Store fallback voice in database
-      const { data: fallbackVoice, error: insertError } = await supabase
-        .from('cloned_voices')
-        .insert({
-          figure_id: figureId,
-          figure_name: figureName,
-          voice_id: fallbackVoiceId,
-          voice_name: `${figureName} (Resemble.ai Fallback)`,
-          source_url: audioUrl,
-          source_description: `Resemble.ai fallback voice for ${figureName}`,
-          audio_quality_score: 70,
-          is_active: true
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Failed to save fallback voice:', insertError);
-      }
-
+      // Option B: No fallback storage in database - return error
       return new Response(JSON.stringify({
-        success: true,
-        voice_id: fallbackVoiceId,
-        voice_name: `${figureName} (Resemble.ai Voice)`,
-        source: audioUrl || 'Resemble.ai fallback',
-        message: `🎤 Created Resemble.ai voice for ${figureName}!`
+        success: false,
+        error: `Voice cloning failed: ${errorText}`,
+        voice_id: null,
+        voice_name: null
       }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
       

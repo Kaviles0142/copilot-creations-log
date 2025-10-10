@@ -261,86 +261,44 @@ const HistoricalChat = () => {
       
       console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
       
-      // Combine all voices from different providers
+      // Option B: Only use fresh API search results (no database cloned voices)
       const allVoices = [...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))];
+      console.log(`✅ Using ${matchingVoices.length} voices from FakeYou API search`);
       
-      // ElevenLabs voices - only from database cloned_voices (no hardcoded voices)
-      console.log('ℹ️ ElevenLabs voices will be loaded from database only (no hardcoded entries)');
-      
-      // Add cloned voices from database (all providers)
-      try {
-        console.log('🔍 Searching database for cloned voices:', figure.name);
-        const { data: clonedVoices, error: clonedError } = await supabase
-          .from('cloned_voices')
-          .select('voice_id, voice_name, provider')
-          .eq('figure_id', figure.id)
-          .eq('is_active', true);
-
-        if (!clonedError && clonedVoices && clonedVoices.length > 0) {
-          console.log(`✅ Found ${clonedVoices.length} cloned voices for ${figure.name}`);
-          clonedVoices.forEach((voice: any) => {
-            allVoices.push({
-              voiceToken: `${voice.provider}_${voice.voice_id}`,
-              title: voice.voice_name, // Use the voice_name from database directly
-              provider: voice.provider,
-              voiceId: voice.voice_id
-            });
-          });
-        } else {
-          console.log('ℹ️ No cloned voices found for', figure.name);
-        }
-      } catch (error) {
-        console.log('⚠️ Database voice search failed:', error);
-      }
-      
-      // Always add fallback voices from multiple providers
+      // Option B: Always add exactly 4 fallback voices (no database check needed)
       const isMale = detectGender(figure);
       
-      // Check if Resemble marketplace voice already exists
-      const hasResembleMarketplace = allVoices.some(v => v.provider === 'resemble' && v.voiceId.includes('marketplace'));
+      // Add 2 Resemble AI fallback voices
+      allVoices.push({
+        voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
+        title: `${figure.name} (Resemble AI - British Voice)`,
+        provider: 'resemble',
+        voiceId: isMale ? '0f2e6952' : 'c16f90a5'
+      });
       
-      if (!hasResembleMarketplace) {
-        // Add Resemble AI fallback voice (British accent)
-        allVoices.push({
-          voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (Resemble AI - British Voice)`,
-          provider: 'resemble',
-          voiceId: isMale ? '0f2e6952' : 'c16f90a5'
-        });
-        console.log(`📢 Added Resemble AI British voice: ${isMale ? '0f2e6952 (male British)' : 'c16f90a5 (female)'}`);
-
-        // Add Resemble AI American voice (gender-specific)
-        allVoices.push({
-          voiceToken: `resemble_marketplace_american_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (Resemble AI - American Voice)`,
-          provider: 'resemble',
-          voiceId: isMale ? 'b605397b' : '02fc35a6' // Use gender-appropriate voice
-        });
-        console.log(`📢 Added Resemble AI American voice: ${isMale ? 'b605397b (male)' : '02fc35a6 (female American)'}`);
-      }
+      allVoices.push({
+        voiceToken: `resemble_marketplace_american_${isMale ? 'male' : 'female'}`,
+        title: `${figure.name} (Resemble AI - American Voice)`,
+        provider: 'resemble',
+        voiceId: isMale ? 'b605397b' : '02fc35a6'
+      });
       
-      // Add FakeYou generic fallback voices (not character-specific)
-      const hasFakeYouGeneric = allVoices.some(v => v.provider === 'fakeyou' && v.voiceToken.includes('generic'));
+      // Add 2 FakeYou generic fallback voices
+      allVoices.push({
+        voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
+        title: `${figure.name} (FakeYou - American Voice)`,
+        provider: 'fakeyou',
+        voiceId: isMale ? 'weight_pr6qyqxgc1h0pg4rd8xystpq9' : 'weight_tvdbzhy28dhrmcyajf94s8vv5'
+      });
       
-      if (!hasFakeYouGeneric) {
-        // Add a generic male/female FakeYou voice (American accent)
-        allVoices.push({
-          voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (FakeYou - American Voice)`,
-          provider: 'fakeyou',
-          voiceId: isMale ? 'weight_pr6qyqxgc1h0pg4rd8xystpq9' : 'weight_tvdbzhy28dhrmcyajf94s8vv5'
-        });
-        
-        // Add a British FakeYou voice (gender-specific)
-        allVoices.push({
-          voiceToken: `fakeyou_generic_british_${isMale ? 'male' : 'female'}`,
-          title: `${figure.name} (FakeYou - British Voice)`,
-          provider: 'fakeyou',
-          voiceId: isMale ? 'weight_169mscrb9sf8pjcnekk3ct9a8' : 'weight_9j9s0sdz9z9gp4hjre3kcndmc'
-        });
-        
-        console.log(`📢 Added FakeYou generic fallback voices (${isMale ? 'male' : 'female'} American & British)`);
-      }
+      allVoices.push({
+        voiceToken: `fakeyou_generic_british_${isMale ? 'male' : 'female'}`,
+        title: `${figure.name} (FakeYou - British Voice)`,
+        provider: 'fakeyou',
+        voiceId: isMale ? 'weight_169mscrb9sf8pjcnekk3ct9a8' : 'weight_9j9s0sdz9z9gp4hjre3kcndmc'
+      });
+      
+      console.log(`📢 Added 4 fallback voices (2 Resemble + 2 FakeYou)`);
       
       console.log(`📊 Total voices from all providers: ${allVoices.length}`);
       
@@ -817,20 +775,10 @@ const HistoricalChat = () => {
         return;
       }
 
-      // Otherwise use ElevenLabs (or check for cloned voice if "auto")
+      // Otherwise use ElevenLabs (no cloned voice check in Option B)
       if (voiceId === "auto") {
-        // Check for cloned voice
-        const { data: clonedVoiceData } = await supabase
-          .from('cloned_voices')
-          .select('voice_id')
-          .eq('figure_id', figure.id)
-          .eq('is_active', true)
-          .limit(1);
-
-        if (clonedVoiceData && clonedVoiceData.length > 0) {
-          voiceId = clonedVoiceData[0].voice_id;
-          console.log('🎯 Using CLONED voice:', voiceId, 'for', figure.name);
-        } else {
+        // Option B: Skip database check, use default voice selection
+        {
           // Use default voice for this figure from VoiceSettings mapping
           voiceId = figure.name; // This will be mapped in elevenlabs-text-to-speech
         }
@@ -1372,18 +1320,11 @@ const HistoricalChat = () => {
 
   const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
     try {
-      // Check for existing cloned Resemble voice
-      const { data: existingVoices } = await supabase
-        .from('cloned_voices')
-        .select('voice_id, provider')
-        .eq('figure_id', figure.id)
-        .eq('is_active', true)
-        .limit(1);
+      // Option B: Skip database check for cloned voices
+      const clonedVoice = null;
       
-      const clonedVoice = existingVoices?.[0];
-      
-      // If we have a Resemble cloned voice, use it
-      if (clonedVoice && clonedVoice.provider === 'resemble') {
+      // Always skip this check in Option B
+      if (false) {
         console.log(`🎯 Using Resemble CLONED voice: ${clonedVoice.voice_id} for ${figure.name}`);
         
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
@@ -1482,18 +1423,9 @@ const HistoricalChat = () => {
   // Auto-clone voice for historical figure using authentic recordings
   const getOrCreateAuthenticVoice = async (figure: HistoricalFigure): Promise<string> => {
     try {
-      // Check if we already have a cloned voice in the new table
-      const { data: existingVoices, error } = await supabase
-        .from('cloned_voices')
-        .select('*')
-        .eq('figure_id', figure.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (!error && existingVoices && existingVoices.length > 0) {
-        console.log(`Using existing cloned voice for ${figure.name}:`, existingVoices[0].voice_name);
-        return existingVoices[0].voice_id;
+      // Option B: Skip database check - always return default voice
+      if (false) {
+        return '';
       }
 
       console.log(`No cloned voice found for ${figure.name}, creating voice clone...`);

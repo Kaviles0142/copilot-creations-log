@@ -31,26 +31,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if voice already exists
-    const { data: existingVoice } = await supabase
-      .from('cloned_voices')
-      .select('*')
-      .eq('figure_id', figureId)
-      .eq('is_active', true)
-      .single();
-
-    if (existingVoice) {
-      console.log(`Using existing voice for ${figureName}: ${existingVoice.voice_name}`);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          voice_id: existingVoice.voice_id,
-          voice_name: existingVoice.voice_name,
-          source: 'existing'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Option B: Skip database check - always create fresh voices
+    console.log(`Creating fresh voice for ${figureName} (no database cache)`);
 
     let processedAudioUrl = audioUrl;
     let qualityScore = 75;
@@ -80,27 +62,8 @@ serve(async (req) => {
       throw new Error('Voice cloning failed - no voice ID returned');
     }
 
-    // Step 3: Store in database
-    const { data: newVoice, error: insertError } = await supabase
-      .from('cloned_voices')
-      .insert({
-        figure_id: figureId,
-        figure_name: figureName,
-        voice_id: voiceCloneResult.voice_id,
-        voice_name: voiceCloneResult.voice_name || `${figureName} (Clone)`,
-        provider: voiceCloneResult.provider || 'resemble',
-        source_url: audioUrl,
-        source_description: `Resemble.ai cloned voice for ${figureName}`,
-        audio_quality_score: qualityScore,
-        is_active: true
-      })
-      .select()
-      .maybeSingle();
-
-    if (insertError) {
-      console.error('Database error:', insertError);
-      throw new Error(`Failed to store voice data: ${insertError.message}`);
-    }
+    // Option B: Don't store in database - return voice data directly
+    console.log(`Returning voice data for ${figureName} (not storing in database)`);
 
     console.log(`Successfully created voice clone for ${figureName}`);
 
