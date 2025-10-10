@@ -166,11 +166,12 @@ serve(async (req) => {
       }
     };
 
-    // Auto-select voice based on figure's region AND gender
+    // Auto-select voice based on figure's region AND gender ONLY if voice is "auto" or undefined
     let selectedVoice = voice;
     let detectedRegion = 'american';
     
-    if (figure_name && figure_id) {
+    // Only auto-detect if user hasn't manually selected a voice
+    if ((voice === 'auto' || !voice || voice === 'de-DE-ConradNeural') && figure_name && figure_id) {
       // Check cache first
       const { data: cachedMetadata } = await supabase
         .from('figure_metadata')
@@ -203,7 +204,9 @@ serve(async (req) => {
       
       const detectedGender = detectGender(figure_name);
       selectedVoice = regionVoiceMap[detectedRegion][detectedGender];
-      console.log(`🎤 ${detectedRegion} ${detectedGender} → Voice: ${selectedVoice}`);
+      console.log(`🎤 Auto mode: ${detectedRegion} ${detectedGender} → Voice: ${selectedVoice}`);
+    } else {
+      console.log(`🎤 Using manually selected voice: ${selectedVoice}`);
     }
 
     // Build SSML for better control
