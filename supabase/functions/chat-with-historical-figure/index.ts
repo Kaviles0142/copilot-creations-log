@@ -86,13 +86,19 @@ serve(async (req) => {
             }
           });
 
-          console.log('📰 RSS News Response:', { 
-            error: rssNewsResponse.error, 
-            hasData: !!rssNewsResponse.data,
-            articlesCount: rssNewsResponse.data?.results?.length || 0 
-          });
+          console.log('📰 RSS Raw Response:', JSON.stringify(rssNewsResponse, null, 2));
 
-          const allNews = rssNewsResponse.data?.results || [];
+          // Defensive: handle multiple possible response structures
+          let allNews: any[] = [];
+          if (rssNewsResponse.data) {
+            if (Array.isArray(rssNewsResponse.data.results)) {
+              allNews = rssNewsResponse.data.results;
+            } else if (Array.isArray(rssNewsResponse.data)) {
+              allNews = rssNewsResponse.data;
+            }
+          }
+          
+          console.log(`📰 Parsed ${allNews.length} RSS articles`);
 
           if (allNews.length > 0) {
             newsData = allNews;
@@ -176,8 +182,10 @@ serve(async (req) => {
               .eq('figure_id', figure.id)
               .limit(5); // Maximum books for comprehensive context
 
-            if (books && books.length > 0) {
-              console.log(`📚 Found ${books.length} books for ${figure.name}`);
+            console.log('📚 Books query result:', { error: null, count: books?.length || 0 });
+            
+            if (books && Array.isArray(books) && books.length > 0) {
+              console.log(`📚 Parsed ${books.length} books for ${figure.name}`);
               sourcesUsed.books = books.length;
               let booksText = '\n\n📚 RELEVANT BOOKS:\n';
               books.forEach(book => {
@@ -198,10 +206,24 @@ serve(async (req) => {
                   }
                 });
 
-                if (bookContentResponse.data?.content && bookContentResponse.data.content.length > 0) {
-                  sourcesUsed.bookContent = bookContentResponse.data.content.length;
+                console.log('📖 Book Content Raw Response:', JSON.stringify(bookContentResponse, null, 2));
+                
+                // Defensive: handle multiple response structures
+                let bookResults: any[] = [];
+                if (bookContentResponse.data) {
+                  if (Array.isArray(bookContentResponse.data.content)) {
+                    bookResults = bookContentResponse.data.content;
+                  } else if (Array.isArray(bookContentResponse.data)) {
+                    bookResults = bookContentResponse.data;
+                  }
+                }
+                
+                console.log(`📖 Parsed ${bookResults.length} book excerpts`);
+                
+                if (bookResults.length > 0) {
+                  sourcesUsed.bookContent = bookResults.length;
                   booksText += '\n\n📖 BOOK EXCERPTS (Full Text):\n';
-                  bookContentResponse.data.content.forEach((content: any) => {
+                  bookResults.forEach((content: any) => {
                     booksText += `\nFrom "${content.book_title}":\n`;
                     booksText += content.content_excerpt.substring(0, 1500);
                     booksText += '...\n';
@@ -255,12 +277,26 @@ serve(async (req) => {
               }
             });
 
-            if (youtubeResponse.data?.results?.length > 0) {
-              sourcesUsed.youtube = youtubeResponse.data.results.length;
+            console.log('🎥 YouTube Raw Response:', JSON.stringify(youtubeResponse, null, 2));
+            
+            // Defensive: handle multiple response structures
+            let videos: any[] = [];
+            if (youtubeResponse.data) {
+              if (Array.isArray(youtubeResponse.data.results)) {
+                videos = youtubeResponse.data.results;
+              } else if (Array.isArray(youtubeResponse.data)) {
+                videos = youtubeResponse.data;
+              }
+            }
+            
+            console.log(`🎥 Parsed ${videos.length} YouTube videos`);
+            
+            if (videos.length > 0) {
+              sourcesUsed.youtube = videos.length;
               let youtubeText = '\n\n🎥 YOUTUBE:\n';
               
-              // Check for existing transcripts (use 'id' field from YouTube response)
-              const videoIds = youtubeResponse.data.results.map((v: any) => v.id);
+              // Check for existing transcripts
+              const videoIds = videos.map((v: any) => v.id);
               const { data: transcripts } = await supabase
                 .from('youtube_transcripts')
                 .select('video_id, transcript, video_title')
@@ -271,7 +307,7 @@ serve(async (req) => {
                 transcripts?.map(t => [t.video_id, t.transcript]) || []
               );
 
-              youtubeResponse.data.results.forEach((video: any) => {
+              videos.forEach((video: any) => {
                 youtubeText += `- "${video.title}"\n`;
                 
                 // Use transcript if available, otherwise use description
@@ -309,11 +345,24 @@ serve(async (req) => {
               body: { query: figure.name }
             });
 
-            console.log('Wikipedia response:', wikiResponse.data);
+            console.log('📚 Wikipedia Raw Response:', JSON.stringify(wikiResponse, null, 2));
 
-            if (wikiResponse.data?.data?.extract) {
+            // Defensive: handle multiple response structures
+            let wikiData: any = null;
+            if (wikiResponse.data) {
+              if (wikiResponse.data.data) {
+                wikiData = wikiResponse.data.data;
+              } else if (wikiResponse.data.title) {
+                wikiData = wikiResponse.data;
+              }
+            }
+            
+            if (wikiData?.extract) {
               sourcesUsed.wikipedia = true;
-              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.data.extract.substring(0, 1500)}...\n`;
+              console.log('📚 Wikipedia context extracted:', wikiData.extract.substring(0, 100) + '...');
+              return `\n\n📖 WIKIPEDIA:\n${wikiData.extract.substring(0, 1500)}...\n`;
+            } else {
+              console.log('📚 No Wikipedia extract found');
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
@@ -337,14 +386,17 @@ serve(async (req) => {
             
             const response = await fetch(searchUrl);
             
+            console.log('🔍 Google Search status:', response.status);
+            
             if (!response.ok) {
-              console.log('Google Search API error:', response.status);
+              console.log('🔍 Google API error:', response.status);
               return '';
             }
 
             const data = await response.json();
+            console.log('🔍 Google Raw Response:', JSON.stringify(data, null, 2));
             
-            if (data.items && data.items.length > 0) {
+            if (data.items && Array.isArray(data.items) && data.items.length > 0) {
               sourcesUsed.googleSearch = data.items.length;
               let searchText = '\n\n🌐 WEB SEARCH RESULTS:\n';
               data.items.forEach((item: any) => {
@@ -372,12 +424,17 @@ serve(async (req) => {
               .order('created_at', { ascending: false })
               .limit(3); // Use top 3 most recent transcripts
 
+            console.log('📝 Transcripts query result:', {
+              error,
+              count: transcripts?.length || 0
+            });
+
             if (error) {
-              console.log('YouTube transcripts query error:', error);
+              console.log('📝 YouTube transcripts query error:', error);
               return '';
             }
 
-            if (transcripts && transcripts.length > 0) {
+            if (transcripts && Array.isArray(transcripts) && transcripts.length > 0) {
               sourcesUsed.youtubeTranscripts = transcripts.length;
               let transcriptText = '\n\n🎥 YOUTUBE TRANSCRIPTS:\n';
               transcripts.forEach((t) => {
