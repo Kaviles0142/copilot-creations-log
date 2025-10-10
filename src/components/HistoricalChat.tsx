@@ -1342,15 +1342,50 @@ const HistoricalChat = () => {
         }
       }
       
-      // No cloned voice, use Resemble AI fallback voices
+      // No cloned voice, use Resemble AI fallback with characteristic preservation
       console.log(`🎵 Using Resemble AI fallback for ${figure.name}`);
       console.log(`📊 Figure details:`, { name: figure.name, description: figure.description, id: figure.id });
       
-      const isMale = detectGender(figure);
-      const fallbackVoice = isMale ? '0f2e6952' : 'b605397b'; // Male or Female Resemble AI voice
+      // Characteristic-preserving fallback: match gender AND accent from selected voice
+      let fallbackVoice = 'b605397b'; // Default: American Male
       
-      console.log(`🎭 Gender detection result: ${isMale ? 'MALE' : 'FEMALE'} for "${figure.name}"`);
-      console.log(`🎤 Selected Resemble fallback voice ID: ${fallbackVoice}`);
+      if (selectedFakeYouVoice) {
+        console.log(`🔄 Attempting to preserve characteristics from: "${selectedFakeYouVoice.title}"`);
+        
+        // Create mapping from FakeYou to Resemble AI (preserving gender + accent)
+        const fakeYouToResembleMap: Record<string, string> = {
+          // FakeYou American -> Resemble American
+          'weight_pr6qyqxgc1h0pg4rd8xystpq9': 'b605397b', // American Male
+          'weight_tvdbzhy28dhrmcyajf94s8vv5': '02fc35a6', // American Female
+          
+          // FakeYou British -> Resemble British
+          'weight_169mscrb9sf8pjcnekk3ct9a8': '0f2e6952', // British Male
+          'weight_9j9s0sdz9z9gp4hjre3kcndmc': 'c16f90a5', // British Female
+        };
+        
+        const mappedVoice = fakeYouToResembleMap[selectedFakeYouVoice.voiceId];
+        if (mappedVoice) {
+          fallbackVoice = mappedVoice;
+          console.log(`✅ Mapped FakeYou voice ${selectedFakeYouVoice.voiceId} -> Resemble ${fallbackVoice}`);
+        } else {
+          console.log(`⚠️ No direct mapping found, using gender-based fallback`);
+          const isMale = detectGender(figure);
+          fallbackVoice = isMale ? 'b605397b' : '02fc35a6'; // Default to American
+        }
+      } else {
+        console.log(`ℹ️ No selected voice, using gender-based fallback`);
+        const isMale = detectGender(figure);
+        fallbackVoice = isMale ? 'b605397b' : '02fc35a6'; // Default to American
+      }
+      
+      const voiceCharacteristics = {
+        'b605397b': 'American Male',
+        '02fc35a6': 'American Female',
+        '0f2e6952': 'British Male',
+        'c16f90a5': 'British Female'
+      };
+      
+      console.log(`🎤 Using Resemble fallback: ${voiceCharacteristics[fallbackVoice] || fallbackVoice}`);
       
       const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
         body: { 
