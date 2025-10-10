@@ -89,10 +89,10 @@ serve(async (req) => {
           console.log('📰 RSS News Response:', { 
             error: rssNewsResponse.error, 
             hasData: !!rssNewsResponse.data,
-            articlesCount: rssNewsResponse.data?.articles?.length || 0 
+            articlesCount: rssNewsResponse.data?.length || 0 
           });
 
-          const allNews = rssNewsResponse.data?.articles || [];
+          const allNews = rssNewsResponse.data || [];
 
           if (allNews.length > 0) {
             newsData = allNews;
@@ -309,9 +309,11 @@ serve(async (req) => {
               body: { query: figure.name }
             });
 
-            if (wikiResponse.data?.extract) {
+            console.log('Wikipedia response:', wikiResponse.data);
+
+            if (wikiResponse.data?.data?.extract) {
               sourcesUsed.wikipedia = true;
-              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.extract.substring(0, 1500)}...\n`;
+              return `\n\n📖 WIKIPEDIA:\n${wikiResponse.data.data.extract.substring(0, 1500)}...\n`;
             }
           } catch (error) {
             console.log('Wikipedia search error:', error);
