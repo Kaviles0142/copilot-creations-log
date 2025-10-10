@@ -975,9 +975,9 @@ const HistoricalChat = () => {
         duration: 3000,
       });
       
-      // Step 4: Poll for completion with progress feedback
+      // Step 4: Poll for completion with timeout and fallback
       let pollCount = 0;
-      const maxPolls = 40; // 40 seconds max
+      const maxPolls = 20; // Reduced to 20 seconds max before fallback
       
       for (let i = 0; i < maxPolls; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1342,19 +1342,19 @@ const HistoricalChat = () => {
         }
       }
       
-      // No cloned voice, use Resemble marketplace fallback voices
-      console.log(`🎵 Using Resemble AI marketplace fallback for ${figure.name}`);
+      // No cloned voice, use Resemble AI fallback voices (our 4 working voices)
+      console.log(`🎵 Using Resemble AI fallback for ${figure.name}`);
       
-      // Detect gender for marketplace voice selection
+      // Use the 4 fallback voices we defined in VoiceSettings
       const isMale = detectGender(figure);
-      const marketplaceVoice = isMale ? 'arthur_marketplace' : 'niki_marketplace';
+      const fallbackVoice = isMale ? '0f2e6952' : 'b605397b'; // arthur or niki
       
-      console.log(`🎭 Detected gender: ${isMale ? 'male' : 'female'}, using ${marketplaceVoice}`);
+      console.log(`🎭 Detected gender: ${isMale ? 'male' : 'female'}, using Resemble fallback voice ${fallbackVoice}`);
       
       const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
         body: { 
           text: text,
-          voice: marketplaceVoice,
+          voice: fallbackVoice,
           figure_name: figure.name
         }
       });
