@@ -26,20 +26,39 @@ serve(async (req) => {
     console.log(`🎤 Starting Whisper transcription for audio: ${audioUrl}`);
 
     // Download the audio file
-    console.log('📥 Downloading audio file...');
-    const audioResponse = await fetch(audioUrl);
+    console.log('📥 Downloading audio from URL...');
+    const audioResponse = await fetch(audioUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Range': 'bytes=0-26214400' // Limit to ~25MB to stay within Whisper's 25MB limit
+      }
+    });
+    
     if (!audioResponse.ok) {
       throw new Error(`Failed to download audio: ${audioResponse.statusText}`);
     }
 
     const audioBuffer = await audioResponse.arrayBuffer();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+    const contentType = audioResponse.headers.get('content-type') || 'audio/mpeg';
+    
+    console.log(`📦 Downloaded ${audioBuffer.byteLength} bytes, type: ${contentType}`);
+    
+    // Determine file extension from content type
+    let fileExt = 'mp3';
+    if (contentType.includes('webm')) fileExt = 'webm';
+    else if (contentType.includes('mp4')) fileExt = 'mp4';
+    else if (contentType.includes('wav')) fileExt = 'wav';
+    else if (contentType.includes('ogg')) fileExt = 'ogg';
+    
+    const audioBlob = new Blob([audioBuffer], { type: contentType });
 
     // Prepare form data for Whisper API
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.wav');
+    formData.append('file', audioBlob, `audio.${fileExt}`);
     formData.append('model', 'whisper-1');
-    formData.append('language', language);
+    if (language !== 'auto') {
+      formData.append('language', language);
+    }
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0');
 
@@ -73,6 +92,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
+      transcript: result.text, // Match expected field name
       text: result.text,
       language: result.language,
       duration: result.duration,

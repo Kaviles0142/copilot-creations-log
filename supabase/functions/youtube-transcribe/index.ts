@@ -70,13 +70,19 @@ serve(async (req) => {
       
       // Fallback: Extract audio and use Whisper
       try {
+        console.log(`Invoking extract-youtube-audio for video ${videoId}...`);
         const { data: audioData, error: audioError } = await supabase.functions.invoke(
           'extract-youtube-audio',
-          { body: { videoId } }
+          { body: { videoUrl: `https://www.youtube.com/watch?v=${videoId}`, figureName: figureName || 'Unknown' } }
         );
 
-        if (audioError || !audioData?.audioUrl) {
-          throw new Error('Failed to extract audio from video');
+        if (audioError) {
+          console.error('Audio extraction error:', audioError);
+          throw new Error(`Audio extraction failed: ${audioError.message}`);
+        }
+
+        if (!audioData?.audioUrl) {
+          throw new Error('No audio URL returned from extraction');
         }
 
         console.log(`Audio extracted, transcribing with Whisper...`);
