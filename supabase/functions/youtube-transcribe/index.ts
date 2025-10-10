@@ -66,18 +66,72 @@ serve(async (req) => {
     const captionTrackMatch = html.match(/"captions".*?"captionTracks":(\[.*?\])/);
     
     if (!captionTrackMatch) {
-      console.log(`No captions found for video ${videoId}`);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'No captions available for this video',
-          videoId
-        }),
-        { 
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      console.log(`No captions found for video ${videoId}, falling back to Whisper transcription...`);
+      
+      // Fallback: Extract audio and use Whisper
+      try {
+        const { data: audioData, error: audioError } = await supabase.functions.invoke(
+          'extract-youtube-audio',
+          { body: { videoId } }
+        );
+
+        if (audioError || !audioData?.audioUrl) {
+          throw new Error('Failed to extract audio from video');
         }
-      );
+
+        console.log(`Audio extracted, transcribing with Whisper...`);
+
+        const { data: whisperData, error: whisperError } = await supabase.functions.invoke(
+          'whisper-transcription',
+          { body: { audioUrl: audioData.audioUrl } }
+        );
+
+        if (whisperError || !whisperData?.transcript) {
+          throw new Error('Whisper transcription failed');
+        }
+
+        const transcript = whisperData.transcript;
+        console.log(`Whisper transcription complete: ${transcript.length} characters`);
+
+        // Save to database
+        const { error: saveError } = await supabase
+          .from('youtube_transcripts')
+          .upsert({
+            video_id: videoId,
+            figure_id: figureId,
+            figure_name: figureName,
+            video_title: videoTitle,
+            transcript: transcript,
+          });
+
+        if (saveError) {
+          console.error('Error saving transcript:', saveError);
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            cached: false,
+            transcript,
+            videoId,
+            method: 'whisper'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (whisperErr) {
+        console.error('Whisper fallback failed:', whisperErr);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'No captions available and Whisper transcription failed',
+            videoId
+          }),
+          { 
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
     }
 
     const captionTracks = JSON.parse(captionTrackMatch[1]);
