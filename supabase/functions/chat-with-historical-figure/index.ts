@@ -89,10 +89,10 @@ serve(async (req) => {
           console.log('📰 RSS News Response:', { 
             error: rssNewsResponse.error, 
             hasData: !!rssNewsResponse.data,
-            articlesCount: rssNewsResponse.data?.length || 0 
+            articlesCount: rssNewsResponse.data?.results?.length || 0 
           });
 
-          const allNews = rssNewsResponse.data || [];
+          const allNews = rssNewsResponse.data?.results || [];
 
           if (allNews.length > 0) {
             newsData = allNews;
