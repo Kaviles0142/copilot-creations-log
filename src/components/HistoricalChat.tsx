@@ -841,8 +841,8 @@ const HistoricalChat = () => {
         console.log('ℹ️ No FakeYou voices available, will use Resemble AI fallback');
       }
 
-      // Priority 2: Fallback to Resemble AI marketplace voices
-      console.log('🎤 Using Resemble AI marketplace voice as fallback...');
+      // Priority 2: Fallback to Resemble AI voices
+      console.log('🎤 Using Resemble AI fallback voice...');
       generatePremiumSpeech(text, figure).then(() => {
         console.log('✅ Resemble AI TTS successful');
       }).catch((premiumError) => {
@@ -1338,7 +1338,7 @@ const HistoricalChat = () => {
           playAudioFromBase64(data.audioContent);
           return;
         } else {
-          console.warn('❌ Resemble cloned voice failed, trying marketplace:', error);
+          console.warn('❌ Resemble cloned voice failed, trying fallback:', error);
         }
       }
       
@@ -1360,7 +1360,7 @@ const HistoricalChat = () => {
       });
 
       if (error) {
-        console.error('❌ Resemble marketplace TTS Error:', error);
+        console.error('❌ Resemble fallback TTS Error:', error);
         throw error;
       }
 
@@ -1369,7 +1369,7 @@ const HistoricalChat = () => {
         throw new Error('No audio content');
       }
 
-      console.log('✅ Resemble marketplace voice TTS successful');
+      console.log('✅ Resemble fallback voice TTS successful');
       playAudioFromBase64(data.audioContent);
       
     } catch (error) {
@@ -1437,7 +1437,7 @@ const HistoricalChat = () => {
         body: JSON.stringify({
           figureName: figure.name,
           figureId: figure.id,
-          audioUrl: null // Let it create fallback voice with Resemble marketplace
+          audioUrl: null // Let it create fallback voice with Resemble AI
         }),
       });
 
@@ -1514,7 +1514,7 @@ const HistoricalChat = () => {
         body: { 
           figureName: figure.name,
           figureId: figure.id,
-          audioUrl: null // Let the function find historical audio or use marketplace fallback
+          audioUrl: null // Let the function find historical audio or use fallback
         }
       });
 
