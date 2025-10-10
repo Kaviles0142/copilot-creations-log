@@ -307,6 +307,36 @@ export type Database = {
           },
         ]
       }
+      figure_metadata: {
+        Row: {
+          created_at: string
+          figure_id: string
+          figure_name: string
+          id: string
+          nationality: string | null
+          region: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          figure_id: string
+          figure_name: string
+          id?: string
+          nationality?: string | null
+          region?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          figure_id?: string
+          figure_name?: string
+          id?: string
+          nationality?: string | null
+          region?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       historical_voices: {
         Row: {
           created_at: string

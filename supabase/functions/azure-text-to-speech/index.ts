@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice = "de-DE-ConradNeural", figure_name } = await req.json();
+    const { text, voice = "de-DE-ConradNeural", figure_name, figure_id } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -20,12 +21,17 @@ serve(async (req) => {
 
     const AZURE_SPEECH_KEY = Deno.env.get('AZURE_SPEECH_KEY');
     const AZURE_SPEECH_REGION = Deno.env.get('AZURE_SPEECH_REGION');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
       throw new Error('Azure Speech credentials not configured');
     }
 
-    console.log(`Generating Azure TTS for ${figure_name || 'figure'} with voice: ${voice}`);
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    console.log(`Generating Azure TTS for ${figure_name || 'figure'}`);
     console.log(`Text length: ${text.length} characters`);
 
     // Detect gender from figure name
@@ -49,82 +55,67 @@ serve(async (req) => {
       return 'male'; // Default
     };
 
-    // Comprehensive figure-to-region detection
-    const detectRegion = (name: string): string => {
-      const nameLower = name.toLowerCase();
+    // Helper function to detect nationality using AI
+    const detectNationality = async (figureName: string): Promise<string> => {
+      console.log(`🤖 Detecting nationality for: ${figureName}`);
       
-      // German figures
-      if (nameLower.includes('einstein') || nameLower.includes('bach') || 
-          nameLower.includes('beethoven') || nameLower.includes('goethe') ||
-          nameLower.includes('nietzsche') || nameLower.includes('kant') ||
-          nameLower.includes('marx') || nameLower.includes('bismarck')) {
-        return 'german';
+      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+      if (!lovableApiKey) {
+        console.log('⚠️ No LOVABLE_API_KEY found, using fallback');
+        return 'american';
       }
-      
-      // British figures
-      if (nameLower.includes('churchill') || nameLower.includes('shakespeare') ||
-          nameLower.includes('newton') || nameLower.includes('darwin') ||
-          nameLower.includes('dickens') || nameLower.includes('austen') ||
-          nameLower.includes('victoria') || nameLower.includes('elizabeth')) {
-        return 'british';
+
+      try {
+        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${lovableApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              {
+                role: 'user',
+                content: `What is the nationality of "${figureName}"? Reply with ONLY the nationality (e.g., "french", "german", "greek", "american", "egyptian", "chinese", "italian", "spanish", "russian", "japanese", "indian", "english", "british"). Be specific and use lowercase. Single word only.`
+              }
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          console.error(`❌ AI API error: ${response.status}`);
+          return 'american';
+        }
+
+        const data = await response.json();
+        const nationality = data.choices?.[0]?.message?.content?.trim()?.toLowerCase() || 'american';
+        console.log(`✅ Detected nationality: ${nationality}`);
+        return nationality;
+      } catch (error) {
+        console.error('❌ Error detecting nationality:', error);
+        return 'american';
       }
-      
-      // French figures
-      if (nameLower.includes('napoleon') || nameLower.includes('joan of arc') ||
-          nameLower.includes('voltaire') || nameLower.includes('rousseau') ||
-          nameLower.includes('descartes') || nameLower.includes('pasteur') ||
-          nameLower.includes('de gaulle') || nameLower.includes('marie curie')) {
-        return 'french';
-      }
-      
-      // Italian figures
-      if (nameLower.includes('da vinci') || nameLower.includes('galileo') ||
-          nameLower.includes('michelangelo') || nameLower.includes('caesar') ||
-          nameLower.includes('dante') || nameLower.includes('machiavelli')) {
-        return 'italian';
-      }
-      
-      // Spanish figures
-      if (nameLower.includes('cervantes') || nameLower.includes('picasso') ||
-          nameLower.includes('goya') || nameLower.includes('columbus')) {
-        return 'spanish';
-      }
-      
-      // Russian figures
-      if (nameLower.includes('tolstoy') || nameLower.includes('dostoyevsky') ||
-          nameLower.includes('tchaikovsky') || nameLower.includes('lenin') ||
-          nameLower.includes('stalin') || nameLower.includes('catherine')) {
-        return 'russian';
-      }
-      
-      // Japanese figures
-      if (nameLower.includes('hirohito') || nameLower.includes('akira') ||
-          nameLower.includes('musashi') || nameLower.includes('tokugawa')) {
-        return 'japanese';
-      }
-      
-      // Chinese figures
-      if (nameLower.includes('confucius') || nameLower.includes('mao') ||
-          nameLower.includes('sun tzu') || nameLower.includes('lao tzu')) {
-        return 'chinese';
-      }
-      
-      // Indian figures
-      if (nameLower.includes('gandhi') || nameLower.includes('tagore') ||
-          nameLower.includes('nehru') || nameLower.includes('ashoka')) {
-        return 'indian';
-      }
-      
-      // Greek/Egyptian figures (Ancient)
-      if (nameLower.includes('plato') || nameLower.includes('aristotle') ||
-          nameLower.includes('socrates') || nameLower.includes('alexander') ||
-          nameLower.includes('cleopatra') || nameLower.includes('homer') ||
-          nameLower.includes('archimedes') || nameLower.includes('hippocrates') ||
-          nameLower.includes('ptolemy') || nameLower.includes('pericles')) {
-        return 'greek';
-      }
-      
-      return 'american'; // Default fallback
+    };
+
+    // Helper function to map nationality to region
+    const mapNationalityToRegion = (nationality: string): string => {
+      const mapping: Record<string, string> = {
+        'french': 'french',
+        'german': 'german',
+        'italian': 'italian',
+        'spanish': 'spanish',
+        'chinese': 'chinese',
+        'japanese': 'japanese',
+        'russian': 'russian',
+        'indian': 'indian',
+        'greek': 'greek',
+        'egyptian': 'greek',
+        'english': 'american',
+        'american': 'american',
+        'british': 'british',
+      };
+      return mapping[nationality] || 'american';
     };
 
     // Region-to-voice mapping with Azure Neural Voices (GENDERED)
@@ -177,11 +168,42 @@ serve(async (req) => {
 
     // Auto-select voice based on figure's region AND gender
     let selectedVoice = voice;
-    if (figure_name) {
-      const detectedRegion = detectRegion(figure_name);
+    let detectedRegion = 'american';
+    
+    if (figure_name && figure_id) {
+      // Check cache first
+      const { data: cachedMetadata } = await supabase
+        .from('figure_metadata')
+        .select('region, nationality')
+        .eq('figure_id', figure_id)
+        .maybeSingle();
+
+      if (cachedMetadata?.region) {
+        console.log(`📦 Using cached region for ${figure_name}: ${cachedMetadata.region}`);
+        detectedRegion = cachedMetadata.region;
+      } else {
+        // Detect nationality using AI
+        const nationality = await detectNationality(figure_name);
+        detectedRegion = mapNationalityToRegion(nationality);
+        
+        console.log(`🗺️ Detected nationality: ${nationality}, mapped to region: ${detectedRegion}`);
+        
+        // Cache the result
+        await supabase
+          .from('figure_metadata')
+          .upsert({
+            figure_id,
+            figure_name,
+            nationality,
+            region: detectedRegion,
+          }, {
+            onConflict: 'figure_id'
+          });
+      }
+      
       const detectedGender = detectGender(figure_name);
       selectedVoice = regionVoiceMap[detectedRegion][detectedGender];
-      console.log(`🌍 Detected: ${detectedRegion} ${detectedGender} → Voice: ${selectedVoice}`);
+      console.log(`🎤 ${detectedRegion} ${detectedGender} → Voice: ${selectedVoice}`);
     }
 
     // Build SSML for better control
