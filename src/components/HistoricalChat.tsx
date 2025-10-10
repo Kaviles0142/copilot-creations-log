@@ -1342,17 +1342,15 @@ const HistoricalChat = () => {
         }
       }
       
-      // No cloned voice, use Resemble AI fallback voices (our 4 working voices)
+      // No cloned voice, use Resemble AI fallback voices
       console.log(`🎵 Using Resemble AI fallback for ${figure.name}`);
       console.log(`📊 Figure details:`, { name: figure.name, description: figure.description, id: figure.id });
       
-      // Use the 4 fallback voices we defined in VoiceSettings
       const isMale = detectGender(figure);
-      const fallbackVoice = isMale ? '0f2e6952' : 'b605397b'; // arthur (male) or niki (female)
+      const fallbackVoice = isMale ? '0f2e6952' : 'b605397b'; // Male or Female Resemble AI voice
       
       console.log(`🎭 Gender detection result: ${isMale ? 'MALE' : 'FEMALE'} for "${figure.name}"`);
-      console.log(`🎤 Selected Resemble fallback voice: ${fallbackVoice} (${isMale ? 'Arthur - British Male' : 'Niki - American Female'})`);
-
+      console.log(`🎤 Selected Resemble fallback voice ID: ${fallbackVoice}`);
       
       const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
         body: { 
