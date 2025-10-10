@@ -775,56 +775,34 @@ const HistoricalChat = () => {
         return;
       }
       
-      if (voiceId.startsWith('resemble-') || !voiceId.startsWith('TM:')) {
-        // Resemble AI voice (or fallback voices which are Resemble IDs)
-        const resembleVoiceId = voiceId.startsWith('resemble-') ? voiceId.replace('resemble-', '') : voiceId;
-        
-        // TESTING: Try Azure TTS FIRST to test voice quality
-        console.log('🎤 TESTING: Trying Azure TTS first (German-accented voice)');
-        
-        try {
-          const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
-            body: { 
-              text: text,
-              voice: resembleVoiceId,
-              figure_name: figure.name,
-              figure_id: figure.id
-            }
-          });
-
-          if (!error && data?.audioContent) {
-            console.log('✅ Successfully used Azure TTS (TESTING MODE)');
-            playAudioFromBase64(data.audioContent);
-            return;
-          }
-          
-          console.log('⚠️ Azure TTS failed, falling back to Resemble AI');
-        } catch (azureError) {
-          console.log('⚠️ Azure TTS error, falling back to Resemble AI:', azureError);
+      // Azure TTS - Primary and ONLY voice generation method
+      console.log('🎤 Using Azure TTS for voice generation');
+      
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: { 
+          text: text,
+          voice: voiceId === 'auto' ? undefined : voiceId, // Let Azure auto-select if "auto"
+          figure_name: figure.name,
+          figure_id: figure.id
         }
-        
-        // Fallback to Resemble AI if Azure failed
-        console.log('🎤 Falling back to Resemble AI with voice:', resembleVoiceId);
-        
-        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
-          body: { 
-            text: text,
-            voice: resembleVoiceId,
-            figure_name: figure.name
-          }
-        });
+      });
 
-        if (error || !data?.audioContent) {
-          throw new Error('Resemble AI TTS failed');
-        }
-
-        console.log('✅ Successfully used Resemble AI TTS');
+      if (!error && data?.audioContent) {
+        console.log('✅ Successfully used Azure TTS');
         playAudioFromBase64(data.audioContent);
         return;
+      } else {
+        throw new Error(error?.message || 'Azure TTS failed');
       }
       
     } catch (error) {
-      console.error('Error generating voice with selection:', error);
+      console.error('Error generating voice with Azure:', error);
+      toast({
+        title: "Voice generation failed",
+        description: "Could not generate voice with Azure TTS",
+        variant: "destructive",
+        duration: 3000,
+      });
       throw error;
     }
   };
@@ -1743,52 +1721,50 @@ const HistoricalChat = () => {
             </p>
           </Card>
 
-          {/* Voice Selection */}
+          {/* Azure Voice Selection */}
           {selectedFigure && (
             <Card className="p-4">
               <h3 className="font-semibold mb-3 flex items-center">
                 <Volume2 className="h-4 w-4 mr-2" />
-                Voice Selection
+                Azure Voice Selection
               </h3>
-              {isLoadingVoices ? (
-                <div className="text-sm text-muted-foreground">
-                  Loading voices...
-                </div>
-              ) : availableFakeYouVoices.length > 0 ? (
-                <>
-                  <Select 
-                    value={selectedFakeYouVoice?.voiceToken} 
-                    onValueChange={(token) => {
-                      const voice = availableFakeYouVoices.find(v => v.voiceToken === token);
-                      setSelectedFakeYouVoice(voice);
-                      toast({
-                        title: "Voice selected",
-                        description: `Now using "${voice?.title}"`,
-                        duration: 2000,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Select a voice" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover z-50">
-                      {availableFakeYouVoices.map((voice) => (
-                        <SelectItem key={voice.voiceToken} value={voice.voiceToken}>
-                          {voice.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {availableFakeYouVoices.length} voice{availableFakeYouVoices.length !== 1 ? 's' : ''} available for {selectedFigure.name}
-                    {selectedFakeYouVoice && ` • ${selectedFakeYouVoice.provider === 'resemble' ? 'Resemble AI' : selectedFakeYouVoice.provider === 'elevenlabs' ? 'ElevenLabs' : 'FakeYou'}`}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No FakeYou voices found for {selectedFigure.name}
-                </p>
-              )}
+              <Select 
+                value={selectedVoiceId} 
+                onValueChange={(voiceId) => {
+                  setSelectedVoiceId(voiceId);
+                  const azureVoices = [
+                    { id: 'auto', name: 'Auto (Region-Based)', description: 'Automatically selects based on figure nationality' },
+                    { id: 'en-US-AndrewNeural', name: 'Andrew (US Male)', description: 'Clear American English, professional' },
+                    { id: 'en-GB-RyanNeural', name: 'Ryan (British Male)', description: 'British English, refined accent' },
+                    { id: 'en-US-JennyNeural', name: 'Jenny (US Female)', description: 'Warm American English, conversational' },
+                    { id: 'fr-FR-HenriNeural', name: 'Henri (French Male)', description: 'Native French speaker' },
+                    { id: 'de-DE-ConradNeural', name: 'Conrad (German Male)', description: 'Native German speaker' },
+                  ];
+                  const voice = azureVoices.find(v => v.id === voiceId);
+                  toast({
+                    title: "Voice selected",
+                    description: voice?.description || `Now using ${voiceId}`,
+                    duration: 2000,
+                  });
+                }}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select Azure voice" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="auto">Auto (Region-Based)</SelectItem>
+                  <SelectItem value="en-US-AndrewNeural">Andrew (US Male)</SelectItem>
+                  <SelectItem value="en-GB-RyanNeural">Ryan (British Male)</SelectItem>
+                  <SelectItem value="en-US-JennyNeural">Jenny (US Female)</SelectItem>
+                  <SelectItem value="fr-FR-HenriNeural">Henri (French Male)</SelectItem>
+                  <SelectItem value="de-DE-ConradNeural">Conrad (German Male)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                {selectedVoiceId === 'auto' 
+                  ? `Auto mode will select the best voice based on ${selectedFigure.name}'s nationality` 
+                  : 'Manual voice selection overrides auto-detection'}
+              </p>
             </Card>
           )}
 
