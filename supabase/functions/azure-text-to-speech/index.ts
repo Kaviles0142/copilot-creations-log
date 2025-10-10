@@ -115,9 +115,12 @@ serve(async (req) => {
         return 'indian';
       }
       
-      // Greek figures (Ancient)
+      // Greek/Egyptian figures (Ancient)
       if (nameLower.includes('plato') || nameLower.includes('aristotle') ||
-          nameLower.includes('socrates') || nameLower.includes('alexander')) {
+          nameLower.includes('socrates') || nameLower.includes('alexander') ||
+          nameLower.includes('cleopatra') || nameLower.includes('homer') ||
+          nameLower.includes('archimedes') || nameLower.includes('hippocrates') ||
+          nameLower.includes('ptolemy') || nameLower.includes('pericles')) {
         return 'greek';
       }
       
