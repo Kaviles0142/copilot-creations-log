@@ -703,10 +703,10 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
 
-      // Show toast indicating which AI was used for text generation
+      // Show toast indicating which AI was used
       toast({
-        title: `Response from ${usedProvider === 'claude' ? 'Claude' : usedProvider === 'grok' ? 'Grok' : usedProvider === 'azure' ? 'Azure OpenAI' : 'Lovable AI'}`,
-        description: `${selectedFigure.name} responded using ${usedProvider === 'claude' ? 'Anthropic Claude' : usedProvider === 'grok' ? 'X.AI Grok' : usedProvider === 'azure' ? 'Azure OpenAI' : 'Lovable AI (Gemini)'}`,
+        title: `Response from ${usedProvider === 'claude' ? 'Claude' : usedProvider === 'grok' ? 'Grok' : 'OpenAI'}`,
+        description: `${selectedFigure.name} responded using ${usedProvider === 'claude' ? 'Anthropic Claude' : usedProvider === 'grok' ? 'X.AI Grok' : 'OpenAI GPT-4o Mini'}`,
         duration: 2000,
       });
 
@@ -789,11 +789,6 @@ const HistoricalChat = () => {
 
       if (!error && data?.audioContent) {
         console.log('✅ Successfully used Azure TTS');
-        toast({
-          title: "Voice from Azure TTS",
-          description: `Using Azure Text-to-Speech for ${figure.name}`,
-          duration: 2000,
-        });
         playAudioFromBase64(data.audioContent);
         return;
       } else {
