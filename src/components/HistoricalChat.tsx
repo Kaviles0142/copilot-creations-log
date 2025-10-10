@@ -778,6 +778,30 @@ const HistoricalChat = () => {
       if (voiceId.startsWith('resemble-') || !voiceId.startsWith('TM:')) {
         // Resemble AI voice (or fallback voices which are Resemble IDs)
         const resembleVoiceId = voiceId.startsWith('resemble-') ? voiceId.replace('resemble-', '') : voiceId;
+        
+        // For long text, use Azure TTS instead of Resemble to avoid 500 errors
+        if (text.length > 800) {
+          console.log('🎤 Long text detected, using Azure TTS instead of Resemble AI');
+          
+          const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+            body: { 
+              text: text,
+              voice: resembleVoiceId,
+              figure_name: figure.name
+            }
+          });
+
+          if (error || !data?.audioContent) {
+            console.log('⚠️ Azure TTS failed, falling back to Resemble AI');
+            // Fall through to try Resemble anyway
+          } else {
+            console.log('✅ Successfully used Azure TTS for long text');
+            playAudioFromBase64(data.audioContent);
+            return;
+          }
+        }
+        
+        // Try Resemble AI for short text or if Azure failed
         console.log('🎤 Using Resemble AI with voice:', resembleVoiceId);
         
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
