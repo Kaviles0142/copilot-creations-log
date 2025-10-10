@@ -28,6 +28,27 @@ serve(async (req) => {
     console.log(`Generating Azure TTS for ${figure_name || 'figure'} with voice: ${voice}`);
     console.log(`Text length: ${text.length} characters`);
 
+    // Detect gender from figure name
+    const detectGender = (name: string): 'male' | 'female' => {
+      const nameLower = name.toLowerCase();
+      
+      // Female figures
+      const femaleNames = [
+        'joan of arc', 'cleopatra', 'marie curie', 'rosa parks', 'mother teresa',
+        'victoria', 'elizabeth', 'catherine', 'anne frank', 'amelia earhart',
+        'harriet tubman', 'malala', 'frida kahlo', 'ada lovelace', 'florence nightingale',
+        'jane austen', 'emily dickinson', 'virginia woolf', 'simone de beauvoir',
+        'eleanor roosevelt', 'margaret thatcher', 'indira gandhi', 'benazir bhutto',
+        'mary', 'anne', 'jane', 'emily', 'rosa', 'harriet', 'ada', 'florence'
+      ];
+      
+      if (femaleNames.some(n => nameLower.includes(n))) {
+        return 'female';
+      }
+      
+      return 'male'; // Default
+    };
+
     // Comprehensive figure-to-region detection
     const detectRegion = (name: string): string => {
       const nameLower = name.toLowerCase();
@@ -103,27 +124,61 @@ serve(async (req) => {
       return 'american'; // Default fallback
     };
 
-    // Region-to-voice mapping with Azure Neural Voices
-    const regionVoiceMap: { [key: string]: string } = {
-      'german': 'de-DE-ConradNeural',          // German male
-      'british': 'en-GB-RyanNeural',           // British male
-      'french': 'fr-FR-HenriNeural',           // French male
-      'italian': 'it-IT-DiegoNeural',          // Italian male
-      'spanish': 'es-ES-AlvaroNeural',         // Spanish male
-      'russian': 'ru-RU-DmitryNeural',         // Russian male
-      'japanese': 'ja-JP-KeitaNeural',         // Japanese male
-      'chinese': 'zh-CN-YunxiNeural',          // Chinese male
-      'indian': 'en-IN-PrabhatNeural',         // Indian English male
-      'greek': 'el-GR-NestorasNeural',         // Greek male
-      'american': 'en-US-GuyNeural',           // American male (default)
+    // Region-to-voice mapping with Azure Neural Voices (GENDERED)
+    const regionVoiceMap: { [key: string]: { male: string; female: string } } = {
+      'german': {
+        male: 'de-DE-ConradNeural',
+        female: 'de-DE-KatjaNeural'
+      },
+      'british': {
+        male: 'en-GB-RyanNeural',
+        female: 'en-GB-SoniaNeural'
+      },
+      'french': {
+        male: 'fr-FR-HenriNeural',
+        female: 'fr-FR-DeniseNeural'
+      },
+      'italian': {
+        male: 'it-IT-DiegoNeural',
+        female: 'it-IT-ElsaNeural'
+      },
+      'spanish': {
+        male: 'es-ES-AlvaroNeural',
+        female: 'es-ES-ElviraNeural'
+      },
+      'russian': {
+        male: 'ru-RU-DmitryNeural',
+        female: 'ru-RU-SvetlanaNeural'
+      },
+      'japanese': {
+        male: 'ja-JP-KeitaNeural',
+        female: 'ja-JP-NanamiNeural'
+      },
+      'chinese': {
+        male: 'zh-CN-YunxiNeural',
+        female: 'zh-CN-XiaoxiaoNeural'
+      },
+      'indian': {
+        male: 'en-IN-PrabhatNeural',
+        female: 'en-IN-NeerjaNeural'
+      },
+      'greek': {
+        male: 'el-GR-NestorasNeural',
+        female: 'el-GR-AthinaNeural'
+      },
+      'american': {
+        male: 'en-US-GuyNeural',
+        female: 'en-US-JennyNeural'
+      }
     };
 
-    // Auto-select voice based on figure's region
+    // Auto-select voice based on figure's region AND gender
     let selectedVoice = voice;
     if (figure_name) {
       const detectedRegion = detectRegion(figure_name);
-      selectedVoice = regionVoiceMap[detectedRegion];
-      console.log(`🌍 Detected region: ${detectedRegion} → Voice: ${selectedVoice}`);
+      const detectedGender = detectGender(figure_name);
+      selectedVoice = regionVoiceMap[detectedRegion][detectedGender];
+      console.log(`🌍 Detected: ${detectedRegion} ${detectedGender} → Voice: ${selectedVoice}`);
     }
 
     // Build SSML for better control
