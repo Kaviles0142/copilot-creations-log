@@ -760,6 +760,13 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
 
       const data = await aiResponse.json();
       response = data.choices[0].message.content;
+      
+      // Post-process response to remove "asteric" and "asterisk" artifacts
+      if (response) {
+        response = response.replace(/\basteric\b|\basterisk\b/gi, '');
+        console.log("🧹 Cleaned response text (removed formatting artifacts)");
+      }
+      
       console.log("✅ Success with Lovable AI (Gemini). Response length: " + (response?.length || 0) + " characters");
       
     } catch (error) {
