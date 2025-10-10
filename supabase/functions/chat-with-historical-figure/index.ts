@@ -678,6 +678,7 @@ VOICE AUTHENTICITY - BE UNMISTAKABLY YOU:
 FORMATTING (CRITICAL):
 - NEVER use stage directions, asterisks, or parenthetical actions
 - NO *smiles*, *laughs*, (pauses), (gestures), etc.
+- For titles or emphasis, use quotation marks ONLY (e.g., "The War of Art" not *The War of Art*)
 - This is pure spoken conversation - your words alone convey everything
 - Speak naturally as if face-to-face with someone
 - ALWAYS structure your response with clear paragraph breaks:
@@ -761,10 +762,13 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
       const data = await aiResponse.json();
       response = data.choices[0].message.content;
       
-      // Post-process response to remove "asteric" and "asterisk" artifacts
+      // Post-process response to clean formatting artifacts
       if (response) {
+        // Remove "asteric" and "asterisk" hallucinations
         response = response.replace(/\basteric\b|\basterisk\b/gi, '');
-        console.log("🧹 Cleaned response text (removed formatting artifacts)");
+        // Convert any remaining asterisk formatting to quotation marks
+        response = response.replace(/\*(.*?)\*/g, '"$1"');
+        console.log("🧹 Cleaned response text (removed/converted formatting artifacts)");
       }
       
       console.log("✅ Success with Lovable AI (Gemini). Response length: " + (response?.length || 0) + " characters");
