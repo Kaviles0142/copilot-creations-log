@@ -779,10 +779,10 @@ const HistoricalChat = () => {
         // Resemble AI voice (or fallback voices which are Resemble IDs)
         const resembleVoiceId = voiceId.startsWith('resemble-') ? voiceId.replace('resemble-', '') : voiceId;
         
-        // For long text, use Azure TTS instead of Resemble to avoid 500 errors
-        if (text.length > 800) {
-          console.log('🎤 Long text detected, using Azure TTS instead of Resemble AI');
-          
+        // TESTING: Try Azure TTS FIRST to test voice quality
+        console.log('🎤 TESTING: Trying Azure TTS first (German-accented voice)');
+        
+        try {
           const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
             body: { 
               text: text,
@@ -791,18 +791,19 @@ const HistoricalChat = () => {
             }
           });
 
-          if (error || !data?.audioContent) {
-            console.log('⚠️ Azure TTS failed, falling back to Resemble AI');
-            // Fall through to try Resemble anyway
-          } else {
-            console.log('✅ Successfully used Azure TTS for long text');
+          if (!error && data?.audioContent) {
+            console.log('✅ Successfully used Azure TTS (TESTING MODE)');
             playAudioFromBase64(data.audioContent);
             return;
           }
+          
+          console.log('⚠️ Azure TTS failed, falling back to Resemble AI');
+        } catch (azureError) {
+          console.log('⚠️ Azure TTS error, falling back to Resemble AI:', azureError);
         }
         
-        // Try Resemble AI for short text or if Azure failed
-        console.log('🎤 Using Resemble AI with voice:', resembleVoiceId);
+        // Fallback to Resemble AI if Azure failed
+        console.log('🎤 Falling back to Resemble AI with voice:', resembleVoiceId);
         
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
           body: { 
