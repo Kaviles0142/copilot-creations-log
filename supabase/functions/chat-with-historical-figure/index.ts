@@ -319,9 +319,47 @@ serve(async (req) => {
           return '';
         })(),
 
-        // SerpAPI removed - using Wikipedia and books for web context
+        // 4. Google Custom Search for web context
+        (async () => {
+          try {
+            const GOOGLE_API_KEY = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
+            const GOOGLE_CX = Deno.env.get('GOOGLE_SEARCH_ENGINE_ID');
+            
+            if (!GOOGLE_API_KEY || !GOOGLE_CX) {
+              console.log('Google Custom Search not configured');
+              return '';
+            }
 
-        // 3. Fetch cached YouTube transcripts from database
+            const searchQuery = `${figure.name} ${message.substring(0, 100)}`;
+            const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(searchQuery)}&num=5`;
+            
+            const response = await fetch(searchUrl);
+            
+            if (!response.ok) {
+              console.log('Google Search API error:', response.status);
+              return '';
+            }
+
+            const data = await response.json();
+            
+            if (data.items && data.items.length > 0) {
+              sourcesUsed.googleSearch = data.items.length;
+              let searchText = '\n\n🌐 WEB SEARCH RESULTS:\n';
+              data.items.forEach((item: any) => {
+                searchText += `\n📄 ${item.title}\n`;
+                searchText += `${item.snippet}\n`;
+                if (item.link) searchText += `Source: ${item.link}\n`;
+              });
+              console.log(`Found ${data.items.length} Google search results`);
+              return searchText;
+            }
+          } catch (error) {
+            console.log('Google Custom Search error:', error);
+          }
+          return '';
+        })(),
+
+        // 5. Fetch cached YouTube transcripts from database
         (async () => {
           try {
             const { data: transcripts, error } = await supabase
