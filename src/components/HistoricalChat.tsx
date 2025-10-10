@@ -753,9 +753,31 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
 
-      // If voice starts with "resemble-", use Resemble AI
-      if (voiceId.startsWith('resemble-')) {
-        const resembleVoiceId = voiceId.replace('resemble-', '');
+      // Route to correct TTS provider based on voice ID
+      if (voiceId.startsWith('TM:')) {
+        // FakeYou voice
+        console.log('🎤 Using FakeYou TTS with voice token:', voiceId);
+        
+        const { data, error } = await supabase.functions.invoke('fakeyou-tts', {
+          body: {
+            action: 'generateTTS',
+            text: text,
+            voiceToken: voiceId
+          }
+        });
+
+        if (error || !data?.audioContent) {
+          throw new Error('FakeYou TTS failed');
+        }
+
+        console.log('✅ Successfully used FakeYou TTS');
+        playAudioFromBase64(data.audioContent);
+        return;
+      }
+      
+      if (voiceId.startsWith('resemble-') || !voiceId.startsWith('TM:')) {
+        // Resemble AI voice (or fallback voices which are Resemble IDs)
+        const resembleVoiceId = voiceId.startsWith('resemble-') ? voiceId.replace('resemble-', '') : voiceId;
         console.log('🎤 Using Resemble AI with voice:', resembleVoiceId);
         
         const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
@@ -774,31 +796,6 @@ const HistoricalChat = () => {
         playAudioFromBase64(data.audioContent);
         return;
       }
-
-      // Otherwise use ElevenLabs (no cloned voice check in Option B)
-      if (voiceId === "auto") {
-        // Option B: Skip database check, use default voice selection
-        {
-          // Use default voice for this figure from VoiceSettings mapping
-          voiceId = figure.name; // This will be mapped in elevenlabs-text-to-speech
-        }
-      }
-
-      console.log('🎤 Using ElevenLabs TTS with voice:', voiceId);
-      
-      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
-        body: { 
-          text: text,
-          voice: voiceId
-        }
-      });
-
-      if (error || !data?.audioContent) {
-        throw new Error('ElevenLabs TTS failed');
-      }
-
-      console.log('✅ Successfully used ElevenLabs TTS');
-      playAudioFromBase64(data.audioContent);
       
     } catch (error) {
       console.error('Error generating voice with selection:', error);
