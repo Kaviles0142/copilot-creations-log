@@ -52,12 +52,13 @@ serve(async (req) => {
 
 Example: Instead of "JFK", describe "a distinguished American statesman from the early 1960s in formal attire"
 Make it completely anonymous - focus on the era, profession, and style, not the individual.`
-        : `Create a detailed visual description for generating a portrait of ${figureName}. Include:
-1. Physical appearance (face, hair, age, distinctive features)
-2. Era-appropriate clothing and accessories
-3. Background setting (should be relevant to their time/location)
-4. Facial expression and posture
-5. Photorealistic portrait style`;
+        : `Create a detailed visual description for generating a peaceful, dignified portrait of ${figureName}. Include:
+1. Calm, wise facial expression showing intelligence and composure
+2. Era-appropriate formal attire (NO weapons, armor, or military gear)
+3. Neutral, scholarly background setting (library, study, or formal portrait setting)
+4. Dignified posture suggesting leadership and wisdom
+5. Photorealistic portrait style with soft, flattering lighting
+6. Emphasize peaceful, diplomatic qualities rather than conflict or aggression`;
 
       const visualPromptResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
