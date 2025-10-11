@@ -65,8 +65,8 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     // D-ID requires URLs ending in .jpg, .jpeg, or .png (no query params)
     console.log('🖼️ Using static placeholder image...');
     
-    // Use a generic historical figure portrait from a reliable CDN
-    const imageUrl = 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face';
+    // Use a direct image URL without query parameters
+    const imageUrl = 'https://d-id-public-bucket.s3.amazonaws.com/alice.jpg';
     
     console.log('✅ Image URL ready');
 
