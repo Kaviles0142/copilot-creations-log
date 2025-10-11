@@ -296,16 +296,17 @@ Make it completely anonymous - focus on the era, profession, and style, not the 
           await new Promise(resolve => setTimeout(resolve, 2000));
           retryCount++;
         } else {
-          // If all attempts failed due to celebrity detection, return success without video
-          if (didResponse.status === 451 && errorText.includes('CelebrityDetectedError')) {
-            console.log('🎭 All D-ID attempts failed due to celebrity detection, continuing without avatar video');
+          // If all attempts failed due to D-ID restrictions (celebrity or content moderation), return success without video
+          if (didResponse.status === 451) {
+            const errorReason = errorText.includes('CelebrityDetectedError') ? 'celebrity detection' : 'content moderation';
+            console.log(`🎭 All D-ID attempts failed due to ${errorReason}, continuing without avatar video`);
             return new Response(
               JSON.stringify({ 
                 success: true,
                 usedGenericAvatar: true,
                 skipVideo: true,
                 visualPrompt: visualPrompt,
-                message: 'Avatar generation skipped due to celebrity detection. Chat is still available.'
+                message: `Avatar generation skipped due to ${errorReason}. Chat is still available.`
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
