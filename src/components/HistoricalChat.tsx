@@ -94,6 +94,8 @@ const HistoricalChat = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
+  const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -476,6 +478,43 @@ const HistoricalChat = () => {
         });
     } catch (error) {
       console.error('Error saving message:', error);
+    }
+  };
+
+  // Generate D-ID animated avatar
+  const generateDidAvatar = async (text: string) => {
+    if (!selectedFigure) return;
+    
+    setIsGeneratingAvatar(true);
+    try {
+      console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
+      
+      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+        body: {
+          figureName: selectedFigure.name,
+          figureId: selectedFigure.id,
+          text: text.substring(0, 500) // Limit text length
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.videoUrl) {
+        setDidVideoUrl(data.videoUrl);
+        toast({
+          title: "Avatar Created!",
+          description: `${selectedFigure.name} is now speaking`,
+        });
+      }
+    } catch (error) {
+      console.error('Error generating D-ID avatar:', error);
+      toast({
+        title: "Avatar Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to create avatar",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAvatar(false);
     }
   };
 
@@ -1808,15 +1847,35 @@ const HistoricalChat = () => {
           />
 
           {/* Figure Recommendations */}
-          <FigureRecommendations
-            selectedFigure={selectedFigure}
-            onSelectFigure={(figure) => {
-              setSelectedFigure(figure);
-              setMessages([]);
-              setCurrentConversationId(null);
-              setDocuments([]);
-            }}
-          />
+          <div className="space-y-3">
+            <FigureRecommendations
+              selectedFigure={selectedFigure}
+              onSelectFigure={(figure) => {
+                setSelectedFigure(figure);
+                setMessages([]);
+                setCurrentConversationId(null);
+                setDocuments([]);
+                setDidVideoUrl(null);
+              }}
+            />
+            
+            {/* D-ID Avatar Generation Button */}
+            {selectedFigure && messages.length > 0 && (
+              <Button
+                onClick={() => {
+                  const lastAssistantMessage = [...messages].reverse().find(m => m.type === 'assistant');
+                  if (lastAssistantMessage) {
+                    generateDidAvatar(lastAssistantMessage.content);
+                  }
+                }}
+                disabled={isGeneratingAvatar}
+                variant="outline"
+                className="w-full"
+              >
+                {isGeneratingAvatar ? "🎬 Generating Avatar..." : "🎭 Animate Last Response"}
+              </Button>
+            )}
+          </div>
           {/* Document Upload */}
           <DocumentUpload
             conversationId={currentConversationId}
@@ -1983,6 +2042,42 @@ const HistoricalChat = () => {
             </h2>
           )}
         </div>
+
+        {/* D-ID Animated Avatar Video Player */}
+        {didVideoUrl && (
+          <div className="border-b border-border bg-card px-6 py-4">
+            <Card className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <span className="text-2xl">🎭</span>
+                    Animated Avatar - {selectedFigure?.name}
+                  </h3>
+                  <Button
+                    onClick={() => setDidVideoUrl(null)}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    ✕
+                  </Button>
+                </div>
+                <video
+                  src={didVideoUrl}
+                  controls
+                  autoPlay
+                  loop
+                  className="w-full rounded-lg shadow-lg"
+                  style={{ maxHeight: '500px' }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+                <p className="text-xs text-muted-foreground text-center">
+                  AI-generated talking avatar powered by D-ID
+                </p>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1">
