@@ -529,14 +529,13 @@ const HistoricalChat = () => {
     }
   };
 
-  // Generate D-ID animated avatar (D-ID handles its own audio for speed)
+  // Generate D-ID animated avatar
   const generateDidAvatar = async (text: string) => {
     if (!selectedFigure) return;
     
     setIsGeneratingAvatar(true);
     try {
       console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
-      console.log('🎤 Using D-ID built-in voice for faster generation');
       
       const { data, error } = await supabase.functions.invoke('create-did-avatar', {
         body: {
@@ -764,8 +763,7 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // Voice generation disabled - using D-ID avatar voice only
-      /* Old voice system - preserved for future activation
+      // Generate voice using the selected voice from VoiceSettings
       if (isAutoVoiceEnabled && aiResponse.length > 20) {
         console.log('🎙️ Starting voice generation for:', selectedFigure!.name);
         console.log('🎯 Using voice ID:', selectedVoiceId);
@@ -784,7 +782,6 @@ const HistoricalChat = () => {
           });
         });
       }
-      */
 
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
@@ -793,36 +790,11 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
 
-      // Auto-generate animated avatar if enabled (D-ID uses its own voice)
+      // Auto-generate animated avatar if enabled
       if (autoAnimateResponses && selectedFigure) {
         console.log('🎬 Auto-generating avatar for response...');
         generateDidAvatar(aiResponse);
       }
-
-      /* Azure TTS infrastructure preserved for future activation
-      if (isAutoVoiceEnabled) {
-        console.log('🎙️ Starting voice generation for:', selectedFigure.name);
-        
-        try {
-          const { data: azureData, error: azureError } = await supabase.functions.invoke('azure-text-to-speech', {
-            body: {
-              text: aiResponse,
-              figure_name: selectedFigure.name,
-              figure_id: selectedFigure.id
-            }
-          });
-
-          if (azureError) {
-            console.error('❌ Azure TTS error:', azureError);
-          } else if (azureData?.audioContent) {
-            console.log('✅ Successfully used Azure TTS');
-            playAudioFromBase64(azureData.audioContent);
-          }
-        } catch (voiceError) {
-          console.error('Voice generation error:', voiceError);
-        }
-      }
-      */
 
       // Show toast indicating which AI was used
       toast({
