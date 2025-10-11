@@ -793,11 +793,16 @@ const HistoricalChat = () => {
 
       // Generate voice and avatar
       if (isAutoVoiceEnabled || autoAnimateResponses) {
-        console.log('🎙️ Starting voice generation for:', selectedFigure.name);
-        console.log('🎯 Using voice ID:', selectedVoiceId);
+        console.log('🎙️ Voice generation available but disabled - using D-ID avatar voice only');
         
+        // Only generate avatar if enabled
+        if (autoAnimateResponses && selectedFigure) {
+          console.log('🎬 Auto-generating avatar for response...');
+          generateDidAvatar(aiResponse); // D-ID will use its own voice
+        }
+        
+        /* Azure TTS infrastructure kept for future use
         try {
-          console.log('🎯 Generating voice with selected ID:', selectedVoiceId);
           console.log('🎤 Using Azure TTS for voice generation');
           
           const { data: azureData, error: azureError } = await supabase.functions.invoke('azure-text-to-speech', {
@@ -817,16 +822,11 @@ const HistoricalChat = () => {
             if (isAutoVoiceEnabled) {
               playAudioFromBase64(azureData.audioContent);
             }
-            
-            // Auto-generate animated avatar (without audio for faster generation)
-            if (autoAnimateResponses && selectedFigure) {
-              console.log('🎬 Auto-generating avatar for response...');
-              generateDidAvatar(aiResponse); // Let D-ID use its own voice for speed
-            }
           }
         } catch (voiceError) {
           console.error('Voice generation error:', voiceError);
         }
+        */
       }
 
       // Show toast indicating which AI was used
