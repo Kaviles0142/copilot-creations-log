@@ -764,7 +764,8 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // Generate voice using the selected voice from VoiceSettings
+      // Voice generation disabled - using D-ID avatar voice only
+      /* Old voice system - preserved for future activation
       if (isAutoVoiceEnabled && aiResponse.length > 20) {
         console.log('🎙️ Starting voice generation for:', selectedFigure!.name);
         console.log('🎯 Using voice ID:', selectedVoiceId);
@@ -783,14 +784,11 @@ const HistoricalChat = () => {
           });
         });
       }
+      */
 
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Reset loading state after text response is complete (UI becomes responsive)
-      setIsLoading(false);
-      setAbortController(null);
-
       // Reset loading state after text response is complete (UI becomes responsive)
       setIsLoading(false);
       setAbortController(null);
