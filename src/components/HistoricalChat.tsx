@@ -97,6 +97,7 @@ const HistoricalChat = () => {
   const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [autoAnimateResponses, setAutoAnimateResponses] = useState(true); // Auto-generate avatars
+  const [isInitialAvatarReady, setIsInitialAvatarReady] = useState(false); // Track if initial greeting avatar is ready
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -183,8 +184,54 @@ const HistoricalChat = () => {
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
       fetchFakeYouVoicesForFigure(selectedFigure);
+      
+      // Reset avatar ready state and generate initial greeting avatar
+      setIsInitialAvatarReady(false);
+      setDidVideoUrl(null);
+      generateInitialGreetingAvatar(selectedFigure);
     }
   }, [selectedFigure]);
+
+  // Generate initial greeting avatar when figure is selected
+  const generateInitialGreetingAvatar = async (figure: HistoricalFigure) => {
+    console.log('🎬 Generating initial greeting avatar for:', figure.name);
+    
+    const greetingText = `Hello, I am ${figure.name}. I'm ready to discuss my life and times with you.`;
+    
+    setIsGeneratingAvatar(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+        body: {
+          figureName: figure.name,
+          text: greetingText,
+          figureId: figure.id
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Initial avatar generated:', data.videoUrl);
+      setDidVideoUrl(data.videoUrl);
+      setIsInitialAvatarReady(true);
+      
+      // Auto-play the greeting
+      toast({
+        title: "Avatar Ready",
+        description: `${figure.name} is ready to chat!`,
+      });
+    } catch (error) {
+      console.error('❌ Error generating initial avatar:', error);
+      toast({
+        title: "Avatar Generation Failed",
+        description: "Proceeding without avatar animation",
+        variant: "destructive",
+      });
+      // Allow chat to proceed even if avatar fails
+      setIsInitialAvatarReady(true);
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+  };
 
   // Fetch available FakeYou voices for the selected figure
   const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
@@ -520,7 +567,7 @@ const HistoricalChat = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !selectedFigure) return;
+    if (!inputMessage.trim() || !selectedFigure || !isInitialAvatarReady) return;
 
     let conversationId = currentConversationId;
     if (!conversationId) {
@@ -2209,9 +2256,10 @@ const HistoricalChat = () => {
                 // Show send button when ready
                 <Button 
                   onClick={handleSendMessage}
-                  disabled={!inputMessage.trim()}
+                  disabled={!inputMessage.trim() || !isInitialAvatarReady}
                   size="icon"
                   className="h-[60px] w-[60px]"
+                  title={!isInitialAvatarReady ? "Waiting for avatar to load..." : ""}
                 >
                   <Send className="h-4 w-4" />
                 </Button>
