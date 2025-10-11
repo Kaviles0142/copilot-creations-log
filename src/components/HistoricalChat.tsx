@@ -791,20 +791,21 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
 
-      // Generate voice and avatar
-      if (isAutoVoiceEnabled || autoAnimateResponses) {
-        console.log('🎙️ Voice generation available but disabled - using D-ID avatar voice only');
+      // Reset loading state after text response is complete (UI becomes responsive)
+      setIsLoading(false);
+      setAbortController(null);
+
+      // Auto-generate animated avatar if enabled (D-ID uses its own voice)
+      if (autoAnimateResponses && selectedFigure) {
+        console.log('🎬 Auto-generating avatar for response...');
+        generateDidAvatar(aiResponse);
+      }
+
+      /* Azure TTS infrastructure preserved for future activation
+      if (isAutoVoiceEnabled) {
+        console.log('🎙️ Starting voice generation for:', selectedFigure.name);
         
-        // Only generate avatar if enabled
-        if (autoAnimateResponses && selectedFigure) {
-          console.log('🎬 Auto-generating avatar for response...');
-          generateDidAvatar(aiResponse); // D-ID will use its own voice
-        }
-        
-        /* Azure TTS infrastructure kept for future use
         try {
-          console.log('🎤 Using Azure TTS for voice generation');
-          
           const { data: azureData, error: azureError } = await supabase.functions.invoke('azure-text-to-speech', {
             body: {
               text: aiResponse,
@@ -817,17 +818,13 @@ const HistoricalChat = () => {
             console.error('❌ Azure TTS error:', azureError);
           } else if (azureData?.audioContent) {
             console.log('✅ Successfully used Azure TTS');
-            
-            // Play audio if auto-voice is enabled
-            if (isAutoVoiceEnabled) {
-              playAudioFromBase64(azureData.audioContent);
-            }
+            playAudioFromBase64(azureData.audioContent);
           }
         } catch (voiceError) {
           console.error('Voice generation error:', voiceError);
         }
-        */
       }
+      */
 
       // Show toast indicating which AI was used
       toast({
