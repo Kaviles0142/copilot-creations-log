@@ -285,6 +285,20 @@ The goal is a respectful, artistic representation that avoids exact likeness.`
           await new Promise(resolve => setTimeout(resolve, 2000));
           retryCount++;
         } else {
+          // If all attempts failed due to celebrity detection, return success without video
+          if (didResponse.status === 451 && errorText.includes('CelebrityDetectedError')) {
+            console.log('🎭 All D-ID attempts failed due to celebrity detection, continuing without avatar video');
+            return new Response(
+              JSON.stringify({ 
+                success: true,
+                usedGenericAvatar: true,
+                skipVideo: true,
+                visualPrompt: visualPrompt,
+                message: 'Avatar generation skipped due to celebrity detection. Chat is still available.'
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
           throw new Error(`D-ID API failed after ${maxRetries + 1} attempts: ${didResponse.status} - ${errorText}`);
         }
       } catch (error) {

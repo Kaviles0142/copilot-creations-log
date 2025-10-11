@@ -210,15 +210,25 @@ const HistoricalChat = () => {
 
       if (error) throw error;
 
-      console.log('✅ Initial avatar generated:', data.videoUrl);
-      setDidVideoUrl(data.videoUrl);
-      setIsInitialAvatarReady(true);
-      
-      // Auto-play the greeting
-      toast({
-        title: "Avatar Ready",
-        description: `${figure.name} is ready to chat!`,
-      });
+      // Check if video was skipped due to celebrity detection
+      if (data.skipVideo) {
+        console.log('⏭️ Avatar video skipped, chat available without video');
+        setIsInitialAvatarReady(true);
+        toast({
+          title: "Chat Ready",
+          description: `${figure.name} is ready to chat! (Avatar animation unavailable)`,
+        });
+      } else {
+        console.log('✅ Initial avatar generated:', data.videoUrl);
+        setDidVideoUrl(data.videoUrl);
+        setIsInitialAvatarReady(true);
+        
+        // Auto-play the greeting
+        toast({
+          title: "Avatar Ready",
+          description: `${figure.name} is ready to chat!`,
+        });
+      }
     } catch (error) {
       console.error('❌ Error generating initial avatar:', error);
       toast({
