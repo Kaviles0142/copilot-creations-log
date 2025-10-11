@@ -529,19 +529,46 @@ const HistoricalChat = () => {
     }
   };
 
-  // Generate D-ID animated avatar
-  const generateDidAvatar = async (text: string) => {
+  // Generate D-ID animated avatar with audio
+  const generateDidAvatar = async (text: string, audioBase64?: string) => {
     if (!selectedFigure) return;
     
     setIsGeneratingAvatar(true);
     try {
       console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
       
+      let audioUrl: string | undefined;
+      
+      // If audio is provided, upload it to storage first
+      if (audioBase64) {
+        console.log('📤 Uploading audio to storage...');
+        const audioBlob = base64ToBlob(audioBase64, 'audio/mpeg');
+        const audioFileName = `avatar-audio/${selectedFigure.id}-${Date.now()}.mp3`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('audio-files')
+          .upload(audioFileName, audioBlob, {
+            contentType: 'audio/mpeg',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Audio upload error:', uploadError);
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('audio-files')
+            .getPublicUrl(audioFileName);
+          audioUrl = publicUrl;
+          console.log('✅ Audio uploaded:', audioUrl);
+        }
+      }
+      
       const { data, error } = await supabase.functions.invoke('create-did-avatar', {
         body: {
           figureName: selectedFigure.name,
           figureId: selectedFigure.id,
-          text: text.substring(0, 500) // Limit text length
+          text: text.substring(0, 500), // Limit text length
+          audioUrl: audioUrl
         }
       });
 
@@ -551,7 +578,7 @@ const HistoricalChat = () => {
         setDidVideoUrl(data.videoUrl);
         toast({
           title: "Avatar Created!",
-          description: `${selectedFigure.name} is now speaking`,
+          description: `${selectedFigure.name} is now speaking with selected voice`,
         });
       }
     } catch (error) {
@@ -564,6 +591,17 @@ const HistoricalChat = () => {
     } finally {
       setIsGeneratingAvatar(false);
     }
+  };
+
+  // Helper to convert base64 to blob
+  const base64ToBlob = (base64: string, type: string): Blob => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type });
   };
 
   const handleSendMessage = async () => {
@@ -790,10 +828,42 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
 
-      // Auto-generate animated avatar if enabled
-      if (autoAnimateResponses && selectedFigure) {
-        console.log('🎬 Auto-generating avatar for response...');
-        generateDidAvatar(aiResponse);
+      // Generate voice and avatar
+      if (isAutoVoiceEnabled || autoAnimateResponses) {
+        console.log('🎙️ Starting voice generation for:', selectedFigure.name);
+        console.log('🎯 Using voice ID:', selectedVoiceId);
+        
+        try {
+          console.log('🎯 Generating voice with selected ID:', selectedVoiceId);
+          console.log('🎤 Using Azure TTS for voice generation');
+          
+          const { data: azureData, error: azureError } = await supabase.functions.invoke('azure-text-to-speech', {
+            body: {
+              text: aiResponse,
+              figure_name: selectedFigure.name,
+              figure_id: selectedFigure.id
+            }
+          });
+
+          if (azureError) {
+            console.error('❌ Azure TTS error:', azureError);
+          } else if (azureData?.audioContent) {
+            console.log('✅ Successfully used Azure TTS');
+            
+            // Play audio if auto-voice is enabled
+            if (isAutoVoiceEnabled) {
+              playAudioFromBase64(azureData.audioContent);
+            }
+            
+            // Auto-generate animated avatar with the audio if enabled
+            if (autoAnimateResponses && selectedFigure) {
+              console.log('🎬 Auto-generating avatar for response...');
+              generateDidAvatar(aiResponse, azureData.audioContent);
+            }
+          }
+        } catch (voiceError) {
+          console.error('Voice generation error:', voiceError);
+        }
       }
 
       // Show toast indicating which AI was used
