@@ -529,46 +529,20 @@ const HistoricalChat = () => {
     }
   };
 
-  // Generate D-ID animated avatar with audio
-  const generateDidAvatar = async (text: string, audioBase64?: string) => {
+  // Generate D-ID animated avatar (D-ID handles its own audio for speed)
+  const generateDidAvatar = async (text: string) => {
     if (!selectedFigure) return;
     
     setIsGeneratingAvatar(true);
     try {
       console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
-      
-      let audioUrl: string | undefined;
-      
-      // If audio is provided, upload it to storage first
-      if (audioBase64) {
-        console.log('📤 Uploading audio to storage...');
-        const audioBlob = base64ToBlob(audioBase64, 'audio/mpeg');
-        const audioFileName = `avatar-audio/${selectedFigure.id}-${Date.now()}.mp3`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('audio-files')
-          .upload(audioFileName, audioBlob, {
-            contentType: 'audio/mpeg',
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error('Audio upload error:', uploadError);
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('audio-files')
-            .getPublicUrl(audioFileName);
-          audioUrl = publicUrl;
-          console.log('✅ Audio uploaded:', audioUrl);
-        }
-      }
+      console.log('🎤 Using D-ID built-in voice for faster generation');
       
       const { data, error } = await supabase.functions.invoke('create-did-avatar', {
         body: {
           figureName: selectedFigure.name,
           figureId: selectedFigure.id,
-          text: text.substring(0, 500), // Limit text length
-          audioUrl: audioUrl
+          text: text.substring(0, 500) // Limit text length
         }
       });
 
@@ -578,7 +552,7 @@ const HistoricalChat = () => {
         setDidVideoUrl(data.videoUrl);
         toast({
           title: "Avatar Created!",
-          description: `${selectedFigure.name} is now speaking with selected voice`,
+          description: `${selectedFigure.name} is now speaking`,
         });
       }
     } catch (error) {
@@ -591,17 +565,6 @@ const HistoricalChat = () => {
     } finally {
       setIsGeneratingAvatar(false);
     }
-  };
-
-  // Helper to convert base64 to blob
-  const base64ToBlob = (base64: string, type: string): Blob => {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type });
   };
 
   const handleSendMessage = async () => {
@@ -855,10 +818,10 @@ const HistoricalChat = () => {
               playAudioFromBase64(azureData.audioContent);
             }
             
-            // Auto-generate animated avatar with the audio if enabled
+            // Auto-generate animated avatar (without audio for faster generation)
             if (autoAnimateResponses && selectedFigure) {
               console.log('🎬 Auto-generating avatar for response...');
-              generateDidAvatar(aiResponse, azureData.audioContent);
+              generateDidAvatar(aiResponse); // Let D-ID use its own voice for speed
             }
           }
         } catch (voiceError) {
