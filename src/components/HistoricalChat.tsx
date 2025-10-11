@@ -2177,7 +2177,6 @@ const HistoricalChat = () => {
                       src={didVideoUrl}
                       controls
                       autoPlay
-                      loop
                       muted
                       className="w-full rounded-lg shadow-lg"
                       style={{ maxHeight: '500px' }}
