@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice = "de-DE-ConradNeural", figure_name, figure_id } = await req.json();
+    const { text, voice, figure_name, figure_id } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
