@@ -61,14 +61,25 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     const visualPrompt = visualData.choices[0].message.content;
     console.log('✅ Generated visual prompt:', visualPrompt.substring(0, 100) + '...');
 
-    // Step 2: Create D-ID talking avatar with text
-    console.log('🎭 Creating D-ID talking avatar...');
+    // Step 2: Fetch DiceBear avatar and convert to base64
+    console.log('🖼️ Fetching avatar image...');
+    const diceBearUrl = `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(figureName)}`;
+    const imageResponse = await fetch(diceBearUrl);
+    
+    if (!imageResponse.ok) {
+      throw new Error('Failed to fetch avatar image');
+    }
 
-    // Use DiceBear as placeholder image source
-    const imageSource = `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(figureName)}`;
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    const imageDataUrl = `data:image/png;base64,${base64Image}`;
+    console.log('✅ Avatar image ready');
+
+    // Step 3: Create D-ID talking avatar with text
+    console.log('🎭 Creating D-ID talking avatar...');
     
     const didPayload = {
-      source_url: imageSource,
+      source_url: imageDataUrl,
       script: {
         type: 'text',
         input: text,
