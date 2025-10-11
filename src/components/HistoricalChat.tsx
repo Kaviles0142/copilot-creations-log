@@ -96,6 +96,7 @@ const HistoricalChat = () => {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [autoAnimateResponses, setAutoAnimateResponses] = useState(true); // Auto-generate avatars
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -741,6 +742,12 @@ const HistoricalChat = () => {
       // Reset loading state after text response is complete (UI becomes responsive)
       setIsLoading(false);
       setAbortController(null);
+
+      // Auto-generate animated avatar if enabled
+      if (autoAnimateResponses && selectedFigure) {
+        console.log('🎬 Auto-generating avatar for response...');
+        generateDidAvatar(aiResponse);
+      }
 
       // Show toast indicating which AI was used
       toast({
@@ -1859,8 +1866,24 @@ const HistoricalChat = () => {
               }}
             />
             
-            {/* D-ID Avatar Generation Button */}
-            {selectedFigure && messages.length > 0 && (
+            {/* Auto-Animation Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Auto-Animate Responses</label>
+                <input
+                  type="checkbox"
+                  checked={autoAnimateResponses}
+                  onChange={(e) => setAutoAnimateResponses(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Automatically generate talking avatar videos for every response
+              </p>
+            </div>
+
+            {/* Manual Animation Button (backup when auto is off) */}
+            {!autoAnimateResponses && selectedFigure && messages.length > 0 && (
               <Button
                 onClick={() => {
                   const lastAssistantMessage = [...messages].reverse().find(m => m.type === 'assistant');
@@ -2044,36 +2067,52 @@ const HistoricalChat = () => {
         </div>
 
         {/* D-ID Animated Avatar Video Player */}
-        {didVideoUrl && (
+        {(didVideoUrl || isGeneratingAvatar) && (
           <div className="border-b border-border bg-card px-6 py-4">
             <Card className="p-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <span className="text-2xl">🎭</span>
-                    Animated Avatar - {selectedFigure?.name}
+                    {isGeneratingAvatar ? 'Generating Animated Avatar...' : `Animated Avatar - ${selectedFigure?.name}`}
                   </h3>
                   <Button
-                    onClick={() => setDidVideoUrl(null)}
+                    onClick={() => {
+                      setDidVideoUrl(null);
+                      setIsGeneratingAvatar(false);
+                    }}
                     variant="ghost"
                     size="sm"
                   >
                     ✕
                   </Button>
                 </div>
-                <video
-                  src={didVideoUrl}
-                  controls
-                  autoPlay
-                  loop
-                  className="w-full rounded-lg shadow-lg"
-                  style={{ maxHeight: '500px' }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-                <p className="text-xs text-muted-foreground text-center">
-                  AI-generated talking avatar powered by D-ID
-                </p>
+                
+                {isGeneratingAvatar && !didVideoUrl && (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-sm text-muted-foreground">Creating your animated avatar...</p>
+                    <p className="text-xs text-muted-foreground">This may take 30-60 seconds</p>
+                  </div>
+                )}
+                
+                {didVideoUrl && (
+                  <>
+                    <video
+                      src={didVideoUrl}
+                      controls
+                      autoPlay
+                      loop
+                      className="w-full rounded-lg shadow-lg"
+                      style={{ maxHeight: '500px' }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                    <p className="text-xs text-muted-foreground text-center">
+                      AI-generated talking avatar powered by D-ID
+                    </p>
+                  </>
+                )}
               </div>
             </Card>
           </div>
