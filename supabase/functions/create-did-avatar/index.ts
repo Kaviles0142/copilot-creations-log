@@ -135,7 +135,7 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     
     console.log('✅ Image ready for D-ID');
 
-    // Step 3: Create D-ID talking avatar with text
+    // Step 3: Create D-ID talking avatar with text (with retry logic)
     console.log('🎭 Creating D-ID talking avatar...');
     
     const didPayload = {
@@ -145,29 +145,59 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
         input: text,
         provider: {
           type: 'microsoft',
-          voice_id: 'en-GB-RyanNeural'
+          voice_id: 'en-US-JennyNeural' // Using a more reliable voice
         }
       },
       config: {
         stitch: true,
         result_format: 'mp4'
-      },
-      driver_url: 'bank://lively/'
+      }
     };
 
-    const didResponse = await fetch('https://api.d-id.com/talks', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${DID_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(didPayload)
-    });
+    console.log('📤 Sending request to D-ID with payload:', JSON.stringify(didPayload, null, 2));
 
-    if (!didResponse.ok) {
-      const errorText = await didResponse.text();
-      console.error('❌ D-ID API error:', errorText);
-      throw new Error(`D-ID API failed: ${didResponse.status} - ${errorText}`);
+    let didResponse;
+    let retryCount = 0;
+    const maxRetries = 2;
+
+    while (retryCount <= maxRetries) {
+      try {
+        didResponse = await fetch('https://api.d-id.com/talks', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${DID_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(didPayload)
+        });
+
+        if (didResponse.ok) {
+          break; // Success, exit retry loop
+        }
+
+        const errorText = await didResponse.text();
+        console.error(`❌ D-ID API error (attempt ${retryCount + 1}/${maxRetries + 1}):`, errorText);
+        
+        if (retryCount < maxRetries) {
+          console.log(`⏳ Retrying in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          retryCount++;
+        } else {
+          throw new Error(`D-ID API failed after ${maxRetries + 1} attempts: ${didResponse.status} - ${errorText}`);
+        }
+      } catch (error) {
+        if (retryCount < maxRetries) {
+          console.log(`⏳ Network error, retrying in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          retryCount++;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (!didResponse || !didResponse.ok) {
+      throw new Error('Failed to create D-ID avatar after retries');
     }
 
     const didData = await didResponse.json();
