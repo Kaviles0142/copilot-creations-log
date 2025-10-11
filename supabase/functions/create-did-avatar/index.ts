@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,14 +62,78 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     const visualPrompt = visualData.choices[0].message.content;
     console.log('✅ Generated visual prompt:', visualPrompt.substring(0, 100) + '...');
 
-    // Step 2: Use a static placeholder image that D-ID will accept
-    // D-ID requires URLs ending in .jpg, .jpeg, or .png (no query params)
-    console.log('🖼️ Using static placeholder image...');
+    // Step 2: Generate image using Lovable AI's image generation model
+    console.log('🎨 Generating portrait image...');
+    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: `Generate a photorealistic portrait: ${visualPrompt}`
+          }
+        ],
+        modalities: ['image', 'text']
+      })
+    });
+
+    if (!imageResponse.ok) {
+      const errorText = await imageResponse.text();
+      console.error('Image generation failed:', errorText);
+      throw new Error('Failed to generate portrait image');
+    }
+
+    const imageData = await imageResponse.json();
+    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
-    // Use a direct image URL without query parameters
-    const imageUrl = 'https://d-id-public-bucket.s3.amazonaws.com/alice.jpg';
+    if (!base64Image) {
+      throw new Error('No image generated');
+    }
+
+    console.log('✅ Portrait image generated');
+
+    // Step 3: Upload image to Supabase storage
+    console.log('📤 Uploading image to storage...');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Convert base64 to blob
+    const base64Data = base64Image.split(',')[1];
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const fileName = `${figureId}-${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(fileName, bytes, {
+        contentType: 'image/png',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error('Failed to upload image');
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Image uploaded:', publicUrl);
+    const imageUrl = publicUrl;
     
-    console.log('✅ Image URL ready');
+    console.log('✅ Image ready for D-ID');
 
     // Step 3: Create D-ID talking avatar with text
     console.log('🎭 Creating D-ID talking avatar...');
