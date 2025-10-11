@@ -2103,13 +2103,14 @@ const HistoricalChat = () => {
                       controls
                       autoPlay
                       loop
+                      muted
                       className="w-full rounded-lg shadow-lg"
                       style={{ maxHeight: '500px' }}
                     >
                       Your browser does not support the video tag.
                     </video>
                     <p className="text-xs text-muted-foreground text-center">
-                      AI-generated talking avatar powered by D-ID
+                      AI-generated talking avatar powered by D-ID (video only, audio via Azure TTS)
                     </p>
                   </>
                 )}
