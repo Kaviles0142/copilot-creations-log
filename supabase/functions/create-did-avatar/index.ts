@@ -28,7 +28,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Helper function to generate visual prompt
+    // Helper function to detect likely gender from name
+    const detectGender = (name: string): 'male' | 'female' => {
+      const nameLower = name.toLowerCase();
+      const femaleIndicators = ['cleopatra', 'queen', 'empress', 'marie', 'elizabeth', 'victoria', 'catherine', 'joan', 'rosa', 'harriet', 'susan', 'amelia', 'florence', 'ada', 'jane', 'mary', 'anne', 'margaret', 'eleanor'];
+      const isFemale = femaleIndicators.some(indicator => nameLower.includes(indicator));
+      return isFemale ? 'female' : 'male';
+    };
+
+    const gender = detectGender(figureName);
+    const voiceId = gender === 'female' ? 'en-US-JennyNeural' : 'en-US-GuyNeural';
+
     const generateVisualPrompt = async (useGenericStyle = false): Promise<string> => {
       console.log(useGenericStyle ? '🎨 Generating ANONYMOUS visual prompt...' : '🎨 Generating visual prompt...');
       
@@ -172,13 +182,13 @@ Make it completely anonymous - focus on the era, profession, and style, not the 
         audio_url: audioUrl
       };
     } else {
-      console.log('📝 Using text-to-speech fallback');
+      console.log(`📝 Using text-to-speech fallback with ${gender} voice: ${voiceId}`);
       didPayload.script = {
         type: 'text',
         input: text,
         provider: {
           type: 'microsoft',
-          voice_id: 'en-US-JennyNeural'
+          voice_id: voiceId
         }
       };
     }
