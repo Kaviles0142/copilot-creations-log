@@ -23,45 +23,65 @@ serve(async (req) => {
       throw new Error('Missing required API keys');
     }
 
-    // Step 1: Generate detailed visual prompt using Lovable AI
-    console.log('🎨 Generating visual prompt...');
-    const visualPromptResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at creating detailed, historically accurate visual descriptions for AI image generation. Focus on physical appearance, era-appropriate clothing, setting, and expression.'
-          },
-          {
-            role: 'user',
-            content: `Create a detailed visual description for generating a portrait of ${figureName}. Include:
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Helper function to generate visual prompt
+    const generateVisualPrompt = async (useGenericStyle = false): Promise<string> => {
+      console.log(useGenericStyle ? '🎨 Generating GENERIC visual prompt...' : '🎨 Generating visual prompt...');
+      
+      const styleInstruction = useGenericStyle 
+        ? `Create a detailed visual description for a STYLIZED, ARTISTIC portrait of ${figureName}. Use:
+- Painterly or illustrated style (NOT photorealistic)
+- Soft focus and artistic interpretation
+- Historical costume/attire style
+- Emphasis on period-appropriate clothing and setting rather than facial accuracy
+- Think classical painting or illustration style, not photography
+
+The goal is a respectful, artistic representation that avoids exact likeness.`
+        : `Create a detailed visual description for generating a portrait of ${figureName}. Include:
 1. Physical appearance (face, hair, age, distinctive features)
 2. Era-appropriate clothing and accessories
 3. Background setting (should be relevant to their time/location)
 4. Facial expression and posture
-5. Photorealistic portrait style
+5. Photorealistic portrait style`;
 
-Keep it concise but vivid. Make it suitable for AI image generation.`
-          }
-        ]
-      })
-    });
+      const visualPromptResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at creating detailed, historically accurate visual descriptions for AI image generation. Focus on physical appearance, era-appropriate clothing, setting, and expression.'
+            },
+            {
+              role: 'user',
+              content: styleInstruction + '\n\nKeep it concise but vivid. Make it suitable for AI image generation.'
+            }
+          ],
+          max_tokens: 500,
+        }),
+      });
 
-    if (!visualPromptResponse.ok) {
-      const errorText = await visualPromptResponse.text();
-      console.error('Visual prompt generation failed:', errorText);
-      throw new Error('Failed to generate visual prompt');
-    }
+      if (!visualPromptResponse.ok) {
+        throw new Error('Failed to generate visual prompt');
+      }
 
-    const visualData = await visualPromptResponse.json();
-    const visualPrompt = visualData.choices[0].message.content;
-    console.log('✅ Generated visual prompt:', visualPrompt.substring(0, 100) + '...');
+      const visualPromptData = await visualPromptResponse.json();
+      const visualPrompt = visualPromptData.choices[0].message.content;
+      console.log('✅ Generated visual prompt:', visualPrompt.substring(0, 100) + '...');
+      return visualPrompt;
+    };
+
+    // Step 1: Generate initial visual prompt
+    let visualPrompt = await generateVisualPrompt(false);
 
     // Step 2: Generate image using Lovable AI's image generation model
     console.log('🎨 Generating portrait image...');
@@ -100,11 +120,7 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
 
     // Step 3: Upload image to Supabase storage
     console.log('📤 Uploading image to storage...');
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
+    
     // Convert base64 to blob
     const base64Data = base64Image.split(',')[1];
     const binaryString = atob(base64Data);
@@ -132,11 +148,11 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
       .getPublicUrl(fileName);
 
     console.log('✅ Image uploaded:', publicUrl);
-    const imageUrl = publicUrl;
+    let imageUrl = publicUrl;
     
     console.log('✅ Image ready for D-ID');
 
-    // Step 3: Create D-ID talking avatar with audio or text
+    // Step 4: Create D-ID talking avatar with audio or text
     console.log('🎭 Creating D-ID talking avatar...');
     
     const didPayload: any = {
@@ -171,6 +187,7 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     let didResponse;
     let retryCount = 0;
     const maxRetries = 2;
+    let usedGenericAvatar = false;
 
     while (retryCount <= maxRetries) {
       try {
@@ -189,6 +206,79 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
 
         const errorText = await didResponse.text();
         console.error(`❌ D-ID API error (attempt ${retryCount + 1}/${maxRetries + 1}):`, errorText);
+        
+        // Check if this is a celebrity detection error (451)
+        if (didResponse.status === 451 && errorText.includes('CelebrityDetectedError') && !usedGenericAvatar) {
+          console.log('🎭 Celebrity detected, regenerating with generic artistic style...');
+          
+          // Regenerate with generic style
+          visualPrompt = await generateVisualPrompt(true);
+          
+          // Generate new image with generic style
+          const genericImageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash-image-preview',
+              messages: [
+                {
+                  role: 'user',
+                  content: `Generate a stylized, artistic portrait (NOT photorealistic): ${visualPrompt}`
+                }
+              ],
+              modalities: ['image', 'text']
+            }),
+          });
+
+          if (!genericImageResponse.ok) {
+            throw new Error('Failed to generate generic portrait');
+          }
+
+          const genericImageData = await genericImageResponse.json();
+          const genericBase64Image = genericImageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+          if (!genericBase64Image) {
+            throw new Error('No generic image generated');
+          }
+
+          console.log('✅ Generic portrait generated');
+
+          // Upload new generic image
+          const genericBase64Data = genericBase64Image.split(',')[1];
+          const genericBinaryString = atob(genericBase64Data);
+          const genericBytes = new Uint8Array(genericBinaryString.length);
+          for (let i = 0; i < genericBinaryString.length; i++) {
+            genericBytes[i] = genericBinaryString.charCodeAt(i);
+          }
+
+          const genericFileName = `${figureId}-generic-${Date.now()}.png`;
+          const { error: genericUploadError } = await supabase.storage
+            .from('audio-files')
+            .upload(genericFileName, genericBytes, {
+              contentType: 'image/png',
+              upsert: true
+            });
+
+          if (genericUploadError) {
+            throw new Error('Failed to upload generic image');
+          }
+
+          const { data: { publicUrl: genericPublicUrl } } = supabase.storage
+            .from('audio-files')
+            .getPublicUrl(genericFileName);
+
+          console.log('✅ Generic avatar image uploaded:', genericPublicUrl);
+          
+          // Update payload with new generic image
+          didPayload.source_url = genericPublicUrl;
+          imageUrl = genericPublicUrl;
+          usedGenericAvatar = true;
+          retryCount = 0; // Reset retry count for new image
+          continue;
+        }
         
         if (retryCount < maxRetries) {
           console.log(`⏳ Retrying in 2 seconds...`);
@@ -215,7 +305,7 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     const didData = await didResponse.json();
     console.log('✅ D-ID talk created:', didData.id);
 
-    // Step 3: Poll for video completion
+    // Step 5: Poll for video completion
     const talkId = didData.id;
     let videoUrl: string | null = null;
     let attempts = 0;
@@ -257,7 +347,8 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
         success: true,
         videoUrl,
         visualPrompt,
-        talkId
+        talkId,
+        usedGenericAvatar
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
