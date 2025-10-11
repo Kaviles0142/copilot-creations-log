@@ -290,6 +290,85 @@ Make it completely anonymous - focus on the era, profession, and style, not the 
           retryCount = 0; // Reset retry count for new image
           continue;
         }
+
+        // Check if this is a content moderation error (violence, etc.)
+        if (didResponse.status === 451 && errorText.includes('ImageModerationError') && !usedGenericAvatar) {
+          console.log('🎨 Content moderation triggered, regenerating with peaceful diplomatic style...');
+          
+          // Create a softer prompt emphasizing peace and diplomacy
+          const softPrompt = `Create a peaceful, dignified portrait suitable for diplomatic purposes. Show ${figureName} as a wise, calm leader in formal attire. Emphasize:
+- Serene, gentle facial expression
+- Formal, dignified clothing
+- Neutral, scholarly background
+- Soft lighting and peaceful atmosphere
+- Classical portrait painting style
+- NO weapons, armor, or aggressive imagery`;
+
+          const softImageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash-image-preview',
+              messages: [
+                {
+                  role: 'user',
+                  content: softPrompt
+                }
+              ],
+              modalities: ['image', 'text']
+            }),
+          });
+
+          if (!softImageResponse.ok) {
+            throw new Error('Failed to generate peaceful portrait');
+          }
+
+          const softImageData = await softImageResponse.json();
+          const softBase64Image = softImageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+          if (!softBase64Image) {
+            throw new Error('No peaceful image generated');
+          }
+
+          console.log('✅ Peaceful portrait generated');
+
+          // Upload new soft image
+          const softBase64Data = softBase64Image.split(',')[1];
+          const softBinaryString = atob(softBase64Data);
+          const softBytes = new Uint8Array(softBinaryString.length);
+          for (let i = 0; i < softBinaryString.length; i++) {
+            softBytes[i] = softBinaryString.charCodeAt(i);
+          }
+
+          const softFileName = `${figureId}-peaceful-${Date.now()}.png`;
+          const { error: softUploadError } = await supabase.storage
+            .from('audio-files')
+            .upload(softFileName, softBytes, {
+              contentType: 'image/png',
+              upsert: true
+            });
+
+          if (softUploadError) {
+            throw new Error('Failed to upload peaceful image');
+          }
+
+          const { data: { publicUrl: softPublicUrl } } = supabase.storage
+            .from('audio-files')
+            .getPublicUrl(softFileName);
+
+          console.log('✅ Peaceful avatar image uploaded:', softPublicUrl);
+          
+          // Update payload with new peaceful image
+          didPayload.source_url = softPublicUrl;
+          imageUrl = softPublicUrl;
+          usedGenericAvatar = true;
+          retryCount = 0; // Reset retry count for new image
+          continue;
+        }
+        
         
         if (retryCount < maxRetries) {
           console.log(`⏳ Retrying in 2 seconds...`);
