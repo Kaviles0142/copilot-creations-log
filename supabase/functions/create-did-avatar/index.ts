@@ -12,8 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { figureName, text, figureId } = await req.json();
+    const { figureName, text, figureId, audioUrl } = await req.json();
     console.log('🎬 Creating D-ID avatar for:', figureName);
+    console.log('🎤 Audio URL provided:', !!audioUrl);
 
     const DID_API_KEY = Deno.env.get('DID_API_KEY');
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -135,24 +136,35 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     
     console.log('✅ Image ready for D-ID');
 
-    // Step 3: Create D-ID talking avatar with text (with retry logic)
+    // Step 3: Create D-ID talking avatar with audio or text
     console.log('🎭 Creating D-ID talking avatar...');
     
-    const didPayload = {
+    const didPayload: any = {
       source_url: imageUrl,
-      script: {
-        type: 'text',
-        input: text,
-        provider: {
-          type: 'microsoft',
-          voice_id: 'en-US-JennyNeural' // Using a more reliable voice
-        }
-      },
       config: {
         stitch: true,
         result_format: 'mp4'
       }
     };
+
+    // If audio URL is provided, use it; otherwise fall back to text-to-speech
+    if (audioUrl) {
+      console.log('🎤 Using provided audio URL');
+      didPayload.script = {
+        type: 'audio',
+        audio_url: audioUrl
+      };
+    } else {
+      console.log('📝 Using text-to-speech fallback');
+      didPayload.script = {
+        type: 'text',
+        input: text,
+        provider: {
+          type: 'microsoft',
+          voice_id: 'en-US-JennyNeural'
+        }
+      };
+    }
 
     console.log('📤 Sending request to D-ID with payload:', JSON.stringify(didPayload, null, 2));
 
