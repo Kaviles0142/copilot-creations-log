@@ -61,25 +61,20 @@ Keep it concise but vivid. Make it suitable for AI image generation.`
     const visualPrompt = visualData.choices[0].message.content;
     console.log('✅ Generated visual prompt:', visualPrompt.substring(0, 100) + '...');
 
-    // Step 2: Fetch DiceBear avatar and convert to base64
-    console.log('🖼️ Fetching avatar image...');
-    const diceBearUrl = `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(figureName)}`;
-    const imageResponse = await fetch(diceBearUrl);
+    // Step 2: Use a static placeholder image that D-ID will accept
+    // D-ID requires URLs ending in .jpg, .jpeg, or .png (no query params)
+    console.log('🖼️ Using static placeholder image...');
     
-    if (!imageResponse.ok) {
-      throw new Error('Failed to fetch avatar image');
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-    const imageDataUrl = `data:image/png;base64,${base64Image}`;
-    console.log('✅ Avatar image ready');
+    // Use a generic historical figure portrait from a reliable CDN
+    const imageUrl = 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face';
+    
+    console.log('✅ Image URL ready');
 
     // Step 3: Create D-ID talking avatar with text
     console.log('🎭 Creating D-ID talking avatar...');
     
     const didPayload = {
-      source_url: imageDataUrl,
+      source_url: imageUrl,
       script: {
         type: 'text',
         input: text,
