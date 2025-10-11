@@ -30,17 +30,18 @@ serve(async (req) => {
 
     // Helper function to generate visual prompt
     const generateVisualPrompt = async (useGenericStyle = false): Promise<string> => {
-      console.log(useGenericStyle ? '🎨 Generating GENERIC visual prompt...' : '🎨 Generating visual prompt...');
+      console.log(useGenericStyle ? '🎨 Generating ANONYMOUS visual prompt...' : '🎨 Generating visual prompt...');
       
       const styleInstruction = useGenericStyle 
-        ? `Create a detailed visual description for a STYLIZED, ARTISTIC portrait of ${figureName}. Use:
-- Painterly or illustrated style (NOT photorealistic)
-- Soft focus and artistic interpretation
-- Historical costume/attire style
-- Emphasis on period-appropriate clothing and setting rather than facial accuracy
-- Think classical painting or illustration style, not photography
+        ? `Create a detailed visual description for an ANONYMOUS portrait that captures the era and style associated with ${figureName}, but DO NOT mention their name or create a recognizable likeness. Describe:
+- A generic person from their historical period and profession
+- Era-appropriate clothing, hairstyle, and accessories
+- Setting and background from their time period
+- Artistic, painterly style (like a classical oil painting)
+- Dignified, professional demeanor
 
-The goal is a respectful, artistic representation that avoids exact likeness.`
+Example: Instead of "JFK", describe "a distinguished American statesman from the early 1960s in formal attire"
+Make it completely anonymous - focus on the era, profession, and style, not the individual.`
         : `Create a detailed visual description for generating a portrait of ${figureName}. Include:
 1. Physical appearance (face, hair, age, distinctive features)
 2. Era-appropriate clothing and accessories
@@ -226,7 +227,7 @@ The goal is a respectful, artistic representation that avoids exact likeness.`
               messages: [
                 {
                   role: 'user',
-                  content: `Generate a stylized, artistic portrait (NOT photorealistic): ${visualPrompt}`
+                  content: `Generate an artistic portrait (NOT photorealistic, painterly style): ${visualPrompt}. Do not include any recognizable celebrity features. Make it anonymous and generic.`
                 }
               ],
               modalities: ['image', 'text']
