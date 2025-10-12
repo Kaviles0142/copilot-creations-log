@@ -84,22 +84,38 @@ serve(async (req) => {
       return visualPrompt;
     };
 
-    // Use Akool's built-in avatar library instead of custom image generation
-    // This avoids image hosting issues and uses Akool's pre-approved avatars
-    console.log('🎭 Using Akool built-in avatar library');
-    
-    // Default to a professional avatar from Akool's library
-    // Avatar ID 1 is typically a professional-looking avatar
-    const avatarId = '1'; // Using built-in avatar instead of custom URL
-    console.log(`✅ Selected built-in avatar ID: ${avatarId}`);
+    // Step 1: Get Akool's official avatar list
+    console.log('📋 Fetching Akool official avatar list...');
+    const avatarListResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/list?from=2&type=1&page=1&size=100', {
+      headers: {
+        'x-api-key': AKOOL_API_KEY,
+      }
+    });
 
-    // Step 2: Create Akool talking avatar using built-in avatar
-    console.log('🎭 Creating Akool talking avatar with built-in avatar...');
+    if (!avatarListResponse.ok) {
+      throw new Error('Failed to fetch Akool avatar list');
+    }
+
+    const avatarListData = await avatarListResponse.json();
+    console.log(`✅ Found ${avatarListData.data?.length || 0} official avatars`);
+
+    // Pick a professional looking avatar (first one from the list)
+    const selectedAvatar = avatarListData.data?.[0];
+    if (!selectedAvatar) {
+      throw new Error('No avatars available in Akool library');
+    }
+
+    const avatarId = selectedAvatar.avatar_id;
+    const avatarFrom = selectedAvatar.from;
+    console.log(`✅ Selected avatar: ${selectedAvatar.name} (ID: ${avatarId})`);
+
+    // Step 2: Create Akool talking avatar using official avatar
+    console.log('🎭 Creating Akool talking avatar with official avatar...');
     
     const akoolPayload = {
       width: 3840,
       height: 2160,
-      avatar_from: 1, // Using built-in avatar from Akool library
+      avatar_from: avatarFrom,
       elements: [
         {
           type: "avatar",
@@ -119,7 +135,7 @@ serve(async (req) => {
       ]
     };
 
-    console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
+    console.log('📤 Sending request to Akool...');
 
     const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/talkingavatar/create', {
       method: 'POST',
@@ -138,7 +154,7 @@ serve(async (req) => {
       throw new Error(`Akool API failed: ${akoolData.msg || 'Unknown error'}`);
     }
 
-    // Step 5: Poll for video completion
+    // Step 3: Poll for video completion
     const taskId = akoolData.data?._id;
     if (!taskId) {
       throw new Error('No task ID returned from Akool');
@@ -146,7 +162,7 @@ serve(async (req) => {
 
     let videoUrl: string | null = null;
     let attempts = 0;
-    const maxAttempts = 120; // 2 minutes max (Akool can take longer)
+    const maxAttempts = 120;
 
     console.log('⏳ Waiting for video generation...');
     while (!videoUrl && attempts < maxAttempts) {
@@ -184,7 +200,7 @@ serve(async (req) => {
         success: true,
         videoUrl,
         taskId,
-        note: 'Using Akool built-in avatar library'
+        avatarUsed: selectedAvatar.name
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
