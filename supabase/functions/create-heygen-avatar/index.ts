@@ -25,12 +25,10 @@ serve(async (req) => {
 
     console.log(`🎬 Creating HeyGen video for ${figureName}`);
 
-    // Detect gender based on common patterns
-    const femalePatterns = ['cleopatra', 'elizabeth', 'michelle', 'marie', 'rosa', 'joan', 'victoria', 'catherine', 'margaret'];
-    const isFemale = femalePatterns.some(pattern => figureName.toLowerCase().includes(pattern));
-    const targetGender = isFemale ? 'female' : 'male';
-
-    console.log(`Detecting gender for "${figureName}": ${targetGender}`);
+    // Detect gender
+    const isFemale = figureName.toLowerCase().includes('cleopatra') || 
+                     figureName.toLowerCase().includes('elizabeth') || 
+                     figureName.toLowerCase().includes('michelle');
 
     // Step 1: Get available avatars
     const avatarsResponse = await fetch('https://api.heygen.com/v2/avatars', {
@@ -42,27 +40,14 @@ serve(async (req) => {
     }
 
     const avatarsData = await avatarsResponse.json();
-    const allAvatars = avatarsData.data?.avatars || [];
-    console.log(`Found ${allAvatars.length} total avatars`);
+    console.log(`Found ${avatarsData.data?.avatars?.length || 0} avatars`);
 
-    // Filter for public avatars only first
-    const publicAvatars = allAvatars.filter((a: any) => a.is_public === true);
-    console.log(`Found ${publicAvatars.length} public avatars`);
-
-    if (publicAvatars.length === 0) {
-      throw new Error('No public avatars available');
-    }
-
-    // Try to find gender-matching avatar, but fall back to any public avatar
-    let avatar = publicAvatars.find((a: any) => {
-      const avatarGender = a.gender?.toLowerCase();
-      return avatarGender === targetGender;
-    });
-
-    if (!avatar) {
-      console.log(`No ${targetGender} avatars found, using first available public avatar`);
-      avatar = publicAvatars[0];
-    }
+    // Find a suitable public avatar - simple approach
+    const avatars = avatarsData.data?.avatars || [];
+    const avatar = avatars.find((a: any) => 
+      a.gender?.toLowerCase() === (isFemale ? 'female' : 'male') && 
+      a.is_public === true
+    ) || avatars.find((a: any) => a.is_public === true) || avatars[0];
 
     if (!avatar) {
       throw new Error('No avatars available');
@@ -78,30 +63,19 @@ serve(async (req) => {
     }
 
     const voicesData = await voicesResponse.json();
-    const allVoices = voicesData.data?.voices || [];
-    console.log(`Found ${allVoices.length} total voices`);
+    console.log(`Found ${voicesData.data?.voices?.length || 0} voices`);
 
-    // Filter for English voices first
-    const englishVoices = allVoices.filter((v: any) => {
-      const language = v.language?.toLowerCase() || '';
-      return language.includes('english') || language.includes('en-');
-    });
-
-    console.log(`Found ${englishVoices.length} English voices`);
-
-    // Try to match gender within English voices, fall back to any English voice
-    let voice = englishVoices.find((v: any) => {
-      const voiceGender = v.gender?.toLowerCase();
-      return voiceGender === targetGender;
-    });
-
-    if (!voice && englishVoices.length > 0) {
-      console.log(`No ${targetGender} English voice found, using first English voice`);
-      voice = englishVoices[0];
-    }
+    // Find a suitable voice (English, matching gender if possible)
+    const voices = voicesData.data?.voices || [];
+    const voice = voices.find((v: any) => 
+      v.language?.toLowerCase().includes('english') && 
+      v.gender?.toLowerCase() === (isFemale ? 'female' : 'male')
+    ) || voices.find((v: any) => 
+      v.language?.toLowerCase().includes('english')
+    ) || voices[0];
 
     if (!voice) {
-      throw new Error('No English voices available');
+      throw new Error('No voices available');
     }
 
     const avatarId = avatar.avatar_id;
@@ -184,4 +158,3 @@ serve(async (req) => {
     );
   }
 });
-
