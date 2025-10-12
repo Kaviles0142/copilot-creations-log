@@ -192,6 +192,34 @@ const HistoricalChat = () => {
     }
   }, [selectedFigure]);
 
+  // Poll HeyGen video status until ready
+  const pollHeyGenStatus = async (videoId: string, maxAttempts = 150): Promise<string | null> => {
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between checks
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('check-heygen-status', {
+          body: { videoId }
+        });
+
+        if (error) throw error;
+
+        console.log(`Poll attempt ${i + 1}: ${data.status}`);
+
+        if (data.status === 'completed' && data.videoUrl) {
+          return data.videoUrl;
+        } else if (data.status === 'failed') {
+          throw new Error('Video generation failed');
+        }
+      } catch (error) {
+        console.error('Error polling video status:', error);
+        throw error;
+      }
+    }
+    
+    throw new Error('Video generation timed out after 5 minutes');
+  };
+
   // Generate initial greeting avatar when figure is selected
   const generateInitialGreetingAvatar = async (figure: HistoricalFigure) => {
     console.log('🎬 Generating initial greeting avatar with HeyGen for:', figure.name);
@@ -200,6 +228,7 @@ const HistoricalChat = () => {
     
     setIsGeneratingAvatar(true);
     try {
+      // Start video generation
       const { data, error } = await supabase.functions.invoke('create-heygen-avatar', {
         body: {
           figureName: figure.name,
@@ -209,16 +238,27 @@ const HistoricalChat = () => {
 
       if (error) throw error;
 
-      if (data.success && data.videoUrl) {
-        console.log('✅ Initial HeyGen avatar generated:', data.videoUrl);
-        setDidVideoUrl(data.videoUrl);
-        setIsInitialAvatarReady(true);
+      if (data.success && data.videoId) {
+        console.log('✅ Video generation started, polling for completion...');
         
-        // Auto-play the greeting
         toast({
-          title: "Avatar Ready",
-          description: `${figure.name} is ready to chat!`,
+          title: "Generating Avatar",
+          description: "Creating your animated avatar... (this may take 2-5 minutes)",
         });
+
+        // Poll for completion
+        const videoUrl = await pollHeyGenStatus(data.videoId);
+        
+        if (videoUrl) {
+          console.log('✅ Initial HeyGen avatar ready:', videoUrl);
+          setDidVideoUrl(videoUrl);
+          setIsInitialAvatarReady(true);
+          
+          toast({
+            title: "Avatar Ready",
+            description: `${figure.name} is ready to chat!`,
+          });
+        }
       }
     } catch (error) {
       console.error('❌ Error generating initial avatar:', error);
@@ -539,6 +579,7 @@ const HistoricalChat = () => {
       console.log('🎬 Generating HeyGen avatar for:', selectedFigure.name);
       console.log('🎤 Using HeyGen AI-generated avatar with voice');
       
+      // Start video generation
       const { data, error } = await supabase.functions.invoke('create-heygen-avatar', {
         body: {
           figureName: selectedFigure.name,
@@ -548,12 +589,24 @@ const HistoricalChat = () => {
 
       if (error) throw error;
 
-      if (data.success && data.videoUrl) {
-        setDidVideoUrl(data.videoUrl);
+      if (data.success && data.videoId) {
+        console.log('✅ Video generation started, polling for completion...');
+        
         toast({
-          title: "Avatar Created!",
-          description: `${selectedFigure.name} is now speaking`,
+          title: "Generating Avatar",
+          description: "Creating animated response... (2-5 minutes)",
         });
+
+        // Poll for completion
+        const videoUrl = await pollHeyGenStatus(data.videoId);
+        
+        if (videoUrl) {
+          setDidVideoUrl(videoUrl);
+          toast({
+            title: "Avatar Created!",
+            description: `${selectedFigure.name} is now speaking`,
+          });
+        }
       }
     } catch (error) {
       console.error('Error generating HeyGen avatar:', error);

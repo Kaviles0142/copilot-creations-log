@@ -150,44 +150,16 @@ serve(async (req) => {
       throw new Error('No video ID returned from video generation');
     }
 
-    // Poll for video completion (max 5 minutes)
-    console.log('⏳ Waiting for video to be generated (this may take 2-5 minutes)');
-    let videoUrl = null;
-    let attempts = 0;
-    const maxAttempts = 150; // 150 attempts * 2 seconds = 5 minutes max
+    console.log(`✅ Video generation started with ID: ${videoId}`);
 
-    while (!videoUrl && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      attempts++;
-
-      const videoStatusResponse = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${videoId}`, {
-        headers: {
-          'X-Api-Key': HEYGEN_API_KEY,
-        }
-      });
-
-      const videoStatusData = await videoStatusResponse.json();
-      console.log(`Video status check ${attempts}:`, videoStatusData.data?.status);
-
-      if (videoStatusData.data?.status === 'completed') {
-        videoUrl = videoStatusData.data?.video_url;
-        console.log('✅ Video generated:', videoUrl);
-        break;
-      } else if (videoStatusData.data?.status === 'failed') {
-        throw new Error('Video generation failed');
-      }
-    }
-
-    if (!videoUrl) {
-      throw new Error('Video generation timed out');
-    }
-
+    // Return video_id immediately for client-side polling
     return new Response(
       JSON.stringify({
         success: true,
-        videoUrl,
+        videoId,
         avatarId,
-        duration: attempts * 2,
+        status: 'processing',
+        message: 'Video generation started. Poll /check-heygen-status to get the video URL.',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
