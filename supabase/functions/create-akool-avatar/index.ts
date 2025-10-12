@@ -183,8 +183,9 @@ serve(async (req) => {
       const cloudinaryProxyUrl = `https://res.cloudinary.com/demo/image/fetch/${encodeURIComponent(publicUrl)}`;
       finalImageUrl = cloudinaryProxyUrl;
       
-      console.log('✅ Cloudinary proxy URL created:', finalImageUrl);
+      console.log('✅ Using Cloudinary fetch URL:', finalImageUrl);
       console.log('📌 Original Supabase URL:', publicUrl);
+      console.log('🎯 This URL will be sent to Akool API');
       
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
