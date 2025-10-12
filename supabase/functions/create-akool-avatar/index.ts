@@ -189,7 +189,9 @@ serve(async (req) => {
     console.log('🎭 Creating Akool talking avatar...');
     console.log('📤 Avatar URL being sent to Akool:', finalImageUrl);
     
-    const akoolPayload = {
+    // For createVideo endpoint, we need to handle TTS differently
+    // TTS should be called first to get an audio URL, then passed in voice.voice_url
+    const akoolPayload: any = {
       data: [
         {
           width: 1920,
@@ -205,9 +207,6 @@ serve(async (req) => {
               layer_number: 1
             }
           ],
-          voice: audioUrl ? {
-            voice_url: audioUrl
-          } : undefined,
           ratio: "16:9",
           background: "#ffffff",
           avatarFrom: 3
@@ -215,13 +214,11 @@ serve(async (req) => {
       ]
     };
 
-    // If no audio URL, add text-to-speech in elements
-    if (!audioUrl) {
-      akoolPayload.data[0].elements.push({
-        type: "audio",
-        input_text: text || `Hello, I am ${figureName}`,
-        voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
-      } as any);
+    // Add voice if audio URL is provided
+    if (audioUrl) {
+      akoolPayload.data[0].voice = {
+        voice_url: audioUrl
+      };
     }
 
     console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
