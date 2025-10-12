@@ -86,9 +86,11 @@ Ultra high resolution, detailed facial features, historically accurate appearanc
 
     console.log('✅ Portrait generated');
 
-    // Step 2: Upload image to Supabase storage
-    console.log('📤 Uploading portrait to storage...');
+    // Keep base64 image for Akool (don't rely on URL)
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    
+    // Still upload to storage for reference, but we'll use base64 for Akool
+    console.log('📤 Uploading portrait to storage for reference...');
     const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     
     const fileName = `${figureId || figureName.replace(/\s+/g, '_')}_${Date.now()}.png`;
@@ -100,8 +102,7 @@ Ultra high resolution, detailed facial features, historically accurate appearanc
       });
 
     if (uploadError) {
-      console.error('❌ Upload failed:', uploadError);
-      throw new Error('Failed to upload portrait');
+      console.warn('⚠️ Upload failed (non-critical):', uploadError);
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -144,7 +145,7 @@ Ultra high resolution, detailed facial features, historically accurate appearanc
 
     console.log('🎵 Selected voice:', selectedVoice.name || selectedVoice.voice_id);
 
-    // Step 4: Create talking avatar with custom image
+    // Step 4: Create talking avatar with custom image (use base64 data URL)
     console.log('🎬 Creating talking avatar video...');
     const createAvatarPayload = {
       width: 3840,
@@ -153,7 +154,7 @@ Ultra high resolution, detailed facial features, historically accurate appearanc
       elements: [
         {
           type: "avatar",
-          url: publicUrl, // Use our generated portrait
+          url: base64Image, // Use base64 data URL instead of storage URL
           scale_x: 1,
           scale_y: 1,
           width: 1920,
@@ -189,8 +190,15 @@ Ultra high resolution, detailed facial features, historically accurate appearanc
     const createData = await createResponse.json();
     console.log('✅ Avatar creation response:', createData);
 
+    // Check for Akool error codes
+    if (createData.code !== 1000) {
+      console.error('❌ Akool API error:', createData);
+      throw new Error(`Akool API error (${createData.code}): ${createData.msg || 'Unknown error'}`);
+    }
+
     const videoId = createData.data?._id;
     if (!videoId) {
+      console.error('❌ No video ID in response:', createData);
       throw new Error('No video ID returned from Akool');
     }
 
