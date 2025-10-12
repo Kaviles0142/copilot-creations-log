@@ -800,18 +800,15 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Reset loading state after text response is complete (UI becomes responsive)
+      // Auto-generate animated avatar if enabled (SEQUENTIAL - wait for it like D-ID did)
+      if (autoAnimateResponses && selectedFigure) {
+        console.log('🎬 Generating avatar for response (this will take a moment)...');
+        await generateDidAvatar(aiResponse);
+      }
+      
+      // Reset loading state after avatar generation is complete
       setIsLoading(false);
       setAbortController(null);
-
-      // Auto-generate animated avatar if enabled (non-blocking background process)
-      if (autoAnimateResponses && selectedFigure) {
-        console.log('🎬 Starting background avatar generation for response...');
-        // Don't await - let it run in background
-        generateDidAvatar(aiResponse).catch(err => {
-          console.error('Background avatar generation failed:', err);
-        });
-      }
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
