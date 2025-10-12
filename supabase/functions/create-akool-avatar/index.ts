@@ -239,67 +239,78 @@ serve(async (req) => {
       throw new Error(`Image URL validation failed: ${errorMsg}`);
     }
 
-    // Step 4: Create Akool talking avatar with inline TTS support
-    console.log('🎭 Creating Akool talking avatar with TTS...');
-    console.log('📤 Avatar URL being sent to Akool:', finalImageUrl);
-    
-    const akoolPayload = {
-      width: 3840,
-      height: 2160,
-      avatar_from: 3,
-      elements: [
-        {
-          type: "avatar",
-          url: finalImageUrl,
-          scale_x: 1,
-          scale_y: 1,
-          width: 1080,
-          height: 1080,
-          offset_x: 1920,
-          offset_y: 1080
-        },
-        {
-          type: "audio",
-          input_text: text || `Hello, I am ${figureName}`,
-          voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
-        }
-      ]
-    };
-
-    console.log('📤 Sending request to Akool with TTS:', JSON.stringify(akoolPayload, null, 2));
-
-    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/talkingavatar/create', {
+    // Step 4: Generate TTS audio using Akool's TTS API
+    console.log('🎤 Generating TTS audio with Akool...');
+    const ttsResponse = await fetch('https://openapi.akool.com/api/open/v3/audio/create', {
       method: 'POST',
       headers: {
         'x-api-key': AKOOL_API_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(akoolPayload)
+      body: JSON.stringify({
+        text: text || `Hello, I am ${figureName}`,
+        voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
+      })
     });
 
-    const akoolData = await akoolResponse.json();
-    console.log('📥 Akool API response:', {
-      status: akoolResponse.status,
-      ok: akoolResponse.ok,
-      code: akoolData.code,
-      msg: akoolData.msg,
-      urlSent: finalImageUrl,
-      fullResponse: JSON.stringify(akoolData, null, 2)
-    });
-
-    if (!akoolResponse.ok || akoolData.code !== 1000) {
-      console.error('❌ Akool API error details:', {
-        httpStatus: akoolResponse.status,
-        responseCode: akoolData.code,
-        message: akoolData.msg,
-        sentUrl: finalImageUrl,
-        fullError: JSON.stringify(akoolData, null, 2)
-      });
-      throw new Error(`Akool API failed: ${akoolData.msg || 'Unknown error'}`);
+    if (!ttsResponse.ok) {
+      const errorText = await ttsResponse.text();
+      console.error('❌ Akool TTS failed:', errorText);
+      throw new Error(`Akool TTS failed: ${errorText}`);
     }
 
-    // Step 3: Poll for video completion
-    const taskId = akoolData.data?._id;
+    const ttsData = await ttsResponse.json();
+    console.log('📥 Akool TTS response:', JSON.stringify(ttsData, null, 2));
+
+    if (ttsData.code !== 1000 || !ttsData.data?.url) {
+      throw new Error(`Akool TTS failed: ${ttsData.msg || 'No audio URL returned'}`);
+    }
+
+    const audioFileUrl = ttsData.data.url;
+    console.log('✅ TTS audio generated:', audioFileUrl);
+
+    // Step 5: Create talking photo using the Talking Photo API
+    console.log('📸 Creating talking photo...');
+    console.log('📤 Photo URL:', finalImageUrl);
+    console.log('🎵 Audio URL:', audioFileUrl);
+
+    const talkingPhotoResponse = await fetch('https://openapi.akool.com/api/open/v3/content/video/createbytalkingphoto', {
+      method: 'POST',
+      headers: {
+        'x-api-key': AKOOL_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        talking_photo_url: finalImageUrl,
+        audio_url: audioFileUrl
+      })
+    });
+
+    const talkingPhotoData = await talkingPhotoResponse.json();
+    console.log('📥 Akool Talking Photo response:', {
+      status: talkingPhotoResponse.status,
+      ok: talkingPhotoResponse.ok,
+      code: talkingPhotoData.code,
+      msg: talkingPhotoData.msg,
+      photoUrl: finalImageUrl,
+      audioUrl: audioFileUrl,
+      fullResponse: JSON.stringify(talkingPhotoData, null, 2)
+    });
+
+    if (!talkingPhotoResponse.ok || talkingPhotoData.code !== 1000) {
+      console.error('❌ Akool Talking Photo error:', {
+        httpStatus: talkingPhotoResponse.status,
+        responseCode: talkingPhotoData.code,
+        message: talkingPhotoData.msg,
+        sentPhotoUrl: finalImageUrl,
+        sentAudioUrl: audioFileUrl,
+        fullError: JSON.stringify(talkingPhotoData, null, 2)
+      });
+      throw new Error(`Akool Talking Photo failed: ${talkingPhotoData.msg || 'Unknown error'}`);
+    }
+
+    // Step 6: Poll for video completion
+    const taskId = talkingPhotoData.data?._id;
     if (!taskId) {
       throw new Error('No task ID returned from Akool');
     }
