@@ -302,9 +302,14 @@ const HistoricalChat = () => {
 
         // Generate Akool avatar with greeting
         console.log('🎬 Starting avatar generation...');
-        await generateAkoolAvatar(greetingText, selectedFigure);
-
-        setIsLoading(false);
+        const avatarResult = await generateAkoolAvatar(greetingText, selectedFigure);
+        
+        // If avatar generation failed, re-enable input
+        if (!avatarResult) {
+          console.log('⚠️ Greeting avatar failed, re-enabling input');
+          setIsLoading(false);
+        }
+        // Otherwise, setIsLoading(false) will be called when video ends
       } catch (error) {
         console.error('Error generating greeting avatar:', error);
         setIsLoading(false);
@@ -841,9 +846,16 @@ const HistoricalChat = () => {
       // Generate Akool avatar for each response
       console.log('🎬 Generating avatar for response...');
       setIsLoading(true); // Keep input disabled while avatar generates
-      await generateAkoolAvatar(aiResponse, selectedFigure!);
       
-      // Note: setIsLoading(false) will be called when video plays/ends
+      const avatarResult = await generateAkoolAvatar(aiResponse, selectedFigure!);
+      
+      // If avatar generation failed, re-enable input
+      if (!avatarResult) {
+        console.log('⚠️ Avatar generation failed, re-enabling input');
+        setIsLoading(false);
+      }
+      // Otherwise, setIsLoading(false) will be called when video ends
+      
       setAbortController(null);
 
       /* Azure TTS infrastructure preserved for future activation
