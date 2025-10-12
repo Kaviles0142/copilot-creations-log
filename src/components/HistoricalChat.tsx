@@ -200,7 +200,7 @@ const HistoricalChat = () => {
     
     setIsGeneratingAvatar(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+      const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
         body: {
           figureName: figure.name,
           text: greetingText,
@@ -210,7 +210,7 @@ const HistoricalChat = () => {
 
       if (error) throw error;
 
-      // Check if video was skipped due to celebrity detection
+      // Check if video was skipped
       if (data.skipVideo) {
         console.log('⏭️ Avatar video skipped, chat available without video');
         setIsInitialAvatarReady(true);
@@ -539,16 +539,16 @@ const HistoricalChat = () => {
     }
   };
 
-  // Generate D-ID animated avatar (D-ID handles its own audio for speed)
+  // Generate Akool animated avatar
   const generateDidAvatar = async (text: string) => {
     if (!selectedFigure) return;
     
     setIsGeneratingAvatar(true);
     try {
-      console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
-      console.log('🎤 Using D-ID built-in voice for faster generation');
+      console.log('🎬 Generating Akool avatar for:', selectedFigure.name);
+      console.log('🎤 Using Akool built-in voice for generation');
       
-      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+      const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
         body: {
           figureName: selectedFigure.name,
           figureId: selectedFigure.id,
@@ -803,7 +803,7 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
 
-      // Auto-generate animated avatar if enabled (D-ID uses its own voice)
+      // Auto-generate animated avatar if enabled (Akool uses its own voice)
       if (autoAnimateResponses && selectedFigure) {
         console.log('🎬 Auto-generating avatar for response...');
         generateDidAvatar(aiResponse);

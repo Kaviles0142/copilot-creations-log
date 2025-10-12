@@ -1,0 +1,258 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { figureName, text, figureId, audioUrl } = await req.json();
+    console.log('🎬 Creating Akool avatar for:', figureName);
+    console.log('🎤 Audio URL provided:', !!audioUrl);
+    console.log('📝 Text provided:', text?.substring(0, 100));
+
+    const AKOOL_API_KEY = Deno.env.get('AKOOL_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+
+    if (!AKOOL_API_KEY || !LOVABLE_API_KEY) {
+      throw new Error('Missing required API keys');
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Helper function to detect likely gender from name
+    const detectGender = (name: string): 'male' | 'female' => {
+      const nameLower = name.toLowerCase();
+      const femaleIndicators = ['cleopatra', 'queen', 'empress', 'marie', 'elizabeth', 'victoria', 'catherine', 'joan', 'rosa', 'harriet', 'susan', 'amelia', 'florence', 'ada', 'jane', 'mary', 'anne', 'margaret', 'eleanor'];
+      const isFemale = femaleIndicators.some(indicator => nameLower.includes(indicator));
+      return isFemale ? 'female' : 'male';
+    };
+
+    const gender = detectGender(figureName);
+
+    const generateVisualPrompt = async (): Promise<string> => {
+      console.log('🎨 Generating visual prompt...');
+      
+      const styleInstruction = `Create a detailed visual description for generating a peaceful, dignified portrait of ${figureName}. Include:
+1. Calm, wise facial expression showing intelligence and composure
+2. Era-appropriate formal attire (NO weapons, armor, or military gear)
+3. Neutral, scholarly background setting (library, study, or formal portrait setting)
+4. Dignified posture suggesting leadership and wisdom
+5. Photorealistic portrait style with soft, flattering lighting
+6. Emphasize peaceful, diplomatic qualities rather than conflict or aggression`;
+
+      const visualPromptResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at creating detailed, historically accurate visual descriptions for AI image generation. Focus on physical appearance, era-appropriate clothing, setting, and expression.'
+            },
+            {
+              role: 'user',
+              content: styleInstruction + '\n\nKeep it concise but vivid. Make it suitable for AI image generation.'
+            }
+          ],
+          max_tokens: 500,
+        }),
+      });
+
+      if (!visualPromptResponse.ok) {
+        throw new Error('Failed to generate visual prompt');
+      }
+
+      const visualPromptData = await visualPromptResponse.json();
+      const visualPrompt = visualPromptData.choices[0].message.content;
+      console.log('✅ Generated visual prompt:', visualPrompt.substring(0, 100) + '...');
+      return visualPrompt;
+    };
+
+    // Step 1: Generate visual prompt
+    const visualPrompt = await generateVisualPrompt();
+
+    // Step 2: Generate image using Lovable AI's image generation model
+    console.log('🎨 Generating portrait image...');
+    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: `Generate a photorealistic portrait: ${visualPrompt}`
+          }
+        ],
+        modalities: ['image', 'text']
+      })
+    });
+
+    if (!imageResponse.ok) {
+      const errorText = await imageResponse.text();
+      console.error('Image generation failed:', errorText);
+      throw new Error('Failed to generate portrait image');
+    }
+
+    const imageData = await imageResponse.json();
+    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    if (!base64Image) {
+      throw new Error('No image generated');
+    }
+
+    console.log('✅ Portrait image generated');
+
+    // Step 3: Upload image to Supabase storage
+    console.log('📤 Uploading image to storage...');
+    
+    // Convert base64 to blob
+    const base64Data = base64Image.split(',')[1];
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const fileName = `${figureId}-${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(fileName, bytes, {
+        contentType: 'image/png',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error('Failed to upload image');
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Image uploaded:', publicUrl);
+    const imageUrl = publicUrl;
+    
+    console.log('✅ Image ready for Akool');
+
+    // Step 4: Create Akool talking avatar
+    console.log('🎭 Creating Akool talking avatar...');
+    
+    // If no audio URL, use text-to-speech
+    let finalAudioUrl = audioUrl;
+    if (!audioUrl && text) {
+      console.log('🎤 No audio URL provided, using text for Akool TTS');
+      // Akool will use its own TTS
+    }
+
+    const akoolPayload: any = {
+      avatar_id: gender === 'female' ? 'avatar_1012' : 'avatar_1001', // Default avatars
+      input_text: text,
+      image_url: imageUrl
+    };
+
+    console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
+
+    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/talk/trigger', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AKOOL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(akoolPayload)
+    });
+
+    if (!akoolResponse.ok) {
+      const errorText = await akoolResponse.text();
+      console.error('❌ Akool API error:', akoolResponse.status, errorText);
+      throw new Error(`Akool API failed: ${akoolResponse.status} - ${errorText}`);
+    }
+
+    const akoolData = await akoolResponse.json();
+    console.log('✅ Akool task created:', akoolData);
+
+    // Step 5: Poll for video completion
+    const taskId = akoolData.data?._id;
+    if (!taskId) {
+      throw new Error('No task ID returned from Akool');
+    }
+
+    let videoUrl: string | null = null;
+    let attempts = 0;
+    const maxAttempts = 120; // 2 minutes max (Akool can take longer)
+
+    console.log('⏳ Waiting for video generation...');
+    while (!videoUrl && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const statusResponse = await fetch(`https://openapi.akool.com/api/open/v3/avatar/talk/query?_id=${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${AKOOL_API_KEY}`,
+        }
+      });
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        
+        if (statusData.data?.status === 'completed') {
+          videoUrl = statusData.data?.result?.video_url;
+          console.log('✅ Video ready!');
+        } else if (statusData.data?.status === 'failed') {
+          console.error('❌ Akool generation error:', statusData);
+          throw new Error('Akool video generation failed');
+        } else {
+          console.log(`⏳ Status: ${statusData.data?.status} (attempt ${attempts + 1}/${maxAttempts})`);
+        }
+      }
+
+      attempts++;
+    }
+
+    if (!videoUrl) {
+      throw new Error('Video generation timeout after 2 minutes');
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        videoUrl,
+        visualPrompt,
+        taskId
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error creating Akool avatar:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: errorMessage 
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+});

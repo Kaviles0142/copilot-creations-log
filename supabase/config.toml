@@ -96,7 +96,7 @@ verify_jwt = false
 [functions.azure-text-to-speech]
 verify_jwt = false
 
-[functions.create-did-avatar]
+[functions.create-akool-avatar]
 verify_jwt = false
 
 [functions.duckduckgo-search]
