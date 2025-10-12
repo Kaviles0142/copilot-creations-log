@@ -122,15 +122,36 @@ serve(async (req) => {
 
     console.log('✅ Portrait image generated');
 
-    // Step 3: Send base64 image directly to Akool in the request
-    // Convert data URL to just the base64 part
+    // Step 3: Save image to public Supabase storage bucket
+    console.log('💾 Saving generated image to public storage...');
     const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
-    console.log('📤 Preparing to send base64 image directly to Akool');
-
-    // Step 4: Create Akool talking avatar with base64 image
-    console.log('🎭 Creating Akool talking avatar with custom image...');
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     
-    // Try sending as data URL directly in the avatar element
+    const fileName = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(fileName, imageBuffer, {
+        contentType: 'image/png',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('❌ Storage upload failed:', uploadError);
+      throw new Error(`Failed to upload image: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Image saved to storage:', publicUrl);
+
+    // Step 4: Create Akool talking avatar with public image URL
+    console.log('🎭 Creating Akool talking avatar with public image URL...');
+    
     const akoolPayload = {
       width: 3840,
       height: 2160,
@@ -138,7 +159,7 @@ serve(async (req) => {
       elements: [
         {
           type: "avatar",
-          url: base64Image, // Send full data URL
+          url: publicUrl, // Use public Supabase URL
           scale_x: 1,
           scale_y: 1,
           width: 1080,
