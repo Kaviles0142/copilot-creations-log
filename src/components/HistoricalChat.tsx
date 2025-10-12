@@ -560,9 +560,10 @@ const HistoricalChat = () => {
 
       if (data.videoUrl) {
         setDidVideoUrl(data.videoUrl);
+        console.log('✅ Avatar video ready, updating display');
         toast({
-          title: "Avatar Created!",
-          description: `${selectedFigure.name} is now speaking`,
+          title: "Avatar Ready!",
+          description: `${selectedFigure.name}'s response is now animated`,
         });
       }
     } catch (error) {
@@ -803,10 +804,13 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
 
-      // Auto-generate animated avatar if enabled (Akool uses its own voice)
+      // Auto-generate animated avatar if enabled (non-blocking background process)
       if (autoAnimateResponses && selectedFigure) {
-        console.log('🎬 Auto-generating avatar for response...');
-        generateDidAvatar(aiResponse);
+        console.log('🎬 Starting background avatar generation for response...');
+        // Don't await - let it run in background
+        generateDidAvatar(aiResponse).catch(err => {
+          console.error('Background avatar generation failed:', err);
+        });
       }
 
       /* Azure TTS infrastructure preserved for future activation
