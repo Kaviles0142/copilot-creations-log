@@ -800,13 +800,13 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Generate new video using CACHED image + new TTS audio for this specific response
+      // Generate avatar using CACHED image + new audio for this specific response
       if (autoAnimateResponses && selectedFigure) {
-        console.log('🎬 Generating video with cached image + new audio...');
+        console.log('🎬 Generating avatar with cached image for response...');
         await generateDidAvatar(aiResponse);
       }
       
-      // Reset loading state after video generation
+      // Reset loading state after avatar generation
       setIsLoading(false);
       setAbortController(null);
 
