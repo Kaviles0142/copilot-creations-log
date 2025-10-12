@@ -106,6 +106,9 @@ verify_jwt = false
 [functions.create-heygen-avatar]
 verify_jwt = false
 
+[functions.check-heygen-status]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 port = 54323

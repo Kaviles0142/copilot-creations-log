@@ -45,22 +45,24 @@ serve(async (req) => {
     const allAvatars = avatarsData.data?.avatars || [];
     console.log(`Found ${allAvatars.length} total avatars`);
 
-    // Filter for public avatars with matching gender
-    const matchingAvatars = allAvatars.filter((a: any) => {
-      const avatarGender = a.gender?.toLowerCase();
-      const isPublic = a.is_public === true;
-      const genderMatch = avatarGender === targetGender;
-      return isPublic && genderMatch;
-    });
+    // Filter for public avatars only first
+    const publicAvatars = allAvatars.filter((a: any) => a.is_public === true);
+    console.log(`Found ${publicAvatars.length} public avatars`);
 
-    console.log(`Found ${matchingAvatars.length} ${targetGender} public avatars`);
-
-    if (matchingAvatars.length === 0) {
-      throw new Error(`No ${targetGender} public avatars available`);
+    if (publicAvatars.length === 0) {
+      throw new Error('No public avatars available');
     }
 
-    // Select the first matching avatar
-    const avatar = matchingAvatars[0];
+    // Try to find gender-matching avatar, but fall back to any public avatar
+    let avatar = publicAvatars.find((a: any) => {
+      const avatarGender = a.gender?.toLowerCase();
+      return avatarGender === targetGender;
+    });
+
+    if (!avatar) {
+      console.log(`No ${targetGender} avatars found, using first available public avatar`);
+      avatar = publicAvatars[0];
+    }
 
     if (!avatar) {
       throw new Error('No avatars available');
@@ -79,25 +81,27 @@ serve(async (req) => {
     const allVoices = voicesData.data?.voices || [];
     console.log(`Found ${allVoices.length} total voices`);
 
-    // Filter for voices matching gender and language
-    const matchingVoices = allVoices.filter((v: any) => {
-      const voiceGender = v.gender?.toLowerCase();
+    // Filter for English voices first
+    const englishVoices = allVoices.filter((v: any) => {
       const language = v.language?.toLowerCase() || '';
-      const isEnglish = language.includes('english') || language.includes('en-');
-      const genderMatch = voiceGender === targetGender;
-      return isEnglish && genderMatch;
+      return language.includes('english') || language.includes('en-');
     });
 
-    console.log(`Found ${matchingVoices.length} ${targetGender} English voices`);
+    console.log(`Found ${englishVoices.length} English voices`);
 
-    if (matchingVoices.length === 0) {
-      throw new Error(`No ${targetGender} English voices available`);
+    // Try to match gender within English voices, fall back to any English voice
+    let voice = englishVoices.find((v: any) => {
+      const voiceGender = v.gender?.toLowerCase();
+      return voiceGender === targetGender;
+    });
+
+    if (!voice && englishVoices.length > 0) {
+      console.log(`No ${targetGender} English voice found, using first English voice`);
+      voice = englishVoices[0];
     }
 
-    const voice = matchingVoices[0];
-
     if (!voice) {
-      throw new Error('No voices available');
+      throw new Error('No English voices available');
     }
 
     const avatarId = avatar.avatar_id;
