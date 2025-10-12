@@ -84,42 +84,61 @@ serve(async (req) => {
       return visualPrompt;
     };
 
-    // Step 1: Get Akool's official avatar list
-    console.log('📋 Fetching Akool official avatar list...');
-    const avatarListResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/list?from=2&type=1&page=1&size=100', {
+    // Step 1: Generate visual prompt
+    const visualPrompt = await generateVisualPrompt();
+
+    // Step 2: Generate image using Lovable AI's image generation model
+    console.log('🎨 Generating portrait image...');
+    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        'x-api-key': AKOOL_API_KEY,
-      }
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: `Generate a photorealistic portrait: ${visualPrompt}`
+          }
+        ],
+        modalities: ['image', 'text']
+      })
     });
 
-    if (!avatarListResponse.ok) {
-      throw new Error('Failed to fetch Akool avatar list');
+    if (!imageResponse.ok) {
+      const errorText = await imageResponse.text();
+      console.error('Image generation failed:', errorText);
+      throw new Error('Failed to generate portrait image');
     }
 
-    const avatarListData = await avatarListResponse.json();
-    console.log(`✅ Found ${avatarListData.data?.length || 0} official avatars`);
-
-    // Pick a professional looking avatar (first one from the list)
-    const selectedAvatar = avatarListData.data?.[0];
-    if (!selectedAvatar) {
-      throw new Error('No avatars available in Akool library');
-    }
-
-    const avatarId = selectedAvatar.avatar_id;
-    const avatarFrom = selectedAvatar.from;
-    console.log(`✅ Selected avatar: ${selectedAvatar.name} (ID: ${avatarId})`);
-
-    // Step 2: Create Akool talking avatar using official avatar
-    console.log('🎭 Creating Akool talking avatar with official avatar...');
+    const imageData = await imageResponse.json();
+    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
+    if (!base64Image) {
+      throw new Error('No image generated');
+    }
+
+    console.log('✅ Portrait image generated');
+
+    // Step 3: Send base64 image directly to Akool in the request
+    // Convert data URL to just the base64 part
+    const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+    console.log('📤 Preparing to send base64 image directly to Akool');
+
+    // Step 4: Create Akool talking avatar with base64 image
+    console.log('🎭 Creating Akool talking avatar with custom image...');
+    
+    // Try sending as data URL directly in the avatar element
     const akoolPayload = {
       width: 3840,
       height: 2160,
-      avatar_from: avatarFrom,
+      avatar_from: 3, // Custom avatar
       elements: [
         {
           type: "avatar",
-          avatar_id: avatarId,
+          url: base64Image, // Send full data URL
           scale_x: 1,
           scale_y: 1,
           width: 1080,
@@ -200,7 +219,7 @@ serve(async (req) => {
         success: true,
         videoUrl,
         taskId,
-        avatarUsed: selectedAvatar.name
+        visualPrompt
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
