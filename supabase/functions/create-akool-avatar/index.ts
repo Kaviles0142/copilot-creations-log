@@ -175,35 +175,16 @@ serve(async (req) => {
 
       console.log('✅ URL validated successfully');
       
-      // Upload to Cloudinary as CDN fallback for Akool compatibility
-      console.log('📤 Uploading to Cloudinary CDN for better compatibility...');
+      // Use Cloudinary fetch URL as CDN proxy (no upload needed!)
+      console.log('🔗 Creating Cloudinary fetch URL proxy...');
       
-      try {
-        // Use Cloudinary's unsigned upload (no API key needed)
-        const cloudinaryFormData = new FormData();
-        cloudinaryFormData.append('file', `data:image/png;base64,${base64Data}`);
-        cloudinaryFormData.append('upload_preset', 'ml_default'); // Default unsigned preset
-        
-        const cloudinaryResponse = await fetch('https://api.cloudinary.com/v1_1/demo/image/upload', {
-          method: 'POST',
-          body: cloudinaryFormData
-        });
-        
-        if (cloudinaryResponse.ok) {
-          const cloudinaryData = await cloudinaryResponse.json();
-          if (cloudinaryData.secure_url) {
-            finalImageUrl = cloudinaryData.secure_url;
-            console.log('✅ Image uploaded to Cloudinary CDN:', finalImageUrl);
-          } else {
-            console.log('⚠️ Cloudinary response missing URL, using Supabase URL');
-          }
-        } else {
-          const errorText = await cloudinaryResponse.text();
-          console.log('⚠️ Cloudinary upload failed:', errorText, '- using Supabase URL');
-        }
-      } catch (cdnError) {
-        console.log('⚠️ CDN upload error:', cdnError, '- using Supabase URL');
-      }
+      // Cloudinary's "demo" cloud for testing - use fetch to proxy the Supabase URL
+      // Format: https://res.cloudinary.com/<cloud_name>/image/fetch/<url>
+      const cloudinaryProxyUrl = `https://res.cloudinary.com/demo/image/fetch/${encodeURIComponent(publicUrl)}`;
+      finalImageUrl = cloudinaryProxyUrl;
+      
+      console.log('✅ Cloudinary proxy URL created:', finalImageUrl);
+      console.log('📌 Original Supabase URL:', publicUrl);
       
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
