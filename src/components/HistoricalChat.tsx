@@ -96,7 +96,7 @@ const HistoricalChat = () => {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
-  const [autoAnimateResponses, setAutoAnimateResponses] = useState(true); // Auto-generate avatars
+  const [autoAnimateResponses, setAutoAnimateResponses] = useState(false); // Disabled by default due to slow generation times
   const [isInitialAvatarReady, setIsInitialAvatarReady] = useState(false); // Track if initial greeting avatar is ready
   const { toast } = useToast();
 
