@@ -184,36 +184,48 @@ serve(async (req) => {
       throw new Error(`Image URL validation failed: ${errorMsg}`);
     }
 
-    // Step 4: Create Akool talking avatar with CDN image URL
-    console.log('🎭 Creating Akool talking avatar with CDN URL...');
+    // Step 4: Create Akool talking avatar using the correct API endpoint
+    console.log('🎭 Creating Akool talking avatar...');
     console.log('📤 Avatar URL being sent to Akool:', finalImageUrl);
     
     const akoolPayload = {
-      width: 3840,
-      height: 2160,
-      avatar_from: 3, // Custom avatar
-      elements: [
+      data: [
         {
-          type: "avatar",
-          url: finalImageUrl, // Use CDN URL
-          scale_x: 1,
-          scale_y: 1,
-          width: 1080,
+          width: 1920,
           height: 1080,
-          offset_x: 1920,
-          offset_y: 1080
-        },
-        {
-          type: "audio",
-          input_text: text || `Hello, I am ${figureName}`,
-          voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
+          elements: [
+            {
+              type: "avatar",
+              url: finalImageUrl,
+              scale_x: 1,
+              scale_y: 1,
+              offset_x: 960,
+              offset_y: 540,
+              layer_number: 1
+            }
+          ],
+          voice: audioUrl ? {
+            voice_url: audioUrl
+          } : undefined,
+          ratio: "16:9",
+          background: "#ffffff",
+          avatarFrom: 3
         }
       ]
     };
 
+    // If no audio URL, add text-to-speech in elements
+    if (!audioUrl) {
+      akoolPayload.data[0].elements.push({
+        type: "audio",
+        input_text: text || `Hello, I am ${figureName}`,
+        voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
+      } as any);
+    }
+
     console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
 
-    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/talkingavatar/create', {
+    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/createVideo', {
       method: 'POST',
       headers: {
         'x-api-key': AKOOL_API_KEY,
