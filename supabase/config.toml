@@ -96,8 +96,9 @@ verify_jwt = false
 [functions.azure-text-to-speech]
 verify_jwt = false
 
-[functions.create-did-avatar]
-verify_jwt = false
+# D-ID temporarily disabled - using HeyGen instead
+# [functions.create-did-avatar]
+# verify_jwt = false
 
 [functions.duckduckgo-search]
 verify_jwt = false
