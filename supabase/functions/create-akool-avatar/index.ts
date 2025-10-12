@@ -149,8 +149,38 @@ serve(async (req) => {
 
     console.log('✅ Image saved to storage:', publicUrl);
 
+    // Step 3.5: Validate the URL is accessible
+    console.log('🔍 Validating image URL accessibility...');
+    try {
+      const headResponse = await fetch(publicUrl, { method: 'HEAD' });
+      console.log('📊 URL validation response:', {
+        status: headResponse.status,
+        contentType: headResponse.headers.get('Content-Type'),
+        contentLength: headResponse.headers.get('Content-Length'),
+        url: publicUrl
+      });
+
+      if (!headResponse.ok) {
+        console.error('❌ URL not accessible:', headResponse.status);
+        throw new Error(`Image URL not accessible: ${headResponse.status}`);
+      }
+
+      const contentType = headResponse.headers.get('Content-Type');
+      if (!contentType?.startsWith('image/')) {
+        console.error('❌ Invalid content type:', contentType);
+        throw new Error(`Invalid content type: ${contentType}`);
+      }
+
+      console.log('✅ URL validated successfully');
+    } catch (validateError) {
+      console.error('❌ URL validation failed:', validateError);
+      const errorMsg = validateError instanceof Error ? validateError.message : String(validateError);
+      throw new Error(`Image URL validation failed: ${errorMsg}`);
+    }
+
     // Step 4: Create Akool talking avatar with public image URL
-    console.log('🎭 Creating Akool talking avatar with public image URL...');
+    console.log('🎭 Creating Akool talking avatar with validated public URL...');
+    console.log('📤 Avatar URL being sent to Akool:', publicUrl);
     
     const akoolPayload = {
       width: 3840,
@@ -175,7 +205,7 @@ serve(async (req) => {
       ]
     };
 
-    console.log('📤 Sending request to Akool...');
+    console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
 
     const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/talkingavatar/create', {
       method: 'POST',
@@ -187,10 +217,22 @@ serve(async (req) => {
     });
 
     const akoolData = await akoolResponse.json();
-    console.log('✅ Akool response:', JSON.stringify(akoolData, null, 2));
+    console.log('📥 Akool API response:', {
+      status: akoolResponse.status,
+      ok: akoolResponse.ok,
+      code: akoolData.code,
+      msg: akoolData.msg,
+      fullResponse: JSON.stringify(akoolData, null, 2)
+    });
 
     if (!akoolResponse.ok || akoolData.code !== 1000) {
-      console.error('❌ Akool API error:', akoolResponse.status, akoolData);
+      console.error('❌ Akool API error details:', {
+        httpStatus: akoolResponse.status,
+        responseCode: akoolData.code,
+        message: akoolData.msg,
+        sentUrl: publicUrl,
+        fullError: JSON.stringify(akoolData, null, 2)
+      });
       throw new Error(`Akool API failed: ${akoolData.msg || 'Unknown error'}`);
     }
 
