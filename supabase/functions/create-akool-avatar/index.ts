@@ -217,8 +217,21 @@ serve(async (req) => {
       
       console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
       
-      // Wait 5 seconds for CDN propagation
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Wait 10 seconds for CDN propagation
+      console.log('⏳ Waiting 10 seconds for Cloudinary CDN propagation...');
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      // Verify the URL is accessible
+      const verifyResponse = await fetch(finalImageUrl, { method: 'HEAD' });
+      console.log('🔍 Cloudinary URL verification:', {
+        status: verifyResponse.status,
+        contentType: verifyResponse.headers.get('Content-Type'),
+        url: finalImageUrl
+      });
+      
+      if (!verifyResponse.ok) {
+        throw new Error(`Cloudinary image not accessible: ${verifyResponse.status}`);
+      }
       
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
