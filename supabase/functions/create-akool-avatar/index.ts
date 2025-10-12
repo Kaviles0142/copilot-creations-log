@@ -122,39 +122,9 @@ serve(async (req) => {
 
     console.log('✅ Portrait image generated');
 
-    // Step 3: Upload image to Supabase storage
-    console.log('📤 Uploading image to storage...');
-    
-    // Convert base64 to blob
-    const base64Data = base64Image.split(',')[1];
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    const fileName = `${figureId}-${Date.now()}.png`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(fileName, bytes, {
-        contentType: 'image/png',
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw new Error('Failed to upload image');
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('audio-files')
-      .getPublicUrl(fileName);
-
-    console.log('✅ Image uploaded:', publicUrl);
-    const imageUrl = publicUrl;
-    
-    console.log('✅ Image ready for Akool');
+    // Use base64 image directly for Akool (they can't access Supabase storage)
+    console.log('✅ Image ready for Akool (using base64)');
+    const imageUrl = base64Image; // Use base64 directly instead of storage URL
 
     // Step 4: Create Akool talking avatar using correct API structure
     console.log('🎭 Creating Akool talking avatar...');
@@ -193,14 +163,13 @@ serve(async (req) => {
       body: JSON.stringify(akoolPayload)
     });
 
-    if (!akoolResponse.ok) {
-      const errorText = await akoolResponse.text();
-      console.error('❌ Akool API error:', akoolResponse.status, errorText);
-      throw new Error(`Akool API failed: ${akoolResponse.status} - ${errorText}`);
-    }
-
     const akoolData = await akoolResponse.json();
-    console.log('✅ Akool task created:', akoolData);
+    console.log('✅ Akool response:', JSON.stringify(akoolData, null, 2));
+
+    if (!akoolResponse.ok || akoolData.code !== 1000) {
+      console.error('❌ Akool API error:', akoolResponse.status, akoolData);
+      throw new Error(`Akool API failed: ${akoolData.msg || 'Unknown error'}`);
+    }
 
     // Step 5: Poll for video completion
     const taskId = akoolData.data?._id;
