@@ -305,7 +305,7 @@ serve(async (req) => {
     while (!audioFileUrl && audioAttempts < maxAudioAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const audioStatusResponse = await fetch(`https://openapi.akool.com/api/open/v3/audio/info?_id=${audioTaskId}`, {
+      const audioStatusResponse = await fetch(`https://openapi.akool.com/api/open/v3/audio/infobymodelid?audio_model_id=${audioTaskId}`, {
         headers: {
           'x-api-key': AKOOL_API_KEY,
         }
