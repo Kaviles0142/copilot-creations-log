@@ -217,10 +217,7 @@ serve(async (req) => {
       
       console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
       
-      // Wait 10 seconds for CDN propagation
-      console.log('⏳ Waiting 10 seconds for Cloudinary CDN propagation...');
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      
+      // Cloudinary CDN is instant, no need to wait
       // Verify the URL is accessible
       const verifyResponse = await fetch(finalImageUrl, { method: 'HEAD' });
       console.log('🔍 Cloudinary URL verification:', {
@@ -303,7 +300,7 @@ serve(async (req) => {
 
     console.log('⏳ Waiting for TTS audio generation...');
     while (!audioFileUrl && audioAttempts < maxAudioAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Poll every 500ms
       
       const audioStatusResponse = await fetch(`https://openapi.akool.com/api/open/v3/audio/infobymodelid?audio_model_id=${audioTaskId}`, {
         headers: {
@@ -386,7 +383,7 @@ serve(async (req) => {
 
     console.log('⏳ Waiting for video generation...');
     while (!videoUrl && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Poll every 500ms
       
       const statusResponse = await fetch(`https://openapi.akool.com/api/open/v3/content/video/infobymodelid?video_model_id=${taskId}`, {
         headers: {
