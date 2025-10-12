@@ -176,56 +176,7 @@ serve(async (req) => {
         throw new Error(`Invalid content type: ${contentType}`);
       }
 
-      console.log('✅ URL validated successfully');
-      
-      // Upload to Cloudinary using proper API
-      console.log('☁️ Uploading image to Cloudinary...');
-      
-      // Create Cloudinary signature for authenticated upload
-      const timestamp = Math.round(Date.now() / 1000);
-      const publicId = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-      
-      // Create signature string - ONLY include params that will be in the request
-      // Must be in alphabetical order by key
-      const signatureString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
-      
-      // Generate SHA256 signature
-      const encoder = new TextEncoder();
-      const data = encoder.encode(signatureString);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      // Prepare form data for Cloudinary upload
-      const formData = new FormData();
-      formData.append('file', new Blob([imageBuffer], { type: 'image/png' }));
-      formData.append('api_key', CLOUDINARY_API_KEY);
-      formData.append('timestamp', timestamp.toString());
-      formData.append('signature', signature);
-      formData.append('public_id', publicId);
-      
-      const cloudinaryUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-      const cloudinaryResponse = await fetch(cloudinaryUploadUrl, {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!cloudinaryResponse.ok) {
-        const errorText = await cloudinaryResponse.text();
-        console.error('❌ Cloudinary upload failed:', errorText);
-        throw new Error(`Cloudinary upload failed: ${errorText}`);
-      }
-      
-      const cloudinaryData = await cloudinaryResponse.json();
-      
-      // Use the raw secure_url without any modifications
-      finalImageUrl = cloudinaryData.secure_url;
-      
-      console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
-      console.log('📌 Cloudinary response:', JSON.stringify(cloudinaryData));
-      
-      // Wait 5 seconds for CDN propagation
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log('✅ URL validated and will be used for Akool');
       
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
