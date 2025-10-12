@@ -198,13 +198,21 @@ const HistoricalChat = () => {
     
     const greetingText = `Hello, I am ${figure.name}. I'm ready to discuss my life and times with you.`;
     
+    // Determine voice based on gender
+    const voiceId = figure.name.toLowerCase().includes('cleopatra') || 
+                    figure.name.toLowerCase().includes('elizabeth') || 
+                    figure.name.toLowerCase().includes('michelle') 
+      ? "en-US-JennyNeural"  // Female voice
+      : "en-US-GuyNeural";    // Male voice (default)
+    
     setIsGeneratingAvatar(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-heygen-avatar', {
         body: {
           figureName: figure.name,
           text: greetingText,
-          description: `A distinguished historical figure resembling ${figure.name}, portrait style, professional, era-appropriate attire`
+          description: `A distinguished historical figure resembling ${figure.name}, portrait style, professional, era-appropriate attire`,
+          voiceId
         }
       });
 
@@ -535,6 +543,13 @@ const HistoricalChat = () => {
   const generateDidAvatar = async (text: string) => {
     if (!selectedFigure) return;
     
+    // Determine voice based on gender
+    const voiceId = selectedFigure.name.toLowerCase().includes('cleopatra') || 
+                    selectedFigure.name.toLowerCase().includes('elizabeth') || 
+                    selectedFigure.name.toLowerCase().includes('michelle') 
+      ? "en-US-JennyNeural"  // Female voice
+      : "en-US-GuyNeural";    // Male voice (default)
+    
     setIsGeneratingAvatar(true);
     try {
       console.log('🎬 Generating HeyGen avatar for:', selectedFigure.name);
@@ -544,7 +559,8 @@ const HistoricalChat = () => {
         body: {
           figureName: selectedFigure.name,
           text: text.substring(0, 500), // Limit text length
-          description: `A distinguished historical figure resembling ${selectedFigure.name}, portrait style, professional, era-appropriate attire`
+          description: `A distinguished historical figure resembling ${selectedFigure.name}, portrait style, professional, era-appropriate attire`,
+          voiceId
         }
       });
 

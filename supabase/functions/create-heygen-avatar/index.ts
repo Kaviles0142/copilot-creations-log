@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, figureName, description, voiceId = "en-US-JennyNeural" } = await req.json();
+    const { text, figureName, description, voiceId = "en-US-GuyNeural" } = await req.json();
 
     if (!text || !figureName) {
       throw new Error('Text and figure name are required');
