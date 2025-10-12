@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      avatar_image_cache: {
+        Row: {
+          cloudinary_url: string
+          created_at: string | null
+          expires_at: string | null
+          figure_id: string
+          figure_name: string
+          id: string
+          visual_prompt: string | null
+        }
+        Insert: {
+          cloudinary_url: string
+          created_at?: string | null
+          expires_at?: string | null
+          figure_id: string
+          figure_name: string
+          id?: string
+          visual_prompt?: string | null
+        }
+        Update: {
+          cloudinary_url?: string
+          created_at?: string | null
+          expires_at?: string | null
+          figure_id?: string
+          figure_name?: string
+          id?: string
+          visual_prompt?: string | null
+        }
+        Relationships: []
+      }
       book_content_cache: {
         Row: {
           book_id: string

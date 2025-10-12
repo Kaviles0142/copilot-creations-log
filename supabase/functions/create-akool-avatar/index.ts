@@ -88,155 +88,188 @@ serve(async (req) => {
       return visualPrompt;
     };
 
-    // Step 1: Generate visual prompt
-    const visualPrompt = await generateVisualPrompt();
+    // Check if we have a cached image for this figure
+    console.log('🔍 Checking for cached avatar image...');
+    const { data: cachedImage } = await supabase
+      .from('avatar_image_cache')
+      .select('*')
+      .eq('figure_id', figureId)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
 
-    // Step 2: Generate image using Lovable AI's image generation model
-    console.log('🎨 Generating portrait image...');
-    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: `Generate a photorealistic portrait: ${visualPrompt}`
-          }
-        ],
-        modalities: ['image', 'text']
-      })
-    });
+    let finalImageUrl: string;
+    let visualPrompt: string;
 
-    if (!imageResponse.ok) {
-      const errorText = await imageResponse.text();
-      console.error('Image generation failed:', errorText);
-      throw new Error('Failed to generate portrait image');
-    }
-
-    const imageData = await imageResponse.json();
-    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
-    if (!base64Image) {
-      throw new Error('No image generated');
-    }
-
-    console.log('✅ Portrait image generated');
-
-    // Step 3: Save image to public Supabase storage bucket
-    console.log('💾 Saving generated image to public storage...');
-    const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
-    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    
-    const fileName = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(fileName, imageBuffer, {
-        contentType: 'image/png',
-        cacheControl: '3600',
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error('❌ Storage upload failed:', uploadError);
-      throw new Error(`Failed to upload image: ${uploadError.message}`);
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('audio-files')
-      .getPublicUrl(fileName);
-
-    console.log('✅ Image saved to storage:', publicUrl);
-
-    // Step 3.5: Validate the URL is accessible
-    console.log('🔍 Validating image URL accessibility...');
-    let finalImageUrl = publicUrl;
-    
-    try {
-      const headResponse = await fetch(publicUrl, { method: 'HEAD' });
-      console.log('📊 URL validation response:', {
-        status: headResponse.status,
-        contentType: headResponse.headers.get('Content-Type'),
-        contentLength: headResponse.headers.get('Content-Length'),
-        url: publicUrl
-      });
-
-      if (!headResponse.ok) {
-        console.error('❌ URL not accessible:', headResponse.status);
-        throw new Error(`Image URL not accessible: ${headResponse.status}`);
-      }
-
-      const contentType = headResponse.headers.get('Content-Type');
-      if (!contentType?.startsWith('image/')) {
-        console.error('❌ Invalid content type:', contentType);
-        throw new Error(`Invalid content type: ${contentType}`);
-      }
-
-      console.log('✅ URL validated successfully');
+    if (cachedImage) {
+      console.log('✅ Using cached image:', cachedImage.cloudinary_url);
+      finalImageUrl = cachedImage.cloudinary_url;
+      visualPrompt = cachedImage.visual_prompt || '';
+    } else {
+      console.log('🎨 No cached image found, generating new one...');
       
-      // Upload to Cloudinary since Akool can't access Supabase storage URLs
-      console.log('☁️ Uploading image to Cloudinary...');
-      
-      const timestamp = Math.round(Date.now() / 1000);
-      const publicId = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-      
-      const signatureString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
-      
-      const encoder = new TextEncoder();
-      const data = encoder.encode(signatureString);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      const formData = new FormData();
-      formData.append('file', new Blob([imageBuffer], { type: 'image/png' }));
-      formData.append('api_key', CLOUDINARY_API_KEY);
-      formData.append('timestamp', timestamp.toString());
-      formData.append('signature', signature);
-      formData.append('public_id', publicId);
-      
-      const cloudinaryUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-      const cloudinaryResponse = await fetch(cloudinaryUploadUrl, {
+      // Step 1: Generate visual prompt
+      visualPrompt = await generateVisualPrompt();
+
+      // Step 2: Generate image using Lovable AI's image generation model
+      console.log('🎨 Generating portrait image...');
+      const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [
+            {
+              role: 'user',
+              content: `Generate a photorealistic portrait: ${visualPrompt}`
+            }
+          ],
+          modalities: ['image', 'text']
+        })
       });
-      
-      if (!cloudinaryResponse.ok) {
-        const errorText = await cloudinaryResponse.text();
-        console.error('❌ Cloudinary upload failed:', errorText);
-        throw new Error(`Cloudinary upload failed: ${errorText}`);
+
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        console.error('Image generation failed:', errorText);
+        throw new Error('Failed to generate portrait image');
       }
+
+      const imageData = await imageResponse.json();
+      const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
       
-      const cloudinaryData = await cloudinaryResponse.json();
-      finalImageUrl = cloudinaryData.secure_url;
-      
-      console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
-      
-      // Brief wait to ensure CDN availability across regions
-      console.log('⏳ Waiting 2 seconds for CDN availability...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Verify the URL is accessible
-      const verifyResponse = await fetch(finalImageUrl, { method: 'HEAD' });
-      console.log('🔍 Cloudinary URL verification:', {
-        status: verifyResponse.status,
-        contentType: verifyResponse.headers.get('Content-Type'),
-        url: finalImageUrl
-      });
-      
-      if (!verifyResponse.ok) {
-        throw new Error(`Cloudinary image not accessible: ${verifyResponse.status}`);
+      if (!base64Image) {
+        throw new Error('No image generated');
       }
+
+      console.log('✅ Portrait image generated');
+
+      // Step 3: Save image to public Supabase storage bucket
+      console.log('💾 Saving generated image to public storage...');
+      const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+      const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
       
-    } catch (validateError) {
-      console.error('❌ URL validation failed:', validateError);
-      const errorMsg = validateError instanceof Error ? validateError.message : String(validateError);
-      throw new Error(`Image URL validation failed: ${errorMsg}`);
+      const fileName = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('audio-files')
+        .upload(fileName, imageBuffer, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('❌ Storage upload failed:', uploadError);
+        throw new Error(`Failed to upload image: ${uploadError.message}`);
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('audio-files')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Image saved to storage:', publicUrl);
+
+      // Step 3.5: Validate the URL is accessible and upload to Cloudinary
+      console.log('🔍 Validating image URL accessibility...');
+      
+      try {
+        const headResponse = await fetch(publicUrl, { method: 'HEAD' });
+        console.log('📊 URL validation response:', {
+          status: headResponse.status,
+          contentType: headResponse.headers.get('Content-Type'),
+          contentLength: headResponse.headers.get('Content-Length'),
+          url: publicUrl
+        });
+
+        if (!headResponse.ok) {
+          console.error('❌ URL not accessible:', headResponse.status);
+          throw new Error(`Image URL not accessible: ${headResponse.status}`);
+        }
+
+        const contentType = headResponse.headers.get('Content-Type');
+        if (!contentType?.startsWith('image/')) {
+          console.error('❌ Invalid content type:', contentType);
+          throw new Error(`Invalid content type: ${contentType}`);
+        }
+
+        console.log('✅ URL validated successfully');
+        
+        // Upload to Cloudinary
+        console.log('☁️ Uploading image to Cloudinary...');
+        
+        const timestamp = Math.round(Date.now() / 1000);
+        const publicId = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
+        
+        const signatureString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
+        
+        const encoder = new TextEncoder();
+        const data = encoder.encode(signatureString);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        const formData = new FormData();
+        formData.append('file', new Blob([imageBuffer], { type: 'image/png' }));
+        formData.append('api_key', CLOUDINARY_API_KEY);
+        formData.append('timestamp', timestamp.toString());
+        formData.append('signature', signature);
+        formData.append('public_id', publicId);
+        
+        const cloudinaryUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+        const cloudinaryResponse = await fetch(cloudinaryUploadUrl, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!cloudinaryResponse.ok) {
+          const errorText = await cloudinaryResponse.text();
+          console.error('❌ Cloudinary upload failed:', errorText);
+          throw new Error(`Cloudinary upload failed: ${errorText}`);
+        }
+        
+        const cloudinaryData = await cloudinaryResponse.json();
+        finalImageUrl = cloudinaryData.secure_url;
+        
+        console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
+        
+        // Brief wait to ensure CDN availability across regions
+        console.log('⏳ Waiting 2 seconds for CDN availability...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Verify the URL is accessible
+        const verifyResponse = await fetch(finalImageUrl, { method: 'HEAD' });
+        console.log('🔍 Cloudinary URL verification:', {
+          status: verifyResponse.status,
+          contentType: verifyResponse.headers.get('Content-Type'),
+          url: finalImageUrl
+        });
+        
+        if (!verifyResponse.ok) {
+          throw new Error(`Cloudinary image not accessible: ${verifyResponse.status}`);
+        }
+
+        // Cache the generated image
+        console.log('💾 Caching avatar image for future use...');
+        await supabase
+          .from('avatar_image_cache')
+          .upsert({
+            figure_id: figureId,
+            figure_name: figureName,
+            cloudinary_url: finalImageUrl,
+            visual_prompt: visualPrompt
+          }, {
+            onConflict: 'figure_id'
+          });
+        console.log('✅ Image cached successfully');
+        
+      } catch (validateError) {
+        console.error('❌ URL validation failed:', validateError);
+        const errorMsg = validateError instanceof Error ? validateError.message : String(validateError);
+        throw new Error(`Image URL validation failed: ${errorMsg}`);
+      }
     }
 
     // Step 4: Get available voices from Akool
