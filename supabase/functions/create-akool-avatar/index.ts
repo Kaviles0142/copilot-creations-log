@@ -217,7 +217,10 @@ serve(async (req) => {
       
       console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
       
-      // Cloudinary CDN is instant, no need to wait
+      // Brief wait to ensure CDN availability across regions
+      console.log('⏳ Waiting 2 seconds for CDN availability...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Verify the URL is accessible
       const verifyResponse = await fetch(finalImageUrl, { method: 'HEAD' });
       console.log('🔍 Cloudinary URL verification:', {
