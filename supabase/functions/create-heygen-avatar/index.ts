@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, figureName, description, voiceId = "en-US-GuyNeural" } = await req.json();
+    const { text, figureName, voiceId = "en-US-GuyNeural" } = await req.json();
 
     if (!text || !figureName) {
       throw new Error('Text and figure name are required');
@@ -23,72 +23,22 @@ serve(async (req) => {
       throw new Error('HEYGEN_API_KEY not configured');
     }
 
-    console.log(`🎬 Creating HeyGen avatar for ${figureName}`);
+    console.log(`🎬 Creating HeyGen video for ${figureName}`);
 
-    // Step 1: Generate AI avatar photo from description
-    console.log('📸 Step 1: Generating AI avatar photo from description');
-    const avatarPhotoResponse = await fetch('https://api.heygen.com/v1/avatar.generate_ai_avatar_photos', {
-      method: 'POST',
-      headers: {
-        'X-Api-Key': HEYGEN_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        description: description || `A distinguished historical figure resembling ${figureName}, portrait style, professional, era-appropriate attire`,
-        num_images: 1,
-        style: 'realistic'
-      })
-    });
+    // Select avatar based on figure characteristics
+    // Using HeyGen's default public avatars (no celebrity restrictions)
+    const isFemale = figureName.toLowerCase().includes('cleopatra') || 
+                     figureName.toLowerCase().includes('elizabeth') || 
+                     figureName.toLowerCase().includes('michelle');
+    
+    // Generic professional avatars that work for all historical figures
+    const avatarId = isFemale 
+      ? "anna_public_3_20240108"  // Professional female avatar
+      : "josh_lite3_20230714";     // Professional male avatar
 
-    if (!avatarPhotoResponse.ok) {
-      const errorText = await avatarPhotoResponse.text();
-      console.error('Avatar photo generation failed:', errorText);
-      throw new Error(`Avatar photo generation failed: ${errorText}`);
-    }
+    console.log(`🎭 Using avatar: ${avatarId} with voice: ${voiceId}`);
 
-    const avatarPhotoData = await avatarPhotoResponse.json();
-    console.log('Avatar photo generation initiated:', avatarPhotoData);
-
-    // The API returns a job ID, we need to poll for completion
-    const jobId = avatarPhotoData.data?.job_id;
-    if (!jobId) {
-      throw new Error('No job ID returned from avatar photo generation');
-    }
-
-    // Step 2: Poll for avatar photo completion (max 60 seconds)
-    console.log('⏳ Step 2: Waiting for avatar photo to be generated');
-    let avatarImageUrl = null;
-    let attempts = 0;
-    const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds max
-
-    while (!avatarImageUrl && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-      attempts++;
-
-      const statusResponse = await fetch(`https://api.heygen.com/v1/avatar.generate_ai_avatar_photos/${jobId}`, {
-        headers: {
-          'X-Api-Key': HEYGEN_API_KEY,
-        }
-      });
-
-      const statusData = await statusResponse.json();
-      console.log(`Status check ${attempts}:`, statusData);
-
-      if (statusData.data?.status === 'completed') {
-        avatarImageUrl = statusData.data?.images?.[0]?.url;
-        console.log('✅ Avatar photo generated:', avatarImageUrl);
-        break;
-      } else if (statusData.data?.status === 'failed') {
-        throw new Error('Avatar photo generation failed');
-      }
-    }
-
-    if (!avatarImageUrl) {
-      throw new Error('Avatar photo generation timed out');
-    }
-
-    // Step 3: Create talking avatar video with the generated image
-    console.log('🎥 Step 3: Creating talking avatar video');
+    // Create talking avatar video using HeyGen v2 API
     const videoResponse = await fetch('https://api.heygen.com/v2/video/generate', {
       method: 'POST',
       headers: {
@@ -100,8 +50,8 @@ serve(async (req) => {
           {
             character: {
               type: 'avatar',
-              avatar_id: 'custom', // Using custom image
-              avatar_image: avatarImageUrl,
+              avatar_id: avatarId,
+              avatar_style: 'normal',
             },
             voice: {
               type: 'text',
@@ -111,8 +61,8 @@ serve(async (req) => {
           }
         ],
         dimension: {
-          width: 1920,
-          height: 1080,
+          width: 1280,
+          height: 720,
         },
         aspect_ratio: '16:9',
       })
@@ -127,29 +77,29 @@ serve(async (req) => {
     const videoData = await videoResponse.json();
     console.log('Video generation initiated:', videoData);
 
-    const videoJobId = videoData.data?.video_id;
-    if (!videoJobId) {
+    const videoId = videoData.data?.video_id;
+    if (!videoId) {
       throw new Error('No video ID returned from video generation');
     }
 
-    // Step 4: Poll for video completion (max 3 minutes)
-    console.log('⏳ Step 4: Waiting for video to be generated');
+    // Poll for video completion (max 2 minutes)
+    console.log('⏳ Waiting for video to be generated');
     let videoUrl = null;
-    let videoAttempts = 0;
-    const maxVideoAttempts = 90; // 90 attempts * 2 seconds = 3 minutes max
+    let attempts = 0;
+    const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
 
-    while (!videoUrl && videoAttempts < maxVideoAttempts) {
+    while (!videoUrl && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      videoAttempts++;
+      attempts++;
 
-      const videoStatusResponse = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${videoJobId}`, {
+      const videoStatusResponse = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${videoId}`, {
         headers: {
           'X-Api-Key': HEYGEN_API_KEY,
         }
       });
 
       const videoStatusData = await videoStatusResponse.json();
-      console.log(`Video status check ${videoAttempts}:`, videoStatusData);
+      console.log(`Video status check ${attempts}:`, videoStatusData.data?.status);
 
       if (videoStatusData.data?.status === 'completed') {
         videoUrl = videoStatusData.data?.video_url;
@@ -168,8 +118,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         videoUrl,
-        avatarImageUrl,
-        duration: videoAttempts * 2,
+        avatarId,
+        duration: attempts * 2,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -190,3 +140,4 @@ serve(async (req) => {
     );
   }
 });
+
