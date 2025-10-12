@@ -17,12 +17,14 @@ serve(async (req) => {
     console.log('🎤 Audio URL provided:', !!audioUrl);
     console.log('📝 Text provided:', text?.substring(0, 100));
 
-    const AKOOL_API_KEY = Deno.env.get('AKOOL_API_KEY');
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const AKOOL_API_KEY = Deno.env.get('AKOOL_API_KEY')?.trim();
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')?.trim();
 
     if (!AKOOL_API_KEY || !LOVABLE_API_KEY) {
       throw new Error('Missing required API keys');
     }
+
+    console.log('🔑 API keys loaded and validated');
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
