@@ -214,7 +214,7 @@ serve(async (req) => {
     while (!videoUrl && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const statusResponse = await fetch(`https://openapi.akool.com/api/open/v3/talkingavatar/videoinfo?_id=${taskId}`, {
+      const statusResponse = await fetch(`https://openapi.akool.com/api/open/v3/content/video/infobymodelid?video_model_id=${taskId}`, {
         headers: {
           'x-api-key': AKOOL_API_KEY,
         }
