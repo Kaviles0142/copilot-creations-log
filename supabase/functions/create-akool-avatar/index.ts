@@ -291,11 +291,47 @@ serve(async (req) => {
     const ttsData = await ttsResponse.json();
     console.log('📥 Akool TTS response:', JSON.stringify(ttsData, null, 2));
 
-    if (ttsData.code !== 1000 || !ttsData.data?.url) {
-      throw new Error(`Akool TTS failed: ${ttsData.msg || 'No audio URL returned'}`);
+    if (ttsData.code !== 1000 || !ttsData.data?._id) {
+      throw new Error(`Akool TTS failed: ${ttsData.msg || 'No task ID returned'}`);
     }
 
-    const audioFileUrl = ttsData.data.url;
+    // Poll for TTS completion
+    const audioTaskId = ttsData.data._id;
+    let audioFileUrl: string | null = null;
+    let audioAttempts = 0;
+    const maxAudioAttempts = 60;
+
+    console.log('⏳ Waiting for TTS audio generation...');
+    while (!audioFileUrl && audioAttempts < maxAudioAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const audioStatusResponse = await fetch(`https://openapi.akool.com/api/open/v3/audio/info?_id=${audioTaskId}`, {
+        headers: {
+          'x-api-key': AKOOL_API_KEY,
+        }
+      });
+
+      if (audioStatusResponse.ok) {
+        const audioStatusData = await audioStatusResponse.json();
+        
+        if (audioStatusData.data?.status === 3 && audioStatusData.data?.url) {
+          audioFileUrl = audioStatusData.data.url;
+          console.log('✅ TTS audio ready!');
+        } else if (audioStatusData.data?.status === 4) {
+          console.error('❌ Akool TTS generation error:', audioStatusData);
+          throw new Error('Akool TTS generation failed');
+        } else {
+          console.log(`⏳ TTS Status: ${audioStatusData.data?.status} (attempt ${audioAttempts + 1}/${maxAudioAttempts})`);
+        }
+      }
+
+      audioAttempts++;
+    }
+
+    if (!audioFileUrl) {
+      throw new Error('TTS audio generation timeout after 1 minute');
+    }
+
     console.log('✅ TTS audio generated:', audioFileUrl);
 
     // Step 6: Create talking photo using the Talking Photo API
