@@ -175,25 +175,34 @@ serve(async (req) => {
 
       console.log('✅ URL validated successfully');
       
-      // Upload to imgbb as CDN fallback for Akool compatibility
-      console.log('📤 Uploading to imgbb CDN for better compatibility...');
+      // Upload to Cloudinary as CDN fallback for Akool compatibility
+      console.log('📤 Uploading to Cloudinary CDN for better compatibility...');
       
-      const formData = new FormData();
-      formData.append('image', base64Data);
-      
-      const imgbbResponse = await fetch(`https://api.imgbb.com/1/upload?key=d3b9c6c4e7a89f3e1d2c5b8a7f6e9d4c`, {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (imgbbResponse.ok) {
-        const imgbbData = await imgbbResponse.json();
-        if (imgbbData.success && imgbbData.data?.url) {
-          finalImageUrl = imgbbData.data.url;
-          console.log('✅ Image uploaded to imgbb CDN:', finalImageUrl);
+      try {
+        // Use Cloudinary's unsigned upload (no API key needed)
+        const cloudinaryFormData = new FormData();
+        cloudinaryFormData.append('file', `data:image/png;base64,${base64Data}`);
+        cloudinaryFormData.append('upload_preset', 'ml_default'); // Default unsigned preset
+        
+        const cloudinaryResponse = await fetch('https://api.cloudinary.com/v1_1/demo/image/upload', {
+          method: 'POST',
+          body: cloudinaryFormData
+        });
+        
+        if (cloudinaryResponse.ok) {
+          const cloudinaryData = await cloudinaryResponse.json();
+          if (cloudinaryData.secure_url) {
+            finalImageUrl = cloudinaryData.secure_url;
+            console.log('✅ Image uploaded to Cloudinary CDN:', finalImageUrl);
+          } else {
+            console.log('⚠️ Cloudinary response missing URL, using Supabase URL');
+          }
+        } else {
+          const errorText = await cloudinaryResponse.text();
+          console.log('⚠️ Cloudinary upload failed:', errorText, '- using Supabase URL');
         }
-      } else {
-        console.log('⚠️ imgbb upload failed, using Supabase URL');
+      } catch (cdnError) {
+        console.log('⚠️ CDN upload error:', cdnError, '- using Supabase URL');
       }
       
     } catch (validateError) {
