@@ -800,10 +800,13 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Don't generate new avatars for responses - just keep showing the cached greeting avatar
-      // The greeting avatar (didVideoUrl) is already displayed and will continue showing
+      // Generate new video using CACHED image + new TTS audio for this specific response
+      if (autoAnimateResponses && selectedFigure) {
+        console.log('🎬 Generating video with cached image + new audio...');
+        await generateDidAvatar(aiResponse);
+      }
       
-      // Reset loading state immediately - no avatar generation needed
+      // Reset loading state after video generation
       setIsLoading(false);
       setAbortController(null);
 
