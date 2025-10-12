@@ -248,8 +248,9 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: text || `Hello, I am ${figureName}`,
-        voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
+        input_text: text || `Hello, I am ${figureName}`,
+        voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc',
+        rate: "100%"
       })
     });
 
