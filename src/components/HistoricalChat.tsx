@@ -838,8 +838,12 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Reset loading state after text response is complete (UI becomes responsive)
-      setIsLoading(false);
+      // Generate Akool avatar for each response
+      console.log('🎬 Generating avatar for response...');
+      setIsLoading(true); // Keep input disabled while avatar generates
+      await generateAkoolAvatar(aiResponse, selectedFigure!);
+      
+      // Note: setIsLoading(false) will be called when video plays/ends
       setAbortController(null);
 
       /* Azure TTS infrastructure preserved for future activation
