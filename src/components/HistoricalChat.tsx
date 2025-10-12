@@ -214,9 +214,56 @@ const HistoricalChat = () => {
     throw new Error('Video generation timed out after 5 minutes');
   };
 
+  // Generate Akool avatar for the response
+  const generateAkoolAvatar = async (text: string, figure: HistoricalFigure) => {
+    try {
+      setIsGeneratingAvatar(true);
+      console.log('🎬 Generating Akool avatar for:', figure.name);
+      
+      const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
+        body: { 
+          text: text,
+          figureName: figure.name,
+          figureId: figure.id
+        }
+      });
+
+      if (error) {
+        console.error('❌ Akool avatar error:', error);
+        toast({
+          title: "Avatar Generation Failed",
+          description: "Could not generate talking avatar",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      if (data?.success && data?.videoUrl) {
+        console.log('✅ Akool avatar generated:', data.videoUrl);
+        console.log('🎨 Portrait used:', data.portraitUrl);
+        setAvatarVideoUrl(data.videoUrl);
+        toast({
+          title: "Avatar Ready!",
+          description: `${figure.name}'s custom talking avatar has been generated`,
+        });
+        return data.videoUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error generating Akool avatar:', error);
+      return null;
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+  };
+
   // Generate initial greeting avatar when figure is selected
   useEffect(() => {
     if (!selectedFigure) return;
+
+    // Clear previous avatar when switching figures
+    setAvatarVideoUrl(null);
 
     const generateGreetingAvatar = async () => {
       try {
@@ -271,6 +318,7 @@ const HistoricalChat = () => {
 
     generateGreetingAvatar();
   }, [selectedFigure]);
+
 
   // Fetch available FakeYou voices for the selected figure
   const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
@@ -568,51 +616,6 @@ const HistoricalChat = () => {
     }
   };
 
-
-  // Generate Akool avatar for the response
-  const generateAkoolAvatar = async (text: string, figure: HistoricalFigure) => {
-    try {
-      setIsGeneratingAvatar(true);
-      console.log('🎬 Generating Akool avatar for:', figure.name);
-      
-      const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
-        body: { 
-          text: text,
-          figureName: figure.name,
-          figureId: figure.id
-        }
-      });
-
-      if (error) {
-        console.error('❌ Akool avatar error:', error);
-        toast({
-          title: "Avatar Generation Failed",
-          description: "Could not generate talking avatar",
-          variant: "destructive",
-        });
-        return null;
-      }
-
-      if (data?.success && data?.videoUrl) {
-        console.log('✅ Akool avatar generated:', data.videoUrl);
-        console.log('🎨 Portrait used:', data.portraitUrl);
-        setAvatarVideoUrl(data.videoUrl);
-        toast({
-          title: "Avatar Ready!",
-          description: `${figure.name}'s custom talking avatar has been generated`,
-        });
-        return data.videoUrl;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error generating Akool avatar:', error);
-      return null;
-    } finally {
-      setIsGeneratingAvatar(false);
-    }
-  };
-
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedFigure) return;
 
@@ -838,11 +841,6 @@ const HistoricalChat = () => {
       // Reset loading state after text response is complete (UI becomes responsive)
       setIsLoading(false);
       setAbortController(null);
-
-      // Generate Akool avatar in background
-      generateAkoolAvatar(aiResponse, selectedFigure!).catch(err => {
-        console.error('Avatar generation failed (non-critical):', err);
-      });
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
