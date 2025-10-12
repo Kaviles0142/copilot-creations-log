@@ -1,6 +1,5 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,13 +37,8 @@ serve(async (req) => {
     }
 
     const html = await response.text();
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    
-    if (!doc) {
-      throw new Error('Failed to parse HTML response');
-    }
 
-    // Extract search results from HTML
+    // Extract search results using regex (lightweight parsing)
     const results: Array<{
       title: string;
       snippet: string;
@@ -52,38 +46,46 @@ serve(async (req) => {
       source?: string;
     }> = [];
 
-    // DuckDuckGo HTML uses specific classes for results
-    const resultElements = doc.querySelectorAll('.result');
+    // Match result blocks in DuckDuckGo HTML
+    const resultRegex = /<div class="result[^"]*"[\s\S]*?<\/div>(?=\s*<div class="result|<div class="footer")/g;
+    const resultMatches = html.match(resultRegex) || [];
     
-    console.log(`Found ${resultElements.length} result elements`);
+    console.log(`Found ${resultMatches.length} result blocks`);
 
-    for (let i = 0; i < Math.min(resultElements.length, limit); i++) {
-      const element = resultElements[i];
+    for (let i = 0; i < Math.min(resultMatches.length, limit); i++) {
+      const resultHtml = resultMatches[i];
       
       // Extract title and URL
-      const titleLink = element.querySelector('.result__a');
-      const title = titleLink?.textContent?.trim() || '';
-      const url = titleLink?.getAttribute('href') || '';
+      const titleMatch = resultHtml.match(/<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/);
+      const url = titleMatch?.[1] || '';
+      const titleHtml = titleMatch?.[2] || '';
+      const title = titleHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
       
       // Extract snippet
-      const snippetElement = element.querySelector('.result__snippet');
-      const snippet = snippetElement?.textContent?.trim() || '';
+      const snippetMatch = resultHtml.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      const snippetHtml = snippetMatch?.[1] || '';
+      const snippet = snippetHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
       
       // Extract source domain
-      const sourceElement = element.querySelector('.result__url');
-      const source = sourceElement?.textContent?.trim() || '';
+      const sourceMatch = resultHtml.match(/<a[^>]*class="result__url"[^>]*>([\s\S]*?)<\/a>/);
+      const sourceHtml = sourceMatch?.[1] || '';
+      const source = sourceHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 
       if (title && url) {
-        // Clean up the URL (DuckDuckGo sometimes adds tracking parameters)
-        const cleanUrl = url.startsWith('//duckduckgo.com/l/?') 
-          ? decodeURIComponent(url.split('uddg=')[1]?.split('&')[0] || url)
-          : url;
+        // Clean up the URL (DuckDuckGo uses redirect URLs)
+        let cleanUrl = url;
+        if (url.includes('//duckduckgo.com/l/?')) {
+          const uddgMatch = url.match(/uddg=([^&]*)/);
+          if (uddgMatch) {
+            cleanUrl = decodeURIComponent(uddgMatch[1]);
+          }
+        }
 
         results.push({
-          title: title.replace(/\s+/g, ' ').trim(),
-          snippet: snippet.replace(/\s+/g, ' ').trim(),
+          title,
+          snippet,
           url: cleanUrl,
-          source: source
+          source
         });
       }
     }
