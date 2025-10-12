@@ -151,6 +151,8 @@ serve(async (req) => {
 
     // Step 3.5: Validate the URL is accessible
     console.log('🔍 Validating image URL accessibility...');
+    let finalImageUrl = publicUrl;
+    
     try {
       const headResponse = await fetch(publicUrl, { method: 'HEAD' });
       console.log('📊 URL validation response:', {
@@ -172,15 +174,37 @@ serve(async (req) => {
       }
 
       console.log('✅ URL validated successfully');
+      
+      // Upload to imgbb as CDN fallback for Akool compatibility
+      console.log('📤 Uploading to imgbb CDN for better compatibility...');
+      
+      const formData = new FormData();
+      formData.append('image', base64Data);
+      
+      const imgbbResponse = await fetch(`https://api.imgbb.com/1/upload?key=d3b9c6c4e7a89f3e1d2c5b8a7f6e9d4c`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (imgbbResponse.ok) {
+        const imgbbData = await imgbbResponse.json();
+        if (imgbbData.success && imgbbData.data?.url) {
+          finalImageUrl = imgbbData.data.url;
+          console.log('✅ Image uploaded to imgbb CDN:', finalImageUrl);
+        }
+      } else {
+        console.log('⚠️ imgbb upload failed, using Supabase URL');
+      }
+      
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
       const errorMsg = validateError instanceof Error ? validateError.message : String(validateError);
       throw new Error(`Image URL validation failed: ${errorMsg}`);
     }
 
-    // Step 4: Create Akool talking avatar with public image URL
-    console.log('🎭 Creating Akool talking avatar with validated public URL...');
-    console.log('📤 Avatar URL being sent to Akool:', publicUrl);
+    // Step 4: Create Akool talking avatar with CDN image URL
+    console.log('🎭 Creating Akool talking avatar with CDN URL...');
+    console.log('📤 Avatar URL being sent to Akool:', finalImageUrl);
     
     const akoolPayload = {
       width: 3840,
@@ -189,7 +213,7 @@ serve(async (req) => {
       elements: [
         {
           type: "avatar",
-          url: publicUrl, // Use public Supabase URL
+          url: finalImageUrl, // Use CDN URL
           scale_x: 1,
           scale_y: 1,
           width: 1080,
@@ -222,6 +246,7 @@ serve(async (req) => {
       ok: akoolResponse.ok,
       code: akoolData.code,
       msg: akoolData.msg,
+      urlSent: finalImageUrl,
       fullResponse: JSON.stringify(akoolData, null, 2)
     });
 
@@ -230,7 +255,7 @@ serve(async (req) => {
         httpStatus: akoolResponse.status,
         responseCode: akoolData.code,
         message: akoolData.msg,
-        sentUrl: publicUrl,
+        sentUrl: finalImageUrl,
         fullError: JSON.stringify(akoolData, null, 2)
       });
       throw new Error(`Akool API failed: ${akoolData.msg || 'Unknown error'}`);
