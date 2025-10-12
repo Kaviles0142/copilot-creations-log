@@ -185,7 +185,8 @@ serve(async (req) => {
       const timestamp = Math.round(Date.now() / 1000);
       const publicId = `avatars/${figureId || figureName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
       
-      // Create signature string (must be in alphabetical order by key)
+      // Create signature string - ONLY include params that will be in the request
+      // Must be in alphabetical order by key
       const signatureString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
       
       // Generate SHA256 signature
@@ -202,8 +203,6 @@ serve(async (req) => {
       formData.append('timestamp', timestamp.toString());
       formData.append('signature', signature);
       formData.append('public_id', publicId);
-      formData.append('resource_type', 'image');
-      formData.append('type', 'upload');
       
       const cloudinaryUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
       const cloudinaryResponse = await fetch(cloudinaryUploadUrl, {
