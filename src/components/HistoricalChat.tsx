@@ -94,8 +94,10 @@ const HistoricalChat = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
-  const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
+  const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [autoAnimateResponses, setAutoAnimateResponses] = useState(true); // Auto-generate avatars
+  const [isInitialAvatarReady, setIsInitialAvatarReady] = useState(false); // Track if initial greeting avatar is ready
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -172,7 +174,6 @@ const HistoricalChat = () => {
     speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-
   // Auto-create authentic voice when figure is selected
   const voiceCreatedForFigure = useRef<string | null>(null);
   
@@ -183,147 +184,64 @@ const HistoricalChat = () => {
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
       fetchFakeYouVoicesForFigure(selectedFigure);
+      
+      // Reset avatar ready state and generate initial greeting avatar
+      setIsInitialAvatarReady(false);
+      setDidVideoUrl(null);
+      generateInitialGreetingAvatar(selectedFigure);
     }
   }, [selectedFigure]);
 
-  // Poll HeyGen video status until ready
-  const pollHeyGenStatus = async (videoId: string, maxAttempts = 150): Promise<string | null> => {
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between checks
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('check-heygen-status', {
-          body: { videoId }
-        });
-
-        if (error) throw error;
-
-        console.log(`Poll attempt ${i + 1}: ${data.status}`);
-
-        if (data.status === 'completed' && data.videoUrl) {
-          return data.videoUrl;
-        } else if (data.status === 'failed') {
-          throw new Error('Video generation failed');
-        }
-      } catch (error) {
-        console.error('Error polling video status:', error);
-        throw error;
-      }
-    }
+  // Generate initial greeting avatar when figure is selected
+  const generateInitialGreetingAvatar = async (figure: HistoricalFigure) => {
+    console.log('🎬 Generating initial greeting avatar for:', figure.name);
     
-    throw new Error('Video generation timed out after 5 minutes');
-  };
-
-  // Generate Akool avatar for the response
-  const generateAkoolAvatar = async (text: string, figure: HistoricalFigure) => {
+    const greetingText = `Hello, I am ${figure.name}. I'm ready to discuss my life and times with you.`;
+    
+    setIsGeneratingAvatar(true);
     try {
-      setIsGeneratingAvatar(true);
-      console.log('🎬 Generating Akool avatar for:', figure.name);
-      
-      const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
-        body: { 
-          text: text,
+      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+        body: {
           figureName: figure.name,
+          text: greetingText,
           figureId: figure.id
         }
       });
 
-      if (error) {
-        console.error('❌ Akool avatar error:', error);
-        toast({
-          title: "Avatar Generation Failed",
-          description: "Could not generate talking avatar",
-          variant: "destructive",
-        });
-        return null;
-      }
+      if (error) throw error;
 
-      if (data?.success && data?.videoUrl) {
-        console.log('✅ Akool avatar generated:', data.videoUrl);
-        console.log('🎨 Portrait used:', data.portraitUrl);
-        setAvatarVideoUrl(data.videoUrl);
+      // Check if video was skipped due to celebrity detection
+      if (data.skipVideo) {
+        console.log('⏭️ Avatar video skipped, chat available without video');
+        setIsInitialAvatarReady(true);
         toast({
-          title: "Avatar Ready!",
-          description: `${figure.name}'s custom talking avatar has been generated`,
+          title: "Chat Ready",
+          description: `${figure.name} is ready to chat! (Avatar animation unavailable)`,
         });
-        return data.videoUrl;
+      } else {
+        console.log('✅ Initial avatar generated:', data.videoUrl);
+        setDidVideoUrl(data.videoUrl);
+        setIsInitialAvatarReady(true);
+        
+        // Auto-play the greeting
+        toast({
+          title: "Avatar Ready",
+          description: `${figure.name} is ready to chat!`,
+        });
       }
-
-      return null;
     } catch (error) {
-      console.error('Error generating Akool avatar:', error);
-      return null;
+      console.error('❌ Error generating initial avatar:', error);
+      toast({
+        title: "Avatar Generation Failed",
+        description: "Proceeding without avatar animation",
+        variant: "destructive",
+      });
+      // Allow chat to proceed even if avatar fails
+      setIsInitialAvatarReady(true);
     } finally {
       setIsGeneratingAvatar(false);
     }
   };
-
-  // Generate initial greeting avatar when figure is selected
-  useEffect(() => {
-    if (!selectedFigure) return;
-
-    // Clear previous avatar when switching figures
-    setAvatarVideoUrl(null);
-
-    const generateGreetingAvatar = async () => {
-      try {
-        setIsLoading(true);
-        console.log('👋 Generating greeting for:', selectedFigure.name);
-
-        // Generate greeting message from AI
-        const { data: greetingData, error: greetingError } = await supabase.functions.invoke('chat-with-historical-figure', {
-          body: {
-            message: "Please introduce yourself briefly and greet the user.",
-            figure: selectedFigure,
-            context: [],
-            aiProvider: selectedAIProvider
-          }
-        });
-
-        if (greetingError) {
-          console.error('❌ Greeting generation failed:', greetingError);
-          setIsLoading(false);
-          return;
-        }
-
-        const greetingText = greetingData?.response || `Hello, I am ${selectedFigure.name}. How may I help you today?`;
-        
-        console.log('💬 Greeting text:', greetingText);
-
-        // Add greeting to messages
-        const greetingMessage: Message = {
-          id: Date.now().toString(),
-          content: greetingText,
-          type: "assistant",
-          timestamp: new Date(),
-        };
-
-        setMessages([greetingMessage]);
-
-        // Generate Akool avatar with greeting
-        console.log('🎬 Starting avatar generation...');
-        const avatarResult = await generateAkoolAvatar(greetingText, selectedFigure);
-        
-        // If avatar generation failed, re-enable input
-        if (!avatarResult) {
-          console.log('⚠️ Greeting avatar failed, re-enabling input');
-          setIsLoading(false);
-        }
-        // Otherwise, setIsLoading(false) will be called when video ends
-      } catch (error) {
-        console.error('Error generating greeting avatar:', error);
-        setIsLoading(false);
-        toast({
-          title: "Greeting Failed",
-          description: "Could not generate initial greeting",
-          variant: "destructive",
-        });
-      }
-    };
-
-    generateGreetingAvatar();
-  }, [selectedFigure]);
-
 
   // Fetch available FakeYou voices for the selected figure
   const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
@@ -621,8 +539,46 @@ const HistoricalChat = () => {
     }
   };
 
+  // Generate D-ID animated avatar (D-ID handles its own audio for speed)
+  const generateDidAvatar = async (text: string) => {
+    if (!selectedFigure) return;
+    
+    setIsGeneratingAvatar(true);
+    try {
+      console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
+      console.log('🎤 Using D-ID built-in voice for faster generation');
+      
+      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+        body: {
+          figureName: selectedFigure.name,
+          figureId: selectedFigure.id,
+          text: text.substring(0, 500) // Limit text length
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.videoUrl) {
+        setDidVideoUrl(data.videoUrl);
+        toast({
+          title: "Avatar Created!",
+          description: `${selectedFigure.name} is now speaking`,
+        });
+      }
+    } catch (error) {
+      console.error('Error generating D-ID avatar:', error);
+      toast({
+        title: "Avatar Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to create avatar",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !selectedFigure) return;
+    if (!inputMessage.trim() || !selectedFigure || !isInitialAvatarReady) return;
 
     let conversationId = currentConversationId;
     if (!conversationId) {
@@ -843,20 +799,15 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Generate Akool avatar for each response
-      console.log('🎬 Generating avatar for response...');
-      setIsLoading(true); // Keep input disabled while avatar generates
-      
-      const avatarResult = await generateAkoolAvatar(aiResponse, selectedFigure!);
-      
-      // If avatar generation failed, re-enable input
-      if (!avatarResult) {
-        console.log('⚠️ Avatar generation failed, re-enabling input');
-        setIsLoading(false);
-      }
-      // Otherwise, setIsLoading(false) will be called when video ends
-      
+      // Reset loading state after text response is complete (UI becomes responsive)
+      setIsLoading(false);
       setAbortController(null);
+
+      // Auto-generate animated avatar if enabled (D-ID uses its own voice)
+      if (autoAnimateResponses && selectedFigure) {
+        console.log('🎬 Auto-generating avatar for response...');
+        generateDidAvatar(aiResponse);
+      }
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
@@ -1996,9 +1947,42 @@ const HistoricalChat = () => {
                 setMessages([]);
                 setCurrentConversationId(null);
                 setDocuments([]);
+                setDidVideoUrl(null);
               }}
             />
             
+            {/* Auto-Animation Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Auto-Animate Responses</label>
+                <input
+                  type="checkbox"
+                  checked={autoAnimateResponses}
+                  onChange={(e) => setAutoAnimateResponses(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Automatically generate talking avatar videos for every response
+              </p>
+            </div>
+
+            {/* Manual Animation Button (backup when auto is off) */}
+            {!autoAnimateResponses && selectedFigure && messages.length > 0 && (
+              <Button
+                onClick={() => {
+                  const lastAssistantMessage = [...messages].reverse().find(m => m.type === 'assistant');
+                  if (lastAssistantMessage) {
+                    generateDidAvatar(lastAssistantMessage.content);
+                  }
+                }}
+                disabled={isGeneratingAvatar}
+                variant="outline"
+                className="w-full"
+              >
+                {isGeneratingAvatar ? "🎬 Generating Avatar..." : "🎭 Animate Last Response"}
+              </Button>
+            )}
           </div>
           {/* Document Upload */}
           <DocumentUpload
@@ -2167,25 +2151,53 @@ const HistoricalChat = () => {
           )}
         </div>
 
-        {/* Real-Time 3D Talking Avatar */}
-        {selectedFigure && (
+        {/* D-ID Animated Avatar Video Player */}
+        {(didVideoUrl || isGeneratingAvatar) && (
           <div className="border-b border-border bg-card px-6 py-4">
             <Card className="p-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <span className="text-2xl">🎭</span>
-                    Real-Time Avatar - {selectedFigure.name}
+                    {isGeneratingAvatar ? 'Generating Animated Avatar...' : `Animated Avatar - ${selectedFigure?.name}`}
                   </h3>
-                  <div className="flex items-center gap-2">
-                    {isPlayingAudio && (
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        Speaking...
-                      </span>
-                    )}
-                  </div>
+                  <Button
+                    onClick={() => {
+                      setDidVideoUrl(null);
+                      setIsGeneratingAvatar(false);
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    ✕
+                  </Button>
                 </div>
+                
+                {isGeneratingAvatar && !didVideoUrl && (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-sm text-muted-foreground">Creating your animated avatar...</p>
+                    <p className="text-xs text-muted-foreground">This may take 30-60 seconds</p>
+                  </div>
+                )}
+                
+                {didVideoUrl && (
+                  <>
+                    <video
+                      src={didVideoUrl}
+                      controls
+                      autoPlay
+                      muted
+                      className="w-full rounded-lg shadow-lg"
+                      style={{ maxHeight: '500px' }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                    <p className="text-xs text-muted-foreground text-center">
+                      AI-generated talking avatar powered by D-ID (video only, audio via Azure TTS)
+                    </p>
+                  </>
+                )}
               </div>
             </Card>
           </div>
@@ -2199,40 +2211,6 @@ const HistoricalChat = () => {
             isLoading={isLoading}
           />
         </div>
-
-        {/* Akool Avatar Video Player */}
-        {avatarVideoUrl && (
-          <Card className="mx-4 mb-4 p-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">
-                  {selectedFigure?.name}'s Talking Avatar
-                </h3>
-                {isGeneratingAvatar && (
-                  <span className="text-xs text-muted-foreground animate-pulse">
-                    Generating...
-                  </span>
-                )}
-              </div>
-              <video 
-                src={avatarVideoUrl} 
-                controls 
-                autoPlay
-                className="w-full rounded-lg max-h-96 object-contain bg-black"
-                onEnded={() => {
-                  console.log('✅ Greeting finished, enabling input');
-                  setIsLoading(false);
-                }}
-                onPlay={() => {
-                  console.log('▶️ Greeting playing, input disabled');
-                  setIsLoading(true);
-                }}
-              >
-                Your browser does not support video playback.
-              </video>
-            </div>
-          </Card>
-        )}
 
         {/* Input */}
         {selectedFigure && (
@@ -2315,9 +2293,10 @@ const HistoricalChat = () => {
                 // Show send button when ready
                 <Button 
                   onClick={handleSendMessage}
-                  disabled={!inputMessage.trim()}
+                  disabled={!inputMessage.trim() || !isInitialAvatarReady}
                   size="icon"
                   className="h-[60px] w-[60px]"
+                  title={!isInitialAvatarReady ? "Waiting for avatar to load..." : ""}
                 >
                   <Send className="h-4 w-4" />
                 </Button>
