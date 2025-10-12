@@ -154,28 +154,38 @@ serve(async (req) => {
     
     console.log('✅ Image ready for Akool');
 
-    // Step 4: Create Akool talking avatar
+    // Step 4: Create Akool talking avatar using correct API structure
     console.log('🎭 Creating Akool talking avatar...');
     
-    // If no audio URL, use text-to-speech
-    let finalAudioUrl = audioUrl;
-    if (!audioUrl && text) {
-      console.log('🎤 No audio URL provided, using text for Akool TTS');
-      // Akool will use its own TTS
-    }
-
-    const akoolPayload: any = {
-      avatar_id: gender === 'female' ? 'avatar_1012' : 'avatar_1001', // Default avatars
-      input_text: text,
-      image_url: imageUrl
+    const akoolPayload = {
+      width: 3840,
+      height: 2160,
+      avatar_from: 3, // Using custom avatar URL
+      elements: [
+        {
+          type: "avatar",
+          url: imageUrl,
+          scale_x: 1,
+          scale_y: 1,
+          width: 1080,
+          height: 1080,
+          offset_x: 1920,
+          offset_y: 1080
+        },
+        {
+          type: "audio",
+          input_text: text || `Hello, I am ${figureName}`,
+          voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc' // Default voice IDs
+        }
+      ]
     };
 
     console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
 
-    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/talk/trigger', {
+    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/talkingavatar/create', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${AKOOL_API_KEY}`,
+        'x-api-key': AKOOL_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(akoolPayload)
@@ -204,23 +214,23 @@ serve(async (req) => {
     while (!videoUrl && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const statusResponse = await fetch(`https://openapi.akool.com/api/open/v3/avatar/talk/query?_id=${taskId}`, {
+      const statusResponse = await fetch(`https://openapi.akool.com/api/open/v3/talkingavatar/videoinfo?_id=${taskId}`, {
         headers: {
-          'Authorization': `Bearer ${AKOOL_API_KEY}`,
+          'x-api-key': AKOOL_API_KEY,
         }
       });
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
         
-        if (statusData.data?.status === 'completed') {
-          videoUrl = statusData.data?.result?.video_url;
+        if (statusData.data?.video_status === 3) {
+          videoUrl = statusData.data?.video;
           console.log('✅ Video ready!');
-        } else if (statusData.data?.status === 'failed') {
+        } else if (statusData.data?.video_status === 4) {
           console.error('❌ Akool generation error:', statusData);
           throw new Error('Akool video generation failed');
         } else {
-          console.log(`⏳ Status: ${statusData.data?.status} (attempt ${attempts + 1}/${maxAttempts})`);
+          console.log(`⏳ Status: ${statusData.data?.video_status} (attempt ${attempts + 1}/${maxAttempts})`);
         }
       }
 
