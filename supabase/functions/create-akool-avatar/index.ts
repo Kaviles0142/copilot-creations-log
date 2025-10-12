@@ -185,36 +185,36 @@ serve(async (req) => {
       throw new Error(`Image URL validation failed: ${errorMsg}`);
     }
 
-    // Step 4: Create Akool talking avatar (without audio for now - testing image only)
-    console.log('🎭 Creating Akool avatar (image only - no audio)...');
+    // Step 4: Create Akool talking avatar with inline TTS support
+    console.log('🎭 Creating Akool talking avatar with TTS...');
     console.log('📤 Avatar URL being sent to Akool:', finalImageUrl);
     
-    const akoolPayload: any = {
-      data: [
+    const akoolPayload = {
+      width: 3840,
+      height: 2160,
+      avatar_from: 3,
+      elements: [
         {
-          width: 1920,
+          type: "avatar",
+          url: finalImageUrl,
+          scale_x: 1,
+          scale_y: 1,
+          width: 1080,
           height: 1080,
-          elements: [
-            {
-              type: "avatar",
-              url: finalImageUrl,
-              scale_x: 1,
-              scale_y: 1,
-              offset_x: 960,
-              offset_y: 540,
-              layer_number: 1
-            }
-          ],
-          ratio: "16:9",
-          background: "#ffffff",
-          avatarFrom: 3
+          offset_x: 1920,
+          offset_y: 1080
+        },
+        {
+          type: "audio",
+          input_text: text || `Hello, I am ${figureName}`,
+          voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
         }
       ]
     };
 
-    console.log('📤 Sending request to Akool (testing image without audio):', JSON.stringify(akoolPayload, null, 2));
+    console.log('📤 Sending request to Akool with TTS:', JSON.stringify(akoolPayload, null, 2));
 
-    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/createVideo', {
+    const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/talkingavatar/create', {
       method: 'POST',
       headers: {
         'x-api-key': AKOOL_API_KEY,
