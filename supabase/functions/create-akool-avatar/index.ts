@@ -224,8 +224,8 @@ serve(async (req) => {
       console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
       console.log('📌 Cloudinary response:', JSON.stringify(cloudinaryData));
       
-      // Wait 2 seconds for CDN propagation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait 5 seconds for CDN propagation
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
