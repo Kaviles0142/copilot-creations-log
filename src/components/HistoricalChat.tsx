@@ -18,6 +18,7 @@ import ConversationHistory from "./ConversationHistory";
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { TalkingHead } from "@/utils/TalkingHead";
 
 export interface Message {
   id: string;
@@ -98,6 +99,8 @@ const HistoricalChat = () => {
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [autoAnimateResponses, setAutoAnimateResponses] = useState(true); // Auto-generate avatars
   const [isInitialAvatarReady, setIsInitialAvatarReady] = useState(false); // Track if initial greeting avatar is ready
+  const [talkingHead, setTalkingHead] = useState<TalkingHead | null>(null);
+  const avatarContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -173,6 +176,23 @@ const HistoricalChat = () => {
     loadVoices();
     speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
+
+  // Initialize TalkingHead avatar
+  useEffect(() => {
+    if (avatarContainerRef.current && !talkingHead) {
+      const head = new TalkingHead(avatarContainerRef.current);
+      setTalkingHead(head);
+      console.log("✅ TalkingHead avatar initialized");
+    }
+
+    return () => {
+      if (talkingHead) {
+        talkingHead.destroy();
+        setTalkingHead(null);
+        console.log("🗑️ TalkingHead avatar destroyed");
+      }
+    };
+  }, [avatarContainerRef.current]);
 
   // Auto-create authentic voice when figure is selected
   const voiceCreatedForFigure = useRef<string | null>(null);
@@ -1599,6 +1619,12 @@ const HistoricalChat = () => {
 
   const playAudioFromBase64 = async (audioContent: string) => {
     try {
+      // Animate TalkingHead avatar with the audio
+      if (talkingHead) {
+        await talkingHead.speakFromBase64(audioContent);
+        console.log("🎭 TalkingHead is speaking");
+      }
+
       // Convert base64 to audio blob and play
       const binaryString = atob(audioContent);
       const bytes = new Uint8Array(binaryString.length);
@@ -2194,53 +2220,35 @@ const HistoricalChat = () => {
           )}
         </div>
 
-        {/* D-ID Animated Avatar Video Player */}
-        {(didVideoUrl || isGeneratingAvatar) && (
+        {/* Real-Time 3D Talking Avatar */}
+        {selectedFigure && (
           <div className="border-b border-border bg-card px-6 py-4">
             <Card className="p-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <span className="text-2xl">🎭</span>
-                    {isGeneratingAvatar ? 'Generating Animated Avatar...' : `Animated Avatar - ${selectedFigure?.name}`}
+                    Real-Time Avatar - {selectedFigure.name}
                   </h3>
-                  <Button
-                    onClick={() => {
-                      setDidVideoUrl(null);
-                      setIsGeneratingAvatar(false);
-                    }}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    ✕
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {isPlayingAudio && (
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        Speaking...
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
-                {isGeneratingAvatar && !didVideoUrl && (
-                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-sm text-muted-foreground">Creating your animated avatar...</p>
-                    <p className="text-xs text-muted-foreground">This may take 30-60 seconds</p>
-                  </div>
-                )}
+                <div 
+                  ref={avatarContainerRef}
+                  className="w-full rounded-lg bg-gradient-to-b from-background to-muted"
+                  style={{ height: '400px' }}
+                />
                 
-                {didVideoUrl && (
-                  <>
-                    <video
-                      src={didVideoUrl}
-                      controls
-                      autoPlay
-                      muted
-                      className="w-full rounded-lg shadow-lg"
-                      style={{ maxHeight: '500px' }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                    <p className="text-xs text-muted-foreground text-center">
-                      AI-generated talking avatar powered by D-ID (video only, audio via Azure TTS)
-                    </p>
-                  </>
-                )}
+                <p className="text-xs text-muted-foreground text-center">
+                  Real-time 3D avatar with instant lip-sync - no generation delays!
+                </p>
               </div>
             </Card>
           </div>
