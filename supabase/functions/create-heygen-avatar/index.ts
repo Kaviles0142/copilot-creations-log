@@ -25,10 +25,12 @@ serve(async (req) => {
 
     console.log(`🎬 Creating HeyGen video for ${figureName}`);
 
-    // Detect gender
-    const isFemale = figureName.toLowerCase().includes('cleopatra') || 
-                     figureName.toLowerCase().includes('elizabeth') || 
-                     figureName.toLowerCase().includes('michelle');
+    // Detect gender based on common patterns
+    const femalePatterns = ['cleopatra', 'elizabeth', 'michelle', 'marie', 'rosa', 'joan', 'victoria', 'catherine', 'margaret'];
+    const isFemale = femalePatterns.some(pattern => figureName.toLowerCase().includes(pattern));
+    const targetGender = isFemale ? 'female' : 'male';
+
+    console.log(`Detecting gender for "${figureName}": ${targetGender}`);
 
     // Step 1: Get available avatars
     const avatarsResponse = await fetch('https://api.heygen.com/v2/avatars', {
@@ -40,14 +42,25 @@ serve(async (req) => {
     }
 
     const avatarsData = await avatarsResponse.json();
-    console.log(`Found ${avatarsData.data?.avatars?.length || 0} avatars`);
+    const allAvatars = avatarsData.data?.avatars || [];
+    console.log(`Found ${allAvatars.length} total avatars`);
 
-    // Find a suitable public avatar
-    const avatars = avatarsData.data?.avatars || [];
-    const avatar = avatars.find((a: any) => 
-      a.gender?.toLowerCase() === (isFemale ? 'female' : 'male') && 
-      a.is_public === true
-    ) || avatars[0];
+    // Filter for public avatars with matching gender
+    const matchingAvatars = allAvatars.filter((a: any) => {
+      const avatarGender = a.gender?.toLowerCase();
+      const isPublic = a.is_public === true;
+      const genderMatch = avatarGender === targetGender;
+      return isPublic && genderMatch;
+    });
+
+    console.log(`Found ${matchingAvatars.length} ${targetGender} public avatars`);
+
+    if (matchingAvatars.length === 0) {
+      throw new Error(`No ${targetGender} public avatars available`);
+    }
+
+    // Select the first matching avatar
+    const avatar = matchingAvatars[0];
 
     if (!avatar) {
       throw new Error('No avatars available');
@@ -63,14 +76,25 @@ serve(async (req) => {
     }
 
     const voicesData = await voicesResponse.json();
-    console.log(`Found ${voicesData.data?.voices?.length || 0} voices`);
+    const allVoices = voicesData.data?.voices || [];
+    console.log(`Found ${allVoices.length} total voices`);
 
-    // Find a suitable voice (English, matching gender)
-    const voices = voicesData.data?.voices || [];
-    const voice = voices.find((v: any) => 
-      v.language?.toLowerCase().includes('english') && 
-      v.gender?.toLowerCase() === (isFemale ? 'female' : 'male')
-    ) || voices[0];
+    // Filter for voices matching gender and language
+    const matchingVoices = allVoices.filter((v: any) => {
+      const voiceGender = v.gender?.toLowerCase();
+      const language = v.language?.toLowerCase() || '';
+      const isEnglish = language.includes('english') || language.includes('en-');
+      const genderMatch = voiceGender === targetGender;
+      return isEnglish && genderMatch;
+    });
+
+    console.log(`Found ${matchingVoices.length} ${targetGender} English voices`);
+
+    if (matchingVoices.length === 0) {
+      throw new Error(`No ${targetGender} English voices available`);
+    }
+
+    const voice = matchingVoices[0];
 
     if (!voice) {
       throw new Error('No voices available');
@@ -126,11 +150,11 @@ serve(async (req) => {
       throw new Error('No video ID returned from video generation');
     }
 
-    // Poll for video completion (max 2 minutes)
-    console.log('⏳ Waiting for video to be generated');
+    // Poll for video completion (max 5 minutes)
+    console.log('⏳ Waiting for video to be generated (this may take 2-5 minutes)');
     let videoUrl = null;
     let attempts = 0;
-    const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+    const maxAttempts = 150; // 150 attempts * 2 seconds = 5 minutes max
 
     while (!videoUrl && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));
