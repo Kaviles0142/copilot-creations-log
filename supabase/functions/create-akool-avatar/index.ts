@@ -415,7 +415,7 @@ serve(async (req) => {
 
     let videoUrl: string | null = null;
     let attempts = 0;
-    const maxAttempts = 240; // 2 minutes with 500ms intervals
+    const maxAttempts = 60; // 30 seconds with 500ms intervals - reduced from 2 minutes
 
     console.log('⏳ Waiting for video generation...');
     while (!videoUrl && attempts < maxAttempts) {
@@ -445,13 +445,13 @@ serve(async (req) => {
     }
 
     if (!videoUrl) {
-      console.error('⏱️ Video generation timeout - Akool is taking too long');
-      // Return a partial success so chat can continue
+      console.error('⏱️ Video generation timeout after 30 seconds - Akool is too slow');
+      // Return success without video so chat can continue
       return new Response(
         JSON.stringify({
           success: true,
           skipVideo: true,
-          message: 'Avatar generation is taking longer than expected. Chat is ready without video.',
+          message: 'Video generation is taking longer than expected. Continuing without avatar.',
           taskId,
           visualPrompt
         }),
