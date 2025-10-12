@@ -194,32 +194,24 @@ const HistoricalChat = () => {
 
   // Generate initial greeting avatar when figure is selected
   const generateInitialGreetingAvatar = async (figure: HistoricalFigure) => {
-    console.log('🎬 Generating initial greeting avatar for:', figure.name);
+    console.log('🎬 Generating initial greeting avatar with HeyGen for:', figure.name);
     
     const greetingText = `Hello, I am ${figure.name}. I'm ready to discuss my life and times with you.`;
     
     setIsGeneratingAvatar(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+      const { data, error } = await supabase.functions.invoke('create-heygen-avatar', {
         body: {
           figureName: figure.name,
           text: greetingText,
-          figureId: figure.id
+          description: `A distinguished historical figure resembling ${figure.name}, portrait style, professional, era-appropriate attire`
         }
       });
 
       if (error) throw error;
 
-      // Check if video was skipped due to celebrity detection
-      if (data.skipVideo) {
-        console.log('⏭️ Avatar video skipped, chat available without video');
-        setIsInitialAvatarReady(true);
-        toast({
-          title: "Chat Ready",
-          description: `${figure.name} is ready to chat! (Avatar animation unavailable)`,
-        });
-      } else {
-        console.log('✅ Initial avatar generated:', data.videoUrl);
+      if (data.success && data.videoUrl) {
+        console.log('✅ Initial HeyGen avatar generated:', data.videoUrl);
         setDidVideoUrl(data.videoUrl);
         setIsInitialAvatarReady(true);
         
@@ -539,26 +531,26 @@ const HistoricalChat = () => {
     }
   };
 
-  // Generate D-ID animated avatar (D-ID handles its own audio for speed)
+  // Generate HeyGen animated avatar
   const generateDidAvatar = async (text: string) => {
     if (!selectedFigure) return;
     
     setIsGeneratingAvatar(true);
     try {
-      console.log('🎬 Generating D-ID avatar for:', selectedFigure.name);
-      console.log('🎤 Using D-ID built-in voice for faster generation');
+      console.log('🎬 Generating HeyGen avatar for:', selectedFigure.name);
+      console.log('🎤 Using HeyGen AI-generated avatar with voice');
       
-      const { data, error } = await supabase.functions.invoke('create-did-avatar', {
+      const { data, error } = await supabase.functions.invoke('create-heygen-avatar', {
         body: {
           figureName: selectedFigure.name,
-          figureId: selectedFigure.id,
-          text: text.substring(0, 500) // Limit text length
+          text: text.substring(0, 500), // Limit text length
+          description: `A distinguished historical figure resembling ${selectedFigure.name}, portrait style, professional, era-appropriate attire`
         }
       });
 
       if (error) throw error;
 
-      if (data.videoUrl) {
+      if (data.success && data.videoUrl) {
         setDidVideoUrl(data.videoUrl);
         toast({
           title: "Avatar Created!",
@@ -566,7 +558,7 @@ const HistoricalChat = () => {
         });
       }
     } catch (error) {
-      console.error('Error generating D-ID avatar:', error);
+      console.error('Error generating HeyGen avatar:', error);
       toast({
         title: "Avatar Generation Failed",
         description: error instanceof Error ? error.message : "Failed to create avatar",
