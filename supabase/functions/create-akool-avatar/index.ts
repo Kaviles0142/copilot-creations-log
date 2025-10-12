@@ -84,90 +84,26 @@ serve(async (req) => {
       return visualPrompt;
     };
 
-    // Step 1: Generate visual prompt
-    const visualPrompt = await generateVisualPrompt();
-
-    // Step 2: Generate image using Lovable AI's image generation model
-    console.log('🎨 Generating portrait image...');
-    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: `Generate a photorealistic portrait: ${visualPrompt}`
-          }
-        ],
-        modalities: ['image', 'text']
-      })
-    });
-
-    if (!imageResponse.ok) {
-      const errorText = await imageResponse.text();
-      console.error('Image generation failed:', errorText);
-      throw new Error('Failed to generate portrait image');
-    }
-
-    const imageData = await imageResponse.json();
-    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Use Akool's built-in avatar library instead of custom image generation
+    // This avoids image hosting issues and uses Akool's pre-approved avatars
+    console.log('🎭 Using Akool built-in avatar library');
     
-    if (!base64Image) {
-      throw new Error('No image generated');
-    }
+    // Default to a professional avatar from Akool's library
+    // Avatar ID 1 is typically a professional-looking avatar
+    const avatarId = '1'; // Using built-in avatar instead of custom URL
+    console.log(`✅ Selected built-in avatar ID: ${avatarId}`);
 
-    console.log('✅ Portrait image generated');
-
-    // Step 3: Upload image to Supabase storage
-    console.log('📤 Uploading image to storage...');
-    
-    // Convert base64 to blob
-    const base64Data = base64Image.split(',')[1];
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    const fileName = `akool-avatars/${figureId}-${Date.now()}.png`;
-    const { error: uploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(fileName, bytes, {
-        contentType: 'image/png',
-        upsert: true,
-        cacheControl: 'public, max-age=31536000'
-      });
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw new Error('Failed to upload image: ' + uploadError.message);
-    }
-
-    // Get download URL (not just public URL - this forces download headers)
-    const { data } = supabase.storage
-      .from('audio-files')
-      .getPublicUrl(fileName, {
-        download: false // We want it viewable, not forced download
-      });
-
-    const imageUrl = data.publicUrl;
-    console.log('✅ Image uploaded, URL:', imageUrl);
-
-    // Step 4: Create Akool talking avatar using correct API structure
-    console.log('🎭 Creating Akool talking avatar...');
+    // Step 2: Create Akool talking avatar using built-in avatar
+    console.log('🎭 Creating Akool talking avatar with built-in avatar...');
     
     const akoolPayload = {
       width: 3840,
       height: 2160,
-      avatar_from: 3, // Using custom avatar URL
+      avatar_from: 1, // Using built-in avatar from Akool library
       elements: [
         {
           type: "avatar",
-          url: imageUrl,
+          avatar_id: avatarId,
           scale_x: 1,
           scale_y: 1,
           width: 1080,
@@ -178,7 +114,7 @@ serve(async (req) => {
         {
           type: "audio",
           input_text: text || `Hello, I am ${figureName}`,
-          voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc' // Default voice IDs
+          voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc'
         }
       ]
     };
@@ -247,8 +183,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         videoUrl,
-        visualPrompt,
-        taskId
+        taskId,
+        note: 'Using Akool built-in avatar library'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
