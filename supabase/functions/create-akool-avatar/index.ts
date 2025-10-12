@@ -239,7 +239,35 @@ serve(async (req) => {
       throw new Error(`Image URL validation failed: ${errorMsg}`);
     }
 
-    // Step 4: Generate TTS audio using Akool's TTS API
+    // Step 4: Get available voices from Akool
+    console.log('🎵 Fetching available Akool voices...');
+    const voicesResponse = await fetch('https://openapi.akool.com/api/open/v3/voice/list?from=3', {
+      headers: {
+        'x-api-key': AKOOL_API_KEY,
+      }
+    });
+
+    if (!voicesResponse.ok) {
+      const errorText = await voicesResponse.text();
+      console.error('❌ Failed to fetch Akool voices:', errorText);
+      throw new Error(`Failed to fetch Akool voices: ${errorText}`);
+    }
+
+    const voicesData = await voicesResponse.json();
+    console.log('📋 Received voices:', JSON.stringify(voicesData, null, 2));
+
+    if (voicesData.code !== 1000 || !voicesData.data || voicesData.data.length === 0) {
+      throw new Error('No voices available from Akool');
+    }
+
+    // Select a voice based on gender
+    const selectedVoice = voicesData.data.find((v: any) => 
+      v.gender?.toLowerCase() === (gender === 'female' ? 'female' : 'male')
+    ) || voicesData.data[0];
+
+    console.log('✅ Selected voice:', selectedVoice.voice_id, '-', selectedVoice.name);
+
+    // Step 5: Generate TTS audio using Akool's TTS API
     console.log('🎤 Generating TTS audio with Akool...');
     const ttsResponse = await fetch('https://openapi.akool.com/api/open/v3/audio/create', {
       method: 'POST',
@@ -249,7 +277,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         input_text: text || `Hello, I am ${figureName}`,
-        voice_id: gender === 'female' ? '6889b628662160e2caad5dbc' : '6889b628662160e2caad5dbc',
+        voice_id: selectedVoice.voice_id,
         rate: "100%"
       })
     });
@@ -270,7 +298,7 @@ serve(async (req) => {
     const audioFileUrl = ttsData.data.url;
     console.log('✅ TTS audio generated:', audioFileUrl);
 
-    // Step 5: Create talking photo using the Talking Photo API
+    // Step 6: Create talking photo using the Talking Photo API
     console.log('📸 Creating talking photo...');
     console.log('📤 Photo URL:', finalImageUrl);
     console.log('🎵 Audio URL:', audioFileUrl);
@@ -310,7 +338,7 @@ serve(async (req) => {
       throw new Error(`Akool Talking Photo failed: ${talkingPhotoData.msg || 'Unknown error'}`);
     }
 
-    // Step 6: Poll for video completion
+    // Step 7: Poll for video completion
     const taskId = talkingPhotoData.data?._id;
     if (!taskId) {
       throw new Error('No task ID returned from Akool');
