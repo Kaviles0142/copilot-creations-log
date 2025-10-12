@@ -48,6 +48,7 @@ export type Database = {
           expires_at: string | null
           figure_id: string
           figure_name: string
+          greeting_video_url: string | null
           id: string
           visual_prompt: string | null
         }
@@ -57,6 +58,7 @@ export type Database = {
           expires_at?: string | null
           figure_id: string
           figure_name: string
+          greeting_video_url?: string | null
           id?: string
           visual_prompt?: string | null
         }
@@ -66,6 +68,7 @@ export type Database = {
           expires_at?: string | null
           figure_id?: string
           figure_name?: string
+          greeting_video_url?: string | null
           id?: string
           visual_prompt?: string | null
         }

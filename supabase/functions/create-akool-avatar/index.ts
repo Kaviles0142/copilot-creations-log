@@ -99,6 +99,21 @@ serve(async (req) => {
 
     let finalImageUrl: string;
     let visualPrompt: string;
+    
+    // Check if this is a greeting message and we have a cached greeting video
+    const isGreeting = text && (text.includes("ready to discuss") || text.includes("Hello, I am"));
+    if (isGreeting && cachedImage?.greeting_video_url) {
+      console.log('✅ Using cached greeting video:', cachedImage.greeting_video_url);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          videoUrl: cachedImage.greeting_video_url,
+          taskId: 'cached',
+          visualPrompt: cachedImage.visual_prompt || ''
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (cachedImage) {
       console.log('✅ Using cached image:', cachedImage.cloudinary_url);
@@ -457,6 +472,15 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Cache the greeting video if this was a greeting
+    if (isGreeting && videoUrl) {
+      console.log('💾 Caching greeting video for future use...');
+      await supabase
+        .from('avatar_image_cache')
+        .update({ greeting_video_url: videoUrl })
+        .eq('figure_id', figureId);
     }
 
     return new Response(
