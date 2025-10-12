@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, figureName, voiceId = "en-US-GuyNeural" } = await req.json();
+    const { text, figureName } = await req.json();
 
     if (!text || !figureName) {
       throw new Error('Text and figure name are required');
@@ -25,18 +25,62 @@ serve(async (req) => {
 
     console.log(`🎬 Creating HeyGen video for ${figureName}`);
 
-    // Select avatar based on figure characteristics
-    // Using HeyGen's default public avatars (no celebrity restrictions)
+    // Detect gender
     const isFemale = figureName.toLowerCase().includes('cleopatra') || 
                      figureName.toLowerCase().includes('elizabeth') || 
                      figureName.toLowerCase().includes('michelle');
-    
-    // Generic professional avatars that work for all historical figures
-    const avatarId = isFemale 
-      ? "anna_public_3_20240108"  // Professional female avatar
-      : "josh_lite3_20230714";     // Professional male avatar
 
-    console.log(`🎭 Using avatar: ${avatarId} with voice: ${voiceId}`);
+    // Step 1: Get available avatars
+    const avatarsResponse = await fetch('https://api.heygen.com/v2/avatars', {
+      headers: { 'X-Api-Key': HEYGEN_API_KEY }
+    });
+
+    if (!avatarsResponse.ok) {
+      throw new Error('Failed to fetch avatars');
+    }
+
+    const avatarsData = await avatarsResponse.json();
+    console.log(`Found ${avatarsData.data?.avatars?.length || 0} avatars`);
+
+    // Find a suitable public avatar
+    const avatars = avatarsData.data?.avatars || [];
+    const avatar = avatars.find((a: any) => 
+      a.gender?.toLowerCase() === (isFemale ? 'female' : 'male') && 
+      a.is_public === true
+    ) || avatars[0];
+
+    if (!avatar) {
+      throw new Error('No avatars available');
+    }
+
+    // Step 2: Get available voices
+    const voicesResponse = await fetch('https://api.heygen.com/v2/voices', {
+      headers: { 'X-Api-Key': HEYGEN_API_KEY }
+    });
+
+    if (!voicesResponse.ok) {
+      throw new Error('Failed to fetch voices');
+    }
+
+    const voicesData = await voicesResponse.json();
+    console.log(`Found ${voicesData.data?.voices?.length || 0} voices`);
+
+    // Find a suitable voice (English, matching gender)
+    const voices = voicesData.data?.voices || [];
+    const voice = voices.find((v: any) => 
+      v.language?.toLowerCase().includes('english') && 
+      v.gender?.toLowerCase() === (isFemale ? 'female' : 'male')
+    ) || voices[0];
+
+    if (!voice) {
+      throw new Error('No voices available');
+    }
+
+    const avatarId = avatar.avatar_id;
+    const voiceId = voice.voice_id;
+
+    console.log(`🎭 Using avatar: ${avatarId} (${avatar.avatar_name})`);
+    console.log(`🎤 Using voice: ${voiceId} (${voice.name})`);
 
     // Create talking avatar video using HeyGen v2 API
     const videoResponse = await fetch('https://api.heygen.com/v2/video/generate', {
