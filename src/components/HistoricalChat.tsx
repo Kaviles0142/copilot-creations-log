@@ -18,7 +18,6 @@ import ConversationHistory from "./ConversationHistory";
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TalkingHead } from "@/utils/TalkingHead";
 
 export interface Message {
   id: string;
@@ -95,8 +94,6 @@ const HistoricalChat = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
-  const [talkingHead, setTalkingHead] = useState<TalkingHead | null>(null);
-  const avatarContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -173,22 +170,6 @@ const HistoricalChat = () => {
     speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // Initialize TalkingHead avatar
-  useEffect(() => {
-    if (avatarContainerRef.current && !talkingHead) {
-      const head = new TalkingHead(avatarContainerRef.current);
-      setTalkingHead(head);
-      console.log("✅ TalkingHead avatar initialized");
-    }
-
-    return () => {
-      if (talkingHead) {
-        talkingHead.destroy();
-        setTalkingHead(null);
-        console.log("🗑️ TalkingHead avatar destroyed");
-      }
-    };
-  }, [avatarContainerRef.current]);
 
   // Auto-create authentic voice when figure is selected
   const voiceCreatedForFigure = useRef<string | null>(null);
@@ -1502,12 +1483,6 @@ const HistoricalChat = () => {
 
   const playAudioFromBase64 = async (audioContent: string) => {
     try {
-      // Animate TalkingHead avatar with the audio
-      if (talkingHead) {
-        await talkingHead.speakFromBase64(audioContent);
-        console.log("🎭 TalkingHead is speaking");
-      }
-
       // Convert base64 to audio blob and play
       const binaryString = atob(audioContent);
       const bytes = new Uint8Array(binaryString.length);
@@ -2089,16 +2064,6 @@ const HistoricalChat = () => {
                     )}
                   </div>
                 </div>
-                
-                <div 
-                  ref={avatarContainerRef}
-                  className="w-full rounded-lg bg-gradient-to-b from-background to-muted"
-                  style={{ height: '400px' }}
-                />
-                
-                <p className="text-xs text-muted-foreground text-center">
-                  Real-time 3D avatar with instant lip-sync - no generation delays!
-                </p>
               </div>
             </Card>
           </div>
