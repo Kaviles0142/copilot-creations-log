@@ -94,6 +94,8 @@ const HistoricalChat = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
+  const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -510,6 +512,48 @@ const HistoricalChat = () => {
   };
 
 
+  // Generate Akool avatar for the response
+  const generateAkoolAvatar = async (text: string, figure: HistoricalFigure) => {
+    try {
+      setIsGeneratingAvatar(true);
+      console.log('🎬 Generating Akool avatar for:', figure.name);
+      
+      const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
+        body: { 
+          text: text,
+          figureName: figure.name
+        }
+      });
+
+      if (error) {
+        console.error('❌ Akool avatar error:', error);
+        toast({
+          title: "Avatar Generation Failed",
+          description: "Could not generate talking avatar",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      if (data?.success && data?.videoUrl) {
+        console.log('✅ Akool avatar generated:', data.videoUrl);
+        setAvatarVideoUrl(data.videoUrl);
+        toast({
+          title: "Avatar Ready!",
+          description: `${figure.name}'s talking avatar has been generated`,
+        });
+        return data.videoUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error generating Akool avatar:', error);
+      return null;
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedFigure) return;
 
@@ -735,6 +779,11 @@ const HistoricalChat = () => {
       // Reset loading state after text response is complete (UI becomes responsive)
       setIsLoading(false);
       setAbortController(null);
+
+      // Generate Akool avatar in background
+      generateAkoolAvatar(aiResponse, selectedFigure!).catch(err => {
+        console.error('Avatar generation failed (non-critical):', err);
+      });
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
@@ -2077,6 +2126,32 @@ const HistoricalChat = () => {
             isLoading={isLoading}
           />
         </div>
+
+        {/* Akool Avatar Video Player */}
+        {avatarVideoUrl && (
+          <Card className="mx-4 mb-4 p-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">
+                  {selectedFigure?.name}'s Talking Avatar
+                </h3>
+                {isGeneratingAvatar && (
+                  <span className="text-xs text-muted-foreground animate-pulse">
+                    Generating...
+                  </span>
+                )}
+              </div>
+              <video 
+                src={avatarVideoUrl} 
+                controls 
+                autoPlay
+                className="w-full rounded-lg max-h-96 object-contain bg-black"
+              >
+                Your browser does not support video playback.
+              </video>
+            </div>
+          </Card>
+        )}
 
         {/* Input */}
         {selectedFigure && (
