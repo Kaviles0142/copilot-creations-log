@@ -800,13 +800,10 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Auto-generate animated avatar if enabled (SEQUENTIAL - wait for it like D-ID did)
-      if (autoAnimateResponses && selectedFigure) {
-        console.log('🎬 Generating avatar for response (this will take a moment)...');
-        await generateDidAvatar(aiResponse);
-      }
+      // Don't generate a new avatar for each response - just reuse the initial greeting avatar
+      // The greeting avatar is already in didVideoUrl state and will continue displaying
       
-      // Reset loading state after avatar generation is complete
+      // Reset loading state immediately after text response
       setIsLoading(false);
       setAbortController(null);
 
