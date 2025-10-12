@@ -122,9 +122,44 @@ serve(async (req) => {
 
     console.log('✅ Portrait image generated');
 
-    // Use base64 image directly for Akool (they can't access Supabase storage)
-    console.log('✅ Image ready for Akool (using base64)');
-    const imageUrl = base64Image; // Use base64 directly instead of storage URL
+    // Step 3: Upload image to Supabase storage with public access
+    console.log('📤 Uploading image to storage...');
+    
+    // Convert base64 to blob
+    const base64Data = base64Image.split(',')[1];
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const fileName = `akool-avatars/${figureId}-${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(fileName, bytes, {
+        contentType: 'image/png',
+        upsert: true,
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error('Failed to upload image');
+    }
+
+    // Get public URL with proper format
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Image uploaded to public URL:', publicUrl);
+    
+    // Test if URL is accessible
+    console.log('🔍 Testing image URL accessibility...');
+    const testResponse = await fetch(publicUrl, { method: 'HEAD' });
+    console.log('📊 Image URL test status:', testResponse.status, testResponse.statusText);
+    
+    const imageUrl = publicUrl;
 
     // Step 4: Create Akool talking avatar using correct API structure
     console.log('🎭 Creating Akool talking avatar...');
