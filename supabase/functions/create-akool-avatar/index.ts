@@ -185,12 +185,10 @@ serve(async (req) => {
       throw new Error(`Image URL validation failed: ${errorMsg}`);
     }
 
-    // Step 4: Create Akool talking avatar using the correct API endpoint
-    console.log('🎭 Creating Akool talking avatar...');
+    // Step 4: Create Akool talking avatar (without audio for now - testing image only)
+    console.log('🎭 Creating Akool avatar (image only - no audio)...');
     console.log('📤 Avatar URL being sent to Akool:', finalImageUrl);
     
-    // For createVideo endpoint, we need to handle TTS differently
-    // TTS should be called first to get an audio URL, then passed in voice.voice_url
     const akoolPayload: any = {
       data: [
         {
@@ -214,14 +212,7 @@ serve(async (req) => {
       ]
     };
 
-    // Add voice if audio URL is provided
-    if (audioUrl) {
-      akoolPayload.data[0].voice = {
-        voice_url: audioUrl
-      };
-    }
-
-    console.log('📤 Sending request to Akool with payload:', JSON.stringify(akoolPayload, null, 2));
+    console.log('📤 Sending request to Akool (testing image without audio):', JSON.stringify(akoolPayload, null, 2));
 
     const akoolResponse = await fetch('https://openapi.akool.com/api/open/v3/avatar/createVideo', {
       method: 'POST',
