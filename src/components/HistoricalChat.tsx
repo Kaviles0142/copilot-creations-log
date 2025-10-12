@@ -215,6 +215,63 @@ const HistoricalChat = () => {
   };
 
   // Generate initial greeting avatar when figure is selected
+  useEffect(() => {
+    if (!selectedFigure) return;
+
+    const generateGreetingAvatar = async () => {
+      try {
+        setIsLoading(true);
+        console.log('👋 Generating greeting for:', selectedFigure.name);
+
+        // Generate greeting message from AI
+        const { data: greetingData, error: greetingError } = await supabase.functions.invoke('chat-with-historical-figure', {
+          body: {
+            message: "Please introduce yourself briefly and greet the user.",
+            figure: selectedFigure,
+            context: [],
+            aiProvider: selectedAIProvider
+          }
+        });
+
+        if (greetingError) {
+          console.error('❌ Greeting generation failed:', greetingError);
+          setIsLoading(false);
+          return;
+        }
+
+        const greetingText = greetingData?.response || `Hello, I am ${selectedFigure.name}. How may I help you today?`;
+        
+        console.log('💬 Greeting text:', greetingText);
+
+        // Add greeting to messages
+        const greetingMessage: Message = {
+          id: Date.now().toString(),
+          content: greetingText,
+          type: "assistant",
+          timestamp: new Date(),
+        };
+
+        setMessages([greetingMessage]);
+
+        // Generate Akool avatar with greeting
+        console.log('🎬 Starting avatar generation...');
+        await generateAkoolAvatar(greetingText, selectedFigure);
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error generating greeting avatar:', error);
+        setIsLoading(false);
+        toast({
+          title: "Greeting Failed",
+          description: "Could not generate initial greeting",
+          variant: "destructive",
+        });
+      }
+    };
+
+    generateGreetingAvatar();
+  }, [selectedFigure]);
+
   // Fetch available FakeYou voices for the selected figure
   const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
     setIsLoadingVoices(true);
@@ -2148,6 +2205,14 @@ const HistoricalChat = () => {
                 controls 
                 autoPlay
                 className="w-full rounded-lg max-h-96 object-contain bg-black"
+                onEnded={() => {
+                  console.log('✅ Greeting finished, enabling input');
+                  setIsLoading(false);
+                }}
+                onPlay={() => {
+                  console.log('▶️ Greeting playing, input disabled');
+                  setIsLoading(true);
+                }}
               >
                 Your browser does not support video playback.
               </video>
