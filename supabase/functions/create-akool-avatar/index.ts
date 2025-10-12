@@ -430,7 +430,7 @@ serve(async (req) => {
 
     let videoUrl: string | null = null;
     let attempts = 0;
-    const maxAttempts = 60; // 30 seconds with 500ms intervals - reduced from 2 minutes
+    const maxAttempts = 240; // 2 minutes with 500ms intervals
 
     console.log('⏳ Waiting for video generation...');
     while (!videoUrl && attempts < maxAttempts) {
