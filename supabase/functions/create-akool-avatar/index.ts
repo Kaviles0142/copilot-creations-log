@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,46 +12,105 @@ serve(async (req) => {
   }
 
   try {
-    const { text, figureName, voiceId } = await req.json();
+    const { text, figureName, figureId } = await req.json();
     console.log('📝 Creating Akool avatar for:', figureName);
 
     const AKOOL_API_KEY = Deno.env.get('AKOOL_API_KEY');
-    if (!AKOOL_API_KEY) {
-      throw new Error('AKOOL_API_KEY not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!AKOOL_API_KEY) throw new Error('AKOOL_API_KEY not configured');
+    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase credentials not configured');
     }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const headers = {
       'x-api-key': AKOOL_API_KEY,
       'Content-Type': 'application/json',
     };
 
-    // Step 1: Get list of available avatars
-    console.log('🎭 Fetching available avatars...');
-    const avatarListResponse = await fetch(
-      'https://openapi.akool.com/api/open/v3/avatar/list?from=2&page=1&size=100',
-      { headers }
-    );
+    // Helper to detect gender from name
+    const detectGender = (name: string): 'male' | 'female' => {
+      const femaleTitles = ['queen', 'empress', 'princess', 'lady', 'mrs', 'ms', 'miss'];
+      const femaleNames = ['marie', 'rosa', 'ada', 'florence', 'helen', 'amelia', 'harriet', 
+                          'eleanor', 'cleopatra', 'joan', 'elizabeth', 'victoria', 'catherine'];
+      const nameLower = name.toLowerCase();
+      
+      if (femaleTitles.some(title => nameLower.includes(title))) return 'female';
+      if (femaleNames.some(fn => nameLower.includes(fn))) return 'female';
+      return 'male';
+    };
 
-    if (!avatarListResponse.ok) {
-      const error = await avatarListResponse.text();
-      console.error('❌ Failed to get avatar list:', error);
-      throw new Error('Failed to get avatar list');
-    }
-
-    const avatarListData = await avatarListResponse.json();
-    console.log('✅ Got avatar list:', avatarListData.data?.length, 'avatars');
-
-    // Select a random avatar (or you could implement logic to match figure characteristics)
-    const avatars = avatarListData.data || [];
-    const selectedAvatar = avatars[Math.floor(Math.random() * avatars.length)];
+    // Step 1: Generate portrait using Lovable AI
+    console.log('🎨 Generating portrait for:', figureName);
+    const gender = detectGender(figureName);
     
-    if (!selectedAvatar) {
-      throw new Error('No avatars available');
+    const visualPrompt = `Create a highly realistic portrait photograph of ${figureName}, the historical figure. 
+Professional studio portrait with era-appropriate clothing and background from their time period.
+${gender === 'female' ? 'Female historical figure' : 'Male historical figure'}.
+Photorealistic, high quality, dignified expression, looking directly at camera.
+Ultra high resolution, detailed facial features, historically accurate appearance.`;
+
+    const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [{
+          role: 'user',
+          content: visualPrompt
+        }],
+        modalities: ['image', 'text']
+      })
+    });
+
+    if (!imageResponse.ok) {
+      const error = await imageResponse.text();
+      console.error('❌ Image generation failed:', error);
+      throw new Error('Failed to generate portrait');
     }
 
-    console.log('👤 Selected avatar:', selectedAvatar.name);
+    const imageData = await imageResponse.json();
+    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    if (!base64Image) {
+      throw new Error('No image generated');
+    }
 
-    // Step 2: Get list of available voices
+    console.log('✅ Portrait generated');
+
+    // Step 2: Upload image to Supabase storage
+    console.log('📤 Uploading portrait to storage...');
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    
+    const fileName = `${figureId || figureName.replace(/\s+/g, '_')}_${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(`avatars/${fileName}`, imageBuffer, {
+        contentType: 'image/png',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('❌ Upload failed:', uploadError);
+      throw new Error('Failed to upload portrait');
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(`avatars/${fileName}`);
+
+    console.log('✅ Portrait uploaded:', publicUrl);
+
+    // Step 3: Get voice list
     console.log('🎤 Fetching available voices...');
     const voiceListResponse = await fetch(
       'https://openapi.akool.com/api/open/v3/voice/list?page=1&size=100',
@@ -66,34 +126,40 @@ serve(async (req) => {
     const voiceListData = await voiceListResponse.json();
     console.log('✅ Got voice list:', voiceListData.data?.length, 'voices');
 
-    // Select a voice (use provided voiceId or pick randomly)
+    // Select gender-appropriate voice
     const voices = voiceListData.data || [];
-    const selectedVoice = voiceId 
-      ? voices.find((v: any) => v.voice_id === voiceId) 
-      : voices[Math.floor(Math.random() * voices.length)];
+    const genderVoices = voices.filter((v: any) => 
+      gender === 'female' 
+        ? v.name?.toLowerCase().includes('female') || v.gender?.toLowerCase() === 'female'
+        : v.name?.toLowerCase().includes('male') || v.gender?.toLowerCase() === 'male'
+    );
+    
+    const selectedVoice = genderVoices.length > 0 
+      ? genderVoices[Math.floor(Math.random() * genderVoices.length)]
+      : voices[0];
 
     if (!selectedVoice) {
       throw new Error('No voices available');
     }
 
-    console.log('🎵 Selected voice:', selectedVoice.voice_id);
+    console.log('🎵 Selected voice:', selectedVoice.name || selectedVoice.voice_id);
 
-    // Step 3: Create talking avatar
+    // Step 4: Create talking avatar with custom image
     console.log('🎬 Creating talking avatar video...');
     const createAvatarPayload = {
       width: 3840,
       height: 2160,
-      avatar_from: selectedAvatar.from,
+      avatar_from: 3, // 3 = custom avatar URL
       elements: [
         {
           type: "avatar",
-          avatar_id: selectedAvatar.avatar_id,
+          url: publicUrl, // Use our generated portrait
           scale_x: 1,
           scale_y: 1,
-          width: 1080,
-          height: 1080,
-          offset_x: 1920,
-          offset_y: 1080
+          width: 1920,
+          height: 2160,
+          offset_x: 960,
+          offset_y: 0
         },
         {
           type: "audio",
@@ -128,7 +194,7 @@ serve(async (req) => {
       throw new Error('No video ID returned from Akool');
     }
 
-    // Step 4: Poll for completion
+    // Step 5: Poll for completion
     console.log('⏳ Polling for video completion...');
     let attempts = 0;
     const maxAttempts = 60; // 5 minutes max (5 second intervals)
@@ -159,7 +225,7 @@ serve(async (req) => {
             success: true,
             videoUrl: statusData.data.video,
             videoId: videoId,
-            avatarName: selectedAvatar.name,
+            portraitUrl: publicUrl,
             voiceId: selectedVoice.voice_id
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

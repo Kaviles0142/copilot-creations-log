@@ -521,7 +521,8 @@ const HistoricalChat = () => {
       const { data, error } = await supabase.functions.invoke('create-akool-avatar', {
         body: { 
           text: text,
-          figureName: figure.name
+          figureName: figure.name,
+          figureId: figure.id
         }
       });
 
@@ -537,10 +538,11 @@ const HistoricalChat = () => {
 
       if (data?.success && data?.videoUrl) {
         console.log('✅ Akool avatar generated:', data.videoUrl);
+        console.log('🎨 Portrait used:', data.portraitUrl);
         setAvatarVideoUrl(data.videoUrl);
         toast({
           title: "Avatar Ready!",
-          description: `${figure.name}'s talking avatar has been generated`,
+          description: `${figure.name}'s custom talking avatar has been generated`,
         });
         return data.videoUrl;
       }
