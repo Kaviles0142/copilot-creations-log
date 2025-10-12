@@ -202,6 +202,8 @@ serve(async (req) => {
       formData.append('timestamp', timestamp.toString());
       formData.append('signature', signature);
       formData.append('public_id', publicId);
+      formData.append('resource_type', 'image');
+      formData.append('type', 'upload');
       
       const cloudinaryUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
       const cloudinaryResponse = await fetch(cloudinaryUploadUrl, {
@@ -216,10 +218,15 @@ serve(async (req) => {
       }
       
       const cloudinaryData = await cloudinaryResponse.json();
+      
+      // Use the raw secure_url without any modifications
       finalImageUrl = cloudinaryData.secure_url;
       
       console.log('✅ Image uploaded to Cloudinary:', finalImageUrl);
-      console.log('📌 Original Supabase URL:', publicUrl);
+      console.log('📌 Cloudinary response:', JSON.stringify(cloudinaryData));
+      
+      // Wait 2 seconds for CDN propagation
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
     } catch (validateError) {
       console.error('❌ URL validation failed:', validateError);
