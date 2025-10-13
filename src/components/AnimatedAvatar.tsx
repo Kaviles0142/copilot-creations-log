@@ -44,7 +44,16 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const headTilt = useRef<number>(0); // Slight head movements
 
 
-  // Load MediaPipe Face Landmarker
+  // Debug: Log when isSpeaking prop changes
+  useEffect(() => {
+    console.log('🎤 AnimatedAvatar - isSpeaking changed to:', isSpeaking);
+  }, [isSpeaking]);
+
+  // Debug: Log when analyser prop changes
+  useEffect(() => {
+    console.log('📊 AnimatedAvatar - analyser changed:', !!externalAnalyser);
+  }, [externalAnalyser]);
+
   useEffect(() => {
     const loadModels = async () => {
       try {
