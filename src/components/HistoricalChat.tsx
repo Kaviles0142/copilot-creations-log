@@ -881,15 +881,17 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Phase 1: Generate TTS audio and play with animation
-      if (aiResponse.length > 20) {
-        console.log('🎤 Generating TTS audio...');
-        await generateAndPlayTTS(aiResponse);
-      }
-      
-      // Reset loading state
+      // Reset loading state FIRST so text appears immediately
       setIsLoading(false);
       setAbortController(null);
+      
+      // Phase 1: Generate TTS audio and play with animation (non-blocking)
+      if (aiResponse.length > 20) {
+        console.log('🎤 Generating TTS audio...');
+        generateAndPlayTTS(aiResponse).catch(err => {
+          console.error('TTS generation failed:', err);
+        });
+      }
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
