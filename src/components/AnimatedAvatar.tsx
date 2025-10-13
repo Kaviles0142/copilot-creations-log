@@ -57,52 +57,69 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     }
 
     // Apply animations
-    applyMouthAnimation(ctx, amplitude);
-    applyBlinking(ctx);
-    applyBreathing(ctx);
+    applyMouthAnimation(ctx, amplitude, canvas);
+    applyBlinking(ctx, canvas);
+    applyBreathing(ctx, canvas);
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  const applyMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number) => {
+  const applyMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
     if (!isSpeaking || amplitude < 0.1) return;
 
-    // Draw mouth opening based on audio amplitude
-    const mouthY = 400; // Approximate mouth position (lower on face)
-    const mouthX = 256; // Center
-    const mouthWidth = 40 + (amplitude * 60); // Dynamic width based on amplitude
-    const mouthHeight = 10 + (amplitude * 40); // Dynamic height
+    // Portrait faces are typically in the upper 2/3 of the image
+    // Mouth is about 70% down from top for a typical portrait
+    const mouthY = canvas.height * 0.68; // ~348px for 512px canvas
+    const mouthX = canvas.width / 2; // Center
+    const mouthWidth = 30 + (amplitude * 50); // Dynamic width based on amplitude
+    const mouthHeight = 8 + (amplitude * 35); // Dynamic height
 
-    ctx.fillStyle = 'rgba(50, 20, 20, 0.7)'; // More visible mouth color
+    // Save context
+    ctx.save();
+    
+    // More visible mouth overlay
+    ctx.fillStyle = 'rgba(80, 40, 40, 0.6)';
     ctx.beginPath();
     ctx.ellipse(mouthX, mouthY, mouthWidth / 2, mouthHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
+    
+    ctx.restore();
   };
 
-  const applyBlinking = (ctx: CanvasRenderingContext2D) => {
+  const applyBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
     // Blink every 3-5 seconds
     setBlinkTimer((prev) => {
       const next = prev + 1;
       if (next % 120 === 0) { // Roughly every 2 seconds at 60fps
-        // Draw eyelids
-        const eyeY = 240;
-        const leftEyeX = 200;
-        const rightEyeX = 312;
+        // Eyes are about 45% down from top
+        const eyeY = canvas.height * 0.42; // ~215px for 512px canvas
+        const centerX = canvas.width / 2;
+        const eyeSpacing = canvas.width * 0.12; // Distance from center
+        const leftEyeX = centerX - eyeSpacing;
+        const rightEyeX = centerX + eyeSpacing;
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(leftEyeX - 20, eyeY - 10, 40, 8);
-        ctx.fillRect(rightEyeX - 20, eyeY - 10, 40, 8);
+        ctx.save();
+        ctx.fillStyle = 'rgba(40, 30, 30, 0.8)';
+        // Draw eyelids
+        ctx.fillRect(leftEyeX - 25, eyeY - 5, 50, 10);
+        ctx.fillRect(rightEyeX - 25, eyeY - 5, 50, 10);
+        ctx.restore();
       }
       return next % 180;
     });
   };
 
-  const applyBreathing = (ctx: CanvasRenderingContext2D) => {
+  const applyBreathing = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
     // Subtle breathing effect using a very slight scale
-    const breathingScale = 1 + Math.sin(Date.now() / 2000) * 0.005;
-    ctx.setTransform(breathingScale, 0, 0, breathingScale, 
-      (1 - breathingScale) * 256, (1 - breathingScale) * 256);
+    const breathingScale = 1 + Math.sin(Date.now() / 2000) * 0.008;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    ctx.setTransform(
+      breathingScale, 0, 0, breathingScale,
+      (1 - breathingScale) * centerX,
+      (1 - breathingScale) * centerY
+    );
   };
 
   useEffect(() => {
