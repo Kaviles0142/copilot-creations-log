@@ -878,14 +878,18 @@ const HistoricalChat = () => {
       }
       */
 
+      // Phase 1: Start TTS generation immediately (in parallel with UI update)
+      const ttsPromise = aiResponse.length > 20 
+        ? generateAndPlayTTS(aiResponse)
+        : Promise.resolve();
+      
+      // Add message to UI while audio is generating
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Phase 1: Generate TTS audio and play with animation
-      if (aiResponse.length > 20) {
-        console.log('🎤 Generating TTS audio...');
-        await generateAndPlayTTS(aiResponse);
-      }
+      // Wait for TTS to complete if it was started
+      console.log('🎤 Waiting for TTS audio to complete...');
+      await ttsPromise;
       
       // Reset loading state
       setIsLoading(false);
