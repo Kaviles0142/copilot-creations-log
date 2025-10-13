@@ -211,6 +211,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       
       console.log('🎭 Warping face:', { 
         isSpeaking, 
+        hasAnalyser: !!externalAnalyser,
         amplitude: amplitude.toFixed(3), 
         viseme: targetViseme,
         jawDrop: blendedViseme.jawDrop.toFixed(1),

@@ -314,6 +314,7 @@ const HistoricalChat = () => {
       audioElementRef.current.src = audioUrl;
       setCurrentAudio(audioElementRef.current);
       setIsSpeaking(true);
+      console.log('✅ setIsSpeaking(true) - audio about to play');
       
       audioElementRef.current.onended = () => {
         setIsSpeaking(false);
@@ -321,12 +322,13 @@ const HistoricalChat = () => {
         setCurrentAudio(null);
         setIsGreetingPlaying(false);
         URL.revokeObjectURL(audioUrl);
-        console.log('🔇 Audio ended');
+        console.log('🔇 Audio ended - setIsSpeaking(false)');
       };
 
       audioElementRef.current.onerror = () => {
         setIsSpeaking(false);
         setIsPlayingAudio(false);
+        console.log('❌ Audio error - setIsSpeaking(false)');
         toast({
           title: "Audio playback failed",
           description: "Could not play the generated voice",
