@@ -176,15 +176,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const baseMouthWidth = faceLandmarks.mouth ? faceLandmarks.mouth.width : 60;
     const baseMouthHeight = faceLandmarks.mouth ? faceLandmarks.mouth.height : 16;
     
-    // Calculate jaw opening (vertical stretch)
-    const jawOpening = amplitude * 10;
-    const mouthOpenHeight = baseMouthHeight + jawOpening;
+    // Much more aggressive jaw opening
+    const jawOpening = amplitude * 25;
     
-    // Define mouth region dimensions
-    const regionWidth = baseMouthWidth * 2;
-    const regionHeight = baseMouthHeight * 3;
+    // Define larger mouth region for smoother blending
+    const regionWidth = baseMouthWidth * 3.5;
+    const regionHeight = baseMouthHeight * 5;
     const regionX = Math.max(0, mouthX - regionWidth / 2);
-    const regionY = Math.max(0, mouthY - regionHeight / 3);
+    const regionY = Math.max(0, mouthY - regionHeight / 2);
     
     ctx.save();
     
@@ -194,15 +193,24 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const { data, width, height } = imageData;
       const warpedData = ctx.createImageData(width, height);
       
-      // Apply vertical stretch deformation
+      // Apply vertical stretch deformation with smooth falloff
       for (let y = 0; y < height; y++) {
-        // Calculate stretch factor based on distance from mouth center
-        const distanceFromCenter = Math.abs(y - height / 3) / (height / 3);
-        const stretchFactor = 1 + (amplitude * 0.3 * (1 - distanceFromCenter));
+        // Distance from mouth center (0 at center, 1 at edges)
+        const normalizedY = (y - height / 2) / (height / 2);
+        const distanceFromCenter = Math.abs(normalizedY);
+        
+        // Smooth falloff for natural deformation (more aggressive near center)
+        const falloff = Math.pow(1 - distanceFromCenter, 2);
+        const stretchFactor = 1 + (amplitude * 1.2 * falloff);
         
         for (let x = 0; x < width; x++) {
-          // Source pixel position with warp
-          const sourceY = Math.floor(y / stretchFactor);
+          // Source pixel position with vertical stretch
+          let sourceY = Math.floor((y - height / 2) / stretchFactor + height / 2);
+          
+          // Add jaw drop for lower half
+          if (normalizedY > 0) {
+            sourceY -= jawOpening * falloff;
+          }
           
           if (sourceY >= 0 && sourceY < height) {
             const sourceIdx = (sourceY * width + x) * 4;
@@ -216,20 +224,22 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         }
       }
       
-      // Redraw warped region
+      // Smooth blend edges to avoid visible seams
+      ctx.globalCompositeOperation = 'source-over';
       ctx.putImageData(warpedData, regionX, regionY);
       
-      // Add dark mouth cavity for realism
-      if (amplitude > 0.15) {
+      // Add dark mouth cavity overlay for depth
+      if (amplitude > 0.1) {
         ctx.globalCompositeOperation = 'multiply';
-        const gradient = ctx.createRadialGradient(mouthX, mouthY, 0, mouthX, mouthY, mouthOpenHeight);
-        gradient.addColorStop(0, `rgba(20, 10, 10, ${Math.min(amplitude * 1.5, 0.8)})`);
-        gradient.addColorStop(0.7, `rgba(40, 20, 20, ${Math.min(amplitude * 0.8, 0.4)})`);
-        gradient.addColorStop(1, 'rgba(60, 30, 30, 0)');
+        const mouthOpenHeight = baseMouthHeight + jawOpening;
+        const gradient = ctx.createRadialGradient(mouthX, mouthY, 0, mouthX, mouthY, mouthOpenHeight * 1.2);
+        gradient.addColorStop(0, `rgba(15, 8, 8, ${Math.min(amplitude * 2, 0.9)})`);
+        gradient.addColorStop(0.5, `rgba(30, 15, 15, ${Math.min(amplitude * 1.2, 0.6)})`);
+        gradient.addColorStop(1, 'rgba(50, 25, 25, 0)');
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.ellipse(mouthX, mouthY, baseMouthWidth * 0.7, mouthOpenHeight * 0.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(mouthX, mouthY, baseMouthWidth * 0.8, mouthOpenHeight * 0.7, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     } catch (error) {
