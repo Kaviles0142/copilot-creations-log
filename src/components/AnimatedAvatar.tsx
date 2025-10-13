@@ -44,20 +44,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const headTilt = useRef<number>(0); // Slight head movements
 
 
-  // Debug: Log when isSpeaking prop changes
-  useEffect(() => {
-    console.log('🎤 AnimatedAvatar - isSpeaking prop:', isSpeaking);
-  }, [isSpeaking]);
-
-  // Debug: Log when analyser prop changes
-  useEffect(() => {
-    console.log('📊 AnimatedAvatar - analyser prop:', !!externalAnalyser);
-    if (externalAnalyser) {
-      console.log('  - frequencyBinCount:', externalAnalyser.frequencyBinCount);
-      console.log('  - fftSize:', externalAnalyser.fftSize);
-    }
-  }, [externalAnalyser]);
-
+  // Load MediaPipe Face Landmarker
   useEffect(() => {
     const loadModels = async () => {
       try {
@@ -164,23 +151,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     if (isSpeaking && externalAnalyser) {
       const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
       externalAnalyser.getByteFrequencyData(dataArray);
-      const sum = dataArray.reduce((a, b) => a + b, 0);
-      const currentAmplitude = sum / dataArray.length / 255;
-      
-      // Log the first few values to see if we're getting data
-      if (Math.random() < 0.1) { // Log 10% of the time to avoid spam
-        console.log('🎵 Analyser data sample:', {
-          sum,
-          avgValue: (sum / dataArray.length).toFixed(2),
-          amplitude: currentAmplitude.toFixed(3),
-          firstValues: Array.from(dataArray.slice(0, 5))
-        });
-      }
-      
-      // DEBUG: Log audio detection
-      if (currentAmplitude > 0.01) {
-        console.log('🔊 Audio detected! Amplitude:', currentAmplitude.toFixed(3));
-      }
+      const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
       // Detect phoneme from frequency analysis
       const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
@@ -235,7 +206,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       
       console.log('🎭 Warping face:', { 
         isSpeaking, 
-        hasAnalyser: !!externalAnalyser,
         amplitude: amplitude.toFixed(3), 
         viseme: targetViseme,
         jawDrop: blendedViseme.jawDrop.toFixed(1),
