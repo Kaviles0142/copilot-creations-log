@@ -173,8 +173,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Save context
     ctx.save();
     
-    // Much more visible mouth overlay with bright red for debugging
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+    // Natural mouth opening effect - dark overlay to simulate mouth opening
+    ctx.fillStyle = `rgba(20, 10, 10, ${amplitude * 0.6})`;
     ctx.beginPath();
     ctx.ellipse(mouthX, mouthY, mouthWidth / 2, mouthHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
