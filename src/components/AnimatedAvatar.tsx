@@ -11,18 +11,18 @@ interface AnimatedAvatarProps {
   analyser?: AnalyserNode | null;
 }
 
-// Viseme shape parameters for different phonemes
+// Viseme shape parameters for different phonemes - TRIPLED for visibility
 const getVisemeParameters = (viseme: string, amplitude: number) => {
   const params = {
-    neutral: { upperLip: 5, lowerLip: 10, jawDrop: 20, width: 5, cornerPull: 0.5, lipPucker: 0 },
-    A: { upperLip: 25, lowerLip: 70, jawDrop: 60, width: 15, cornerPull: 0.9, lipPucker: 0 }, // WIDE open mouth
-    E: { upperLip: 8, lowerLip: 25, jawDrop: 25, width: 25, cornerPull: 1.8, lipPucker: 0 }, // WIDE smile
-    I: { upperLip: 5, lowerLip: 15, jawDrop: 15, width: 30, cornerPull: 2.2, lipPucker: 0 }, // WIDEST smile
-    O: { upperLip: 15, lowerLip: 40, jawDrop: 40, width: 3, cornerPull: 0.1, lipPucker: 2.5 }, // ROUND pursed lips
-    U: { upperLip: 12, lowerLip: 35, jawDrop: 35, width: 2, cornerPull: 0.05, lipPucker: 3.0 }, // VERY round
-    M: { upperLip: 1, lowerLip: 1, jawDrop: 3, width: 1, cornerPull: 0.1, lipPucker: 0 }, // Lips CLOSED
-    F: { upperLip: 3, lowerLip: 8, jawDrop: 12, width: 10, cornerPull: 0.5, lipPucker: 0 }, // Teeth on lip
-    S: { upperLip: 4, lowerLip: 10, jawDrop: 15, width: 12, cornerPull: 0.7, lipPucker: 0 }, // Teeth close
+    neutral: { upperLip: 10, lowerLip: 20, jawDrop: 30, width: 10, cornerPull: 1, lipPucker: 0 },
+    A: { upperLip: 75, lowerLip: 210, jawDrop: 180, width: 45, cornerPull: 2.7, lipPucker: 0 }, // WIDE open mouth
+    E: { upperLip: 24, lowerLip: 75, jawDrop: 75, width: 75, cornerPull: 5.4, lipPucker: 0 }, // WIDE smile
+    I: { upperLip: 15, lowerLip: 45, jawDrop: 45, width: 90, cornerPull: 6.6, lipPucker: 0 }, // WIDEST smile
+    O: { upperLip: 45, lowerLip: 120, jawDrop: 120, width: 9, cornerPull: 0.3, lipPucker: 7.5 }, // ROUND pursed lips
+    U: { upperLip: 36, lowerLip: 105, jawDrop: 105, width: 6, cornerPull: 0.15, lipPucker: 9.0 }, // VERY round
+    M: { upperLip: 3, lowerLip: 3, jawDrop: 9, width: 3, cornerPull: 0.3, lipPucker: 0 }, // Lips CLOSED
+    F: { upperLip: 9, lowerLip: 24, jawDrop: 36, width: 30, cornerPull: 1.5, lipPucker: 0 }, // Teeth on lip
+    S: { upperLip: 12, lowerLip: 30, jawDrop: 45, width: 36, cornerPull: 2.1, lipPucker: 0 }, // Teeth close
   };
   
   return params[viseme as keyof typeof params] || params.neutral;
@@ -76,7 +76,10 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
   // Load image and detect facial mesh with MediaPipe
   useEffect(() => {
-    if (!imageUrl || !modelsLoaded || !faceLandmarkerRef.current) return;
+    if (!imageUrl || !modelsLoaded || !faceLandmarkerRef.current) {
+      console.log('⏸️ Skipping face detection:', { imageUrl: !!imageUrl, modelsLoaded, hasLandmarker: !!faceLandmarkerRef.current });
+      return;
+    }
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -153,6 +156,16 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       externalAnalyser.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
+      // DEBUG: Log audio analysis every 30 frames
+      if (Math.random() < 0.03) {
+        console.log('🎵 Audio analysis:', {
+          amplitude: currentAmplitude.toFixed(3),
+          binCount: externalAnalyser.frequencyBinCount,
+          sampleRate: externalAnalyser.context.sampleRate,
+          hasData: dataArray.some(v => v > 0)
+        });
+      }
+      
       // Detect phoneme from frequency analysis
       const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
       
@@ -204,13 +217,18 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current)
         : getVisemeParameters('neutral', 0);
       
-      console.log('🎭 Warping face:', { 
-        isSpeaking, 
-        amplitude: amplitude.toFixed(3), 
-        viseme: targetViseme,
-        jawDrop: blendedViseme.jawDrop.toFixed(1),
-        cornerPull: blendedViseme.cornerPull.toFixed(1)
-      });
+      // DEBUG: Log warping every 30 frames
+      if (Math.random() < 0.03) {
+        console.log('🎭 Warping face:', { 
+          isSpeaking, 
+          amplitude: amplitude.toFixed(3), 
+          viseme: targetViseme,
+          jawDrop: blendedViseme.jawDrop.toFixed(1),
+          cornerPull: blendedViseme.cornerPull.toFixed(1),
+          hasFaceMesh: !!faceMesh,
+          expressionIntensity: expressionIntensity.current.toFixed(2)
+        });
+      }
       
       applyFullFaceWarping(ctx, amplitude, canvas, blendedViseme, expressionIntensity.current, isSpeaking && amplitude > 0.05);
     }
