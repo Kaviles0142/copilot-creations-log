@@ -7,35 +7,15 @@ interface AnimatedAvatarProps {
   isLoading?: boolean;
   isSpeaking?: boolean;
   audioElement?: HTMLAudioElement | null;
+  analyser?: AnalyserNode | null;
 }
 
-const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement }: AnimatedAvatarProps) => {
+const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyser: externalAnalyser }: AnimatedAvatarProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number>();
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [blinkTimer, setBlinkTimer] = useState(0);
 
-  // Initialize audio analysis
-  useEffect(() => {
-    if (!audioElement || !isSpeaking) return;
-
-    const ctx = new AudioContext();
-    const analyserNode = ctx.createAnalyser();
-    analyserNode.fftSize = 256;
-
-    const source = ctx.createMediaElementSource(audioElement);
-    source.connect(analyserNode);
-    analyserNode.connect(ctx.destination);
-
-    setAudioContext(ctx);
-    setAnalyser(analyserNode);
-
-    return () => {
-      ctx.close();
-    };
-  }, [audioElement, isSpeaking]);
 
   // Load image
   useEffect(() => {
@@ -70,9 +50,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement }: Anima
 
     // Get audio amplitude if speaking
     let amplitude = 0;
-    if (isSpeaking && analyser) {
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(dataArray);
+    if (isSpeaking && externalAnalyser) {
+      const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
+      externalAnalyser.getByteFrequencyData(dataArray);
       amplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
     }
 
@@ -86,17 +66,17 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement }: Anima
   };
 
   const applyMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number) => {
-    if (!isSpeaking || amplitude < 0.05) return;
+    if (!isSpeaking || amplitude < 0.1) return;
 
     // Draw mouth opening based on audio amplitude
-    const mouthY = 380; // Approximate mouth position
+    const mouthY = 400; // Approximate mouth position (lower on face)
     const mouthX = 256; // Center
-    const mouthWidth = 60;
-    const mouthHeight = amplitude * 30; // Scale with amplitude
+    const mouthWidth = 40 + (amplitude * 60); // Dynamic width based on amplitude
+    const mouthHeight = 10 + (amplitude * 40); // Dynamic height
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillStyle = 'rgba(50, 20, 20, 0.7)'; // More visible mouth color
     ctx.beginPath();
-    ctx.ellipse(mouthX, mouthY, mouthWidth, mouthHeight, 0, 0, Math.PI * 2);
+    ctx.ellipse(mouthX, mouthY, mouthWidth / 2, mouthHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
   };
 
@@ -135,7 +115,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement }: Anima
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [imageUrl, isSpeaking, analyser]);
+  }, [imageUrl, isSpeaking, externalAnalyser]);
 
   if (isLoading) {
     return (

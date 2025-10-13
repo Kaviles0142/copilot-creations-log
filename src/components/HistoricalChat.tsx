@@ -101,6 +101,8 @@ const HistoricalChat = () => {
   const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   
   const { toast } = useToast();
 
@@ -282,6 +284,28 @@ const HistoricalChat = () => {
       const audioUrl = URL.createObjectURL(audioBlob);
       
       const audio = new Audio(audioUrl);
+      
+      // Setup audio analysis for avatar animation
+      try {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        
+        if (!analyserRef.current) {
+          analyserRef.current = audioContextRef.current.createAnalyser();
+          analyserRef.current.fftSize = 256;
+        }
+        
+        // Create media source and connect to analyser
+        const source = audioContextRef.current.createMediaElementSource(audio);
+        source.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+        
+        console.log('✅ Audio analysis setup for avatar animation');
+      } catch (error) {
+        console.warn('⚠️ Audio analysis setup failed (avatar will play without lip-sync):', error);
+      }
+      
       setCurrentAudio(audio);
       setIsSpeaking(true);
       
@@ -2176,6 +2200,7 @@ const HistoricalChat = () => {
               isLoading={isLoadingAvatarImage}
               isSpeaking={isSpeaking}
               audioElement={currentAudio}
+              analyser={analyserRef.current}
             />
           </div>
         )}
