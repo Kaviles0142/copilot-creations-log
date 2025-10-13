@@ -309,11 +309,18 @@ const HistoricalChat = () => {
     } catch (error) {
       console.error('❌ TTS generation error:', error);
       setIsSpeaking(false);
-      toast({
-        title: "Voice generation failed",
-        description: "Could not generate voice response",
-        variant: "destructive",
-      });
+      
+      // Only show toast if it's not a quota error (which is expected)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('quota')) {
+        toast({
+          title: "Voice generation failed",
+          description: "Text response is still visible",
+          variant: "default",
+        });
+      } else {
+        console.log('ℹ️ TTS quota exceeded - continuing without voice');
+      }
     }
   };
 
@@ -652,15 +659,18 @@ const HistoricalChat = () => {
     setAbortController(controller);
 
     await saveMessage(userMessage, conversationId);
+    
+    console.log('📤 Sending message to AI...', inputMessage.substring(0, 50));
 
     try {
       await processMessageWithRetry(inputMessage, conversationId, controller);
+      console.log('✅ Message processing complete');
     } catch (error) {
       if (error.name === 'AbortError') {
         console.log('Request was aborted');
         return;
       }
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: "I apologize, but I'm having trouble responding right now. Please try again.",
@@ -669,6 +679,12 @@ const HistoricalChat = () => {
       };
       setMessages(prev => [...prev, errorMessage]);
       await saveMessage(errorMessage, conversationId);
+      
+      toast({
+        title: "Error",
+        description: "Failed to get response. Please try again.",
+        variant: "destructive",
+      });
       
       // Reset loading state on error
       setIsLoading(false);
@@ -848,10 +864,15 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
+      console.log('✅ Assistant message added to UI:', aiResponse.substring(0, 100));
+      
       // Phase 1: Generate TTS audio and play with animation
       if (aiResponse.length > 20) {
         console.log('🎤 Generating TTS audio...');
-        await generateAndPlayTTS(aiResponse);
+        generateAndPlayTTS(aiResponse).catch(ttsError => {
+          console.error('TTS failed, but text is visible:', ttsError);
+          // Don't show error toast, just log it - text response is still visible
+        });
       }
       
       // Reset loading state
