@@ -96,8 +96,6 @@ verify_jwt = false
 [functions.azure-text-to-speech]
 verify_jwt = false
 
-[functions.create-akool-avatar]
-verify_jwt = false
 
 [functions.duckduckgo-search]
 verify_jwt = false
