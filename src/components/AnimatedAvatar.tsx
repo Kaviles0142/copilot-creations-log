@@ -201,12 +201,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Apply PIXEL WARPING for mouth animation with blended viseme
     if (isSpeaking && amplitude > 0.05) {
       const blendedViseme = getBlendedViseme(currentViseme, targetViseme, visemeBlend.current);
-      
-      // Apply facial expressions (eyebrows, eyes)
-      if (faceMesh && expressionIntensity.current > 0.01) {
-        applyFacialExpressions(ctx, canvas, blendedViseme, expressionIntensity.current);
-      }
-      
       applyMouthPixelWarping(ctx, amplitude, canvas, blendedViseme);
     }
     
@@ -462,81 +456,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     } catch (error) {
       console.warn('⚠️ Pixel warping failed:', error);
     }
-  };
-
-  const applyFacialExpressions = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, visemeParams: any, intensity: number) => {
-    if (!faceMesh) return;
-    
-    const { landmarks, leftEyeIndices, rightEyeIndices } = faceMesh;
-    
-    // Get eyebrow landmarks (left: 70, 63, 105, 66, 107 / right: 336, 296, 334, 293, 300)
-    const leftBrowIndices = [70, 63, 105, 66, 107];
-    const rightBrowIndices = [336, 296, 334, 293, 300];
-    
-    // Get eye center positions
-    const leftEyePoints = leftEyeIndices.map((idx: number) => landmarks[idx]);
-    const rightEyePoints = rightEyeIndices.map((idx: number) => landmarks[idx]);
-    
-    const leftEyeX = leftEyePoints.reduce((sum: number, p: any) => sum + p.x, 0) / leftEyePoints.length;
-    const leftEyeY = leftEyePoints.reduce((sum: number, p: any) => sum + p.y, 0) / leftEyePoints.length;
-    const rightEyeX = rightEyePoints.reduce((sum: number, p: any) => sum + p.x, 0) / rightEyePoints.length;
-    const rightEyeY = rightEyePoints.reduce((sum: number, p: any) => sum + p.y, 0) / rightEyePoints.length;
-    
-    ctx.save();
-    
-    // EYEBROW RAISES for emphasis and certain visemes (A, E, I)
-    if (visemeParams.cornerPull > 0.5 || intensity > 0.3) {
-      const browRaise = intensity * 3; // Pixels to raise eyebrows
-      
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // Subtle shadow
-      
-      // Draw subtle eyebrow movement indication (darkening below brow)
-      leftBrowIndices.forEach((idx: number) => {
-        const brow = landmarks[idx];
-        ctx.beginPath();
-        ctx.arc(brow.x, brow.y + browRaise, 8, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      
-      rightBrowIndices.forEach((idx: number) => {
-        const brow = landmarks[idx];
-        ctx.beginPath();
-        ctx.arc(brow.x, brow.y + browRaise, 8, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-    
-    // EYE SQUINT for smiling (E, I visemes)
-    if (visemeParams.cornerPull > 1.0) {
-      const squintAmount = (visemeParams.cornerPull - 1.0) * intensity * 5;
-      
-      ctx.globalAlpha = 0.4;
-      ctx.fillStyle = 'rgba(40, 30, 30, 0.3)';
-      
-      // Draw squint lines under eyes
-      ctx.fillRect(leftEyeX - 25, leftEyeY + 8, 50, squintAmount);
-      ctx.fillRect(rightEyeX - 25, rightEyeY + 8, 50, squintAmount);
-    }
-    
-    // CHEEK RAISE for O/U sounds (pucker)
-    if (visemeParams.lipPucker > 1.0) {
-      const cheekRaise = visemeParams.lipPucker * intensity * 3;
-      
-      ctx.globalAlpha = 0.3;
-      ctx.fillStyle = 'rgba(255, 220, 200, 0.2)'; // Slight highlight
-      
-      // Subtle cheek highlights
-      ctx.beginPath();
-      ctx.arc(leftEyeX + 40, leftEyeY + 50, 15 + cheekRaise, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.beginPath();
-      ctx.arc(rightEyeX - 40, rightEyeY + 50, 15 + cheekRaise, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    
-    ctx.restore();
   };
 
   const applyMeshBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
