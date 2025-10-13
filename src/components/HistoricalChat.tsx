@@ -878,22 +878,20 @@ const HistoricalChat = () => {
       }
       */
 
-      // Phase 1: Start TTS generation immediately (in parallel with UI update)
-      const ttsPromise = aiResponse.length > 20 
-        ? generateAndPlayTTS(aiResponse)
-        : Promise.resolve();
-      
-      // Add message to UI while audio is generating
+      // Add message to UI immediately
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Wait for TTS to complete if it was started
-      console.log('🎤 Waiting for TTS audio to complete...');
-      await ttsPromise;
-      
-      // Reset loading state
+      // Reset loading state immediately
       setIsLoading(false);
       setAbortController(null);
+      
+      // Phase 1: Start TTS generation in background (don't await)
+      if (aiResponse.length > 20) {
+        generateAndPlayTTS(aiResponse).catch(err => {
+          console.error('Background TTS error:', err);
+        });
+      }
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
