@@ -261,22 +261,53 @@ const HistoricalChat = () => {
 
       console.log('🎤 Generating TTS for:', selectedFigure.name);
       
-      const { data, error } = await supabase.functions.invoke('generate-tts-audio', {
-        body: {
-          text: text,
-          figureName: selectedFigure.name,
-          voiceId: selectedVoiceId === 'auto' ? null : selectedVoiceId
+      let audioContent = null;
+      let provider = 'elevenlabs';
+      
+      // Try ElevenLabs first
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-tts-audio', {
+          body: {
+            text: text,
+            figureName: selectedFigure.name,
+            voiceId: selectedVoiceId === 'auto' ? null : selectedVoiceId
+          }
+        });
+
+        if (error) throw error;
+        audioContent = data?.audioContent;
+        provider = 'elevenlabs';
+        console.log('✅ ElevenLabs TTS successful');
+      } catch (elevenLabsError) {
+        console.warn('⚠️ ElevenLabs TTS failed, trying Azure fallback:', elevenLabsError);
+        
+        // Fallback to Azure TTS
+        try {
+          const { data: azureData, error: azureError } = await supabase.functions.invoke('azure-text-to-speech', {
+            body: {
+              text: text,
+              figure_name: selectedFigure.name,
+              figure_id: selectedFigure.id,
+              voice: 'auto'
+            }
+          });
+
+          if (azureError) throw azureError;
+          audioContent = azureData?.audioContent;
+          provider = 'azure';
+          console.log('✅ Azure TTS fallback successful');
+        } catch (azureError) {
+          console.error('❌ Azure TTS also failed:', azureError);
+          throw new Error('Both TTS providers failed');
         }
-      });
+      }
 
-      if (error) throw error;
-
-      if (!data?.audioContent) {
-        throw new Error('No audio content received');
+      if (!audioContent) {
+        throw new Error('No audio content received from any provider');
       }
 
       // Convert base64 to audio and play
-      const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
+      const audioBlob = base64ToBlob(audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
       const audio = new Audio(audioUrl);
@@ -304,14 +335,14 @@ const HistoricalChat = () => {
       await audio.play();
       setIsPlayingAudio(true);
       
-      console.log('🔊 TTS audio playing');
+      console.log(`🔊 TTS audio playing (${provider})`);
       
     } catch (error) {
       console.error('❌ TTS generation error:', error);
       setIsSpeaking(false);
       toast({
         title: "Voice generation failed",
-        description: "Could not generate voice response",
+        description: "Could not generate voice response. Please check TTS provider credits.",
         variant: "destructive",
       });
     }
