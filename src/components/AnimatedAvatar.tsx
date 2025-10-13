@@ -198,13 +198,16 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Apply PIXEL WARPING for mouth animation with blended viseme
-    if (isSpeaking && amplitude > 0.05) {
-      const blendedViseme = getBlendedViseme(currentViseme, targetViseme, visemeBlend.current);
-      applyMouthPixelWarping(ctx, amplitude, canvas, blendedViseme);
+    // Apply PIXEL WARPING for entire face (eyes, eyebrows, mouth)
+    if (faceMesh) {
+      const blendedViseme = isSpeaking && amplitude > 0.05 
+        ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current)
+        : getVisemeParameters('neutral', 0);
+      
+      applyFullFaceWarping(ctx, amplitude, canvas, blendedViseme, expressionIntensity.current, isSpeaking);
     }
     
-    applyMeshBlinking(ctx, canvas);
+    applyNaturalBlinking(ctx, canvas);
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(drawFrame);
@@ -287,178 +290,165 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     return 'neutral';
   };
 
-  const applyMouthPixelWarping = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement, visemeParams: any) => {
+  const applyFullFaceWarping = (
+    ctx: CanvasRenderingContext2D, 
+    amplitude: number, 
+    canvas: HTMLCanvasElement, 
+    visemeParams: any,
+    intensity: number,
+    isSpeaking: boolean
+  ) => {
+    if (!faceMesh) return;
+    
+    const { landmarks, mouthOuter, leftEyeIndices, rightEyeIndices } = faceMesh;
+    
     // Get mouth position
-    let mouthX, mouthY, mouthWidth, mouthHeight;
+    const mouthPoints = mouthOuter.map((idx: number) => landmarks[idx]);
+    const mouthXs = mouthPoints.map((p: any) => p.x);
+    const mouthYs = mouthPoints.map((p: any) => p.y);
+    const mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
+    const mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
+    const mouthWidth = Math.max(...mouthXs) - Math.min(...mouthXs);
+    const mouthHeight = Math.max(...mouthYs) - Math.min(...mouthYs);
     
-    if (faceMesh) {
-      const { landmarks, mouthOuter } = faceMesh;
-      const mouthPoints = mouthOuter.map((idx: number) => landmarks[idx]);
-      const mouthXs = mouthPoints.map((p: any) => p.x);
-      const mouthYs = mouthPoints.map((p: any) => p.y);
-      mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
-      mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
-      mouthWidth = Math.max(...mouthXs) - Math.min(...mouthXs);
-      mouthHeight = Math.max(...mouthYs) - Math.min(...mouthYs);
-    } else {
-      mouthX = canvas.width / 2;
-      mouthY = canvas.height * 0.7;
-      mouthWidth = 100;
-      mouthHeight = 40;
-    }
-
-    // Use pre-blended viseme parameters
-    // Calculate warp region
-    const warpRadius = Math.max(mouthWidth, mouthHeight) * 0.8;
-    const jawDrop = amplitude * visemeParams.jawDrop;
-    const mouthOpen = amplitude * visemeParams.width;
+    // Get eyebrow landmarks
+    const leftBrowIndices = [70, 63, 105, 66, 107];
+    const rightBrowIndices = [336, 296, 334, 293, 300];
+    const leftBrowPoints = leftBrowIndices.map((idx: number) => landmarks[idx]);
+    const rightBrowPoints = rightBrowIndices.map((idx: number) => landmarks[idx]);
+    const leftBrowY = leftBrowPoints.reduce((sum: number, p: any) => sum + p.y, 0) / leftBrowPoints.length;
+    const rightBrowY = rightBrowPoints.reduce((sum: number, p: any) => sum + p.y, 0) / rightBrowPoints.length;
     
-    const regionX = Math.max(0, Math.floor(mouthX - warpRadius));
-    const regionY = Math.max(0, Math.floor(mouthY - warpRadius * 0.5)); // Start higher to capture upper lip
-    const regionWidth = Math.min(canvas.width - regionX, Math.ceil(warpRadius * 2));
-    const regionHeight = Math.min(canvas.height - regionY, Math.ceil(warpRadius * 1.5 + jawDrop)); // Extend down for jaw
-
+    // Get eye positions
+    const leftEyePoints = leftEyeIndices.map((idx: number) => landmarks[idx]);
+    const rightEyePoints = rightEyeIndices.map((idx: number) => landmarks[idx]);
+    const leftEyeX = leftEyePoints.reduce((sum: number, p: any) => sum + p.x, 0) / leftEyePoints.length;
+    const leftEyeY = leftEyePoints.reduce((sum: number, p: any) => sum + p.y, 0) / leftEyePoints.length;
+    const rightEyeX = rightEyePoints.reduce((sum: number, p: any) => sum + p.x, 0) / rightEyePoints.length;
+    const rightEyeY = rightEyePoints.reduce((sum: number, p: any) => sum + p.y, 0) / rightEyePoints.length;
+    
+    // Define full face warp region
+    const faceTop = Math.min(leftBrowY, rightBrowY) - 40;
+    const faceBottom = mouthY + mouthHeight + 60;
+    const faceLeft = Math.min(leftEyeX - 60, mouthX - mouthWidth);
+    const faceRight = Math.max(rightEyeX + 60, mouthX + mouthWidth);
+    
+    const regionX = Math.max(0, Math.floor(faceLeft));
+    const regionY = Math.max(0, Math.floor(faceTop));
+    const regionWidth = Math.min(canvas.width - regionX, Math.ceil(faceRight - faceLeft));
+    const regionHeight = Math.min(canvas.height - regionY, Math.ceil(faceBottom - faceTop));
+    
     try {
-      // Get the pixel data for the mouth region
       const imageData = ctx.getImageData(regionX, regionY, regionWidth, regionHeight);
       const pixels = imageData.data;
-      
-      // Create output buffer
       const outputData = ctx.createImageData(regionWidth, regionHeight);
       const output = outputData.data;
       
-      // Warp pixels with asymmetric jaw movement
+      // Warp entire face region
       for (let y = 0; y < regionHeight; y++) {
         for (let x = 0; x < regionWidth; x++) {
-          // Convert to canvas coordinates
           const canvasX = regionX + x;
           const canvasY = regionY + y;
           
-          // Distance from mouth center
-          const dx = canvasX - mouthX;
-          const dy = canvasY - mouthY;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+          let sourceX = x;
+          let sourceY = y;
           
-          // Only warp pixels within warp radius
-          if (distance < warpRadius) {
-            // Calculate warp strength (stronger near center)
-            const strength = 1 - (distance / warpRadius);
-            const warpAmount = strength * strength * strength; // Cubic falloff for smoother blend
+          // EYEBROW WARPING - raise for emphasis
+          if (isSpeaking && intensity > 0.2 && visemeParams.cornerPull > 0.5) {
+            const leftBrowDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftBrowY, 2));
+            const rightBrowDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightBrowY, 2));
             
-            // Calculate displacement - initialize source coordinates
-            let sourceX = x;
-            let sourceY = y;
+            if (leftBrowDist < 50) {
+              const browStrength = 1 - (leftBrowDist / 50);
+              const raise = intensity * 8 * browStrength;
+              sourceY = y + raise;
+            }
+            if (rightBrowDist < 50) {
+              const browStrength = 1 - (rightBrowDist / 50);
+              const raise = intensity * 8 * browStrength;
+              sourceY = y + raise;
+            }
+          }
+          
+          // EYE SQUINTING - for smiles (E/I sounds)
+          if (isSpeaking && visemeParams.cornerPull > 1.0) {
+            const leftEyeDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftEyeY, 2));
+            const rightEyeDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightEyeY, 2));
             
-            // LIP SEPARATION - pull lips apart to create visible gap
-            // Define zones relative to mouth center
+            const squintAmount = (visemeParams.cornerPull - 1.0) * intensity * 3;
+            
+            if (leftEyeDist < 30 && canvasY > leftEyeY) {
+              const squintStrength = 1 - (leftEyeDist / 30);
+              sourceY = y - (squintAmount * squintStrength);
+            }
+            if (rightEyeDist < 30 && canvasY > rightEyeY) {
+              const squintStrength = 1 - (rightEyeDist / 30);
+              sourceY = y - (squintAmount * squintStrength);
+            }
+          }
+          
+          // MOUTH WARPING
+          const mouthDist = Math.sqrt(Math.pow(canvasX - mouthX, 2) + Math.pow(canvasY - mouthY, 2));
+          const mouthRadius = Math.max(mouthWidth, mouthHeight) * 0.8;
+          
+          if (mouthDist < mouthRadius && isSpeaking) {
+            const dx = canvasX - mouthX;
+            const dy = canvasY - mouthY;
+            const strength = 1 - (mouthDist / mouthRadius);
+            const warpAmount = strength * strength * strength;
+            
             const isInMouthZone = Math.abs(dx) < mouthWidth * 0.7;
             
             if (isInMouthZone) {
-              // UPPER LIP ZONE (above mouth center)
+              // Upper lip
               if (dy < 0 && dy > -mouthHeight * 1.2) {
                 const upperLipStrength = Math.abs(dy) / (mouthHeight * 1.2);
                 const pullUp = amplitude * visemeParams.upperLip * warpAmount * (1 - upperLipStrength);
                 sourceY = y + pullUp;
               }
               
-              // LOWER LIP & JAW ZONE (at and below mouth center)  
+              // Lower lip & jaw
               if (dy >= 0) {
                 const jawStrength = Math.min(2, 1 + (dy / (mouthHeight * 0.8)));
                 const pullDown = amplitude * visemeParams.lowerLip * warpAmount * jawStrength;
                 sourceY = y - pullDown;
               }
               
-              // HORIZONTAL STRETCH (for smiles) or PUCKER (for O/U sounds)
+              // Horizontal stretch or pucker
               const cornerStrength = Math.abs(dx) / (mouthWidth * 0.7);
               
               if (visemeParams.lipPucker > 0) {
-                // Pucker inward for O/U sounds
                 const puckerAmount = visemeParams.lipPucker * warpAmount * cornerStrength * amplitude;
-                if (dx > 0) {
-                  sourceX = x + puckerAmount; // Pull corners inward
-                } else {
-                  sourceX = x - puckerAmount;
-                }
+                sourceX = dx > 0 ? x + puckerAmount : x - puckerAmount;
               } else {
-                // Stretch outward for smiles (E/I sounds)
-                const pullSide = mouthOpen * warpAmount * cornerStrength * visemeParams.cornerPull;
-                if (dx > 0) {
-                  sourceX = x - pullSide;
-                } else {
-                  sourceX = x + pullSide;
-                }
+                const pullSide = amplitude * visemeParams.width * warpAmount * cornerStrength * visemeParams.cornerPull;
+                sourceX = dx > 0 ? x - pullSide : x + pullSide;
               }
             }
-            
-            // Clamp source coordinates
-            sourceX = Math.max(0, Math.min(regionWidth - 1, Math.floor(sourceX)));
-            sourceY = Math.max(0, Math.min(regionHeight - 1, Math.floor(sourceY)));
-            
-            // Copy pixel from source to output
-            const sourceIdx = (sourceY * regionWidth + sourceX) * 4;
-            const outputIdx = (y * regionWidth + x) * 4;
-            
-            output[outputIdx] = pixels[sourceIdx];
-            output[outputIdx + 1] = pixels[sourceIdx + 1];
-            output[outputIdx + 2] = pixels[sourceIdx + 2];
-            output[outputIdx + 3] = pixels[sourceIdx + 3];
-          } else {
-            // Outside warp radius, copy original pixel
-            const idx = (y * regionWidth + x) * 4;
-            output[idx] = pixels[idx];
-            output[idx + 1] = pixels[idx + 1];
-            output[idx + 2] = pixels[idx + 2];
-            output[idx + 3] = pixels[idx + 3];
           }
+          
+          // Clamp source coordinates
+          sourceX = Math.max(0, Math.min(regionWidth - 1, Math.floor(sourceX)));
+          sourceY = Math.max(0, Math.min(regionHeight - 1, Math.floor(sourceY)));
+          
+          // Copy pixel
+          const sourceIdx = (sourceY * regionWidth + sourceX) * 4;
+          const outputIdx = (y * regionWidth + x) * 4;
+          
+          output[outputIdx] = pixels[sourceIdx];
+          output[outputIdx + 1] = pixels[sourceIdx + 1];
+          output[outputIdx + 2] = pixels[sourceIdx + 2];
+          output[outputIdx + 3] = pixels[sourceIdx + 3];
         }
       }
       
-      // Put warped pixels back
       ctx.putImageData(outputData, regionX, regionY);
-      
-      // Add dark mouth cavity when mouth opens - MORE VISIBLE
-      if (amplitude > 0.1) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        
-        // Create visible opening/cavity between lips
-        const cavityWidth = mouthWidth * 0.5 * (1 + amplitude * 1.5);
-        const cavityHeight = (amplitude * 25) + (mouthHeight * 0.3); // Height based on amplitude
-        
-        const gradient = ctx.createRadialGradient(
-          mouthX, mouthY + (amplitude * 5), // Center slightly below mouth center
-          0,
-          mouthX, mouthY + (amplitude * 5),
-          Math.max(cavityWidth, cavityHeight)
-        );
-        
-        // Very dark center (almost black) fading out
-        const darkness = Math.min(amplitude * 1.2, 0.95);
-        gradient.addColorStop(0, `rgba(5, 2, 2, ${darkness})`);
-        gradient.addColorStop(0.3, `rgba(15, 8, 8, ${darkness * 0.8})`);
-        gradient.addColorStop(0.6, `rgba(30, 15, 15, ${darkness * 0.5})`);
-        gradient.addColorStop(0.85, `rgba(50, 30, 30, ${darkness * 0.2})`);
-        gradient.addColorStop(1, 'rgba(60, 40, 40, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.ellipse(
-          mouthX,
-          mouthY + (amplitude * 8), // Position cavity lower as mouth opens
-          cavityWidth,
-          cavityHeight,
-          0, 0, Math.PI * 2
-        );
-        ctx.fill();
-        ctx.restore();
-      }
-      
     } catch (error) {
-      console.warn('⚠️ Pixel warping failed:', error);
+      console.warn('⚠️ Face warping failed:', error);
     }
   };
 
-  const applyMeshBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+  const applyNaturalBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
     setBlinkTimer((prev) => {
       const next = prev + 1;
       if (next % 150 === 0) {
@@ -549,21 +539,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         ref={canvasRef}
         className="w-full h-full object-cover"
       />
-      
-      {/* Speaking indicator */}
-      {isSpeaking && (
-        <div className="absolute bottom-4 right-4 bg-primary/90 text-primary-foreground px-3 py-2 rounded-full flex items-center gap-2 animate-pulse">
-          <Volume2 className="w-4 h-4" />
-          <span className="text-xs font-medium">Speaking...</span>
-        </div>
-      )}
-
-      {/* Glow effect when speaking */}
-      {isSpeaking && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-primary/10 animate-pulse" />
-        </div>
-      )}
     </Card>
   );
 };
