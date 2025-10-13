@@ -38,6 +38,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const amplitudeHistory = useRef<number[]>([]);
   const [currentViseme, setCurrentViseme] = useState<string>('neutral');
+  const [targetViseme, setTargetViseme] = useState<string>('neutral');
+  const visemeBlend = useRef<number>(0); // 0 to 1 for smooth transitions
 
 
   // Load MediaPipe Face Landmarker
@@ -143,7 +145,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
     // Get audio amplitude and detect phonemes/visemes
     let amplitude = 0;
-    let viseme = 'neutral';
     
     if (isSpeaking && externalAnalyser) {
       const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
@@ -151,12 +152,15 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
       // Detect phoneme from frequency analysis
-      viseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
-      setCurrentViseme(viseme);
+      const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
       
-      // Debug logging
-      if (currentAmplitude > 0.05) {
-        console.log('🎵 Amplitude:', currentAmplitude.toFixed(3), 'Viseme:', viseme);
+      // Smooth viseme transitions
+      if (detectedViseme !== targetViseme) {
+        setTargetViseme(detectedViseme);
+        visemeBlend.current = 0;
+      } else {
+        // Gradually blend to target viseme
+        visemeBlend.current = Math.min(1, visemeBlend.current + 0.15);
       }
       
       // Add delay buffer for natural lip sync (50-100ms)
@@ -165,6 +169,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         amplitudeHistory.current.shift();
       }
       amplitude = amplitudeHistory.current[0] || currentAmplitude;
+    } else {
+      // Blend back to neutral when not speaking
+      if (targetViseme !== 'neutral') {
+        setTargetViseme('neutral');
+        visemeBlend.current = 0;
+      } else {
+        visemeBlend.current = Math.min(1, visemeBlend.current + 0.1);
+      }
     }
 
     // Apply breathing animation to whole image
@@ -176,16 +188,31 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Apply PIXEL WARPING for mouth animation with viseme
+    // Apply PIXEL WARPING for mouth animation with blended viseme
     if (isSpeaking && amplitude > 0.05) {
-      console.log('🗣️ Warping mouth - amplitude:', amplitude.toFixed(3), 'viseme:', viseme, 'faceMesh:', !!faceMesh);
-      applyMouthPixelWarping(ctx, amplitude, canvas, viseme);
+      const blendedViseme = getBlendedViseme(currentViseme, targetViseme, visemeBlend.current);
+      applyMouthPixelWarping(ctx, amplitude, canvas, blendedViseme);
     }
     
     applyMeshBlinking(ctx, canvas);
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(drawFrame);
+  };
+
+  // Blend between two viseme parameter sets
+  const getBlendedViseme = (fromViseme: string, toViseme: string, blend: number) => {
+    const from = getVisemeParameters(fromViseme, 1);
+    const to = getVisemeParameters(toViseme, 1);
+    
+    return {
+      upperLip: from.upperLip + (to.upperLip - from.upperLip) * blend,
+      lowerLip: from.lowerLip + (to.lowerLip - from.lowerLip) * blend,
+      jawDrop: from.jawDrop + (to.jawDrop - from.jawDrop) * blend,
+      width: from.width + (to.width - from.width) * blend,
+      cornerPull: from.cornerPull + (to.cornerPull - from.cornerPull) * blend,
+      lipPucker: from.lipPucker + (to.lipPucker - from.lipPucker) * blend,
+    };
   };
 
   const detectVisemeFromFrequency = (frequencyData: Uint8Array, sampleRate: number): string => {
@@ -220,8 +247,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const high = getHighEnergy();
     const total = low + mid + high;
     
-    console.log('📊 Frequency analysis - Low:', low.toFixed(1), 'Mid:', mid.toFixed(1), 'High:', high.toFixed(1));
-    
     if (total < 5) return 'neutral';
     
     // Calculate ratios
@@ -230,50 +255,29 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const highRatio = high / total;
     
     // Vowel A - balanced mid and low
-    if (midRatio > 0.4 && lowRatio > 0.3) {
-      console.log('👄 Detected: A (open)');
-      return 'A';
-    }
+    if (midRatio > 0.4 && lowRatio > 0.3) return 'A';
     
     // Vowel E - mid-high dominant
-    if (midRatio > 0.45 && highRatio > 0.25) {
-      console.log('👄 Detected: E (smile)');
-      return 'E';
-    }
+    if (midRatio > 0.45 && highRatio > 0.25) return 'E';
     
     // Vowel I - high frequencies
-    if (highRatio > 0.4) {
-      console.log('👄 Detected: I (wide smile)');
-      return 'I';
-    }
+    if (highRatio > 0.4) return 'I';
     
     // Vowel O - low dominant
-    if (lowRatio > 0.5) {
-      console.log('👄 Detected: O (round)');
-      return 'O';
-    }
+    if (lowRatio > 0.5) return 'O';
     
     // Vowel U - very low dominant
-    if (lowRatio > 0.6) {
-      console.log('👄 Detected: U (very round)');
-      return 'U';
-    }
+    if (lowRatio > 0.6) return 'U';
     
     // Consonants
-    if (high > 80 && highRatio > 0.5) {
-      console.log('👄 Detected: S/F (sibilant)');
-      return 'S';
-    }
+    if (high > 80 && highRatio > 0.5) return 'S';
     
-    if (low > 60 && mid < 20) {
-      console.log('👄 Detected: M (closed)');
-      return 'M';
-    }
+    if (low > 60 && mid < 20) return 'M';
     
     return 'neutral';
   };
 
-  const applyMouthPixelWarping = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement, viseme: string = 'neutral') => {
+  const applyMouthPixelWarping = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement, visemeParams: any) => {
     // Get mouth position
     let mouthX, mouthY, mouthWidth, mouthHeight;
     
@@ -293,10 +297,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       mouthHeight = 40;
     }
 
-    // Get viseme-specific mouth shape parameters
-    const visemeParams = getVisemeParameters(viseme, amplitude);
-    
-    // Calculate warp region - REDUCED to only affect mouth/jaw, not whole face
+    // Use pre-blended viseme parameters
+    // Calculate warp region
     const warpRadius = Math.max(mouthWidth, mouthHeight) * 0.8;
     const jawDrop = amplitude * visemeParams.jawDrop;
     const mouthOpen = amplitude * visemeParams.width;
