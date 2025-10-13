@@ -157,7 +157,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const applyMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
     console.log('🎤 Mouth animation - isSpeaking:', isSpeaking, 'amplitude:', amplitude.toFixed(3));
     
-    if (!isSpeaking || amplitude < 0.1) return;
+    if (!isSpeaking || amplitude < 0.05) return;
 
     // Use detected mouth position or fallback to default
     const mouthY = faceLandmarks.mouth ? faceLandmarks.mouth.y : canvas.height * 0.68;
@@ -165,19 +165,30 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const baseMouthWidth = faceLandmarks.mouth ? faceLandmarks.mouth.width : 60;
     const baseMouthHeight = faceLandmarks.mouth ? faceLandmarks.mouth.height : 16;
     
-    const mouthWidth = baseMouthWidth * (1 + amplitude * 0.5);
-    const mouthHeight = baseMouthHeight * (1 + amplitude * 1.2);
+    // More dramatic mouth opening based on amplitude
+    const mouthWidth = baseMouthWidth * (1 + amplitude * 1.5);
+    const mouthHeight = baseMouthHeight * (1 + amplitude * 3);
 
     console.log('👄 Drawing mouth at:', { x: Math.round(mouthX), y: Math.round(mouthY), width: Math.round(mouthWidth), height: Math.round(mouthHeight) });
 
-    // Save context
     ctx.save();
     
-    // Natural mouth opening effect - dark overlay to simulate mouth opening
-    ctx.fillStyle = `rgba(20, 10, 10, ${amplitude * 0.6})`;
+    // Create realistic mouth opening with gradient
+    const gradient = ctx.createRadialGradient(mouthX, mouthY, 0, mouthX, mouthY, mouthHeight / 2);
+    gradient.addColorStop(0, `rgba(40, 20, 20, ${Math.min(amplitude * 1.5, 0.9)})`);
+    gradient.addColorStop(0.6, `rgba(60, 30, 30, ${Math.min(amplitude * 1.2, 0.7)})`);
+    gradient.addColorStop(1, `rgba(80, 40, 40, ${Math.min(amplitude * 0.8, 0.4)})`);
+    
+    // Draw mouth opening
+    ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.ellipse(mouthX, mouthY, mouthWidth / 2, mouthHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Add subtle lip highlight for realism
+    ctx.strokeStyle = `rgba(0, 0, 0, ${amplitude * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
     
     ctx.restore();
   };
