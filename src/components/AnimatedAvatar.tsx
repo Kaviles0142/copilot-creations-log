@@ -204,7 +204,15 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current)
         : getVisemeParameters('neutral', 0);
       
-      applyFullFaceWarping(ctx, amplitude, canvas, blendedViseme, expressionIntensity.current, isSpeaking);
+      console.log('🎭 Warping face:', { 
+        isSpeaking, 
+        amplitude: amplitude.toFixed(3), 
+        viseme: targetViseme,
+        jawDrop: blendedViseme.jawDrop.toFixed(1),
+        cornerPull: blendedViseme.cornerPull.toFixed(1)
+      });
+      
+      applyFullFaceWarping(ctx, amplitude, canvas, blendedViseme, expressionIntensity.current, isSpeaking && amplitude > 0.05);
     }
     
     applyNaturalBlinking(ctx, canvas);
@@ -487,13 +495,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   };
 
   const applyBreathing = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, tilt: number = 0) => {
-    // Subtle breathing effect with slight head tilt
-    const breathingScale = 1 + Math.sin(Date.now() / 2000) * 0.008;
+    // Much more subtle breathing effect - barely noticeable
+    const breathingScale = 1 + Math.sin(Date.now() / 2000) * 0.002; // Reduced from 0.008 to 0.002
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
-    // Apply slight rotation for head tilt (in radians)
-    const rotation = (tilt * Math.PI) / 180;
+    // Very subtle head tilt only during speech (reduced rotation)
+    const rotation = (tilt * 0.3 * Math.PI) / 180; // Reduced from full tilt to 30%
     
     ctx.setTransform(
       breathingScale * Math.cos(rotation), 
