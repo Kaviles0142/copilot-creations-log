@@ -225,23 +225,30 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             let sourceX = x;
             let sourceY = y;
             
-            // ASYMMETRIC JAW DROP (bottom moves MUCH more than top)
-            if (dy > 0) {
-              // Below mouth center - BOTTOM JAW (strong movement)
-              const jawStrength = Math.min(1.5, dy / (mouthHeight * 1.5)); // Progressive strength going down
-              sourceY = y - (jawDrop * warpAmount * jawStrength * 0.9); // Strong jaw drop
-            } else {
-              // Above mouth center - TOP LIP (almost no movement)
-              const upperLipResistance = 0.05; // Top lip barely moves at all
-              sourceY = y - (jawDrop * warpAmount * upperLipResistance);
+            // LIP SEPARATION - pull lips apart vertically
+            const lipZone = Math.abs(dy) < mouthHeight * 1.2;
+            
+            if (lipZone) {
+              // Upper lip zone (slightly above center)
+              if (dy < -mouthHeight * 0.1 && dy > -mouthHeight * 0.8) {
+                // Pull upper lip UP slightly
+                const upperLipPull = amplitude * 8 * warpAmount;
+                sourceY = y + upperLipPull; // Pull UP (positive direction)
+              }
+              // Lower lip zone (at and below center)
+              else if (dy >= -mouthHeight * 0.1) {
+                // Pull lower lip DOWN more aggressively
+                const lowerLipPull = amplitude * 40 * warpAmount;
+                const jawProgression = Math.max(1, dy / (mouthHeight * 0.5)); // Stronger as you go down
+                sourceY = y - (lowerLipPull * jawProgression); // Pull DOWN
+              }
             }
             
-            // HORIZONTAL STRETCH (corners pull outward, but only in mouth zone)
-            const horizontalZone = Math.abs(dy) < mouthHeight * 0.6;
+            // HORIZONTAL STRETCH (corners pull outward)
+            const horizontalZone = Math.abs(dy) < mouthHeight * 0.8;
             if (horizontalZone) {
-              // Stronger pull at the corners
               const cornerStrength = Math.min(1, Math.abs(dx) / (mouthWidth * 0.6));
-              const pullAmount = mouthOpen * warpAmount * cornerStrength * 0.7;
+              const pullAmount = mouthOpen * warpAmount * cornerStrength * 0.8;
               
               if (dx > 0) {
                 sourceX = x - pullAmount;
@@ -276,33 +283,35 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       // Put warped pixels back
       ctx.putImageData(outputData, regionX, regionY);
       
-      // Add dark mouth cavity when mouth opens significantly
-      if (amplitude > 0.15) {
+      // Add dark mouth cavity when mouth opens - MORE VISIBLE
+      if (amplitude > 0.1) {
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
         
-        // Create oval cavity in center of mouth
-        const cavityWidth = mouthWidth * 0.6 * (1 + amplitude);
-        const cavityHeight = mouthHeight * 0.4 + (jawDrop * 0.4);
+        // Create visible opening/cavity between lips
+        const cavityWidth = mouthWidth * 0.5 * (1 + amplitude * 1.5);
+        const cavityHeight = (amplitude * 25) + (mouthHeight * 0.3); // Height based on amplitude
         
         const gradient = ctx.createRadialGradient(
-          mouthX, mouthY + jawDrop * 0.3,
+          mouthX, mouthY + (amplitude * 5), // Center slightly below mouth center
           0,
-          mouthX, mouthY + jawDrop * 0.3,
-          cavityHeight
+          mouthX, mouthY + (amplitude * 5),
+          Math.max(cavityWidth, cavityHeight)
         );
         
-        // Dark center fading to transparent
-        gradient.addColorStop(0, `rgba(10, 5, 5, ${Math.min(amplitude * 0.9, 0.85)})`);
-        gradient.addColorStop(0.4, `rgba(20, 10, 10, ${Math.min(amplitude * 0.6, 0.5)})`);
-        gradient.addColorStop(0.7, `rgba(30, 20, 20, ${Math.min(amplitude * 0.3, 0.2)})`);
-        gradient.addColorStop(1, 'rgba(50, 30, 30, 0)');
+        // Very dark center (almost black) fading out
+        const darkness = Math.min(amplitude * 1.2, 0.95);
+        gradient.addColorStop(0, `rgba(5, 2, 2, ${darkness})`);
+        gradient.addColorStop(0.3, `rgba(15, 8, 8, ${darkness * 0.8})`);
+        gradient.addColorStop(0.6, `rgba(30, 15, 15, ${darkness * 0.5})`);
+        gradient.addColorStop(0.85, `rgba(50, 30, 30, ${darkness * 0.2})`);
+        gradient.addColorStop(1, 'rgba(60, 40, 40, 0)');
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.ellipse(
           mouthX,
-          mouthY + jawDrop * 0.3,
+          mouthY + (amplitude * 8), // Position cavity lower as mouth opens
           cavityWidth,
           cavityHeight,
           0, 0, Math.PI * 2
