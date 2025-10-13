@@ -153,6 +153,11 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       externalAnalyser.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
+      // DEBUG: Log audio detection
+      if (currentAmplitude > 0.01) {
+        console.log('🔊 Audio detected! Amplitude:', currentAmplitude.toFixed(3));
+      }
+      
       // Detect phoneme from frequency analysis
       const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
       
