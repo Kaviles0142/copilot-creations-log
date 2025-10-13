@@ -95,7 +95,7 @@ const HistoricalChat = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
-  const [isInitialAvatarReady, setIsInitialAvatarReady] = useState(false); // Track if initial greeting avatar is ready
+  const [isGreetingPlaying, setIsGreetingPlaying] = useState(false); // Track if greeting is playing
   
   // Phase 1 avatar state
   const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
@@ -189,45 +189,63 @@ const HistoricalChat = () => {
       setSelectedLanguage(figureLanguage);
       fetchFakeYouVoicesForFigure(selectedFigure);
       
-      // Phase 1: Generate static avatar portrait
-      generateAvatarPortrait(selectedFigure);
-      
-      setIsInitialAvatarReady(true);
+      // Phase 1: Generate static avatar portrait and play greeting
+      generateAvatarPortraitAndGreeting(selectedFigure);
     }
   }, [selectedFigure]);
   
-  // Generate avatar portrait using new system
-  const generateAvatarPortrait = async (figure: HistoricalFigure) => {
-    console.log('🎨 Generating avatar portrait for:', figure.name);
+  // Generate avatar portrait and play greeting
+  const generateAvatarPortraitAndGreeting = async (figure: HistoricalFigure) => {
+    console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
+    setIsGreetingPlaying(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
+      // Step 1: Generate avatar image
+      const { data: avatarData, error: avatarError } = await supabase.functions.invoke('generate-avatar-portrait', {
         body: {
           figureName: figure.name,
           figureId: figure.id
         }
       });
 
-      if (error) throw error;
+      if (avatarError) throw avatarError;
 
-      console.log('✅ Avatar portrait ready:', data.cached ? '(cached)' : '(new)');
-      setAvatarImageUrl(data.imageUrl);
+      console.log('✅ Avatar portrait ready:', avatarData.cached ? '(cached)' : '(new)');
+      setAvatarImageUrl(avatarData.imageUrl);
+      setIsLoadingAvatarImage(false);
+      
+      // Step 2: Generate and play greeting
+      const greetingText = getGreetingForFigure(figure);
+      console.log('👋 Playing greeting:', greetingText);
+      
+      await generateAndPlayTTS(greetingText);
       
       toast({
-        title: data.cached ? "Avatar Loaded" : "Avatar Generated",
-        description: `${figure.name} is ready to chat!`,
+        title: "Ready to Chat",
+        description: `${figure.name} has greeted you!`,
       });
+      
     } catch (error) {
-      console.error('❌ Error generating avatar portrait:', error);
+      console.error('❌ Error in avatar/greeting:', error);
       toast({
-        title: "Avatar Generation Failed",
-        description: "Chat will proceed without avatar",
-        variant: "destructive",
+        title: "Setup Complete",
+        description: "You can now start chatting",
+        variant: "default",
       });
-    } finally {
-      setIsLoadingAvatarImage(false);
+      setIsGreetingPlaying(false);
     }
+  };
+  
+  // Get appropriate greeting for historical figure
+  const getGreetingForFigure = (figure: HistoricalFigure): string => {
+    const greetings = [
+      `Greetings! I am ${figure.name}. What would you like to discuss?`,
+      `Hello! ${figure.name} here. How may I enlighten you today?`,
+      `Welcome! I'm ${figure.name}. What questions do you have for me?`,
+      `Salutations! I am ${figure.name}. What shall we speak of?`,
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
   };
 
   // Generate and play TTS audio with avatar animation
@@ -269,6 +287,7 @@ const HistoricalChat = () => {
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         setCurrentAudio(null);
+        setIsGreetingPlaying(false);
         URL.revokeObjectURL(audioUrl);
       };
 
@@ -608,7 +627,7 @@ const HistoricalChat = () => {
 
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !selectedFigure || !isInitialAvatarReady) return;
+    if (!inputMessage.trim() || !selectedFigure || isGreetingPlaying) return;
 
     let conversationId = currentConversationId;
     if (!conversationId) {
@@ -2249,10 +2268,10 @@ const HistoricalChat = () => {
                 // Show send button when ready
                 <Button 
                   onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || !isInitialAvatarReady}
+                  disabled={!inputMessage.trim() || isGreetingPlaying}
                   size="icon"
                   className="h-[60px] w-[60px]"
-                  title={!isInitialAvatarReady ? "Waiting for avatar to load..." : ""}
+                  title={isGreetingPlaying ? "Please wait for greeting to finish..." : ""}
                 >
                   <Send className="h-4 w-4" />
                 </Button>
