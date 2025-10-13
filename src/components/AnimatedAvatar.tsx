@@ -11,6 +11,23 @@ interface AnimatedAvatarProps {
   analyser?: AnalyserNode | null;
 }
 
+// Viseme shape parameters for different phonemes
+const getVisemeParameters = (viseme: string, amplitude: number) => {
+  const params = {
+    neutral: { upperLip: 5, lowerLip: 10, jawDrop: 20, width: 5, cornerPull: 0.5, roundness: 0 },
+    A: { upperLip: 20, lowerLip: 60, jawDrop: 50, width: 12, cornerPull: 0.8, roundness: 0 }, // Open wide
+    E: { upperLip: 8, lowerLip: 25, jawDrop: 25, width: 18, cornerPull: 1.2, roundness: 0 }, // Wide smile
+    I: { upperLip: 5, lowerLip: 15, jawDrop: 15, width: 22, cornerPull: 1.5, roundness: 0 }, // Widest smile
+    O: { upperLip: 12, lowerLip: 35, jawDrop: 35, width: 6, cornerPull: 0.3, roundness: 1.5 }, // Round lips
+    U: { upperLip: 10, lowerLip: 30, jawDrop: 30, width: 4, cornerPull: 0.2, roundness: 2.0 }, // Very round
+    M: { upperLip: 2, lowerLip: 2, jawDrop: 5, width: 2, cornerPull: 0.1, roundness: 0 }, // Lips closed
+    F: { upperLip: 3, lowerLip: 8, jawDrop: 12, width: 8, cornerPull: 0.4, roundness: 0 }, // Teeth on lip
+    S: { upperLip: 4, lowerLip: 10, jawDrop: 15, width: 10, cornerPull: 0.6, roundness: 0 }, // Teeth close
+  };
+  
+  return params[viseme as keyof typeof params] || params.neutral;
+};
+
 const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyser: externalAnalyser }: AnimatedAvatarProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -20,6 +37,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const [faceMesh, setFaceMesh] = useState<any>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const amplitudeHistory = useRef<number[]>([]);
+  const [currentViseme, setCurrentViseme] = useState<string>('neutral');
 
 
   // Load MediaPipe Face Landmarker
@@ -123,16 +141,22 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get audio amplitude if speaking with smoothing buffer
+    // Get audio amplitude and detect phonemes/visemes
     let amplitude = 0;
+    let viseme = 'neutral';
+    
     if (isSpeaking && externalAnalyser) {
       const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
       externalAnalyser.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
+      // Detect phoneme from frequency analysis
+      viseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
+      setCurrentViseme(viseme);
+      
       // Debug logging
       if (currentAmplitude > 0.05) {
-        console.log('🎵 Audio amplitude:', currentAmplitude.toFixed(3));
+        console.log('🎵 Amplitude:', currentAmplitude.toFixed(3), 'Viseme:', viseme);
       }
       
       // Add delay buffer for natural lip sync (50-100ms)
@@ -152,10 +176,10 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Apply PIXEL WARPING for mouth animation
+    // Apply PIXEL WARPING for mouth animation with viseme
     if (isSpeaking && amplitude > 0.05) {
-      console.log('🗣️ Warping mouth - amplitude:', amplitude.toFixed(3), 'faceMesh:', !!faceMesh);
-      applyMouthPixelWarping(ctx, amplitude, canvas);
+      console.log('🗣️ Warping mouth - amplitude:', amplitude.toFixed(3), 'viseme:', viseme, 'faceMesh:', !!faceMesh);
+      applyMouthPixelWarping(ctx, amplitude, canvas, viseme);
     }
     
     applyMeshBlinking(ctx, canvas);
@@ -164,7 +188,67 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  const applyMouthPixelWarping = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
+  const detectVisemeFromFrequency = (frequencyData: Uint8Array, sampleRate: number): string => {
+    // Analyze frequency bands to detect phonemes
+    const binCount = frequencyData.length;
+    const nyquist = sampleRate / 2;
+    const binWidth = nyquist / binCount;
+    
+    // Get energy in different frequency bands
+    const getLowEnergy = () => {
+      let sum = 0;
+      for (let i = 0; i < binCount * 0.1; i++) sum += frequencyData[i];
+      return sum / (binCount * 0.1);
+    };
+    
+    const getMidEnergy = () => {
+      let sum = 0;
+      for (let i = Math.floor(binCount * 0.1); i < binCount * 0.4; i++) sum += frequencyData[i];
+      return sum / (binCount * 0.3);
+    };
+    
+    const getHighEnergy = () => {
+      let sum = 0;
+      for (let i = Math.floor(binCount * 0.4); i < binCount; i++) sum += frequencyData[i];
+      return sum / (binCount * 0.6);
+    };
+    
+    const low = getLowEnergy();
+    const mid = getMidEnergy();
+    const high = getHighEnergy();
+    const total = low + mid + high;
+    
+    if (total < 10) return 'neutral';
+    
+    // Vowel detection based on formants
+    if (low > mid && low > high) {
+      // Low frequencies dominant - O, U sounds
+      if (mid < high * 0.5) return 'O'; // Round lips
+      return 'U'; // Very round
+    } else if (high > low && high > mid) {
+      // High frequencies dominant - E, I sounds
+      if (high > mid * 1.5) return 'I'; // Wide smile
+      return 'E'; // Slight smile
+    } else if (mid > low * 1.2 && mid > high * 1.2) {
+      // Mid frequencies - A sound
+      return 'A'; // Open mouth
+    }
+    
+    // Consonant detection
+    if (high > total * 0.6) {
+      // Sibilants - S, SH, F
+      if (high > 150) return 'F'; // Teeth on lip
+      return 'S'; // Teeth close
+    }
+    
+    if (low > total * 0.5 && mid < 30) {
+      return 'M'; // Lips closed
+    }
+    
+    return 'neutral';
+  };
+
+  const applyMouthPixelWarping = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement, viseme: string = 'neutral') => {
     // Get mouth position
     let mouthX, mouthY, mouthWidth, mouthHeight;
     
@@ -184,10 +268,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       mouthHeight = 40;
     }
 
+    // Get viseme-specific mouth shape parameters
+    const visemeParams = getVisemeParameters(viseme, amplitude);
+    
     // Calculate warp region - REDUCED to only affect mouth/jaw, not whole face
-    const warpRadius = Math.max(mouthWidth, mouthHeight) * 0.8; // Much smaller radius
-    const jawDrop = amplitude * 40; // Jaw drop amount
-    const mouthOpen = amplitude * 10; // Horizontal opening
+    const warpRadius = Math.max(mouthWidth, mouthHeight) * 0.8;
+    const jawDrop = amplitude * visemeParams.jawDrop;
+    const mouthOpen = amplitude * visemeParams.width;
     
     const regionX = Math.max(0, Math.floor(mouthX - warpRadius));
     const regionY = Math.max(0, Math.floor(mouthY - warpRadius * 0.5)); // Start higher to capture upper lip
@@ -234,7 +321,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
               if (dy < 0 && dy > -mouthHeight * 1.2) {
                 // Pull upper lip pixels UPWARD (sample from below)
                 const upperLipStrength = Math.abs(dy) / (mouthHeight * 1.2);
-                const pullUp = amplitude * 18 * warpAmount * (1 - upperLipStrength);
+                const pullUp = amplitude * visemeParams.upperLip * warpAmount * (1 - upperLipStrength);
                 sourceY = y + pullUp; // Sample from below = visual pull up
               }
               
@@ -242,13 +329,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
               if (dy >= 0) {
                 // Pull lower lip/jaw pixels DOWNWARD (sample from above)
                 const jawStrength = Math.min(2, 1 + (dy / (mouthHeight * 0.8)));
-                const pullDown = amplitude * 50 * warpAmount * jawStrength;
+                const pullDown = amplitude * visemeParams.lowerLip * warpAmount * jawStrength;
                 sourceY = y - pullDown; // Sample from above = visual pull down
               }
               
               // HORIZONTAL STRETCH at corners
               const cornerStrength = Math.abs(dx) / (mouthWidth * 0.7);
-              const pullSide = mouthOpen * warpAmount * cornerStrength;
+              const pullSide = mouthOpen * warpAmount * cornerStrength * visemeParams.cornerPull;
               if (dx > 0) {
                 sourceX = x - pullSide;
               } else {
