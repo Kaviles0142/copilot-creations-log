@@ -176,79 +176,56 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const baseMouthWidth = faceLandmarks.mouth ? faceLandmarks.mouth.width : 60;
     const baseMouthHeight = faceLandmarks.mouth ? faceLandmarks.mouth.height : 16;
     
-    // Much more aggressive jaw opening
-    const jawOpening = amplitude * 25;
-    
-    // Define larger mouth region for smoother blending
-    const regionWidth = baseMouthWidth * 3.5;
-    const regionHeight = baseMouthHeight * 5;
-    const regionX = Math.max(0, mouthX - regionWidth / 2);
-    const regionY = Math.max(0, mouthY - regionHeight / 2);
-    
     ctx.save();
     
-    try {
-      // Extract mouth region pixels
-      const imageData = ctx.getImageData(regionX, regionY, regionWidth, regionHeight);
-      const { data, width, height } = imageData;
-      const warpedData = ctx.createImageData(width, height);
+    // Calculate dynamic mouth opening
+    const openHeight = baseMouthHeight * (1 + amplitude * 8);
+    const openWidth = baseMouthWidth * (1 + amplitude * 0.8);
+    const jawDrop = amplitude * 12;
+    
+    // Draw mouth cavity shadow with blend mode
+    ctx.globalCompositeOperation = 'multiply';
+    
+    // Inner dark mouth
+    const innerGradient = ctx.createRadialGradient(
+      mouthX, mouthY + jawDrop * 0.3, 
+      0, 
+      mouthX, mouthY + jawDrop * 0.3, 
+      openHeight * 0.8
+    );
+    innerGradient.addColorStop(0, `rgba(10, 5, 5, ${Math.min(amplitude * 2.5, 0.95)})`);
+    innerGradient.addColorStop(0.4, `rgba(25, 12, 12, ${Math.min(amplitude * 1.8, 0.75)})`);
+    innerGradient.addColorStop(0.7, `rgba(40, 20, 20, ${Math.min(amplitude * 1.2, 0.5)})`);
+    innerGradient.addColorStop(1, 'rgba(60, 30, 30, 0)');
+    
+    ctx.fillStyle = innerGradient;
+    ctx.beginPath();
+    ctx.ellipse(
+      mouthX, 
+      mouthY + jawDrop * 0.3, 
+      openWidth * 0.7, 
+      openHeight * 0.6, 
+      0, 0, Math.PI * 2
+    );
+    ctx.fill();
+    
+    // Jaw shadow below mouth
+    if (amplitude > 0.15) {
+      const jawGradient = ctx.createLinearGradient(
+        mouthX, mouthY, 
+        mouthX, mouthY + jawDrop + 30
+      );
+      jawGradient.addColorStop(0, `rgba(0, 0, 0, ${amplitude * 0.25})`);
+      jawGradient.addColorStop(0.5, `rgba(0, 0, 0, ${amplitude * 0.15})`);
+      jawGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       
-      // Initialize with original data to avoid white pixels
-      warpedData.data.set(data);
-      
-      // Apply vertical stretch deformation with smooth falloff
-      for (let y = 0; y < height; y++) {
-        // Distance from mouth center (0 at center, 1 at edges)
-        const normalizedY = (y - height / 2) / (height / 2);
-        const distanceFromCenter = Math.abs(normalizedY);
-        
-        // Smooth falloff for natural deformation (more aggressive near center)
-        const falloff = Math.pow(1 - distanceFromCenter, 2);
-        const stretchFactor = 1 + (amplitude * 1.2 * falloff);
-        
-        for (let x = 0; x < width; x++) {
-          // Source pixel position with vertical stretch
-          let sourceY = Math.floor((y - height / 2) / stretchFactor + height / 2);
-          
-          // Add jaw drop for lower half
-          if (normalizedY > 0) {
-            sourceY -= jawOpening * falloff;
-          }
-          
-          // Only modify pixels if source is valid (otherwise keep original)
-          if (sourceY >= 0 && sourceY < height) {
-            const sourceIdx = (sourceY * width + x) * 4;
-            const targetIdx = (y * width + x) * 4;
-            
-            // Copy all RGBA channels
-            warpedData.data[targetIdx] = data[sourceIdx];
-            warpedData.data[targetIdx + 1] = data[sourceIdx + 1];
-            warpedData.data[targetIdx + 2] = data[sourceIdx + 2];
-            warpedData.data[targetIdx + 3] = data[sourceIdx + 3];
-          }
-        }
-      }
-      
-      // Smooth blend edges to avoid visible seams
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.putImageData(warpedData, regionX, regionY);
-      
-      // Add dark mouth cavity overlay for depth
-      if (amplitude > 0.1) {
-        ctx.globalCompositeOperation = 'multiply';
-        const mouthOpenHeight = baseMouthHeight + jawOpening;
-        const gradient = ctx.createRadialGradient(mouthX, mouthY, 0, mouthX, mouthY, mouthOpenHeight * 1.2);
-        gradient.addColorStop(0, `rgba(15, 8, 8, ${Math.min(amplitude * 2, 0.9)})`);
-        gradient.addColorStop(0.5, `rgba(30, 15, 15, ${Math.min(amplitude * 1.2, 0.6)})`);
-        gradient.addColorStop(1, 'rgba(50, 25, 25, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.ellipse(mouthX, mouthY, baseMouthWidth * 0.8, mouthOpenHeight * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } catch (error) {
-      console.error('Pixel warp error:', error);
+      ctx.fillStyle = jawGradient;
+      ctx.fillRect(
+        mouthX - openWidth * 1.2, 
+        mouthY, 
+        openWidth * 2.4, 
+        jawDrop + 30
+      );
     }
     
     ctx.restore();
