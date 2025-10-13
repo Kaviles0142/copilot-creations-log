@@ -189,28 +189,30 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   };
 
   const detectVisemeFromFrequency = (frequencyData: Uint8Array, sampleRate: number): string => {
-    // Analyze frequency bands to detect phonemes
     const binCount = frequencyData.length;
-    const nyquist = sampleRate / 2;
-    const binWidth = nyquist / binCount;
     
-    // Get energy in different frequency bands
+    // Analyze specific frequency ranges for phoneme detection
+    // Low: 0-500Hz, Mid: 500-2000Hz, High: 2000Hz+
     const getLowEnergy = () => {
       let sum = 0;
-      for (let i = 0; i < binCount * 0.1; i++) sum += frequencyData[i];
-      return sum / (binCount * 0.1);
+      const endBin = Math.floor((500 / (sampleRate / 2)) * binCount);
+      for (let i = 0; i < endBin; i++) sum += frequencyData[i];
+      return sum / endBin;
     };
     
     const getMidEnergy = () => {
       let sum = 0;
-      for (let i = Math.floor(binCount * 0.1); i < binCount * 0.4; i++) sum += frequencyData[i];
-      return sum / (binCount * 0.3);
+      const startBin = Math.floor((500 / (sampleRate / 2)) * binCount);
+      const endBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
+      for (let i = startBin; i < endBin; i++) sum += frequencyData[i];
+      return sum / (endBin - startBin);
     };
     
     const getHighEnergy = () => {
       let sum = 0;
-      for (let i = Math.floor(binCount * 0.4); i < binCount; i++) sum += frequencyData[i];
-      return sum / (binCount * 0.6);
+      const startBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
+      for (let i = startBin; i < binCount; i++) sum += frequencyData[i];
+      return sum / (binCount - startBin);
     };
     
     const low = getLowEnergy();
@@ -218,31 +220,54 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const high = getHighEnergy();
     const total = low + mid + high;
     
-    if (total < 10) return 'neutral';
+    console.log('📊 Frequency analysis - Low:', low.toFixed(1), 'Mid:', mid.toFixed(1), 'High:', high.toFixed(1));
     
-    // Vowel detection based on formants
-    if (low > mid && low > high) {
-      // Low frequencies dominant - O, U sounds
-      if (mid < high * 0.5) return 'O'; // Round lips
-      return 'U'; // Very round
-    } else if (high > low && high > mid) {
-      // High frequencies dominant - E, I sounds
-      if (high > mid * 1.5) return 'I'; // Wide smile
-      return 'E'; // Slight smile
-    } else if (mid > low * 1.2 && mid > high * 1.2) {
-      // Mid frequencies - A sound
-      return 'A'; // Open mouth
+    if (total < 5) return 'neutral';
+    
+    // Calculate ratios
+    const lowRatio = low / total;
+    const midRatio = mid / total;
+    const highRatio = high / total;
+    
+    // Vowel A - balanced mid and low
+    if (midRatio > 0.4 && lowRatio > 0.3) {
+      console.log('👄 Detected: A (open)');
+      return 'A';
     }
     
-    // Consonant detection
-    if (high > total * 0.6) {
-      // Sibilants - S, SH, F
-      if (high > 150) return 'F'; // Teeth on lip
-      return 'S'; // Teeth close
+    // Vowel E - mid-high dominant
+    if (midRatio > 0.45 && highRatio > 0.25) {
+      console.log('👄 Detected: E (smile)');
+      return 'E';
     }
     
-    if (low > total * 0.5 && mid < 30) {
-      return 'M'; // Lips closed
+    // Vowel I - high frequencies
+    if (highRatio > 0.4) {
+      console.log('👄 Detected: I (wide smile)');
+      return 'I';
+    }
+    
+    // Vowel O - low dominant
+    if (lowRatio > 0.5) {
+      console.log('👄 Detected: O (round)');
+      return 'O';
+    }
+    
+    // Vowel U - very low dominant
+    if (lowRatio > 0.6) {
+      console.log('👄 Detected: U (very round)');
+      return 'U';
+    }
+    
+    // Consonants
+    if (high > 80 && highRatio > 0.5) {
+      console.log('👄 Detected: S/F (sibilant)');
+      return 'S';
+    }
+    
+    if (low > 60 && mid < 20) {
+      console.log('👄 Detected: M (closed)');
+      return 'M';
     }
     
     return 'neutral';
