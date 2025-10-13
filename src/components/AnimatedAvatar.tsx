@@ -139,6 +139,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   };
 
   const applyMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
+    console.log('🎤 Mouth animation - isSpeaking:', isSpeaking, 'amplitude:', amplitude.toFixed(3));
+    
     if (!isSpeaking || amplitude < 0.1) return;
 
     // Use detected mouth position or fallback to default
@@ -150,11 +152,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const mouthWidth = baseMouthWidth * (1 + amplitude * 0.5);
     const mouthHeight = baseMouthHeight * (1 + amplitude * 1.2);
 
+    console.log('👄 Drawing mouth at:', { x: Math.round(mouthX), y: Math.round(mouthY), width: Math.round(mouthWidth), height: Math.round(mouthHeight) });
+
     // Save context
     ctx.save();
     
-    // More visible mouth overlay
-    ctx.fillStyle = 'rgba(80, 40, 40, 0.6)';
+    // Much more visible mouth overlay with bright red for debugging
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
     ctx.beginPath();
     ctx.ellipse(mouthX, mouthY, mouthWidth / 2, mouthHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
