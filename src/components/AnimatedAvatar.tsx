@@ -82,14 +82,20 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           const scaleX = 512;
           const scaleY = 512;
           
-          setFaceMesh({
+          const faceMeshData = {
             landmarks: landmarks.map(l => ({ x: l.x * scaleX, y: l.y * scaleY, z: l.z })),
             mouthOuter,
             leftEyeIndices,
             rightEyeIndices
-          });
+          };
+          
+          setFaceMesh(faceMeshData);
           
           console.log('✅ Face mesh detected with 478 landmarks');
+          console.log('👄 Mouth position:', {
+            x: faceMeshData.landmarks[61].x.toFixed(1),
+            y: faceMeshData.landmarks[61].y.toFixed(1)
+          });
         } else {
           console.warn('⚠️ No face detected, using fallback');
         }
@@ -124,6 +130,11 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       externalAnalyser.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
+      // Debug logging
+      if (currentAmplitude > 0.05) {
+        console.log('🎵 Audio amplitude:', currentAmplitude.toFixed(3));
+      }
+      
       // Add delay buffer for natural lip sync (50-100ms)
       amplitudeHistory.current.push(currentAmplitude);
       if (amplitudeHistory.current.length > 3) {
@@ -143,6 +154,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
     // Apply facial animations using mesh
     if (isSpeaking && amplitude > 0.05) {
+      console.log('🗣️ Animating mouth with amplitude:', amplitude.toFixed(3));
       applyMeshMouthAnimation(ctx, amplitude, canvas);
     }
     applyMeshBlinking(ctx, canvas);
