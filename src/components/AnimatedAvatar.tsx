@@ -184,15 +184,15 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       mouthHeight = 40;
     }
 
-    // Calculate warp region (area around mouth to displace)
-    const warpRadius = Math.max(mouthWidth, mouthHeight) * 2;
-    const jawDrop = amplitude * 35; // Increased jaw drop for more dramatic effect
-    const mouthOpen = amplitude * 12; // Horizontal opening
+    // Calculate warp region - REDUCED to only affect mouth/jaw, not whole face
+    const warpRadius = Math.max(mouthWidth, mouthHeight) * 0.8; // Much smaller radius
+    const jawDrop = amplitude * 40; // Jaw drop amount
+    const mouthOpen = amplitude * 10; // Horizontal opening
     
     const regionX = Math.max(0, Math.floor(mouthX - warpRadius));
-    const regionY = Math.max(0, Math.floor(mouthY - warpRadius));
+    const regionY = Math.max(0, Math.floor(mouthY - warpRadius * 0.5)); // Start higher to capture upper lip
     const regionWidth = Math.min(canvas.width - regionX, Math.ceil(warpRadius * 2));
-    const regionHeight = Math.min(canvas.height - regionY, Math.ceil(warpRadius * 2 + jawDrop));
+    const regionHeight = Math.min(canvas.height - regionY, Math.ceil(warpRadius * 1.5 + jawDrop)); // Extend down for jaw
 
     try {
       // Get the pixel data for the mouth region
@@ -225,23 +225,23 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             let sourceX = x;
             let sourceY = y;
             
-            // ASYMMETRIC JAW DROP (bottom moves much more than top)
+            // ASYMMETRIC JAW DROP (bottom moves MUCH more than top)
             if (dy > 0) {
-              // Below mouth center - BOTTOM JAW
-              const jawStrength = Math.min(1, dy / (mouthHeight * 2)); // Stronger as you go down
-              sourceY = y - (jawDrop * warpAmount * jawStrength);
+              // Below mouth center - BOTTOM JAW (strong movement)
+              const jawStrength = Math.min(1.5, dy / (mouthHeight * 1.5)); // Progressive strength going down
+              sourceY = y - (jawDrop * warpAmount * jawStrength * 0.9); // Strong jaw drop
             } else {
-              // Above mouth center - TOP LIP (minimal movement)
-              const upperLipResistance = 0.15; // Top lip barely moves
+              // Above mouth center - TOP LIP (almost no movement)
+              const upperLipResistance = 0.05; // Top lip barely moves at all
               sourceY = y - (jawDrop * warpAmount * upperLipResistance);
             }
             
-            // HORIZONTAL STRETCH (corners pull outward)
-            const horizontalZone = Math.abs(dy) < mouthHeight * 0.8;
+            // HORIZONTAL STRETCH (corners pull outward, but only in mouth zone)
+            const horizontalZone = Math.abs(dy) < mouthHeight * 0.6;
             if (horizontalZone) {
-              // Stronger pull near the corners
-              const cornerStrength = Math.abs(dx) / (mouthWidth * 0.5);
-              const pullAmount = mouthOpen * warpAmount * cornerStrength;
+              // Stronger pull at the corners
+              const cornerStrength = Math.min(1, Math.abs(dx) / (mouthWidth * 0.6));
+              const pullAmount = mouthOpen * warpAmount * cornerStrength * 0.7;
               
               if (dx > 0) {
                 sourceX = x - pullAmount;
