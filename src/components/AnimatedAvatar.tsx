@@ -362,19 +362,19 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           let deltaX = 0;
           let deltaY = 0;
           
-          // EYEBROW WARPING - subtle raise based on expression intensity
+          // EYEBROW WARPING - raise based on expression intensity and open vowels
           const leftBrowDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftBrowY, 2));
           const rightBrowDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightBrowY, 2));
           
           if (leftBrowDist < 60 && isSpeaking && amplitude > 0.05) {
             const browStrength = 1 - (leftBrowDist / 60);
-            // Much more subtle eyebrow movement - only slight raise on emphasized speech
-            const browRaise = amplitude * (visemeParams.jawDrop / 60 + visemeParams.cornerPull * 0.8) * browStrength;
+            // Raise eyebrows during speech, especially for wide mouth shapes
+            const browRaise = amplitude * (visemeParams.jawDrop / 15 + visemeParams.cornerPull * 4) * browStrength;
             deltaY += browRaise;
           }
           if (rightBrowDist < 60 && isSpeaking && amplitude > 0.05) {
             const browStrength = 1 - (rightBrowDist / 60);
-            const browRaise = amplitude * (visemeParams.jawDrop / 60 + visemeParams.cornerPull * 0.8) * browStrength;
+            const browRaise = amplitude * (visemeParams.jawDrop / 15 + visemeParams.cornerPull * 4) * browStrength;
             deltaY += browRaise;
           }
           
