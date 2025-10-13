@@ -103,6 +103,8 @@ const HistoricalChat = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null); // Reusable audio element
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null); // Reusable source node
   
   const { toast } = useToast();
 
@@ -255,12 +257,6 @@ const HistoricalChat = () => {
     if (!selectedFigure) return;
     
     try {
-      // Stop any current audio
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-
       console.log('🎤 Generating Azure TTS for:', selectedFigure.name);
       
       // Use Azure TTS directly
@@ -279,45 +275,56 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Convert base64 to audio and play
+      // Convert base64 to audio blob
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      const audio = new Audio(audioUrl);
-      
-      // Setup audio analysis for avatar animation
-      try {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
-        
-        if (!analyserRef.current) {
-          analyserRef.current = audioContextRef.current.createAnalyser();
-          analyserRef.current.fftSize = 256;
-        }
-        
-        // Create media source and connect to analyser
-        const source = audioContextRef.current.createMediaElementSource(audio);
-        source.connect(analyserRef.current);
-        analyserRef.current.connect(audioContextRef.current.destination);
-        
-        console.log('✅ Audio analysis setup for avatar animation');
-      } catch (error) {
-        console.warn('⚠️ Audio analysis setup failed (avatar will play without lip-sync):', error);
+      // Initialize audio context and analyser ONCE
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log('🎧 AudioContext created');
       }
       
-      setCurrentAudio(audio);
+      if (!analyserRef.current) {
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+        console.log('📊 Analyser created');
+      }
+      
+      // Create or reuse audio element
+      if (!audioElementRef.current) {
+        audioElementRef.current = new Audio();
+        
+        // Create source node ONCE and connect to analyser
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+        sourceNodeRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+        
+        console.log('✅ Audio pipeline created: Element -> Source -> Analyser -> Destination');
+      }
+      
+      // Stop current audio if playing
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      
+      // Set new audio source
+      audioElementRef.current.src = audioUrl;
+      setCurrentAudio(audioElementRef.current);
       setIsSpeaking(true);
       
-      audio.onended = () => {
+      audioElementRef.current.onended = () => {
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         setCurrentAudio(null);
         setIsGreetingPlaying(false);
         URL.revokeObjectURL(audioUrl);
+        console.log('🔇 Audio ended');
       };
 
-      audio.onerror = () => {
+      audioElementRef.current.onerror = () => {
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         toast({
@@ -327,10 +334,10 @@ const HistoricalChat = () => {
         });
       };
 
-      await audio.play();
+      await audioElementRef.current.play();
       setIsPlayingAudio(true);
       
-      console.log('🔊 Azure TTS audio playing');
+      console.log('🔊 Azure TTS audio playing with analyser connected');
       
     } catch (error) {
       console.error('❌ Azure TTS generation error:', error);
