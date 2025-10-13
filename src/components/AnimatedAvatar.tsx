@@ -14,15 +14,15 @@ interface AnimatedAvatarProps {
 // Viseme shape parameters for different phonemes
 const getVisemeParameters = (viseme: string, amplitude: number) => {
   const params = {
-    neutral: { upperLip: 5, lowerLip: 10, jawDrop: 20, width: 5, cornerPull: 0.5, roundness: 0 },
-    A: { upperLip: 20, lowerLip: 60, jawDrop: 50, width: 12, cornerPull: 0.8, roundness: 0 }, // Open wide
-    E: { upperLip: 8, lowerLip: 25, jawDrop: 25, width: 18, cornerPull: 1.2, roundness: 0 }, // Wide smile
-    I: { upperLip: 5, lowerLip: 15, jawDrop: 15, width: 22, cornerPull: 1.5, roundness: 0 }, // Widest smile
-    O: { upperLip: 12, lowerLip: 35, jawDrop: 35, width: 6, cornerPull: 0.3, roundness: 1.5 }, // Round lips
-    U: { upperLip: 10, lowerLip: 30, jawDrop: 30, width: 4, cornerPull: 0.2, roundness: 2.0 }, // Very round
-    M: { upperLip: 2, lowerLip: 2, jawDrop: 5, width: 2, cornerPull: 0.1, roundness: 0 }, // Lips closed
-    F: { upperLip: 3, lowerLip: 8, jawDrop: 12, width: 8, cornerPull: 0.4, roundness: 0 }, // Teeth on lip
-    S: { upperLip: 4, lowerLip: 10, jawDrop: 15, width: 10, cornerPull: 0.6, roundness: 0 }, // Teeth close
+    neutral: { upperLip: 5, lowerLip: 10, jawDrop: 20, width: 5, cornerPull: 0.5, lipPucker: 0 },
+    A: { upperLip: 25, lowerLip: 70, jawDrop: 60, width: 15, cornerPull: 0.9, lipPucker: 0 }, // WIDE open mouth
+    E: { upperLip: 8, lowerLip: 25, jawDrop: 25, width: 25, cornerPull: 1.8, lipPucker: 0 }, // WIDE smile
+    I: { upperLip: 5, lowerLip: 15, jawDrop: 15, width: 30, cornerPull: 2.2, lipPucker: 0 }, // WIDEST smile
+    O: { upperLip: 15, lowerLip: 40, jawDrop: 40, width: 3, cornerPull: 0.1, lipPucker: 2.5 }, // ROUND pursed lips
+    U: { upperLip: 12, lowerLip: 35, jawDrop: 35, width: 2, cornerPull: 0.05, lipPucker: 3.0 }, // VERY round
+    M: { upperLip: 1, lowerLip: 1, jawDrop: 3, width: 1, cornerPull: 0.1, lipPucker: 0 }, // Lips CLOSED
+    F: { upperLip: 3, lowerLip: 8, jawDrop: 12, width: 10, cornerPull: 0.5, lipPucker: 0 }, // Teeth on lip
+    S: { upperLip: 4, lowerLip: 10, jawDrop: 15, width: 12, cornerPull: 0.7, lipPucker: 0 }, // Teeth close
   };
   
   return params[viseme as keyof typeof params] || params.neutral;
@@ -344,27 +344,37 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             if (isInMouthZone) {
               // UPPER LIP ZONE (above mouth center)
               if (dy < 0 && dy > -mouthHeight * 1.2) {
-                // Pull upper lip pixels UPWARD (sample from below)
                 const upperLipStrength = Math.abs(dy) / (mouthHeight * 1.2);
                 const pullUp = amplitude * visemeParams.upperLip * warpAmount * (1 - upperLipStrength);
-                sourceY = y + pullUp; // Sample from below = visual pull up
+                sourceY = y + pullUp;
               }
               
               // LOWER LIP & JAW ZONE (at and below mouth center)  
               if (dy >= 0) {
-                // Pull lower lip/jaw pixels DOWNWARD (sample from above)
                 const jawStrength = Math.min(2, 1 + (dy / (mouthHeight * 0.8)));
                 const pullDown = amplitude * visemeParams.lowerLip * warpAmount * jawStrength;
-                sourceY = y - pullDown; // Sample from above = visual pull down
+                sourceY = y - pullDown;
               }
               
-              // HORIZONTAL STRETCH at corners
+              // HORIZONTAL STRETCH (for smiles) or PUCKER (for O/U sounds)
               const cornerStrength = Math.abs(dx) / (mouthWidth * 0.7);
-              const pullSide = mouthOpen * warpAmount * cornerStrength * visemeParams.cornerPull;
-              if (dx > 0) {
-                sourceX = x - pullSide;
+              
+              if (visemeParams.lipPucker > 0) {
+                // Pucker inward for O/U sounds
+                const puckerAmount = visemeParams.lipPucker * warpAmount * cornerStrength * amplitude;
+                if (dx > 0) {
+                  sourceX = x + puckerAmount; // Pull corners inward
+                } else {
+                  sourceX = x - puckerAmount;
+                }
               } else {
-                sourceX = x + pullSide;
+                // Stretch outward for smiles (E/I sounds)
+                const pullSide = mouthOpen * warpAmount * cornerStrength * visemeParams.cornerPull;
+                if (dx > 0) {
+                  sourceX = x - pullSide;
+                } else {
+                  sourceX = x + pullSide;
+                }
               }
             }
             
