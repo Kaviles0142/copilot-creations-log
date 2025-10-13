@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
 import { Volume2, Loader2 } from 'lucide-react';
+import * as faceapi from '@vladmandic/face-api';
 
 interface AnimatedAvatarProps {
   imageUrl: string | null;
@@ -15,20 +16,78 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const imageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number>();
   const [blinkTimer, setBlinkTimer] = useState(0);
+  const [faceLandmarks, setFaceLandmarks] = useState<{ mouth: { x: number; y: number; width: number; height: number } | null; eyes: { left: { x: number; y: number }; right: { x: number; y: number } } | null }>({ mouth: null, eyes: null });
+  const [modelsLoaded, setModelsLoaded] = useState(false);
 
 
-  // Load image
+  // Load face-api models
   useEffect(() => {
-    if (!imageUrl) return;
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        setModelsLoaded(true);
+        console.log('Face detection models loaded');
+      } catch (error) {
+        console.error('Error loading face detection models:', error);
+      }
+    };
+    loadModels();
+  }, []);
+
+  // Load image and detect facial landmarks
+  useEffect(() => {
+    if (!imageUrl || !modelsLoaded) return;
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => {
+    img.onload = async () => {
       imageRef.current = img;
+      
+      // Detect facial landmarks
+      try {
+        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+        
+        if (detection) {
+          const landmarks = detection.landmarks;
+          const mouthLandmarks = landmarks.getMouth();
+          const leftEye = landmarks.getLeftEye();
+          const rightEye = landmarks.getRightEye();
+          
+          // Calculate mouth bounding box
+          const mouthXs = mouthLandmarks.map(p => p.x);
+          const mouthYs = mouthLandmarks.map(p => p.y);
+          const mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
+          const mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
+          const mouthWidth = Math.max(...mouthXs) - Math.min(...mouthXs);
+          const mouthHeight = Math.max(...mouthYs) - Math.min(...mouthYs);
+          
+          // Calculate eye centers
+          const leftEyeX = leftEye.reduce((sum, p) => sum + p.x, 0) / leftEye.length;
+          const leftEyeY = leftEye.reduce((sum, p) => sum + p.y, 0) / leftEye.length;
+          const rightEyeX = rightEye.reduce((sum, p) => sum + p.x, 0) / rightEye.length;
+          const rightEyeY = rightEye.reduce((sum, p) => sum + p.y, 0) / rightEye.length;
+          
+          setFaceLandmarks({
+            mouth: { x: mouthX, y: mouthY, width: mouthWidth, height: mouthHeight },
+            eyes: {
+              left: { x: leftEyeX, y: leftEyeY },
+              right: { x: rightEyeX, y: rightEyeY }
+            }
+          });
+          
+          console.log('Facial landmarks detected:', { mouth: { x: mouthX, y: mouthY }, eyes: { left: { x: leftEyeX, y: leftEyeY }, right: { x: rightEyeX, y: rightEyeY } } });
+        } else {
+          console.warn('No face detected, using default positions');
+        }
+      } catch (error) {
+        console.error('Error detecting facial landmarks:', error);
+      }
+      
       drawFrame();
     };
     img.src = imageUrl;
-  }, [imageUrl]);
+  }, [imageUrl, modelsLoaded]);
 
   const drawFrame = () => {
     const canvas = canvasRef.current;
@@ -68,12 +127,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const applyMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
     if (!isSpeaking || amplitude < 0.1) return;
 
-    // Portrait faces are typically in the upper 2/3 of the image
-    // Mouth is about 70% down from top for a typical portrait
-    const mouthY = canvas.height * 0.68; // ~348px for 512px canvas
-    const mouthX = canvas.width / 2; // Center
-    const mouthWidth = 30 + (amplitude * 50); // Dynamic width based on amplitude
-    const mouthHeight = 8 + (amplitude * 35); // Dynamic height
+    // Use detected mouth position or fallback to default
+    const mouthY = faceLandmarks.mouth ? faceLandmarks.mouth.y : canvas.height * 0.68;
+    const mouthX = faceLandmarks.mouth ? faceLandmarks.mouth.x : canvas.width / 2;
+    const baseMouthWidth = faceLandmarks.mouth ? faceLandmarks.mouth.width : 60;
+    const baseMouthHeight = faceLandmarks.mouth ? faceLandmarks.mouth.height : 16;
+    
+    const mouthWidth = baseMouthWidth * (1 + amplitude * 0.5);
+    const mouthHeight = baseMouthHeight * (1 + amplitude * 1.2);
 
     // Save context
     ctx.save();
@@ -92,18 +153,17 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     setBlinkTimer((prev) => {
       const next = prev + 1;
       if (next % 120 === 0) { // Roughly every 2 seconds at 60fps
-        // Eyes are about 45% down from top
-        const eyeY = canvas.height * 0.42; // ~215px for 512px canvas
-        const centerX = canvas.width / 2;
-        const eyeSpacing = canvas.width * 0.12; // Distance from center
-        const leftEyeX = centerX - eyeSpacing;
-        const rightEyeX = centerX + eyeSpacing;
+        // Use detected eye positions or fallback to default
+        const leftEyeX = faceLandmarks.eyes?.left.x || (canvas.width / 2 - canvas.width * 0.12);
+        const leftEyeY = faceLandmarks.eyes?.left.y || (canvas.height * 0.42);
+        const rightEyeX = faceLandmarks.eyes?.right.x || (canvas.width / 2 + canvas.width * 0.12);
+        const rightEyeY = faceLandmarks.eyes?.right.y || (canvas.height * 0.42);
 
         ctx.save();
         ctx.fillStyle = 'rgba(40, 30, 30, 0.8)';
         // Draw eyelids
-        ctx.fillRect(leftEyeX - 25, eyeY - 5, 50, 10);
-        ctx.fillRect(rightEyeX - 25, eyeY - 5, 50, 10);
+        ctx.fillRect(leftEyeX - 25, leftEyeY - 5, 50, 10);
+        ctx.fillRect(rightEyeX - 25, rightEyeY - 5, 50, 10);
         ctx.restore();
       }
       return next % 180;
@@ -132,7 +192,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [imageUrl, isSpeaking, externalAnalyser]);
+  }, [imageUrl, isSpeaking, externalAnalyser, faceLandmarks]);
 
   if (isLoading) {
     return (
