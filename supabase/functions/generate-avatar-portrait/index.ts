@@ -127,5 +127,5 @@ serve(async (req) => {
 });
 
 function generateVisualPrompt(figureName: string): string {
-  return `Create a photorealistic, high-quality portrait of ${figureName}. The image should show them from the chest up, seated or standing in an environment appropriate to their era and profession. They should have a neutral, welcoming facial expression and be facing the camera directly. The lighting should be natural and professional, with rich historical details in the background that reflect their time period and achievements. Ultra high resolution, 4K quality, cinematic lighting, historically accurate costume and setting.`;
+  return `Create a professional passport-style portrait photograph of ${figureName}. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. Professional studio lighting with a subtle gradient background appropriate to their era. Head and shoulders only, straight-on angle. Ultra high resolution, photorealistic, historically accurate facial features and period-appropriate attire visible from shoulders up.`;
 }
