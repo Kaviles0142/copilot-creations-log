@@ -483,6 +483,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         }
       }
       
+      // CRITICAL: Clear original face region before placing warped pixels
+      ctx.clearRect(regionX, regionY, regionWidth, regionHeight);
       ctx.putImageData(outputData, regionX, regionY);
     } catch (error) {
       console.warn('⚠️ Face warping failed:', error);
