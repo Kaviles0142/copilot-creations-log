@@ -76,19 +76,35 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           const rightEyeX = rightEye.reduce((sum, p) => sum + p.x, 0) / rightEye.length;
           const rightEyeY = rightEye.reduce((sum, p) => sum + p.y, 0) / rightEye.length;
           
+          // CRITICAL: Scale coordinates from original image size to canvas size (512x512)
+          const scaleX = 512 / img.width;
+          const scaleY = 512 / img.height;
+          
+          console.log('📐 Scaling factors:', { scaleX, scaleY, imgWidth: img.width, imgHeight: img.height });
+          
           setFaceLandmarks({
-            mouth: { x: mouthX, y: mouthY, width: mouthWidth, height: mouthHeight },
+            mouth: { 
+              x: mouthX * scaleX, 
+              y: mouthY * scaleY, 
+              width: mouthWidth * scaleX, 
+              height: mouthHeight * scaleY 
+            },
             eyes: {
-              left: { x: leftEyeX, y: leftEyeY },
-              right: { x: rightEyeX, y: rightEyeY }
+              left: { x: leftEyeX * scaleX, y: leftEyeY * scaleY },
+              right: { x: rightEyeX * scaleX, y: rightEyeY * scaleY }
             }
           });
           
-          console.log('✅ Facial landmarks detected:', { 
-            mouth: { x: Math.round(mouthX), y: Math.round(mouthY), width: Math.round(mouthWidth), height: Math.round(mouthHeight) },
+          console.log('✅ Facial landmarks detected and scaled:', { 
+            mouth: { 
+              x: Math.round(mouthX * scaleX), 
+              y: Math.round(mouthY * scaleY), 
+              width: Math.round(mouthWidth * scaleX), 
+              height: Math.round(mouthHeight * scaleY) 
+            },
             eyes: { 
-              left: { x: Math.round(leftEyeX), y: Math.round(leftEyeY) }, 
-              right: { x: Math.round(rightEyeX), y: Math.round(rightEyeY) } 
+              left: { x: Math.round(leftEyeX * scaleX), y: Math.round(leftEyeY * scaleY) }, 
+              right: { x: Math.round(rightEyeX * scaleX), y: Math.round(rightEyeY * scaleY) } 
             } 
           });
         } else {
