@@ -213,15 +213,26 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
     // Apply PIXEL WARPING for entire face (eyes, eyebrows, mouth)
     if (faceMesh) {
-      const blendedViseme = isSpeaking && amplitude > 0.05 
+      // CRITICAL: Scale amplitude MUCH higher for visibility
+      const amplifiedAmplitude = Math.min(1, amplitude * 8); // 8x amplification!
+      
+      const blendedViseme = isSpeaking && amplifiedAmplitude > 0.05 
         ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current)
         : getVisemeParameters('neutral', 0);
+      
+      // Add amplitude-driven jaw movement even for neutral
+      if (isSpeaking && amplifiedAmplitude > 0.05) {
+        blendedViseme.jawDrop = Math.max(blendedViseme.jawDrop, amplifiedAmplitude * 200);
+        blendedViseme.lowerLip = Math.max(blendedViseme.lowerLip, amplifiedAmplitude * 150);
+        blendedViseme.upperLip = Math.max(blendedViseme.upperLip, amplifiedAmplitude * 80);
+      }
       
       // DEBUG: Log warping every 30 frames
       if (Math.random() < 0.03) {
         console.log('🎭 Warping face:', { 
           isSpeaking, 
-          amplitude: amplitude.toFixed(3), 
+          rawAmplitude: amplitude.toFixed(3),
+          amplified: amplifiedAmplitude.toFixed(3), 
           viseme: targetViseme,
           jawDrop: blendedViseme.jawDrop.toFixed(1),
           cornerPull: blendedViseme.cornerPull.toFixed(1),
@@ -230,7 +241,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         });
       }
       
-      applyFullFaceWarping(ctx, amplitude, canvas, blendedViseme, expressionIntensity.current, isSpeaking && amplitude > 0.05);
+      applyFullFaceWarping(ctx, amplifiedAmplitude, canvas, blendedViseme, expressionIntensity.current, isSpeaking && amplifiedAmplitude > 0.05);
     }
     
     applyNaturalBlinking(ctx, canvas);
