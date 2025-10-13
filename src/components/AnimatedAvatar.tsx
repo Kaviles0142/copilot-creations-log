@@ -154,7 +154,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
     // Apply PIXEL WARPING for mouth animation
     if (isSpeaking && amplitude > 0.05) {
-      console.log('🗣️ Warping mouth pixels with amplitude:', amplitude.toFixed(3));
+      console.log('🗣️ Warping mouth - amplitude:', amplitude.toFixed(3), 'faceMesh:', !!faceMesh);
       applyMouthPixelWarping(ctx, amplitude, canvas);
     }
     
@@ -221,39 +221,38 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             const strength = 1 - (distance / warpRadius);
             const warpAmount = strength * strength * strength; // Cubic falloff for smoother blend
             
-            // Calculate displacement
+            // Calculate displacement - initialize source coordinates
             let sourceX = x;
             let sourceY = y;
             
-            // LIP SEPARATION - pull lips apart vertically
-            const lipZone = Math.abs(dy) < mouthHeight * 1.2;
+            // LIP SEPARATION - pull lips apart to create visible gap
+            // Define zones relative to mouth center
+            const isInMouthZone = Math.abs(dx) < mouthWidth * 0.7;
             
-            if (lipZone) {
-              // Upper lip zone (slightly above center)
-              if (dy < -mouthHeight * 0.1 && dy > -mouthHeight * 0.8) {
-                // Pull upper lip UP slightly
-                const upperLipPull = amplitude * 8 * warpAmount;
-                sourceY = y + upperLipPull; // Pull UP (positive direction)
+            if (isInMouthZone) {
+              // UPPER LIP ZONE (above mouth center)
+              if (dy < 0 && dy > -mouthHeight * 1.2) {
+                // Pull upper lip pixels UPWARD (sample from below)
+                const upperLipStrength = Math.abs(dy) / (mouthHeight * 1.2);
+                const pullUp = amplitude * 18 * warpAmount * (1 - upperLipStrength);
+                sourceY = y + pullUp; // Sample from below = visual pull up
               }
-              // Lower lip zone (at and below center)
-              else if (dy >= -mouthHeight * 0.1) {
-                // Pull lower lip DOWN more aggressively
-                const lowerLipPull = amplitude * 40 * warpAmount;
-                const jawProgression = Math.max(1, dy / (mouthHeight * 0.5)); // Stronger as you go down
-                sourceY = y - (lowerLipPull * jawProgression); // Pull DOWN
-              }
-            }
-            
-            // HORIZONTAL STRETCH (corners pull outward)
-            const horizontalZone = Math.abs(dy) < mouthHeight * 0.8;
-            if (horizontalZone) {
-              const cornerStrength = Math.min(1, Math.abs(dx) / (mouthWidth * 0.6));
-              const pullAmount = mouthOpen * warpAmount * cornerStrength * 0.8;
               
+              // LOWER LIP & JAW ZONE (at and below mouth center)  
+              if (dy >= 0) {
+                // Pull lower lip/jaw pixels DOWNWARD (sample from above)
+                const jawStrength = Math.min(2, 1 + (dy / (mouthHeight * 0.8)));
+                const pullDown = amplitude * 50 * warpAmount * jawStrength;
+                sourceY = y - pullDown; // Sample from above = visual pull down
+              }
+              
+              // HORIZONTAL STRETCH at corners
+              const cornerStrength = Math.abs(dx) / (mouthWidth * 0.7);
+              const pullSide = mouthOpen * warpAmount * cornerStrength;
               if (dx > 0) {
-                sourceX = x - pullAmount;
+                sourceX = x - pullSide;
               } else {
-                sourceX = x + pullAmount;
+                sourceX = x + pullSide;
               }
             }
             
