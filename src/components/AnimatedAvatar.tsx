@@ -20,18 +20,18 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const [modelsLoaded, setModelsLoaded] = useState(false);
 
 
-  // Load face-api models from CDN
+  // Load face-api models from official CDN
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         setModelsLoaded(true);
         console.log('✅ Face detection models loaded successfully');
       } catch (error) {
         console.error('❌ Error loading face detection models:', error);
-        // Fallback to default positions - still allow animation
+        // Fallback - still allow animation with default positions
         setModelsLoaded(true);
         console.log('⚠️ Using default face positions (no detection)');
       }
