@@ -152,95 +152,122 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Apply facial animations using mesh
+    // Apply PIXEL WARPING for mouth animation
     if (isSpeaking && amplitude > 0.05) {
-      console.log('🗣️ Animating mouth with amplitude:', amplitude.toFixed(3));
-      applyMeshMouthAnimation(ctx, amplitude, canvas);
+      console.log('🗣️ Warping mouth pixels with amplitude:', amplitude.toFixed(3));
+      applyMouthPixelWarping(ctx, amplitude, canvas);
     }
+    
     applyMeshBlinking(ctx, canvas);
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  const applyMeshMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
-    if (!faceMesh) {
-      // Fallback to center position
-      const mouthX = canvas.width / 2;
-      const mouthY = canvas.height * 0.7;
-      drawMouthOpening(ctx, mouthX, mouthY, amplitude);
-      return;
+  const applyMouthPixelWarping = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
+    // Get mouth position
+    let mouthX, mouthY, mouthWidth, mouthHeight;
+    
+    if (faceMesh) {
+      const { landmarks, mouthOuter } = faceMesh;
+      const mouthPoints = mouthOuter.map((idx: number) => landmarks[idx]);
+      const mouthXs = mouthPoints.map((p: any) => p.x);
+      const mouthYs = mouthPoints.map((p: any) => p.y);
+      mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
+      mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
+      mouthWidth = Math.max(...mouthXs) - Math.min(...mouthXs);
+      mouthHeight = Math.max(...mouthYs) - Math.min(...mouthYs);
+    } else {
+      mouthX = canvas.width / 2;
+      mouthY = canvas.height * 0.7;
+      mouthWidth = 100;
+      mouthHeight = 40;
     }
 
-    const { landmarks, mouthOuter } = faceMesh;
+    // Calculate warp region (area around mouth to displace)
+    const warpRadius = Math.max(mouthWidth, mouthHeight) * 1.5;
+    const jawDrop = amplitude * 25; // How far down to stretch
+    const mouthOpen = amplitude * 20; // How wide to open
     
-    // Get mouth landmarks
-    const mouthPoints = mouthOuter.map((idx: number) => landmarks[idx]);
-    
-    // Calculate mouth center and dimensions
-    const mouthXs = mouthPoints.map((p: any) => p.x);
-    const mouthYs = mouthPoints.map((p: any) => p.y);
-    const mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
-    const mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
-    
-    drawMouthOpening(ctx, mouthX, mouthY, amplitude);
-  };
+    const regionX = Math.max(0, Math.floor(mouthX - warpRadius));
+    const regionY = Math.max(0, Math.floor(mouthY - warpRadius));
+    const regionWidth = Math.min(canvas.width - regionX, Math.ceil(warpRadius * 2));
+    const regionHeight = Math.min(canvas.height - regionY, Math.ceil(warpRadius * 2 + jawDrop));
 
-  const drawMouthOpening = (ctx: CanvasRenderingContext2D, mouthX: number, mouthY: number, amplitude: number) => {
-    ctx.save();
-    
-    // Calculate dynamic mouth opening
-    const baseWidth = 50;
-    const baseHeight = 14;
-    const openHeight = baseHeight * (1 + amplitude * 10);
-    const openWidth = baseWidth * (1 + amplitude * 1.2);
-    const jawDrop = amplitude * 15;
-    
-    // Draw dark mouth cavity with gradient
-    ctx.globalCompositeOperation = 'multiply';
-    
-    const gradient = ctx.createRadialGradient(
-      mouthX, mouthY + jawDrop * 0.4,
-      0,
-      mouthX, mouthY + jawDrop * 0.4,
-      openHeight
-    );
-    gradient.addColorStop(0, `rgba(5, 2, 2, ${Math.min(amplitude * 3, 0.98)})`);
-    gradient.addColorStop(0.3, `rgba(15, 8, 8, ${Math.min(amplitude * 2.2, 0.85)})`);
-    gradient.addColorStop(0.6, `rgba(30, 15, 15, ${Math.min(amplitude * 1.5, 0.6)})`);
-    gradient.addColorStop(1, 'rgba(50, 25, 25, 0)');
-    
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.ellipse(
-      mouthX,
-      mouthY + jawDrop * 0.4,
-      openWidth * 0.8,
-      openHeight * 0.7,
-      0, 0, Math.PI * 2
-    );
-    ctx.fill();
-    
-    // Add jaw shadow for larger openings
-    if (amplitude > 0.2) {
-      const jawGradient = ctx.createLinearGradient(
-        mouthX, mouthY,
-        mouthX, mouthY + jawDrop + 35
-      );
-      jawGradient.addColorStop(0, `rgba(0, 0, 0, ${amplitude * 0.3})`);
-      jawGradient.addColorStop(0.6, `rgba(0, 0, 0, ${amplitude * 0.15})`);
-      jawGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    try {
+      // Get the pixel data for the mouth region
+      const imageData = ctx.getImageData(regionX, regionY, regionWidth, regionHeight);
+      const pixels = imageData.data;
       
-      ctx.fillStyle = jawGradient;
-      ctx.fillRect(
-        mouthX - openWidth * 1.3,
-        mouthY,
-        openWidth * 2.6,
-        jawDrop + 35
-      );
+      // Create output buffer
+      const outputData = ctx.createImageData(regionWidth, regionHeight);
+      const output = outputData.data;
+      
+      // Warp pixels
+      for (let y = 0; y < regionHeight; y++) {
+        for (let x = 0; x < regionWidth; x++) {
+          // Convert to canvas coordinates
+          const canvasX = regionX + x;
+          const canvasY = regionY + y;
+          
+          // Distance from mouth center
+          const dx = canvasX - mouthX;
+          const dy = canvasY - mouthY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Only warp pixels within warp radius
+          if (distance < warpRadius) {
+            // Calculate warp strength (stronger near center)
+            const strength = 1 - (distance / warpRadius);
+            const warpAmount = strength * strength; // Quadratic falloff
+            
+            // Calculate displacement
+            let sourceX = x;
+            let sourceY = y;
+            
+            // Vertical displacement for jaw drop (below mouth center)
+            if (dy > 0) {
+              sourceY = y - (jawDrop * warpAmount);
+            }
+            
+            // Horizontal displacement for mouth opening (near vertical center)
+            if (Math.abs(dy) < mouthHeight * 0.5) {
+              if (dx > 0) {
+                sourceX = x - (mouthOpen * warpAmount * 0.3);
+              } else {
+                sourceX = x + (mouthOpen * warpAmount * 0.3);
+              }
+            }
+            
+            // Clamp source coordinates
+            sourceX = Math.max(0, Math.min(regionWidth - 1, Math.floor(sourceX)));
+            sourceY = Math.max(0, Math.min(regionHeight - 1, Math.floor(sourceY)));
+            
+            // Copy pixel from source to output
+            const sourceIdx = (sourceY * regionWidth + sourceX) * 4;
+            const outputIdx = (y * regionWidth + x) * 4;
+            
+            output[outputIdx] = pixels[sourceIdx];
+            output[outputIdx + 1] = pixels[sourceIdx + 1];
+            output[outputIdx + 2] = pixels[sourceIdx + 2];
+            output[outputIdx + 3] = pixels[sourceIdx + 3];
+          } else {
+            // Outside warp radius, copy original pixel
+            const idx = (y * regionWidth + x) * 4;
+            output[idx] = pixels[idx];
+            output[idx + 1] = pixels[idx + 1];
+            output[idx + 2] = pixels[idx + 2];
+            output[idx + 3] = pixels[idx + 3];
+          }
+        }
+      }
+      
+      // Put warped pixels back
+      ctx.putImageData(outputData, regionX, regionY);
+      
+    } catch (error) {
+      console.warn('⚠️ Pixel warping failed:', error);
     }
-    
-    ctx.restore();
   };
 
   const applyMeshBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
