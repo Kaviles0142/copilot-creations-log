@@ -193,6 +193,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const { data, width, height } = imageData;
       const warpedData = ctx.createImageData(width, height);
       
+      // Initialize with original data to avoid white pixels
+      warpedData.data.set(data);
+      
       // Apply vertical stretch deformation with smooth falloff
       for (let y = 0; y < height; y++) {
         // Distance from mouth center (0 at center, 1 at edges)
@@ -212,10 +215,12 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             sourceY -= jawOpening * falloff;
           }
           
+          // Only modify pixels if source is valid (otherwise keep original)
           if (sourceY >= 0 && sourceY < height) {
             const sourceIdx = (sourceY * width + x) * 4;
             const targetIdx = (y * width + x) * 4;
             
+            // Copy all RGBA channels
             warpedData.data[targetIdx] = data[sourceIdx];
             warpedData.data[targetIdx + 1] = data[sourceIdx + 1];
             warpedData.data[targetIdx + 2] = data[sourceIdx + 2];
