@@ -142,77 +142,67 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       amplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
     }
 
-    console.log('🎬 Frame - isSpeaking:', isSpeaking, 'amplitude:', amplitude.toFixed(3));
-
-    // Apply breathing animation
+    // Apply breathing animation to whole image
     applyBreathing(ctx, canvas);
 
-    // If speaking with significant amplitude, warp the mouth area
-    if (isSpeaking && amplitude > 0.05 && faceLandmarks.mouth) {
-      drawImageWithMouthWarp(ctx, image, amplitude, canvas);
-    } else {
-      // Draw normal image
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    }
+    // Draw base image with breathing applied
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    // Reset transform
+    // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Apply blinking
+    // Apply facial animations on top
+    if (isSpeaking && amplitude > 0.05) {
+      applyMouthDeformation(ctx, amplitude, canvas);
+    }
     applyBlinking(ctx, canvas);
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  const drawImageWithMouthWarp = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, amplitude: number, canvas: HTMLCanvasElement) => {
-    const mouthY = faceLandmarks.mouth!.y;
-    const mouthX = faceLandmarks.mouth!.x;
-    const mouthHeight = faceLandmarks.mouth!.height;
-    const mouthWidth = faceLandmarks.mouth!.width;
+  const applyMouthDeformation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
+    console.log('🎤 Mouth deformation - amplitude:', amplitude.toFixed(3));
     
-    // Calculate jaw opening (how much to stretch vertically)
-    const jawOpening = amplitude * 25; // pixels to open
+    // Use detected mouth position or fallback
+    const mouthY = faceLandmarks.mouth ? faceLandmarks.mouth.y : canvas.height * 0.68;
+    const mouthX = faceLandmarks.mouth ? faceLandmarks.mouth.x : canvas.width / 2;
+    const baseMouthWidth = faceLandmarks.mouth ? faceLandmarks.mouth.width : 60;
+    const baseMouthHeight = faceLandmarks.mouth ? faceLandmarks.mouth.height : 16;
     
-    console.log('🎨 Warping mouth - jawOpening:', jawOpening.toFixed(1), 'px');
+    // Calculate mouth opening size based on amplitude
+    const openHeight = baseMouthHeight * amplitude * 4;
+    const openWidth = baseMouthWidth * (1 + amplitude * 0.5);
     
-    // Draw top part of face (above mouth) - unchanged
-    const topHeight = mouthY - mouthHeight;
-    ctx.drawImage(
-      image,
-      0, 0, canvas.width, topHeight,  // source
-      0, 0, canvas.width, topHeight   // destination
-    );
-    
-    // Draw mouth area - stretched vertically
-    const mouthAreaHeight = mouthHeight * 2.5;
-    const stretchedMouthHeight = mouthAreaHeight + jawOpening;
-    ctx.drawImage(
-      image,
-      0, topHeight, canvas.width, mouthAreaHeight,  // source
-      0, topHeight, canvas.width, stretchedMouthHeight  // destination - stretched
-    );
-    
-    // Draw bottom part of face - shifted down
-    const bottomY = topHeight + mouthAreaHeight;
-    const bottomHeight = canvas.height - bottomY;
-    ctx.drawImage(
-      image,
-      0, bottomY, canvas.width, bottomHeight,  // source
-      0, topHeight + stretchedMouthHeight, canvas.width, bottomHeight  // destination - shifted down
-    );
-    
-    // Add dark mouth cavity overlay for realism
     ctx.save();
-    const cavityGradient = ctx.createRadialGradient(mouthX, mouthY + jawOpening/2, 0, mouthX, mouthY + jawOpening/2, mouthWidth/2);
-    cavityGradient.addColorStop(0, `rgba(20, 10, 10, ${Math.min(amplitude * 1.8, 0.85)})`);
-    cavityGradient.addColorStop(0.7, `rgba(40, 20, 20, ${Math.min(amplitude * 1.2, 0.6)})`);
-    cavityGradient.addColorStop(1, 'rgba(60, 30, 30, 0)');
     
-    ctx.fillStyle = cavityGradient;
+    // Create a darker inner mouth cavity
+    const gradient = ctx.createRadialGradient(mouthX, mouthY, 0, mouthX, mouthY, openHeight);
+    gradient.addColorStop(0, `rgba(25, 10, 10, ${Math.min(amplitude * 2, 0.95)})`);
+    gradient.addColorStop(0.5, `rgba(45, 20, 20, ${Math.min(amplitude * 1.5, 0.75)})`);
+    gradient.addColorStop(1, `rgba(65, 30, 30, ${Math.min(amplitude * 0.8, 0.4)})`);
+    
+    // Draw the mouth opening with composite operation for natural blending
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.ellipse(mouthX, mouthY + jawOpening/2, mouthWidth/1.5, jawOpening/1.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(mouthX, mouthY, openWidth / 2, openHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Add jaw movement - slightly move the lower face
+    if (amplitude > 0.2) {
+      ctx.globalCompositeOperation = 'source-over';
+      const jawMovement = amplitude * 3;
+      
+      // Darken area below mouth to simulate jaw opening
+      const jawGradient = ctx.createLinearGradient(mouthX, mouthY, mouthX, mouthY + 40);
+      jawGradient.addColorStop(0, `rgba(0, 0, 0, ${amplitude * 0.15})`);
+      jawGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      
+      ctx.fillStyle = jawGradient;
+      ctx.fillRect(mouthX - openWidth, mouthY, openWidth * 2, 40);
+    }
+    
     ctx.restore();
   };
 
