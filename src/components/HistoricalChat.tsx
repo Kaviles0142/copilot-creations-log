@@ -14,6 +14,7 @@ import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import ConversationHistory from "./ConversationHistory";
+import AnimatedAvatar from "./AnimatedAvatar";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,6 +99,12 @@ const HistoricalChat = () => {
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [autoAnimateResponses, setAutoAnimateResponses] = useState(true); // Auto-generate avatars
   const [isInitialAvatarReady, setIsInitialAvatarReady] = useState(false); // Track if initial greeting avatar is ready
+  
+  // New Phase 1 avatar state
+  const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
+  const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  
   const { toast } = useToast();
 
   // Initialize speech recognition with enhanced settings
@@ -185,12 +192,125 @@ const HistoricalChat = () => {
       setSelectedLanguage(figureLanguage);
       fetchFakeYouVoicesForFigure(selectedFigure);
       
-      // Reset avatar ready state and generate initial greeting avatar
-      setIsInitialAvatarReady(false);
-      setDidVideoUrl(null);
-      generateInitialGreetingAvatar(selectedFigure);
+      // Phase 1: Generate static avatar portrait
+      generateAvatarPortrait(selectedFigure);
+      
+      setIsInitialAvatarReady(true);
     }
   }, [selectedFigure]);
+  
+  // Generate avatar portrait using new system
+  const generateAvatarPortrait = async (figure: HistoricalFigure) => {
+    console.log('🎨 Generating avatar portrait for:', figure.name);
+    setIsLoadingAvatarImage(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
+        body: {
+          figureName: figure.name,
+          figureId: figure.id
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Avatar portrait ready:', data.cached ? '(cached)' : '(new)');
+      setAvatarImageUrl(data.imageUrl);
+      
+      toast({
+        title: data.cached ? "Avatar Loaded" : "Avatar Generated",
+        description: `${figure.name} is ready to chat!`,
+      });
+    } catch (error) {
+      console.error('❌ Error generating avatar portrait:', error);
+      toast({
+        title: "Avatar Generation Failed",
+        description: "Chat will proceed without avatar",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingAvatarImage(false);
+    }
+  };
+
+  // Generate and play TTS audio with avatar animation
+  const generateAndPlayTTS = async (text: string) => {
+    if (!selectedFigure) return;
+    
+    try {
+      // Stop any current audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      console.log('🎤 Generating TTS for:', selectedFigure.name);
+      
+      const { data, error } = await supabase.functions.invoke('generate-tts-audio', {
+        body: {
+          text: text,
+          figureName: selectedFigure.name,
+          voiceId: selectedVoiceId === 'auto' ? null : selectedVoiceId
+        }
+      });
+
+      if (error) throw error;
+
+      if (!data?.audioContent) {
+        throw new Error('No audio content received');
+      }
+
+      // Convert base64 to audio and play
+      const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      setCurrentAudio(audio);
+      setIsSpeaking(true);
+      
+      audio.onended = () => {
+        setIsSpeaking(false);
+        setIsPlayingAudio(false);
+        setCurrentAudio(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        setIsPlayingAudio(false);
+        toast({
+          title: "Audio playback failed",
+          description: "Could not play the generated voice",
+          variant: "destructive",
+        });
+      };
+
+      await audio.play();
+      setIsPlayingAudio(true);
+      
+      console.log('🔊 TTS audio playing');
+      
+    } catch (error) {
+      console.error('❌ TTS generation error:', error);
+      setIsSpeaking(false);
+      toast({
+        title: "Voice generation failed",
+        description: "Could not generate voice response",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Helper function to convert base64 to Blob
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+  };
 
   // Generate initial greeting avatar when figure is selected
   const generateInitialGreetingAvatar = async (figure: HistoricalFigure) => {
@@ -800,13 +920,13 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Generate avatar using CACHED image + new audio for this specific response
-      if (autoAnimateResponses && selectedFigure) {
-        console.log('🎬 Generating avatar with cached image for response...');
-        await generateDidAvatar(aiResponse);
+      // Phase 1: Generate TTS audio and play with animation
+      if (aiResponse.length > 20) {
+        console.log('🎤 Generating TTS audio...');
+        await generateAndPlayTTS(aiResponse);
       }
       
-      // Reset loading state after avatar generation
+      // Reset loading state
       setIsLoading(false);
       setAbortController(null);
 
@@ -2152,55 +2272,15 @@ const HistoricalChat = () => {
           )}
         </div>
 
-        {/* D-ID Animated Avatar Video Player */}
-        {(didVideoUrl || isGeneratingAvatar) && (
+        {/* Animated Avatar - Phase 1 */}
+        {selectedFigure && (
           <div className="border-b border-border bg-card px-6 py-4">
-            <Card className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <span className="text-2xl">🎭</span>
-                    {isGeneratingAvatar ? 'Generating Animated Avatar...' : `Animated Avatar - ${selectedFigure?.name}`}
-                  </h3>
-                  <Button
-                    onClick={() => {
-                      setDidVideoUrl(null);
-                      setIsGeneratingAvatar(false);
-                    }}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    ✕
-                  </Button>
-                </div>
-                
-                {isGeneratingAvatar && !didVideoUrl && (
-                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-sm text-muted-foreground">Creating your animated avatar...</p>
-                    <p className="text-xs text-muted-foreground">This may take 30-60 seconds</p>
-                  </div>
-                )}
-                
-                {didVideoUrl && (
-                  <>
-                    <video
-                      src={didVideoUrl}
-                      controls
-                      autoPlay
-                      muted
-                      className="w-full rounded-lg shadow-lg"
-                      style={{ maxHeight: '500px' }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                    <p className="text-xs text-muted-foreground text-center">
-                      AI-generated talking avatar powered by D-ID (video only, audio via Azure TTS)
-                    </p>
-                  </>
-                )}
-              </div>
-            </Card>
+            <AnimatedAvatar 
+              imageUrl={avatarImageUrl}
+              isLoading={isLoadingAvatarImage}
+              isSpeaking={isSpeaking}
+              audioElement={currentAudio}
+            />
           </div>
         )}
 
