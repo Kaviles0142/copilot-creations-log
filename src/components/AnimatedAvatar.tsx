@@ -358,23 +358,24 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           const canvasX = regionX + x;
           const canvasY = regionY + y;
           
-          let sourceX = x;
-          let sourceY = y;
+          // Start with no offset
+          let deltaX = 0;
+          let deltaY = 0;
           
           // EYEBROW WARPING - raise based on expression intensity and open vowels
           const leftBrowDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftBrowY, 2));
           const rightBrowDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightBrowY, 2));
           
-          if (leftBrowDist < 60) {
+          if (leftBrowDist < 60 && isSpeaking && amplitude > 0.05) {
             const browStrength = 1 - (leftBrowDist / 60);
-            // Raise eyebrows during speech, especially for wide mouth shapes (A, E, I)
-            const browRaise = amplitude * (visemeParams.jawDrop / 20 + visemeParams.cornerPull * 3) * browStrength;
-            sourceY = y + browRaise;
+            // Raise eyebrows during speech, especially for wide mouth shapes
+            const browRaise = amplitude * (visemeParams.jawDrop / 15 + visemeParams.cornerPull * 4) * browStrength;
+            deltaY += browRaise;
           }
-          if (rightBrowDist < 60) {
+          if (rightBrowDist < 60 && isSpeaking && amplitude > 0.05) {
             const browStrength = 1 - (rightBrowDist / 60);
-            const browRaise = amplitude * (visemeParams.jawDrop / 20 + visemeParams.cornerPull * 3) * browStrength;
-            sourceY = y + browRaise;
+            const browRaise = amplitude * (visemeParams.jawDrop / 15 + visemeParams.cornerPull * 4) * browStrength;
+            deltaY += browRaise;
           }
           
           // EYE SQUINTING - narrow eyes during smiles and wide vowels
@@ -382,19 +383,19 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           const rightEyeDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightEyeY, 2));
           
           // Squint based on corner pull (smile) and amplitude
-          const squintAmount = amplitude * visemeParams.cornerPull * 5;
+          const squintAmount = amplitude * visemeParams.cornerPull * 6;
           
-          if (leftEyeDist < 35) {
+          if (leftEyeDist < 35 && isSpeaking && amplitude > 0.05) {
             const squintStrength = 1 - (leftEyeDist / 35);
             // Narrow the eye vertically
             if (canvasY > leftEyeY - 5 && canvasY < leftEyeY + 15) {
-              sourceY = y - (squintAmount * squintStrength * 0.8);
+              deltaY -= squintAmount * squintStrength;
             }
           }
-          if (rightEyeDist < 35) {
+          if (rightEyeDist < 35 && isSpeaking && amplitude > 0.05) {
             const squintStrength = 1 - (rightEyeDist / 35);
             if (canvasY > rightEyeY - 5 && canvasY < rightEyeY + 15) {
-              sourceY = y - (squintAmount * squintStrength * 0.8);
+              deltaY -= squintAmount * squintStrength;
             }
           }
           
@@ -402,7 +403,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           const mouthDist = Math.sqrt(Math.pow(canvasX - mouthX, 2) + Math.pow(canvasY - mouthY, 2));
           const mouthRadius = Math.max(mouthWidth, mouthHeight) * 0.8;
           
-          if (mouthDist < mouthRadius && isSpeaking) {
+          if (mouthDist < mouthRadius && isSpeaking && amplitude > 0.05) {
             const dx = canvasX - mouthX;
             const dy = canvasY - mouthY;
             const strength = 1 - (mouthDist / mouthRadius);
@@ -415,14 +416,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
               if (dy < 0 && dy > -mouthHeight * 1.2) {
                 const upperLipStrength = Math.abs(dy) / (mouthHeight * 1.2);
                 const pullUp = amplitude * visemeParams.upperLip * warpAmount * (1 - upperLipStrength);
-                sourceY = y + pullUp;
+                deltaY += pullUp;
               }
               
               // Lower lip & jaw
               if (dy >= 0) {
                 const jawStrength = Math.min(2, 1 + (dy / (mouthHeight * 0.8)));
                 const pullDown = amplitude * visemeParams.lowerLip * warpAmount * jawStrength;
-                sourceY = y - pullDown;
+                deltaY -= pullDown;
               }
               
               // Horizontal stretch or pucker
@@ -430,17 +431,17 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
               
               if (visemeParams.lipPucker > 0) {
                 const puckerAmount = visemeParams.lipPucker * warpAmount * cornerStrength * amplitude;
-                sourceX = dx > 0 ? x + puckerAmount : x - puckerAmount;
+                deltaX += dx > 0 ? puckerAmount : -puckerAmount;
               } else {
                 const pullSide = amplitude * visemeParams.width * warpAmount * cornerStrength * visemeParams.cornerPull;
-                sourceX = dx > 0 ? x - pullSide : x + pullSide;
+                deltaX += dx > 0 ? -pullSide : pullSide;
               }
             }
           }
           
-          // Clamp source coordinates
-          sourceX = Math.max(0, Math.min(regionWidth - 1, Math.floor(sourceX)));
-          sourceY = Math.max(0, Math.min(regionHeight - 1, Math.floor(sourceY)));
+          // Apply accumulated deltas
+          const sourceX = Math.max(0, Math.min(regionWidth - 1, Math.floor(x + deltaX)));
+          const sourceY = Math.max(0, Math.min(regionHeight - 1, Math.floor(y + deltaY)));
           
           // Copy pixel
           const sourceIdx = (sourceY * regionWidth + sourceX) * 4;
