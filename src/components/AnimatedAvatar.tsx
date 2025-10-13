@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
 import { Volume2, Loader2 } from 'lucide-react';
-import * as faceapi from '@vladmandic/face-api';
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 interface AnimatedAvatarProps {
   imageUrl: string | null;
@@ -16,23 +16,35 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const imageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number>();
   const [blinkTimer, setBlinkTimer] = useState(0);
-  const [faceLandmarks, setFaceLandmarks] = useState<{ mouth: { x: number; y: number; width: number; height: number } | null; eyes: { left: { x: number; y: number }; right: { x: number; y: number } } | null }>({ mouth: null, eyes: null });
+  const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
+  const [faceMesh, setFaceMesh] = useState<any>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const amplitudeHistory = useRef<number[]>([]);
 
 
-  // Load face-api models from official CDN
+  // Load MediaPipe Face Landmarker
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        console.log('🔄 Loading MediaPipe Face Landmarker...');
+        const vision = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+        );
+        
+        const landmarker = await FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+            delegate: 'GPU'
+          },
+          runningMode: 'IMAGE',
+          numFaces: 1
+        });
+        
+        faceLandmarkerRef.current = landmarker;
         setModelsLoaded(true);
-        console.log('✅ Face detection models loaded successfully');
+        console.log('✅ MediaPipe Face Landmarker loaded successfully');
       } catch (error) {
-        console.error('❌ Error loading face detection models:', error);
-        // Fallback - still allow animation with default positions
+        console.error('❌ Error loading MediaPipe models:', error);
         setModelsLoaded(true);
         console.log('⚠️ Using default face positions (no detection)');
       }
@@ -40,79 +52,49 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     loadModels();
   }, []);
 
-  // Load image and detect facial landmarks
+  // Load image and detect facial mesh with MediaPipe
   useEffect(() => {
-    if (!imageUrl || !modelsLoaded) return;
+    if (!imageUrl || !modelsLoaded || !faceLandmarkerRef.current) return;
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = async () => {
       imageRef.current = img;
       
-      // Detect facial landmarks - wait for image to be fully loaded
       try {
-        console.log('🔍 Starting face detection...');
-        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({
-          inputSize: 512,
-          scoreThreshold: 0.5
-        })).withFaceLandmarks();
+        console.log('🔍 Detecting face mesh with MediaPipe...');
+        const results = faceLandmarkerRef.current!.detect(img);
         
-        if (detection) {
-          const landmarks = detection.landmarks;
-          const mouthLandmarks = landmarks.getMouth();
-          const leftEye = landmarks.getLeftEye();
-          const rightEye = landmarks.getRightEye();
+        if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+          const landmarks = results.faceLandmarks[0];
           
-          // Calculate mouth bounding box
-          const mouthXs = mouthLandmarks.map(p => p.x);
-          const mouthYs = mouthLandmarks.map(p => p.y);
-          const mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
-          const mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
-          const mouthWidth = Math.max(...mouthXs) - Math.min(...mouthXs);
-          const mouthHeight = Math.max(...mouthYs) - Math.min(...mouthYs);
+          // MediaPipe provides 478 landmarks - we need specific ones for mouth and eyes
+          // Mouth outer: indices 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308
+          // Mouth inner: indices 78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415
+          // Left eye: indices 33, 160, 158, 133, 153, 144
+          // Right eye: indices 362, 385, 387, 263, 373, 380
           
-          // Calculate eye centers
-          const leftEyeX = leftEye.reduce((sum, p) => sum + p.x, 0) / leftEye.length;
-          const leftEyeY = leftEye.reduce((sum, p) => sum + p.y, 0) / leftEye.length;
-          const rightEyeX = rightEye.reduce((sum, p) => sum + p.x, 0) / rightEye.length;
-          const rightEyeY = rightEye.reduce((sum, p) => sum + p.y, 0) / rightEye.length;
+          const mouthOuter = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308];
+          const leftEyeIndices = [33, 160, 158, 133, 153, 144];
+          const rightEyeIndices = [362, 385, 387, 263, 373, 380];
           
-          // CRITICAL: Scale coordinates from original image size to canvas size (512x512)
-          const scaleX = 512 / img.width;
-          const scaleY = 512 / img.height;
+          // Scale to canvas size
+          const scaleX = 512;
+          const scaleY = 512;
           
-          console.log('📐 Scaling factors:', { scaleX, scaleY, imgWidth: img.width, imgHeight: img.height });
-          
-          setFaceLandmarks({
-            mouth: { 
-              x: mouthX * scaleX, 
-              y: mouthY * scaleY, 
-              width: mouthWidth * scaleX, 
-              height: mouthHeight * scaleY 
-            },
-            eyes: {
-              left: { x: leftEyeX * scaleX, y: leftEyeY * scaleY },
-              right: { x: rightEyeX * scaleX, y: rightEyeY * scaleY }
-            }
+          setFaceMesh({
+            landmarks: landmarks.map(l => ({ x: l.x * scaleX, y: l.y * scaleY, z: l.z })),
+            mouthOuter,
+            leftEyeIndices,
+            rightEyeIndices
           });
           
-          console.log('✅ Facial landmarks detected and scaled:', { 
-            mouth: { 
-              x: Math.round(mouthX * scaleX), 
-              y: Math.round(mouthY * scaleY), 
-              width: Math.round(mouthWidth * scaleX), 
-              height: Math.round(mouthHeight * scaleY) 
-            },
-            eyes: { 
-              left: { x: Math.round(leftEyeX * scaleX), y: Math.round(leftEyeY * scaleY) }, 
-              right: { x: Math.round(rightEyeX * scaleX), y: Math.round(rightEyeY * scaleY) } 
-            } 
-          });
+          console.log('✅ Face mesh detected with 478 landmarks');
         } else {
-          console.warn('⚠️ No face detected in image, using default positions');
+          console.warn('⚠️ No face detected, using fallback');
         }
       } catch (error) {
-        console.error('❌ Error detecting facial landmarks:', error);
+        console.error('❌ Error detecting face mesh:', error);
       }
       
       drawFrame();
@@ -159,97 +141,128 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Apply facial animations on top
+    // Apply facial animations using mesh
     if (isSpeaking && amplitude > 0.05) {
-      applyPixelWarpMouth(ctx, amplitude, canvas, image);
+      applyMeshMouthAnimation(ctx, amplitude, canvas);
     }
-    applyBlinking(ctx, canvas);
+    applyMeshBlinking(ctx, canvas);
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  const applyPixelWarpMouth = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement, image: HTMLImageElement) => {
-    // Use detected mouth position or fallback
-    const mouthY = faceLandmarks.mouth ? faceLandmarks.mouth.y : canvas.height * 0.68;
-    const mouthX = faceLandmarks.mouth ? faceLandmarks.mouth.x : canvas.width / 2;
-    const baseMouthWidth = faceLandmarks.mouth ? faceLandmarks.mouth.width : 60;
-    const baseMouthHeight = faceLandmarks.mouth ? faceLandmarks.mouth.height : 16;
+  const applyMeshMouthAnimation = (ctx: CanvasRenderingContext2D, amplitude: number, canvas: HTMLCanvasElement) => {
+    if (!faceMesh) {
+      // Fallback to center position
+      const mouthX = canvas.width / 2;
+      const mouthY = canvas.height * 0.7;
+      drawMouthOpening(ctx, mouthX, mouthY, amplitude);
+      return;
+    }
+
+    const { landmarks, mouthOuter } = faceMesh;
     
+    // Get mouth landmarks
+    const mouthPoints = mouthOuter.map((idx: number) => landmarks[idx]);
+    
+    // Calculate mouth center and dimensions
+    const mouthXs = mouthPoints.map((p: any) => p.x);
+    const mouthYs = mouthPoints.map((p: any) => p.y);
+    const mouthX = (Math.min(...mouthXs) + Math.max(...mouthXs)) / 2;
+    const mouthY = (Math.min(...mouthYs) + Math.max(...mouthYs)) / 2;
+    
+    drawMouthOpening(ctx, mouthX, mouthY, amplitude);
+  };
+
+  const drawMouthOpening = (ctx: CanvasRenderingContext2D, mouthX: number, mouthY: number, amplitude: number) => {
     ctx.save();
     
     // Calculate dynamic mouth opening
-    const openHeight = baseMouthHeight * (1 + amplitude * 8);
-    const openWidth = baseMouthWidth * (1 + amplitude * 0.8);
-    const jawDrop = amplitude * 12;
+    const baseWidth = 50;
+    const baseHeight = 14;
+    const openHeight = baseHeight * (1 + amplitude * 10);
+    const openWidth = baseWidth * (1 + amplitude * 1.2);
+    const jawDrop = amplitude * 15;
     
-    // Draw mouth cavity shadow with blend mode
+    // Draw dark mouth cavity with gradient
     ctx.globalCompositeOperation = 'multiply';
     
-    // Inner dark mouth
-    const innerGradient = ctx.createRadialGradient(
-      mouthX, mouthY + jawDrop * 0.3, 
-      0, 
-      mouthX, mouthY + jawDrop * 0.3, 
-      openHeight * 0.8
+    const gradient = ctx.createRadialGradient(
+      mouthX, mouthY + jawDrop * 0.4,
+      0,
+      mouthX, mouthY + jawDrop * 0.4,
+      openHeight
     );
-    innerGradient.addColorStop(0, `rgba(10, 5, 5, ${Math.min(amplitude * 2.5, 0.95)})`);
-    innerGradient.addColorStop(0.4, `rgba(25, 12, 12, ${Math.min(amplitude * 1.8, 0.75)})`);
-    innerGradient.addColorStop(0.7, `rgba(40, 20, 20, ${Math.min(amplitude * 1.2, 0.5)})`);
-    innerGradient.addColorStop(1, 'rgba(60, 30, 30, 0)');
+    gradient.addColorStop(0, `rgba(5, 2, 2, ${Math.min(amplitude * 3, 0.98)})`);
+    gradient.addColorStop(0.3, `rgba(15, 8, 8, ${Math.min(amplitude * 2.2, 0.85)})`);
+    gradient.addColorStop(0.6, `rgba(30, 15, 15, ${Math.min(amplitude * 1.5, 0.6)})`);
+    gradient.addColorStop(1, 'rgba(50, 25, 25, 0)');
     
-    ctx.fillStyle = innerGradient;
+    ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.ellipse(
-      mouthX, 
-      mouthY + jawDrop * 0.3, 
-      openWidth * 0.7, 
-      openHeight * 0.6, 
+      mouthX,
+      mouthY + jawDrop * 0.4,
+      openWidth * 0.8,
+      openHeight * 0.7,
       0, 0, Math.PI * 2
     );
     ctx.fill();
     
-    // Jaw shadow below mouth
-    if (amplitude > 0.15) {
+    // Add jaw shadow for larger openings
+    if (amplitude > 0.2) {
       const jawGradient = ctx.createLinearGradient(
-        mouthX, mouthY, 
-        mouthX, mouthY + jawDrop + 30
+        mouthX, mouthY,
+        mouthX, mouthY + jawDrop + 35
       );
-      jawGradient.addColorStop(0, `rgba(0, 0, 0, ${amplitude * 0.25})`);
-      jawGradient.addColorStop(0.5, `rgba(0, 0, 0, ${amplitude * 0.15})`);
+      jawGradient.addColorStop(0, `rgba(0, 0, 0, ${amplitude * 0.3})`);
+      jawGradient.addColorStop(0.6, `rgba(0, 0, 0, ${amplitude * 0.15})`);
       jawGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       
       ctx.fillStyle = jawGradient;
       ctx.fillRect(
-        mouthX - openWidth * 1.2, 
-        mouthY, 
-        openWidth * 2.4, 
-        jawDrop + 30
+        mouthX - openWidth * 1.3,
+        mouthY,
+        openWidth * 2.6,
+        jawDrop + 35
       );
     }
     
     ctx.restore();
   };
 
-  const applyBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
-    // Blink every 3-5 seconds
+  const applyMeshBlinking = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
     setBlinkTimer((prev) => {
       const next = prev + 1;
-      if (next % 120 === 0) { // Roughly every 2 seconds at 60fps
-        // Use detected eye positions or fallback to default
-        const leftEyeX = faceLandmarks.eyes?.left.x || (canvas.width / 2 - canvas.width * 0.12);
-        const leftEyeY = faceLandmarks.eyes?.left.y || (canvas.height * 0.42);
-        const rightEyeX = faceLandmarks.eyes?.right.x || (canvas.width / 2 + canvas.width * 0.12);
-        const rightEyeY = faceLandmarks.eyes?.right.y || (canvas.height * 0.42);
+      if (next % 150 === 0) {
+        let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+        
+        if (faceMesh) {
+          const { landmarks, leftEyeIndices, rightEyeIndices } = faceMesh;
+          
+          // Get eye centers from mesh
+          const leftEyePoints = leftEyeIndices.map((idx: number) => landmarks[idx]);
+          const rightEyePoints = rightEyeIndices.map((idx: number) => landmarks[idx]);
+          
+          leftEyeX = leftEyePoints.reduce((sum: number, p: any) => sum + p.x, 0) / leftEyePoints.length;
+          leftEyeY = leftEyePoints.reduce((sum: number, p: any) => sum + p.y, 0) / leftEyePoints.length;
+          rightEyeX = rightEyePoints.reduce((sum: number, p: any) => sum + p.x, 0) / rightEyePoints.length;
+          rightEyeY = rightEyePoints.reduce((sum: number, p: any) => sum + p.y, 0) / rightEyePoints.length;
+        } else {
+          // Fallback positions
+          leftEyeX = canvas.width / 2 - canvas.width * 0.12;
+          leftEyeY = canvas.height * 0.42;
+          rightEyeX = canvas.width / 2 + canvas.width * 0.12;
+          rightEyeY = canvas.height * 0.42;
+        }
 
         ctx.save();
-        ctx.fillStyle = 'rgba(40, 30, 30, 0.8)';
-        // Draw eyelids
-        ctx.fillRect(leftEyeX - 25, leftEyeY - 5, 50, 10);
-        ctx.fillRect(rightEyeX - 25, rightEyeY - 5, 50, 10);
+        ctx.fillStyle = 'rgba(40, 30, 30, 0.85)';
+        ctx.fillRect(leftEyeX - 28, leftEyeY - 6, 56, 12);
+        ctx.fillRect(rightEyeX - 28, rightEyeY - 6, 56, 12);
         ctx.restore();
       }
-      return next % 180;
+      return next % 200;
     });
   };
 
@@ -275,7 +288,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [imageUrl, isSpeaking, externalAnalyser, faceLandmarks]);
+  }, [imageUrl, isSpeaking, externalAnalyser, faceMesh]);
 
   if (isLoading) {
     return (
