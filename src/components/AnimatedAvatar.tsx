@@ -353,37 +353,40 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           let sourceX = x;
           let sourceY = y;
           
-          // EYEBROW WARPING - raise for emphasis
-          if (isSpeaking && intensity > 0.2 && visemeParams.cornerPull > 0.5) {
-            const leftBrowDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftBrowY, 2));
-            const rightBrowDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightBrowY, 2));
-            
-            if (leftBrowDist < 50) {
-              const browStrength = 1 - (leftBrowDist / 50);
-              const raise = intensity * 8 * browStrength;
-              sourceY = y + raise;
-            }
-            if (rightBrowDist < 50) {
-              const browStrength = 1 - (rightBrowDist / 50);
-              const raise = intensity * 8 * browStrength;
-              sourceY = y + raise;
-            }
+          // EYEBROW WARPING - raise based on expression intensity and open vowels
+          const leftBrowDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftBrowY, 2));
+          const rightBrowDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightBrowY, 2));
+          
+          if (leftBrowDist < 60) {
+            const browStrength = 1 - (leftBrowDist / 60);
+            // Raise eyebrows during speech, especially for wide mouth shapes (A, E, I)
+            const browRaise = amplitude * (visemeParams.jawDrop / 20 + visemeParams.cornerPull * 3) * browStrength;
+            sourceY = y + browRaise;
+          }
+          if (rightBrowDist < 60) {
+            const browStrength = 1 - (rightBrowDist / 60);
+            const browRaise = amplitude * (visemeParams.jawDrop / 20 + visemeParams.cornerPull * 3) * browStrength;
+            sourceY = y + browRaise;
           }
           
-          // EYE SQUINTING - for smiles (E/I sounds)
-          if (isSpeaking && visemeParams.cornerPull > 1.0) {
-            const leftEyeDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftEyeY, 2));
-            const rightEyeDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightEyeY, 2));
-            
-            const squintAmount = (visemeParams.cornerPull - 1.0) * intensity * 3;
-            
-            if (leftEyeDist < 30 && canvasY > leftEyeY) {
-              const squintStrength = 1 - (leftEyeDist / 30);
-              sourceY = y - (squintAmount * squintStrength);
+          // EYE SQUINTING - narrow eyes during smiles and wide vowels
+          const leftEyeDist = Math.sqrt(Math.pow(canvasX - leftEyeX, 2) + Math.pow(canvasY - leftEyeY, 2));
+          const rightEyeDist = Math.sqrt(Math.pow(canvasX - rightEyeX, 2) + Math.pow(canvasY - rightEyeY, 2));
+          
+          // Squint based on corner pull (smile) and amplitude
+          const squintAmount = amplitude * visemeParams.cornerPull * 5;
+          
+          if (leftEyeDist < 35) {
+            const squintStrength = 1 - (leftEyeDist / 35);
+            // Narrow the eye vertically
+            if (canvasY > leftEyeY - 5 && canvasY < leftEyeY + 15) {
+              sourceY = y - (squintAmount * squintStrength * 0.8);
             }
-            if (rightEyeDist < 30 && canvasY > rightEyeY) {
-              const squintStrength = 1 - (rightEyeDist / 30);
-              sourceY = y - (squintAmount * squintStrength);
+          }
+          if (rightEyeDist < 35) {
+            const squintStrength = 1 - (rightEyeDist / 35);
+            if (canvasY > rightEyeY - 5 && canvasY < rightEyeY + 15) {
+              sourceY = y - (squintAmount * squintStrength * 0.8);
             }
           }
           
