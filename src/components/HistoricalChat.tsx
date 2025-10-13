@@ -282,7 +282,13 @@ const HistoricalChat = () => {
       // Initialize audio context and analyser ONCE
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log('🎧 AudioContext created');
+        console.log('🎧 AudioContext created, state:', audioContextRef.current.state);
+      }
+      
+      // CRITICAL: Resume AudioContext if suspended
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+        console.log('▶️ AudioContext resumed, state:', audioContextRef.current.state);
       }
       
       if (!analyserRef.current) {
@@ -337,7 +343,15 @@ const HistoricalChat = () => {
       await audioElementRef.current.play();
       setIsPlayingAudio(true);
       
-      console.log('🔊 Azure TTS audio playing with analyser connected');
+      // Log analyser connectivity
+      console.log('🔊 Audio playing - Context state:', audioContextRef.current.state);
+      console.log('📊 Analyser connected - FFT size:', analyserRef.current.fftSize);
+      
+      // Test analyser data immediately
+      const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(testArray);
+      const hasData = testArray.some(v => v > 0);
+      console.log('🧪 Analyser test:', { hasData, sampleData: Array.from(testArray.slice(0, 10)) });
       
     } catch (error) {
       console.error('❌ Azure TTS generation error:', error);
