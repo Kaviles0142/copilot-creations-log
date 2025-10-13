@@ -185,9 +185,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     }
 
     // Calculate warp region (area around mouth to displace)
-    const warpRadius = Math.max(mouthWidth, mouthHeight) * 1.5;
-    const jawDrop = amplitude * 25; // How far down to stretch
-    const mouthOpen = amplitude * 20; // How wide to open
+    const warpRadius = Math.max(mouthWidth, mouthHeight) * 2;
+    const jawDrop = amplitude * 35; // Increased jaw drop for more dramatic effect
+    const mouthOpen = amplitude * 12; // Horizontal opening
     
     const regionX = Math.max(0, Math.floor(mouthX - warpRadius));
     const regionY = Math.max(0, Math.floor(mouthY - warpRadius));
@@ -203,7 +203,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const outputData = ctx.createImageData(regionWidth, regionHeight);
       const output = outputData.data;
       
-      // Warp pixels
+      // Warp pixels with asymmetric jaw movement
       for (let y = 0; y < regionHeight; y++) {
         for (let x = 0; x < regionWidth; x++) {
           // Convert to canvas coordinates
@@ -219,23 +219,34 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           if (distance < warpRadius) {
             // Calculate warp strength (stronger near center)
             const strength = 1 - (distance / warpRadius);
-            const warpAmount = strength * strength; // Quadratic falloff
+            const warpAmount = strength * strength * strength; // Cubic falloff for smoother blend
             
             // Calculate displacement
             let sourceX = x;
             let sourceY = y;
             
-            // Vertical displacement for jaw drop (below mouth center)
+            // ASYMMETRIC JAW DROP (bottom moves much more than top)
             if (dy > 0) {
-              sourceY = y - (jawDrop * warpAmount);
+              // Below mouth center - BOTTOM JAW
+              const jawStrength = Math.min(1, dy / (mouthHeight * 2)); // Stronger as you go down
+              sourceY = y - (jawDrop * warpAmount * jawStrength);
+            } else {
+              // Above mouth center - TOP LIP (minimal movement)
+              const upperLipResistance = 0.15; // Top lip barely moves
+              sourceY = y - (jawDrop * warpAmount * upperLipResistance);
             }
             
-            // Horizontal displacement for mouth opening (near vertical center)
-            if (Math.abs(dy) < mouthHeight * 0.5) {
+            // HORIZONTAL STRETCH (corners pull outward)
+            const horizontalZone = Math.abs(dy) < mouthHeight * 0.8;
+            if (horizontalZone) {
+              // Stronger pull near the corners
+              const cornerStrength = Math.abs(dx) / (mouthWidth * 0.5);
+              const pullAmount = mouthOpen * warpAmount * cornerStrength;
+              
               if (dx > 0) {
-                sourceX = x - (mouthOpen * warpAmount * 0.3);
+                sourceX = x - pullAmount;
               } else {
-                sourceX = x + (mouthOpen * warpAmount * 0.3);
+                sourceX = x + pullAmount;
               }
             }
             
@@ -264,6 +275,41 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       
       // Put warped pixels back
       ctx.putImageData(outputData, regionX, regionY);
+      
+      // Add dark mouth cavity when mouth opens significantly
+      if (amplitude > 0.15) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        
+        // Create oval cavity in center of mouth
+        const cavityWidth = mouthWidth * 0.6 * (1 + amplitude);
+        const cavityHeight = mouthHeight * 0.4 + (jawDrop * 0.4);
+        
+        const gradient = ctx.createRadialGradient(
+          mouthX, mouthY + jawDrop * 0.3,
+          0,
+          mouthX, mouthY + jawDrop * 0.3,
+          cavityHeight
+        );
+        
+        // Dark center fading to transparent
+        gradient.addColorStop(0, `rgba(10, 5, 5, ${Math.min(amplitude * 0.9, 0.85)})`);
+        gradient.addColorStop(0.4, `rgba(20, 10, 10, ${Math.min(amplitude * 0.6, 0.5)})`);
+        gradient.addColorStop(0.7, `rgba(30, 20, 20, ${Math.min(amplitude * 0.3, 0.2)})`);
+        gradient.addColorStop(1, 'rgba(50, 30, 30, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(
+          mouthX,
+          mouthY + jawDrop * 0.3,
+          cavityWidth,
+          cavityHeight,
+          0, 0, Math.PI * 2
+        );
+        ctx.fill();
+        ctx.restore();
+      }
       
     } catch (error) {
       console.warn('⚠️ Pixel warping failed:', error);
