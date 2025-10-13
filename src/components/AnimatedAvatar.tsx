@@ -48,9 +48,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     img.onload = async () => {
       imageRef.current = img;
       
-      // Detect facial landmarks
+      // Detect facial landmarks - wait for image to be fully loaded
       try {
-        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+        console.log('🔍 Starting face detection...');
+        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({
+          inputSize: 512,
+          scoreThreshold: 0.5
+        })).withFaceLandmarks();
         
         if (detection) {
           const landmarks = detection.landmarks;
@@ -80,12 +84,18 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             }
           });
           
-          console.log('Facial landmarks detected:', { mouth: { x: mouthX, y: mouthY }, eyes: { left: { x: leftEyeX, y: leftEyeY }, right: { x: rightEyeX, y: rightEyeY } } });
+          console.log('✅ Facial landmarks detected:', { 
+            mouth: { x: Math.round(mouthX), y: Math.round(mouthY), width: Math.round(mouthWidth), height: Math.round(mouthHeight) },
+            eyes: { 
+              left: { x: Math.round(leftEyeX), y: Math.round(leftEyeY) }, 
+              right: { x: Math.round(rightEyeX), y: Math.round(rightEyeY) } 
+            } 
+          });
         } else {
-          console.warn('No face detected, using default positions');
+          console.warn('⚠️ No face detected in image, using default positions');
         }
       } catch (error) {
-        console.error('Error detecting facial landmarks:', error);
+        console.error('❌ Error detecting facial landmarks:', error);
       }
       
       drawFrame();
