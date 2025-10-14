@@ -370,12 +370,18 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const regionHeight = Math.min(canvas.height - regionY, Math.ceil(faceBottom - faceTop));
     
     try {
-      const imageData = ctx.getImageData(regionX, regionY, regionWidth, regionHeight);
-      const pixels = imageData.data;
-      const outputData = ctx.createImageData(regionWidth, regionHeight);
+      // Get the ENTIRE canvas image data
+      const fullImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const fullPixels = fullImageData.data;
+      
+      // Create output for entire canvas
+      const outputData = ctx.createImageData(canvas.width, canvas.height);
       const output = outputData.data;
       
-      // Warp entire face region
+      // Copy entire image first
+      output.set(fullPixels);
+      
+      // Warp only the face region
       for (let y = 0; y < regionHeight; y++) {
         for (let x = 0; x < regionWidth; x++) {
           const canvasX = regionX + x;
@@ -462,22 +468,24 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
             }
           }
           
-          // Apply accumulated deltas
-          const sourceX = Math.max(0, Math.min(regionWidth - 1, Math.floor(x + deltaX)));
-          const sourceY = Math.max(0, Math.min(regionHeight - 1, Math.floor(y + deltaY)));
+          // Apply accumulated deltas - read from source position in full image
+          const sourceX = Math.max(0, Math.min(canvas.width - 1, Math.floor(canvasX + deltaX)));
+          const sourceY = Math.max(0, Math.min(canvas.height - 1, Math.floor(canvasY + deltaY)));
           
-          // Copy pixel
-          const sourceIdx = (sourceY * regionWidth + sourceX) * 4;
-          const outputIdx = (y * regionWidth + x) * 4;
+          // Copy pixel from source to output
+          const sourceIdx = (sourceY * canvas.width + sourceX) * 4;
+          const outputIdx = (canvasY * canvas.width + canvasX) * 4;
           
-          output[outputIdx] = pixels[sourceIdx];
-          output[outputIdx + 1] = pixels[sourceIdx + 1];
-          output[outputIdx + 2] = pixels[sourceIdx + 2];
-          output[outputIdx + 3] = pixels[sourceIdx + 3];
+          output[outputIdx] = fullPixels[sourceIdx];
+          output[outputIdx + 1] = fullPixels[sourceIdx + 1];
+          output[outputIdx + 2] = fullPixels[sourceIdx + 2];
+          output[outputIdx + 3] = fullPixels[sourceIdx + 3];
         }
       }
       
-      ctx.putImageData(outputData, regionX, regionY);
+      // Clear canvas and put back the entire warped image
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.putImageData(outputData, 0, 0);
     } catch (error) {
       console.warn('⚠️ Face warping failed:', error);
     }
