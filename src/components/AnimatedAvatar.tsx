@@ -148,9 +148,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw base image FIRST (before any transforms or warping)
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-
     // Get audio amplitude and detect phonemes/visemes
     let amplitude = 0;
     
@@ -204,6 +201,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       expressionIntensity.current = Math.max(0, expressionIntensity.current - 0.05);
       headTilt.current *= 0.95; // Gradually return to center
     }
+
+    // Draw base image
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
     // Apply PIXEL WARPING for entire face (eyes, eyebrows, mouth)
     if (faceMesh && isSpeaking) {
