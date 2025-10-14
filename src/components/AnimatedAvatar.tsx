@@ -148,6 +148,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw base image FIRST (before any transforms or warping)
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
     // Get audio amplitude and detect phonemes/visemes
     let amplitude = 0;
     
