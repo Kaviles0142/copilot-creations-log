@@ -205,9 +205,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Apply breathing animation to whole image with head tilt
     applyBreathing(ctx, canvas, headTilt.current);
 
-    // Draw base image with breathing applied
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-
     // Reset transform after drawing
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -483,8 +480,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         }
       }
       
-      // CRITICAL: Clear original face region before placing warped pixels
-      ctx.clearRect(regionX, regionY, regionWidth, regionHeight);
       ctx.putImageData(outputData, regionX, regionY);
     } catch (error) {
       console.warn('⚠️ Face warping failed:', error);
