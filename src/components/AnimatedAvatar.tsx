@@ -205,12 +205,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       headTilt.current *= 0.95; // Gradually return to center
     }
 
-    // Apply breathing animation to whole image with head tilt
-    applyBreathing(ctx, canvas, headTilt.current);
-
-    // Reset transform after drawing
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
     // Apply PIXEL WARPING for entire face (eyes, eyebrows, mouth)
     if (faceMesh && isSpeaking) {
       // CRITICAL: Scale amplitude MUCH higher for visibility
