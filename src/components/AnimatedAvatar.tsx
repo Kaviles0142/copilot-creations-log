@@ -145,9 +145,16 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     canvas.width = 512;
     canvas.height = 512;
 
-    // Draw base image ONCE at start
+    // Clear canvas first
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    
+    // Draw base image to a temporary canvas for warping
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
+    tempCtx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
     // Get audio amplitude and detect phonemes/visemes
     let amplitude = 0;
@@ -233,7 +240,10 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         });
       }
       
-      applyFullFaceWarping(ctx, amplifiedAmplitude, canvas, blendedViseme, expressionIntensity.current, amplifiedAmplitude > 0.05);
+      applyFullFaceWarping(ctx, tempCtx, amplifiedAmplitude, canvas, blendedViseme, expressionIntensity.current, amplifiedAmplitude > 0.05);
+    } else {
+      // No warping, just draw the base image
+      ctx.drawImage(tempCanvas, 0, 0);
     }
     
     applyNaturalBlinking(ctx, canvas);
@@ -320,7 +330,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   };
 
   const applyFullFaceWarping = (
-    ctx: CanvasRenderingContext2D, 
+    ctx: CanvasRenderingContext2D,
+    tempCtx: CanvasRenderingContext2D,
     amplitude: number, 
     canvas: HTMLCanvasElement, 
     visemeParams: any,
@@ -368,8 +379,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const regionHeight = Math.min(canvas.height - regionY, Math.ceil(faceBottom - faceTop));
     
     try {
-      // Get the ENTIRE canvas image data
-      const fullImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Get the image data from the TEMP canvas (not the main canvas)
+      const fullImageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
       const fullPixels = fullImageData.data;
       
       // Create output for entire canvas
