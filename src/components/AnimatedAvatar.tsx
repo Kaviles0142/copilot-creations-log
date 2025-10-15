@@ -302,7 +302,18 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const high = getHighEnergy();
     const total = low + mid + high;
     
-    if (total < 5) return 'neutral';
+    // DEBUG: Log frequency analysis occasionally
+    if (Math.random() < 0.03) {
+      console.log('🎤 Frequency analysis:', {
+        low: low.toFixed(1),
+        mid: mid.toFixed(1),
+        high: high.toFixed(1),
+        total: total.toFixed(1)
+      });
+    }
+    
+    // Lower threshold to trigger visemes more easily
+    if (total < 0.5) return 'neutral';
     
     // Calculate ratios
     const lowRatio = low / total;
