@@ -320,27 +320,47 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const midRatio = mid / total;
     const highRatio = high / total;
     
+    // DEBUG: Log ratios and detection result
+    let detectedViseme = 'neutral';
+    
     // Vowel A - balanced mid and low
-    if (midRatio > 0.4 && lowRatio > 0.3) return 'A';
-    
+    if (midRatio > 0.4 && lowRatio > 0.3) {
+      detectedViseme = 'A';
+    }
     // Vowel E - mid-high dominant
-    if (midRatio > 0.45 && highRatio > 0.25) return 'E';
-    
+    else if (midRatio > 0.45 && highRatio > 0.25) {
+      detectedViseme = 'E';
+    }
     // Vowel I - high frequencies
-    if (highRatio > 0.4) return 'I';
-    
+    else if (highRatio > 0.4) {
+      detectedViseme = 'I';
+    }
     // Vowel O - low dominant
-    if (lowRatio > 0.5) return 'O';
-    
+    else if (lowRatio > 0.5) {
+      detectedViseme = 'O';
+    }
     // Vowel U - very low dominant
-    if (lowRatio > 0.6) return 'U';
-    
+    else if (lowRatio > 0.6) {
+      detectedViseme = 'U';
+    }
     // Consonants
-    if (high > 80 && highRatio > 0.5) return 'S';
+    else if (high > 80 && highRatio > 0.5) {
+      detectedViseme = 'S';
+    }
+    else if (low > 60 && mid < 20) {
+      detectedViseme = 'M';
+    }
     
-    if (low > 60 && mid < 20) return 'M';
+    if (Math.random() < 0.03) {
+      console.log('👄 Viseme detection:', {
+        lowRatio: lowRatio.toFixed(2),
+        midRatio: midRatio.toFixed(2),
+        highRatio: highRatio.toFixed(2),
+        detected: detectedViseme
+      });
+    }
     
-    return 'neutral';
+    return detectedViseme;
   };
 
   const applyFullFaceWarping = (
