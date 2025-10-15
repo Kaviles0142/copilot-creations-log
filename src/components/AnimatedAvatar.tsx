@@ -11,21 +11,31 @@ interface AnimatedAvatarProps {
   analyser?: AnalyserNode | null;
 }
 
-// Viseme shape parameters for different phonemes - TRIPLED for visibility
+// Clean viseme shape parameters for different phonemes - scaled naturally with amplitude
 const getVisemeParameters = (viseme: string, amplitude: number) => {
-  const params = {
-    neutral: { upperLip: 10, lowerLip: 20, jawDrop: 30, width: 10, cornerPull: 1, lipPucker: 0 },
-    A: { upperLip: 75, lowerLip: 210, jawDrop: 180, width: 45, cornerPull: 2.7, lipPucker: 0 }, // WIDE open mouth
-    E: { upperLip: 24, lowerLip: 75, jawDrop: 75, width: 75, cornerPull: 5.4, lipPucker: 0 }, // WIDE smile
-    I: { upperLip: 15, lowerLip: 45, jawDrop: 45, width: 90, cornerPull: 6.6, lipPucker: 0 }, // WIDEST smile
-    O: { upperLip: 45, lowerLip: 120, jawDrop: 120, width: 9, cornerPull: 0.3, lipPucker: 7.5 }, // ROUND pursed lips
-    U: { upperLip: 36, lowerLip: 105, jawDrop: 105, width: 6, cornerPull: 0.15, lipPucker: 9.0 }, // VERY round
-    M: { upperLip: 3, lowerLip: 3, jawDrop: 9, width: 3, cornerPull: 0.3, lipPucker: 0 }, // Lips CLOSED
-    F: { upperLip: 9, lowerLip: 24, jawDrop: 36, width: 30, cornerPull: 1.5, lipPucker: 0 }, // Teeth on lip
-    S: { upperLip: 12, lowerLip: 30, jawDrop: 45, width: 36, cornerPull: 2.1, lipPucker: 0 }, // Teeth close
+  const baseParams = {
+    neutral: { upperLip: 0, lowerLip: 0, jawDrop: 0, width: 0, cornerPull: 0, lipPucker: 0 },
+    A: { upperLip: 30, lowerLip: 80, jawDrop: 70, width: 20, cornerPull: 1.2, lipPucker: 0 }, // Open mouth
+    E: { upperLip: 10, lowerLip: 30, jawDrop: 25, width: 35, cornerPull: 2.5, lipPucker: 0 }, // Smile
+    I: { upperLip: 8, lowerLip: 20, jawDrop: 18, width: 40, cornerPull: 3.0, lipPucker: 0 }, // Wide smile
+    O: { upperLip: 20, lowerLip: 50, jawDrop: 45, width: 5, cornerPull: 0.2, lipPucker: 3.5 }, // Round
+    U: { upperLip: 18, lowerLip: 45, jawDrop: 40, width: 3, cornerPull: 0.1, lipPucker: 4.5 }, // Very round
+    M: { upperLip: 2, lowerLip: 2, jawDrop: 5, width: 2, cornerPull: 0.2, lipPucker: 0 }, // Lips closed
+    F: { upperLip: 5, lowerLip: 12, jawDrop: 15, width: 15, cornerPull: 0.8, lipPucker: 0 }, // Teeth on lip
+    S: { upperLip: 6, lowerLip: 15, jawDrop: 20, width: 18, cornerPull: 1.0, lipPucker: 0 }, // Teeth close
   };
   
-  return params[viseme as keyof typeof params] || params.neutral;
+  const params = baseParams[viseme as keyof typeof baseParams] || baseParams.neutral;
+  
+  // Scale all parameters by amplitude (single scaling point)
+  return {
+    upperLip: params.upperLip * amplitude,
+    lowerLip: params.lowerLip * amplitude,
+    jawDrop: params.jawDrop * amplitude,
+    width: params.width * amplitude,
+    cornerPull: params.cornerPull * amplitude,
+    lipPucker: params.lipPucker * amplitude,
+  };
 };
 
 const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyser: externalAnalyser }: AnimatedAvatarProps) => {
@@ -210,37 +220,26 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       headTilt.current *= 0.95; // Gradually return to center
     }
 
-    // Apply PIXEL WARPING for entire face (eyes, eyebrows, mouth)
+    // Apply PIXEL WARPING for entire face using clean Phoneme-to-Viseme mapping
     if (faceMesh && isSpeaking) {
-      // CRITICAL: Scale amplitude MUCH higher for visibility
-      const amplifiedAmplitude = Math.min(1, amplitude * 8); // 8x amplification!
-      
-      const blendedViseme = amplifiedAmplitude > 0.05 
-        ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current)
-        : getVisemeParameters('neutral', 0);
-      
-      // Add amplitude-driven jaw movement even for neutral
-      if (amplifiedAmplitude > 0.05) {
-        blendedViseme.jawDrop = Math.max(blendedViseme.jawDrop, amplifiedAmplitude * 200);
-        blendedViseme.lowerLip = Math.max(blendedViseme.lowerLip, amplifiedAmplitude * 150);
-        blendedViseme.upperLip = Math.max(blendedViseme.upperLip, amplifiedAmplitude * 80);
-      }
+      // Use raw amplitude - let viseme parameters control scaling naturally
+      const blendedViseme = amplitude > 0.05 
+        ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current, amplitude)
+        : getVisemeParameters('neutral', 1);
       
       // DEBUG: Log warping every 30 frames
       if (Math.random() < 0.03) {
-        console.log('🎭 Warping face:', { 
+        console.log('🎭 Phoneme warping:', { 
           isSpeaking, 
-          rawAmplitude: amplitude.toFixed(3),
-          amplified: amplifiedAmplitude.toFixed(3), 
+          amplitude: amplitude.toFixed(3),
           viseme: targetViseme,
           jawDrop: blendedViseme.jawDrop.toFixed(1),
           cornerPull: blendedViseme.cornerPull.toFixed(1),
-          hasFaceMesh: !!faceMesh,
-          expressionIntensity: expressionIntensity.current.toFixed(2)
+          hasFaceMesh: !!faceMesh
         });
       }
       
-      applyFullFaceWarping(ctx, tempCtx, amplifiedAmplitude, canvas, blendedViseme, expressionIntensity.current, amplifiedAmplitude > 0.05);
+      applyFullFaceWarping(ctx, tempCtx, amplitude, canvas, blendedViseme, expressionIntensity.current, amplitude > 0.05);
     } else {
       // No warping, just draw the base image
       ctx.drawImage(tempCanvas, 0, 0);
@@ -252,10 +251,11 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  // Blend between two viseme parameter sets
-  const getBlendedViseme = (fromViseme: string, toViseme: string, blend: number) => {
-    const from = getVisemeParameters(fromViseme, 1);
-    const to = getVisemeParameters(toViseme, 1);
+  // Blend between two viseme parameter sets (pass amplitude to get scaled values)
+  const getBlendedViseme = (fromViseme: string, toViseme: string, blend: number, amp: number) => {
+    // Get parameters with amplitude scaling already applied
+    const from = getVisemeParameters(fromViseme, amp);
+    const to = getVisemeParameters(toViseme, amp);
     
     return {
       upperLip: from.upperLip + (to.upperLip - from.upperLip) * blend,
