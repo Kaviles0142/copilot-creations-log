@@ -222,16 +222,19 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
     // Apply PIXEL WARPING for entire face using clean Phoneme-to-Viseme mapping
     if (faceMesh && isSpeaking) {
-      // Use raw amplitude - let viseme parameters control scaling naturally
-      const blendedViseme = amplitude > 0.05 
-        ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current, amplitude)
+      // Apply controlled 3.5x amplification (single scaling point to make movement visible)
+      const effectiveAmplitude = Math.min(1, amplitude * 3.5);
+      
+      const blendedViseme = effectiveAmplitude > 0.05 
+        ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current, effectiveAmplitude)
         : getVisemeParameters('neutral', 1);
       
       // DEBUG: Log warping every 30 frames
       if (Math.random() < 0.03) {
         console.log('🎭 Phoneme warping:', { 
           isSpeaking, 
-          amplitude: amplitude.toFixed(3),
+          rawAmplitude: amplitude.toFixed(3),
+          effectiveAmplitude: effectiveAmplitude.toFixed(3),
           viseme: targetViseme,
           jawDrop: blendedViseme.jawDrop.toFixed(1),
           cornerPull: blendedViseme.cornerPull.toFixed(1),
@@ -239,7 +242,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         });
       }
       
-      applyFullFaceWarping(ctx, tempCtx, amplitude, canvas, blendedViseme, expressionIntensity.current, amplitude > 0.05);
+      applyFullFaceWarping(ctx, tempCtx, effectiveAmplitude, canvas, blendedViseme, expressionIntensity.current, effectiveAmplitude > 0.05);
     } else {
       // No warping, just draw the base image
       ctx.drawImage(tempCanvas, 0, 0);
