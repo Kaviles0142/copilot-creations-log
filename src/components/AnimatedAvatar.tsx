@@ -188,15 +188,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       externalAnalyserRef.current.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
-      // DEBUG: ALWAYS log when isSpeaking is true
-      console.log('🎵 Audio analysis (isSpeaking=true):', {
-        amplitude: currentAmplitude.toFixed(3),
-        binCount: externalAnalyserRef.current.frequencyBinCount,
-        sampleRate: externalAnalyserRef.current.context.sampleRate,
-        contextState: externalAnalyserRef.current.context.state,
-        hasData: dataArray.some(v => v > 0),
-        avgFreq: (dataArray.reduce((a, b) => a + b, 0) / dataArray.length).toFixed(1)
-      });
+      console.log('🎵 Reading analyser - amplitude:', currentAmplitude.toFixed(3));
       
       // Detect phoneme from frequency analysis
       const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyserRef.current.context.sampleRate);
@@ -206,7 +198,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         setTargetViseme(detectedViseme);
         visemeBlend.current = 0;
       } else {
-        // Gradually blend to target viseme
         visemeBlend.current = Math.min(1, visemeBlend.current + 0.15);
       }
       
@@ -216,13 +207,19 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       // Subtle head movement based on audio
       headTilt.current = Math.sin(Date.now() / 800) * currentAmplitude * 2;
       
-      // Add delay buffer for natural lip sync (50-100ms)
+      // Add delay buffer for natural lip sync
       amplitudeHistory.current.push(currentAmplitude);
       if (amplitudeHistory.current.length > 3) {
         amplitudeHistory.current.shift();
       }
       amplitude = amplitudeHistory.current[0] || currentAmplitude;
     } else {
+      console.log('❌ Cannot read analyser:', {
+        isSpeaking: isSpeakingRef.current,
+        hasAnalyser: !!externalAnalyserRef.current,
+        analyserFromProp: !!externalAnalyser
+      });
+      
       // Blend back to neutral when not speaking
       if (targetViseme !== 'neutral') {
         setTargetViseme('neutral');
@@ -231,7 +228,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         visemeBlend.current = Math.min(1, visemeBlend.current + 0.1);
       }
       expressionIntensity.current = Math.max(0, expressionIntensity.current - 0.05);
-      headTilt.current *= 0.95; // Gradually return to center
+      headTilt.current *= 0.95;
     }
 
     // DEBUG: Check state before warping
