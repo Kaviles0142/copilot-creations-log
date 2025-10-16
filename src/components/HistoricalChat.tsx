@@ -102,9 +102,9 @@ const HistoricalChat = () => {
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null); // Reusable audio element
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null); // Reusable source node
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null); // Changed from ref to state
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   
   const { toast } = useToast();
 
@@ -296,10 +296,11 @@ const HistoricalChat = () => {
         console.log('▶️ AudioContext resumed, state:', audioContextRef.current.state);
       }
       
-      if (!analyserRef.current) {
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.8;
+      if (!analyser) {
+        const newAnalyser = audioContextRef.current.createAnalyser();
+        newAnalyser.fftSize = 256;
+        newAnalyser.smoothingTimeConstant = 0.8;
+        setAnalyser(newAnalyser);
         console.log('📊 Analyser created');
       }
       
@@ -307,21 +308,24 @@ const HistoricalChat = () => {
       if (!audioElementRef.current) {
         audioElementRef.current = new Audio();
         
-        // CRITICAL: Set isSpeaking when audio actually plays
-        audioElementRef.current.onplay = () => {
-          console.log('▶️ Audio playing - setting isSpeaking = true');
-          setIsSpeaking(true);
+        audioElementRef.current.onended = () => {
+          setIsPlayingAudio(false);
+          setIsPaused(false);
+          setCurrentAudio(null);
+          setIsSpeaking(false);
+          console.log('Greeting audio ended');
         };
         
-        audioElementRef.current.onpause = () => {
-          console.log('⏸️ Audio paused - setting isSpeaking = false');
-          setIsSpeaking(false);
+        audioElementRef.current.onerror = (error) => {
+          console.error('Greeting audio error:', error);
         };
         
         // Create source node ONCE and connect to analyser
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-        sourceNodeRef.current.connect(analyserRef.current);
-        analyserRef.current.connect(audioContextRef.current.destination);
+        if (analyser) {
+          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+          sourceNodeRef.current.connect(analyser);
+          analyser.connect(audioContextRef.current.destination);
+        }
         
         console.log('✅ Audio pipeline created: Element -> Source -> Analyser -> Destination');
       }
@@ -363,30 +367,32 @@ const HistoricalChat = () => {
       
       // Log analyser connectivity
       console.log('🔊 Audio playing - Context state:', audioContextRef.current.state);
-      console.log('📊 Analyser connected - FFT size:', analyserRef.current.fftSize);
+      console.log('📊 Analyser connected - FFT size:', analyser?.fftSize);
       
       // Continuously test analyser data while playing
       let testCount = 0;
       const testInterval = setInterval(() => {
-        if (!audioElementRef.current || audioElementRef.current.paused) {
+        if (testCount >= 5 || !audioElementRef.current?.duration) {
           clearInterval(testInterval);
           return;
         }
         
-        const testArray = new Uint8Array(analyserRef.current!.frequencyBinCount);
-        analyserRef.current!.getByteFrequencyData(testArray);
-        const hasData = testArray.some(v => v > 0);
-        const avgLevel = testArray.reduce((a, b) => a + b, 0) / testArray.length;
-        
-        console.log(`🧪 Analyser test #${++testCount}:`, { 
-          hasData, 
-          avgLevel: avgLevel.toFixed(2),
-          sampleData: Array.from(testArray.slice(0, 10)),
-          audioTime: audioElementRef.current?.currentTime.toFixed(2),
-          paused: audioElementRef.current?.paused
-        });
-        
-        if (testCount >= 10) clearInterval(testInterval);
+        if (analyser) {
+          const testArray = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(testArray);
+          const hasData = testArray.some(v => v > 0);
+          const avgLevel = testArray.reduce((a, b) => a + b, 0) / testArray.length;
+          
+          console.log(`🧪 Analyser test #${++testCount}:`, { 
+            hasData, 
+            avgLevel: avgLevel.toFixed(2),
+            sampleData: Array.from(testArray.slice(0, 10)),
+            audioTime: audioElementRef.current?.currentTime.toFixed(2),
+            paused: audioElementRef.current?.paused
+          });
+          
+          if (testCount >= 10) clearInterval(testInterval);
+        }
       }, 500);
       
     } catch (error) {
@@ -1304,18 +1310,19 @@ const HistoricalChat = () => {
             await audioContextRef.current.resume();
           }
           
-          if (!analyserRef.current) {
-            analyserRef.current = audioContextRef.current.createAnalyser();
-            analyserRef.current.fftSize = 256;
-            analyserRef.current.smoothingTimeConstant = 0.8;
+          if (!analyser) {
+            const newAnalyser = audioContextRef.current.createAnalyser();
+            newAnalyser.fftSize = 256;
+            newAnalyser.smoothingTimeConstant = 0.8;
+            setAnalyser(newAnalyser);
           }
           
           // Use the connected audio element
-          if (!audioElementRef.current) {
+          if (!audioElementRef.current && analyser) {
             audioElementRef.current = new Audio();
             sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-            sourceNodeRef.current.connect(analyserRef.current);
-            analyserRef.current.connect(audioContextRef.current.destination);
+            sourceNodeRef.current.connect(analyser);
+            analyser.connect(audioContextRef.current.destination);
           }
           
           // Stop current audio if playing
@@ -1729,19 +1736,20 @@ const HistoricalChat = () => {
         console.log('🎧 AudioContext resumed, state:', audioContextRef.current.state);
       }
       
-      if (!analyserRef.current) {
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.8;
+      if (!analyser) {
+        const newAnalyser = audioContextRef.current.createAnalyser();
+        newAnalyser.fftSize = 256;
+        newAnalyser.smoothingTimeConstant = 0.8;
+        setAnalyser(newAnalyser);
       }
       
       // CRITICAL: Create audio element and source node ONCE
-      if (!audioElementRef.current) {
+      if (!audioElementRef.current && analyser) {
         console.log('🎧 Creating new audio element and source node');
         audioElementRef.current = new Audio();
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-        sourceNodeRef.current.connect(analyserRef.current);
-        analyserRef.current.connect(audioContextRef.current.destination);
+        sourceNodeRef.current.connect(analyser);
+        analyser.connect(audioContextRef.current.destination);
         console.log('✅ Audio pipeline created');
       }
       
@@ -2333,7 +2341,7 @@ const HistoricalChat = () => {
               isLoading={isLoadingAvatarImage}
               isSpeaking={isSpeaking}
               audioElement={currentAudio}
-              analyser={analyserRef.current}
+              analyser={analyser}
             />
           </div>
         )}
