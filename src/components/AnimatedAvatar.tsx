@@ -220,6 +220,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       headTilt.current *= 0.95; // Gradually return to center
     }
 
+    // DEBUG: Check state before warping
+    console.log('🔍 Warping check:', {
+      hasFaceMesh: !!faceMesh,
+      isSpeaking,
+      amplitude: amplitude.toFixed(3)
+    });
+
     // Apply PIXEL WARPING for entire face using clean Phoneme-to-Viseme mapping
     if (faceMesh && isSpeaking) {
       // Apply controlled 3.5x amplification (single scaling point to make movement visible)
