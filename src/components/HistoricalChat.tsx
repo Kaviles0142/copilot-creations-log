@@ -257,6 +257,38 @@ const HistoricalChat = () => {
     return greetings[Math.floor(Math.random() * greetings.length)];
   };
 
+  // Initialize audio pipeline (centralizes audio setup)
+  const initializeAudioPipeline = () => {
+    // Initialize audio context
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log('🎧 AudioContext created, state:', audioContextRef.current.state);
+    }
+    
+    // Resume AudioContext if suspended
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+      console.log('▶️ AudioContext resumed');
+    }
+    
+    // Create analyser once
+    if (!analyserRef.current) {
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      analyserRef.current.smoothingTimeConstant = 0.8;
+      console.log('📊 Analyser created');
+    }
+    
+    // Create audio element and connect to analyser ONCE
+    if (!audioElementRef.current) {
+      audioElementRef.current = new Audio();
+      sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+      sourceNodeRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      console.log('✅ Audio pipeline: Element -> Source -> Analyser -> Destination');
+    }
+  };
+
   // Generate and play TTS audio with avatar animation
   const generateAndPlayTTS = async (text: string) => {
     if (!selectedFigure) return;
@@ -280,54 +312,17 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
+      // Initialize audio pipeline
+      initializeAudioPipeline();
+      
+      // Ensure context is running
+      if (audioContextRef.current!.state === 'suspended') {
+        await audioContextRef.current!.resume();
+      }
+      
       // Convert base64 to audio blob
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
-      
-      // Initialize audio context and analyser ONCE
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log('🎧 AudioContext created, state:', audioContextRef.current.state);
-      }
-      
-      // CRITICAL: Resume AudioContext if suspended
-      if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
-        console.log('▶️ AudioContext resumed, state:', audioContextRef.current.state);
-      }
-      
-      if (!analyserRef.current) {
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.8;
-        console.log('📊 Analyser created (ref)');
-      }
-      
-      // Create or reuse audio element
-      if (!audioElementRef.current) {
-        audioElementRef.current = new Audio();
-        
-        audioElementRef.current.onended = () => {
-          setIsPlayingAudio(false);
-          setIsPaused(false);
-          setCurrentAudio(null);
-          setIsSpeaking(false);
-          console.log('Greeting audio ended');
-        };
-        
-        audioElementRef.current.onerror = (error) => {
-          console.error('Greeting audio error:', error);
-        };
-        
-        // Create source node ONCE and connect to analyser
-        if (analyserRef.current) {
-          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-          sourceNodeRef.current.connect(analyserRef.current);
-          analyserRef.current.connect(audioContextRef.current.destination);
-        }
-        
-        console.log('✅ Audio pipeline created: Element -> Source -> Analyser -> Destination');
-      }
       
       // Stop current audio if playing
       if (currentAudio) {
@@ -335,23 +330,28 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
       
-      // Set new audio source
-      audioElementRef.current.src = audioUrl;
-      setCurrentAudio(audioElementRef.current);
-      console.log('🎤 Setting isSpeaking to TRUE');
-      setIsSpeaking(true);
+      // Set new audio source on the shared element
+      audioElementRef.current!.src = audioUrl;
+      setCurrentAudio(audioElementRef.current!);
       
-      audioElementRef.current.onended = () => {
-        console.log('🎤 Setting isSpeaking to FALSE (audio ended)');
+      // CRITICAL: Set event handlers BEFORE play to ensure isSpeaking is managed
+      audioElementRef.current!.onplay = () => {
+        console.log('▶️ Audio PLAY event fired - Setting isSpeaking = TRUE');
+        setIsSpeaking(true);
+        setIsPlayingAudio(true);
+      };
+      
+      audioElementRef.current!.onended = () => {
+        console.log('⏹️ Audio ENDED event fired - Setting isSpeaking = FALSE');
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         setCurrentAudio(null);
         setIsGreetingPlaying(false);
         URL.revokeObjectURL(audioUrl);
-        console.log('🔇 Audio ended');
       };
 
-      audioElementRef.current.onerror = () => {
+      audioElementRef.current!.onerror = () => {
+        console.error('❌ Audio ERROR event fired');
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         toast({
@@ -361,38 +361,9 @@ const HistoricalChat = () => {
         });
       };
 
-      await audioElementRef.current.play();
-      setIsPlayingAudio(true);
-      
-      // Log analyser connectivity
-      console.log('🔊 Audio playing - Context state:', audioContextRef.current.state);
-      console.log('📊 Analyser connected - FFT size:', analyserRef.current?.fftSize);
-      
-      // Continuously test analyser data while playing
-      let testCount = 0;
-      const testInterval = setInterval(() => {
-        if (testCount >= 5 || !audioElementRef.current?.duration) {
-          clearInterval(testInterval);
-          return;
-        }
-        
-        if (analyserRef.current) {
-          const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-          analyserRef.current.getByteFrequencyData(testArray);
-          const hasData = testArray.some(v => v > 0);
-          const avgLevel = testArray.reduce((a, b) => a + b, 0) / testArray.length;
-          
-          console.log(`🧪 Analyser test #${++testCount}:`, { 
-            hasData, 
-            avgLevel: avgLevel.toFixed(2),
-            sampleData: Array.from(testArray.slice(0, 10)),
-            audioTime: audioElementRef.current?.currentTime.toFixed(2),
-            paused: audioElementRef.current?.paused
-          });
-          
-          if (testCount >= 10) clearInterval(testInterval);
-        }
-      }, 500);
+      // Play the audio
+      await audioElementRef.current!.play();
+      console.log('🔊 Audio playing - Context state:', audioContextRef.current!.state);
       
     } catch (error) {
       console.error('❌ Azure TTS generation error:', error);
@@ -1300,27 +1271,12 @@ const HistoricalChat = () => {
             duration: 2000,
           });
           
-          // Initialize audio context and analyser if needed
-          if (!audioContextRef.current) {
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-          }
+          // Use centralized audio pipeline initialization
+          initializeAudioPipeline();
           
-          if (audioContextRef.current.state === 'suspended') {
-            await audioContextRef.current.resume();
-          }
-          
-          if (!analyserRef.current) {
-            analyserRef.current = audioContextRef.current.createAnalyser();
-            analyserRef.current.fftSize = 256;
-            analyserRef.current.smoothingTimeConstant = 0.8;
-          }
-          
-          // Use the connected audio element
-          if (!audioElementRef.current && analyserRef.current) {
-            audioElementRef.current = new Audio();
-            sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-            sourceNodeRef.current.connect(analyserRef.current);
-            analyserRef.current.connect(audioContextRef.current.destination);
+          // Ensure audio context is running
+          if (audioContextRef.current!.state === 'suspended') {
+            await audioContextRef.current!.resume();
           }
           
           // Stop current audio if playing
@@ -1332,29 +1288,30 @@ const HistoricalChat = () => {
           console.log('🎵 Final Audio URL:', audioUrl);
           console.log('🔗 Loading audio into connected element...');
           
-          audioElementRef.current.crossOrigin = 'anonymous';
-          audioElementRef.current.src = audioUrl;
-          audioElementRef.current.playbackRate = 0.85;
+          // Set audio properties on shared element
+          audioElementRef.current!.crossOrigin = 'anonymous';
+          audioElementRef.current!.src = audioUrl;
+          audioElementRef.current!.playbackRate = 0.85;
           
-          audioElementRef.current.onloadeddata = () => {
-            console.log('📡 Audio loaded, starting playback at 0.85x speed');
-            audioElementRef.current!.play().then(() => {
-              setIsPlayingAudio(true);
-              setCurrentAudio(audioElementRef.current!);
-              setIsSpeaking(true);
-              console.log('🔊 FakeYou voice playing with analyser connected');
-            }).catch(err => {
-              console.error('❌ Audio playback failed:', err);
-              setIsPlayingAudio(false);
-              throw err;
-            });
+          // CRITICAL: Set event handlers BEFORE play
+          audioElementRef.current!.onplay = () => {
+            console.log('▶️ FakeYou audio PLAY event - Setting isSpeaking = TRUE');
+            setIsSpeaking(true);
+            setIsPlayingAudio(true);
+            setCurrentAudio(audioElementRef.current!);
           };
           
-          audioElementRef.current.onerror = (e) => {
-            console.error('❌ Audio load failed:', e);
-            setIsPlayingAudio(false);
+          audioElementRef.current!.onended = () => {
+            console.log('⏹️ FakeYou audio ENDED event - Setting isSpeaking = FALSE');
             setIsSpeaking(false);
-            
+            setIsPlayingAudio(false);
+            setCurrentAudio(null);
+          };
+          
+          audioElementRef.current!.onerror = (e) => {
+            console.error('❌ FakeYou audio ERROR event:', e);
+            setIsSpeaking(false);
+            setIsPlayingAudio(false);
             toast({
               title: "Audio playback error",
               description: "Failed to load audio file",
@@ -1362,11 +1319,13 @@ const HistoricalChat = () => {
             });
           };
           
-          audioElementRef.current.onended = () => {
-            console.log('✅ Audio playback completed');
-            setIsPlayingAudio(false);
-            setCurrentAudio(null);
-            setIsSpeaking(false);
+          audioElementRef.current!.onloadeddata = () => {
+            console.log('📡 Audio loaded, starting playback at 0.85x speed');
+            audioElementRef.current!.play().catch(err => {
+              console.error('❌ Audio playback failed:', err);
+              setIsPlayingAudio(false);
+              setIsSpeaking(false);
+            });
           };
           
           return; // Success!
@@ -1723,33 +1682,13 @@ const HistoricalChat = () => {
 
   const playAudioFromBase64 = async (audioContent: string) => {
     try {
-      // Initialize audio context
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
+      // Use centralized audio pipeline initialization
+      initializeAudioPipeline();
       
-      // CRITICAL: Resume audio context FIRST
-      if (audioContextRef.current.state !== 'running') {
-        await audioContextRef.current.resume();
-        console.log('🎧 AudioContext resumed, state:', audioContextRef.current.state);
-      }
-      
-      // CRITICAL: Create analyser synchronously using ref for immediate availability
-      if (!analyserRef.current) {
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.8;
-        console.log('📊 Created new analyser (stored in ref)');
-      }
-      
-      // CRITICAL: Create audio element and connect to analyser
-      if (!audioElementRef.current) {
-        console.log('🎧 Creating new audio element and source node');
-        audioElementRef.current = new Audio();
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-        sourceNodeRef.current.connect(analyserRef.current!);
-        analyserRef.current!.connect(audioContextRef.current.destination);
-        console.log('✅ Audio pipeline: Element -> Source -> Analyser -> Destination');
+      // Ensure audio context is running
+      if (audioContextRef.current!.state !== 'running') {
+        await audioContextRef.current!.resume();
+        console.log('🎧 AudioContext resumed');
       }
       
       // Stop current audio if playing
@@ -1768,46 +1707,48 @@ const HistoricalChat = () => {
       const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      audioElementRef.current.src = audioUrl;
-      setCurrentAudio(audioElementRef.current);
+      // Set audio source on shared element
+      audioElementRef.current!.src = audioUrl;
+      setCurrentAudio(audioElementRef.current!);
       
-      // CRITICAL: Always attach event handlers for each playback
-      audioElementRef.current.onplay = () => {
-        console.log('▶️ Audio playing - Context state:', audioContextRef.current?.state);
+      // CRITICAL: Set event handlers BEFORE play
+      audioElementRef.current!.onplay = () => {
+        console.log('▶️ Audio PLAY event - Setting isSpeaking = TRUE');
         setIsSpeaking(true);
+        setIsPlayingAudio(true);
       };
       
-      audioElementRef.current.onpause = () => {
-        console.log('⏸️ Audio paused');
+      audioElementRef.current!.onpause = () => {
+        console.log('⏸️ Audio PAUSED event');
         setIsSpeaking(false);
       };
       
-      audioElementRef.current.onended = () => {
-        console.log('⏹️ Audio ended');
+      audioElementRef.current!.onended = () => {
+        console.log('⏹️ Audio ENDED event - Setting isSpeaking = FALSE');
+        setIsSpeaking(false);
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
-        setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl);
       };
 
-      audioElementRef.current.onerror = () => {
-        console.error('❌ Audio error');
+      audioElementRef.current!.onerror = () => {
+        console.error('❌ Audio ERROR event');
+        setIsSpeaking(false);
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
-        setIsSpeaking(false);
       };
 
-      // CRITICAL: Play audio AFTER context is running and handlers are attached
-      await audioElementRef.current.play();
-      setIsPlayingAudio(true);
+      // Play audio
+      await audioElementRef.current!.play();
+      console.log('🔊 Audio playing - Context:', audioContextRef.current!.state);
     } catch (error) {
       console.error('Error in playAudioFromBase64:', error);
+      setIsSpeaking(false);
       setIsPlayingAudio(false);
       setIsPaused(false);
       setCurrentAudio(null);
-      setIsSpeaking(false);
     }
   };
 
