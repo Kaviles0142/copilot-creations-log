@@ -514,17 +514,13 @@ serve(async (req) => {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
 
-    // Get Lovable AI API key
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    
-    if (!lovableApiKey) {
-      return new Response(JSON.stringify({ 
-        error: 'Lovable AI is not configured. Please check your secrets.' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Priority order for AI providers (to use free credits first)
+    const AI_PROVIDERS = [
+      { name: 'OpenAI', env: 'OPENAI_API_KEY', model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
+      { name: 'Grok', env: 'GROK_API_KEY', model: 'grok-beta', endpoint: 'https://api.x.ai/v1/chat/completions' },
+      { name: 'Anthropic', env: 'ANTHROPIC_API_KEY', model: 'claude-sonnet-4-5', endpoint: 'https://api.anthropic.com/v1/messages' },
+      { name: 'Lovable AI', env: 'LOVABLE_API_KEY', model: 'google/gemini-2.5-flash', endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions' }
+    ];
 
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
     console.log(`Making Lovable AI (Gemini) request with comprehensive multi-source context...`);
@@ -756,83 +752,104 @@ ${relevantKnowledge}
 
 Remember: You're ${figure.name} having a real conversation. Share your experiences, quote your own words, express genuine emotions. Make every response feel like YOU speaking, not someone speaking ABOUT you. NO stage directions - just authentic, passionate dialogue.`;
 
-    // Call Lovable AI with Gemini
+    // Try AI providers in priority order with automatic fallback
     let response: string | null = null;
+    let usedProvider = '';
     
-    try {
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${lovableApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message }
-          ],
-          max_tokens: 2000,
-          temperature: 0.8
-        }),
-      });
-
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        
-        // Handle specific error codes
-        if (aiResponse.status === 429) {
-          console.error('Rate limit exceeded');
-          return new Response(JSON.stringify({ 
-            error: 'Rate limit exceeded. Please wait a moment and try again.' 
-          }), {
-            status: 429,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        if (aiResponse.status === 402) {
-          console.error('Payment required');
-          return new Response(JSON.stringify({ 
-            error: 'Usage credits depleted. Please add credits to your Lovable workspace.' 
-          }), {
-            status: 402,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        console.error('Lovable AI error:', aiResponse.status, errorText);
-        throw new Error(`Lovable AI error: ${aiResponse.status}`);
-      }
-
-      const data = await aiResponse.json();
-      response = data.choices[0].message.content;
+    for (const provider of AI_PROVIDERS) {
+      const apiKey = Deno.env.get(provider.env);
       
-      // Post-process response to clean formatting artifacts
-      if (response) {
-        // Remove "asteric" and "asterisk" hallucinations
-        response = response.replace(/\basteric\b|\basterisk\b/gi, '');
-        // Convert any remaining asterisk formatting to quotation marks
-        response = response.replace(/\*(.*?)\*/g, '"$1"');
-        console.log("🧹 Cleaned response text (removed/converted formatting artifacts)");
+      if (!apiKey) {
+        console.log(`${provider.name} not configured, skipping...`);
+        continue;
       }
       
-      console.log("✅ Success with Lovable AI (Gemini). Response length: " + (response?.length || 0) + " characters");
-      
-    } catch (error) {
-      console.error('Lovable AI request failed:', error);
-      return new Response(JSON.stringify({ 
-        error: 'AI service is currently unavailable. Please try again.'
-      }), {
-        status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      try {
+        console.log(`Trying ${provider.name}...`);
+        
+        if (provider.name === 'Anthropic') {
+          // Anthropic uses a different API format
+          const aiResponse = await fetch(provider.endpoint, {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: provider.model,
+              max_tokens: 2000,
+              messages: [
+                { role: 'user', content: `${systemPrompt}\n\nUser: ${message}` }
+              ]
+            }),
+          });
+
+          if (aiResponse.status === 429 || aiResponse.status === 402) {
+            console.log(`${provider.name} credits depleted (${aiResponse.status}), trying next provider...`);
+            continue;
+          }
+
+          if (!aiResponse.ok) {
+            throw new Error(`${provider.name} error: ${aiResponse.status}`);
+          }
+
+          const data = await aiResponse.json();
+          response = data.content[0].text;
+          usedProvider = provider.name;
+          
+        } else {
+          // OpenAI, Grok, and Lovable AI use OpenAI-compatible format
+          const aiResponse = await fetch(provider.endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: provider.model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: message }
+              ],
+              max_tokens: 2000,
+              temperature: 0.8
+            }),
+          });
+
+          if (aiResponse.status === 429 || aiResponse.status === 402) {
+            console.log(`${provider.name} credits depleted (${aiResponse.status}), trying next provider...`);
+            continue;
+          }
+
+          if (!aiResponse.ok) {
+            throw new Error(`${provider.name} error: ${aiResponse.status}`);
+          }
+
+          const data = await aiResponse.json();
+          response = data.choices[0].message.content;
+          usedProvider = provider.name;
+        }
+        
+        // Post-process response to clean formatting artifacts
+        if (response) {
+          response = response.replace(/\basteric\b|\basterisk\b/gi, '');
+          response = response.replace(/\*(.*?)\*/g, '"$1"');
+          console.log("🧹 Cleaned response text (removed/converted formatting artifacts)");
+        }
+        
+        console.log(`✅ Success with ${provider.name}. Response length: ${response?.length || 0} characters`);
+        break; // Success! Exit the loop
+        
+      } catch (error) {
+        console.error(`${provider.name} failed:`, error);
+        // Continue to next provider
+      }
     }
-
+    
     if (!response) {
-      console.error('No response from AI');
       return new Response(JSON.stringify({ 
-        error: 'Failed to generate response. Please try again.'
+        error: 'All AI providers failed or have no credits. Please check your API keys and credits.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -841,10 +858,10 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
 
     return new Response(JSON.stringify({ 
       response, 
-      aiProvider: 'lovable-ai',
-      requestedProvider: 'lovable-ai',
-      fallbackUsed: false,
-      model: 'google/gemini-2.5-flash',
+      aiProvider: usedProvider.toLowerCase().replace(' ', '-'),
+      requestedProvider: usedProvider.toLowerCase().replace(' ', '-'),
+      fallbackUsed: usedProvider !== 'OpenAI',
+      model: AI_PROVIDERS.find(p => p.name === usedProvider)?.model || 'unknown',
       sourcesUsed,
       audioUrl: null,
       figureId: figure.id,
