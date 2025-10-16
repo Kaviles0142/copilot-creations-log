@@ -189,12 +189,15 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       // Detect phoneme using Meyda audio features
       const detectedViseme = detectVisemeFromMeyda(externalAnalyser);
       
-      // Smooth viseme transitions
+      // Smooth viseme transitions with easing
       if (detectedViseme !== targetVisemeRef.current) {
-        targetVisemeRef.current = detectedViseme; // Update ref immediately
+        targetVisemeRef.current = detectedViseme;
         visemeBlend.current = 0;
       } else {
-        visemeBlend.current = Math.min(1, visemeBlend.current + 0.15);
+        // Slower, smoother blend using easing (cubic ease-out)
+        const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+        visemeBlend.current = Math.min(1, visemeBlend.current + 0.08);
+        visemeBlend.current = easeOut(visemeBlend.current);
       }
       
       // Animate expression intensity
@@ -262,19 +265,25 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     animationFrameRef.current = requestAnimationFrame(drawFrame);
   };
 
-  // Blend between two viseme parameter sets (pass amplitude to get scaled values)
+  // Blend between two viseme parameter sets with smooth easing
   const getBlendedViseme = (fromViseme: string, toViseme: string, blend: number, amp: number) => {
-    // Get parameters with amplitude scaling already applied
+    // Apply smooth easing to blend value (ease-in-out)
+    const easeInOut = (t: number) => t < 0.5 
+      ? 4 * t * t * t 
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    
+    const smoothBlend = easeInOut(blend);
+    
     const from = getVisemeParameters(fromViseme, amp);
     const to = getVisemeParameters(toViseme, amp);
     
     return {
-      upperLip: from.upperLip + (to.upperLip - from.upperLip) * blend,
-      lowerLip: from.lowerLip + (to.lowerLip - from.lowerLip) * blend,
-      jawDrop: from.jawDrop + (to.jawDrop - from.jawDrop) * blend,
-      width: from.width + (to.width - from.width) * blend,
-      cornerPull: from.cornerPull + (to.cornerPull - from.cornerPull) * blend,
-      lipPucker: from.lipPucker + (to.lipPucker - from.lipPucker) * blend,
+      upperLip: from.upperLip + (to.upperLip - from.upperLip) * smoothBlend,
+      lowerLip: from.lowerLip + (to.lowerLip - from.lowerLip) * smoothBlend,
+      jawDrop: from.jawDrop + (to.jawDrop - from.jawDrop) * smoothBlend,
+      width: from.width + (to.width - from.width) * smoothBlend,
+      cornerPull: from.cornerPull + (to.cornerPull - from.cornerPull) * smoothBlend,
+      lipPucker: from.lipPucker + (to.lipPucker - from.lipPucker) * smoothBlend,
     };
   };
 
