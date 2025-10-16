@@ -306,38 +306,40 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       zcr: zeroCrossing.toFixed(4)
     });
     
-    // Low energy threshold
-    if (energy < 0.01) return 'neutral';
+    // Low energy threshold - adjusted for actual values
+    if (energy < 0.005) return 'neutral';
     
     let detectedViseme = 'neutral';
     
-    // Vowel detection based on MFCC patterns and spectral centroid
-    // A - open vowel, lower spectral centroid, balanced MFCCs
-    if (centroid < 1500 && mfcc0 > -20 && Math.abs(mfcc1) < 15) {
+    // Adjusted vowel detection based on ACTUAL Meyda output ranges
+    // Spectral centroid is in 100-130 range, MFCCs are 0-60
+    
+    // High energy speech (A, E vowels)
+    if (energy > 0.08 && mfcc0 > 40) {
       detectedViseme = 'A';
     }
-    // E - mid-high formant, higher spectral centroid
-    else if (centroid > 1500 && centroid < 2500 && mfcc1 > 0) {
+    // Mid-high energy with higher MFCC1 (E vowel)
+    else if (energy > 0.05 && mfcc1 > 30) {
       detectedViseme = 'E';
     }
-    // I - high formant, high spectral centroid
-    else if (centroid > 2500 && zeroCrossing > 0.1) {
-      detectedViseme = 'I';
-    }
-    // O - rounded vowel, low centroid, low ZCR
-    else if (centroid < 1000 && zeroCrossing < 0.08 && mfcc0 < -15) {
-      detectedViseme = 'O';
-    }
-    // U - very rounded, very low centroid
-    else if (centroid < 800 && mfcc0 < -20) {
-      detectedViseme = 'U';
-    }
-    // S - fricative, high frequency, high ZCR
-    else if (centroid > 3000 && zeroCrossing > 0.15) {
+    // High ZCR indicates fricatives (S, F sounds)
+    else if (zeroCrossing > 30) {
       detectedViseme = 'S';
     }
-    // M - nasal, low frequency, specific MFCC pattern
-    else if (centroid < 1200 && zeroCrossing < 0.05 && Math.abs(mfcc2) > 10) {
+    // High MFCC2 relative to others (I vowel)
+    else if (mfcc2 > mfcc1 && energy > 0.04) {
+      detectedViseme = 'I';
+    }
+    // Low MFCC2, rounded sounds (O, U)
+    else if (mfcc2 < 20 && energy > 0.03) {
+      if (mfcc0 > 50) {
+        detectedViseme = 'O';
+      } else {
+        detectedViseme = 'U';
+      }
+    }
+    // Low ZCR, nasal sounds (M, N)
+    else if (zeroCrossing < 10 && energy > 0.02) {
       detectedViseme = 'M';
     }
     
