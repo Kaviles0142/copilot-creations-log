@@ -319,9 +319,11 @@ const HistoricalChat = () => {
       // Set new audio source
       audioElementRef.current.src = audioUrl;
       setCurrentAudio(audioElementRef.current);
+      console.log('🎤 Setting isSpeaking to TRUE');
       setIsSpeaking(true);
       
       audioElementRef.current.onended = () => {
+        console.log('🎤 Setting isSpeaking to FALSE (audio ended)');
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         setCurrentAudio(null);
