@@ -108,6 +108,11 @@ const HistoricalChat = () => {
   
   const { toast } = useToast();
 
+  // DEBUG: Watch isSpeaking state changes
+  useEffect(() => {
+    console.log('🎤🎤🎤 isSpeaking changed to:', isSpeaking);
+  }, [isSpeaking]);
+
   // Initialize speech recognition with enhanced settings
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
