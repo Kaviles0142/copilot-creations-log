@@ -177,6 +177,16 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     if (isSpeaking && externalAnalyser) {
       const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
       externalAnalyser.getByteFrequencyData(dataArray);
+      
+      // DEBUG: Check what we're actually getting
+      console.log('🔍 Analyser data check:', {
+        frequencyBinCount: externalAnalyser.frequencyBinCount,
+        dataArrayLength: dataArray.length,
+        firstTenValues: Array.from(dataArray.slice(0, 10)),
+        maxValue: Math.max(...dataArray),
+        hasNonZero: dataArray.some(v => v > 0)
+      });
+      
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
       console.log('🎵 Reading analyser - amplitude:', currentAmplitude.toFixed(3));
