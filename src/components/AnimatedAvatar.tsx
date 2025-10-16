@@ -311,7 +311,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       let sum = 0;
       const endBin = Math.floor((500 / (sampleRate / 2)) * binCount);
       for (let i = 0; i < endBin; i++) sum += frequencyData[i];
-      return sum / endBin;
+      return (sum / endBin) / 255; // Normalize to 0-1
     };
     
     const getMidEnergy = () => {
@@ -319,14 +319,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const startBin = Math.floor((500 / (sampleRate / 2)) * binCount);
       const endBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
       for (let i = startBin; i < endBin; i++) sum += frequencyData[i];
-      return sum / (endBin - startBin);
+      return (sum / (endBin - startBin)) / 255; // Normalize to 0-1
     };
     
     const getHighEnergy = () => {
       let sum = 0;
       const startBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
       for (let i = startBin; i < binCount; i++) sum += frequencyData[i];
-      return sum / (binCount - startBin);
+      return (sum / (binCount - startBin)) / 255; // Normalize to 0-1
     };
     
     const low = getLowEnergy();
