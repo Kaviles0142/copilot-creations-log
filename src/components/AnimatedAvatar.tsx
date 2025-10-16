@@ -49,7 +49,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const amplitudeHistory = useRef<number[]>([]);
   const [currentViseme, setCurrentViseme] = useState<string>('neutral');
-  const [targetViseme, setTargetViseme] = useState<string>('neutral');
+  const targetVisemeRef = useRef<string>('neutral'); // Changed to ref for immediate updates
   const visemeBlend = useRef<number>(0);
   const expressionIntensity = useRef<number>(0);
   const headTilt = useRef<number>(0);
@@ -190,8 +190,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const detectedViseme = detectVisemeFromMeyda(externalAnalyser);
       
       // Smooth viseme transitions
-      if (detectedViseme !== targetViseme) {
-        setTargetViseme(detectedViseme);
+      if (detectedViseme !== targetVisemeRef.current) {
+        targetVisemeRef.current = detectedViseme; // Update ref immediately
         visemeBlend.current = 0;
       } else {
         visemeBlend.current = Math.min(1, visemeBlend.current + 0.15);
@@ -214,8 +214,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       }
       
       // Blend back to neutral
-      if (targetViseme !== 'neutral') {
-        setTargetViseme('neutral');
+      if (targetVisemeRef.current !== 'neutral') {
+        targetVisemeRef.current = 'neutral';
         visemeBlend.current = 0;
       } else {
         visemeBlend.current = Math.min(1, visemeBlend.current + 0.1);
@@ -236,7 +236,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const effectiveAmplitude = Math.min(1, amplitude * 3.5);
       
       const blendedViseme = effectiveAmplitude > 0.05 
-        ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current, effectiveAmplitude)
+        ? getBlendedViseme(currentViseme, targetVisemeRef.current, visemeBlend.current, effectiveAmplitude)
         : getVisemeParameters('neutral', 1);
       
       // Log warping action occasionally
@@ -245,7 +245,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
           raw: amplitude.toFixed(3),
           effective: effectiveAmplitude.toFixed(3),
           current: currentViseme,
-          target: targetViseme,
+          target: targetVisemeRef.current,
           blend: visemeBlend.current.toFixed(2),
           jaw: blendedViseme.jawDrop.toFixed(1)
         });
