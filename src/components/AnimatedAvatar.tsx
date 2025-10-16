@@ -278,17 +278,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const detectVisemeFromFrequency = (frequencyData: Uint8Array, sampleRate: number): string => {
     const binCount = frequencyData.length;
     
-    // Calculate total energy first to decide if we should detect
-    const totalEnergy = frequencyData.reduce((sum, val) => sum + val, 0) / binCount;
-    
-    console.log('🔍 Viseme Detection:', { totalEnergy, binCount, sampleRate });
-    
-    // CRITICAL: Very low threshold based on actual values (max was ~74 in logs)
-    if (totalEnergy < 1) { // Ultra low - average of 1 out of 255
-      console.log('❌ Below threshold, returning neutral');
-      return 'neutral';
-    }
-    
     // Analyze specific frequency ranges for phoneme detection
     // Low: 0-500Hz, Mid: 500-2000Hz, High: 2000Hz+
     const getLowEnergy = () => {
