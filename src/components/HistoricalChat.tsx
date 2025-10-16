@@ -307,6 +307,17 @@ const HistoricalChat = () => {
       if (!audioElementRef.current) {
         audioElementRef.current = new Audio();
         
+        // CRITICAL: Set isSpeaking when audio actually plays
+        audioElementRef.current.onplay = () => {
+          console.log('▶️ Audio playing - setting isSpeaking = true');
+          setIsSpeaking(true);
+        };
+        
+        audioElementRef.current.onpause = () => {
+          console.log('⏸️ Audio paused - setting isSpeaking = false');
+          setIsSpeaking(false);
+        };
+        
         // Create source node ONCE and connect to analyser
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
         sourceNodeRef.current.connect(analyserRef.current);
