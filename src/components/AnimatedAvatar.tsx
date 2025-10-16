@@ -600,6 +600,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   };
 
   useEffect(() => {
+    // Cancel any existing animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    }
+    
+    console.log('🔄 Restarting animation with isSpeaking:', isSpeaking, 'hasAnalyser:', !!externalAnalyser);
+    
     if (imageUrl && imageRef.current) {
       drawFrame();
     }
@@ -609,6 +617,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageUrl, isSpeaking, externalAnalyser, faceMesh]);
 
   if (isLoading) {
