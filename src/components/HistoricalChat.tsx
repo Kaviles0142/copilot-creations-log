@@ -1758,12 +1758,15 @@ const HistoricalChat = () => {
       const audioUrl = URL.createObjectURL(audioBlob);
       
       audioElementRef.current.src = audioUrl;
+      
+      // CRITICAL: Set currentAudio BEFORE setting handlers so AnimatedAvatar has reference
       setCurrentAudio(audioElementRef.current);
       
       // CRITICAL: Always set these handlers before playing
       audioElementRef.current.onplay = () => {
         console.log('▶️ Audio playing - setting isSpeaking = true');
         setIsSpeaking(true);
+        setCurrentAudio(audioElementRef.current); // Update again to trigger re-render
       };
       
       audioElementRef.current.onpause = () => {
