@@ -102,7 +102,7 @@ const HistoricalChat = () => {
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null); // Changed from ref to state
+  const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   
@@ -296,12 +296,11 @@ const HistoricalChat = () => {
         console.log('▶️ AudioContext resumed, state:', audioContextRef.current.state);
       }
       
-      if (!analyser) {
-        const newAnalyser = audioContextRef.current.createAnalyser();
-        newAnalyser.fftSize = 256;
-        newAnalyser.smoothingTimeConstant = 0.8;
-        setAnalyser(newAnalyser);
-        console.log('📊 Analyser created');
+      if (!analyserRef.current) {
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+        console.log('📊 Analyser created (ref)');
       }
       
       // Create or reuse audio element
@@ -321,10 +320,10 @@ const HistoricalChat = () => {
         };
         
         // Create source node ONCE and connect to analyser
-        if (analyser) {
+        if (analyserRef.current) {
           sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-          sourceNodeRef.current.connect(analyser);
-          analyser.connect(audioContextRef.current.destination);
+          sourceNodeRef.current.connect(analyserRef.current);
+          analyserRef.current.connect(audioContextRef.current.destination);
         }
         
         console.log('✅ Audio pipeline created: Element -> Source -> Analyser -> Destination');
@@ -367,7 +366,7 @@ const HistoricalChat = () => {
       
       // Log analyser connectivity
       console.log('🔊 Audio playing - Context state:', audioContextRef.current.state);
-      console.log('📊 Analyser connected - FFT size:', analyser?.fftSize);
+      console.log('📊 Analyser connected - FFT size:', analyserRef.current?.fftSize);
       
       // Continuously test analyser data while playing
       let testCount = 0;
@@ -377,9 +376,9 @@ const HistoricalChat = () => {
           return;
         }
         
-        if (analyser) {
-          const testArray = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(testArray);
+        if (analyserRef.current) {
+          const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteFrequencyData(testArray);
           const hasData = testArray.some(v => v > 0);
           const avgLevel = testArray.reduce((a, b) => a + b, 0) / testArray.length;
           
@@ -1310,19 +1309,18 @@ const HistoricalChat = () => {
             await audioContextRef.current.resume();
           }
           
-          if (!analyser) {
-            const newAnalyser = audioContextRef.current.createAnalyser();
-            newAnalyser.fftSize = 256;
-            newAnalyser.smoothingTimeConstant = 0.8;
-            setAnalyser(newAnalyser);
+          if (!analyserRef.current) {
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            analyserRef.current.fftSize = 256;
+            analyserRef.current.smoothingTimeConstant = 0.8;
           }
           
           // Use the connected audio element
-          if (!audioElementRef.current && analyser) {
+          if (!audioElementRef.current && analyserRef.current) {
             audioElementRef.current = new Audio();
             sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-            sourceNodeRef.current.connect(analyser);
-            analyser.connect(audioContextRef.current.destination);
+            sourceNodeRef.current.connect(analyserRef.current);
+            analyserRef.current.connect(audioContextRef.current.destination);
           }
           
           // Stop current audio if playing
@@ -1736,14 +1734,12 @@ const HistoricalChat = () => {
         console.log('🎧 AudioContext resumed, state:', audioContextRef.current.state);
       }
       
-      // CRITICAL: Create analyser synchronously and store in both state AND local variable
-      let currentAnalyser = analyser;
-      if (!currentAnalyser) {
-        currentAnalyser = audioContextRef.current.createAnalyser();
-        currentAnalyser.fftSize = 256;
-        currentAnalyser.smoothingTimeConstant = 0.8;
-        setAnalyser(currentAnalyser); // Update state for component
-        console.log('📊 Created new analyser');
+      // CRITICAL: Create analyser synchronously using ref for immediate availability
+      if (!analyserRef.current) {
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+        console.log('📊 Created new analyser (stored in ref)');
       }
       
       // CRITICAL: Create audio element and connect to analyser
@@ -1751,8 +1747,8 @@ const HistoricalChat = () => {
         console.log('🎧 Creating new audio element and source node');
         audioElementRef.current = new Audio();
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-        sourceNodeRef.current.connect(currentAnalyser);
-        currentAnalyser.connect(audioContextRef.current.destination);
+        sourceNodeRef.current.connect(analyserRef.current!);
+        analyserRef.current!.connect(audioContextRef.current.destination);
         console.log('✅ Audio pipeline: Element -> Source -> Analyser -> Destination');
       }
       
@@ -2344,7 +2340,7 @@ const HistoricalChat = () => {
               isLoading={isLoadingAvatarImage}
               isSpeaking={isSpeaking}
               audioElement={currentAudio}
-              analyser={analyser}
+              analyser={analyserRef.current}
             />
           </div>
         )}
