@@ -229,11 +229,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
 
     // Log critical state once when it changes
     const shouldWarp = !!(faceMesh && isSpeaking);
+    const shouldAnimateWithoutMesh = !faceMesh && isSpeaking && amplitude > 0.05;
+    
     if (Math.random() < 0.02) {
-      console.log('🧠 faceMesh:', !!faceMesh, '| 🎤 isSpeaking:', isSpeaking, '| 📊 amplitude:', amplitude.toFixed(3), '| ✅ willWarp:', shouldWarp);
+      console.log('🧠 faceMesh:', !!faceMesh, '| 🎤 isSpeaking:', isSpeaking, '| 📊 amplitude:', amplitude.toFixed(3), '| ✅ willWarp:', shouldWarp, '| 🎭 fallback:', shouldAnimateWithoutMesh);
     }
 
-    // Apply PIXEL WARPING
+    // Apply PIXEL WARPING or FALLBACK ANIMATION
     if (shouldWarp) {
       // Apply controlled 3.5x amplification (single scaling point to make movement visible)
       const effectiveAmplitude = Math.min(1, amplitude * 3.5);
@@ -255,6 +257,21 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       }
       
       applyFullFaceWarping(ctx, tempCtx, effectiveAmplitude, canvas, blendedViseme, expressionIntensity.current, effectiveAmplitude > 0.05);
+    } else if (shouldAnimateWithoutMesh) {
+      // Fallback: Simple scaling animation when face mesh isn't detected
+      const effectiveAmplitude = Math.min(1, amplitude * 3.5);
+      const scale = 1 + (effectiveAmplitude * 0.02); // Subtle scaling
+      
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(tempCanvas, 0, 0);
+      ctx.restore();
+      
+      if (Math.random() < 0.05) {
+        console.log('🎭 FALLBACK ANIMATION:', { amplitude: amplitude.toFixed(3), scale: scale.toFixed(3) });
+      }
     } else {
       ctx.drawImage(tempCanvas, 0, 0);
     }
