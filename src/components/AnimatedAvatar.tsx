@@ -281,8 +281,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Calculate total energy first to decide if we should detect
     const totalEnergy = frequencyData.reduce((sum, val) => sum + val, 0) / binCount;
     
-    // CRITICAL: Much lower threshold - if there's ANY meaningful audio, detect visemes
-    if (totalEnergy < 10) { // Lowered from normalized 0.1 to raw value 10
+    // CRITICAL: Very low threshold based on actual values (max was ~74 in logs)
+    if (totalEnergy < 1) { // Ultra low - average of 1 out of 255
       return 'neutral';
     }
     
