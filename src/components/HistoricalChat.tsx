@@ -1733,13 +1733,27 @@ const HistoricalChat = () => {
         analyserRef.current.smoothingTimeConstant = 0.8;
       }
       
-      // Use the connected audio element
+      // CRITICAL: Create audio element and source node ONCE
       if (!audioElementRef.current) {
+        console.log('🎧 Creating new audio element and source node');
         audioElementRef.current = new Audio();
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
+        console.log('✅ Audio pipeline connected: Element -> Source -> Analyser -> Destination');
+      } else {
+        console.log('🎧 Reusing existing audio element and source node');
       }
+      
+      // Verify connection by testing analyser immediately
+      const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(testArray);
+      console.log('🔍 Pre-play analyser test:', {
+        contextState: audioContextRef.current.state,
+        hasSourceNode: !!sourceNodeRef.current,
+        analyserConnected: !!analyserRef.current,
+        binCount: analyserRef.current.frequencyBinCount
+      });
       
       // Stop current audio if playing
       if (currentAudio) {
