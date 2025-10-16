@@ -223,8 +223,10 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // DEBUG: Check state before warping
     console.log('🔍 Warping check:', {
       hasFaceMesh: !!faceMesh,
+      faceMeshLandmarks: faceMesh?.landmarks?.length || 0,
       isSpeaking,
-      amplitude: amplitude.toFixed(3)
+      amplitude: amplitude.toFixed(3),
+      willWarp: !!(faceMesh && isSpeaking)
     });
 
     // Apply PIXEL WARPING for entire face using clean Phoneme-to-Viseme mapping
@@ -236,22 +238,19 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current, effectiveAmplitude)
         : getVisemeParameters('neutral', 1);
       
-      // DEBUG: Log warping every 30 frames
-      if (Math.random() < 0.03) {
-        console.log('🎭 Phoneme warping:', { 
-          isSpeaking, 
-          rawAmplitude: amplitude.toFixed(3),
-          effectiveAmplitude: effectiveAmplitude.toFixed(3),
-          viseme: targetViseme,
-          jawDrop: blendedViseme.jawDrop.toFixed(1),
-          cornerPull: blendedViseme.cornerPull.toFixed(1),
-          hasFaceMesh: !!faceMesh
-        });
-      }
+      console.log('🎭 WARPING NOW:', { 
+        isSpeaking, 
+        rawAmplitude: amplitude.toFixed(3),
+        effectiveAmplitude: effectiveAmplitude.toFixed(3),
+        viseme: targetViseme,
+        jawDrop: blendedViseme.jawDrop.toFixed(1),
+        cornerPull: blendedViseme.cornerPull.toFixed(1)
+      });
       
       applyFullFaceWarping(ctx, tempCtx, effectiveAmplitude, canvas, blendedViseme, expressionIntensity.current, effectiveAmplitude > 0.05);
     } else {
       // No warping, just draw the base image
+      console.log('❌ NOT warping - faceMesh:', !!faceMesh, 'isSpeaking:', isSpeaking);
       ctx.drawImage(tempCanvas, 0, 0);
     }
     
