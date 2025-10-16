@@ -354,11 +354,29 @@ const HistoricalChat = () => {
       console.log('🔊 Audio playing - Context state:', audioContextRef.current.state);
       console.log('📊 Analyser connected - FFT size:', analyserRef.current.fftSize);
       
-      // Test analyser data immediately
-      const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-      analyserRef.current.getByteFrequencyData(testArray);
-      const hasData = testArray.some(v => v > 0);
-      console.log('🧪 Analyser test:', { hasData, sampleData: Array.from(testArray.slice(0, 10)) });
+      // Continuously test analyser data while playing
+      let testCount = 0;
+      const testInterval = setInterval(() => {
+        if (!audioElementRef.current || audioElementRef.current.paused) {
+          clearInterval(testInterval);
+          return;
+        }
+        
+        const testArray = new Uint8Array(analyserRef.current!.frequencyBinCount);
+        analyserRef.current!.getByteFrequencyData(testArray);
+        const hasData = testArray.some(v => v > 0);
+        const avgLevel = testArray.reduce((a, b) => a + b, 0) / testArray.length;
+        
+        console.log(`🧪 Analyser test #${++testCount}:`, { 
+          hasData, 
+          avgLevel: avgLevel.toFixed(2),
+          sampleData: Array.from(testArray.slice(0, 10)),
+          audioTime: audioElementRef.current?.currentTime.toFixed(2),
+          paused: audioElementRef.current?.paused
+        });
+        
+        if (testCount >= 10) clearInterval(testInterval);
+      }, 500);
       
     } catch (error) {
       console.error('❌ Azure TTS generation error:', error);
