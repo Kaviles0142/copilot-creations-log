@@ -318,7 +318,7 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Initialize audio pipeline
+      // Initialize audio pipeline FIRST
       initializeAudioPipeline();
       
       // Ensure context is running
@@ -326,21 +326,13 @@ const HistoricalChat = () => {
         await audioContextRef.current!.resume();
       }
       
-      // Convert base64 to audio blob
-      const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
       // Stop current audio if playing
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
       }
       
-      // Set new audio source on the shared element
-      audioElementRef.current!.src = audioUrl;
-      setCurrentAudio(audioElementRef.current!);
-      
-      // CRITICAL: Set event handlers BEFORE play to ensure isSpeaking is managed
+      // CRITICAL: Attach event handlers BEFORE setting src
       audioElementRef.current!.onplay = () => {
         console.log('▶️ Audio PLAY event fired - Setting isSpeaking = TRUE');
         setIsSpeaking(true);
@@ -353,11 +345,10 @@ const HistoricalChat = () => {
         setIsPlayingAudio(false);
         setCurrentAudio(null);
         setIsGreetingPlaying(false);
-        URL.revokeObjectURL(audioUrl);
       };
 
-      audioElementRef.current!.onerror = () => {
-        console.error('❌ Audio ERROR event fired');
+      audioElementRef.current!.onerror = (err) => {
+        console.error('❌ Audio ERROR event fired:', err);
         setIsSpeaking(false);
         setIsPlayingAudio(false);
         toast({
@@ -366,10 +357,24 @@ const HistoricalChat = () => {
           variant: "destructive",
         });
       };
-
-      // Play the audio
+      
+      audioElementRef.current!.onpause = () => {
+        console.log('⏸️ Audio PAUSED');
+        setIsSpeaking(false);
+      };
+      
+      // Convert base64 to audio blob AFTER handlers are attached
+      const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Set source AFTER handlers
+      audioElementRef.current!.src = audioUrl;
+      setCurrentAudio(audioElementRef.current!);
+      
+      // Load and play
+      audioElementRef.current!.load();
       await audioElementRef.current!.play();
-      console.log('🔊 Audio playing - Context state:', audioContextRef.current!.state);
+      console.log('🔊 Audio play() called - Context state:', audioContextRef.current!.state);
       
     } catch (error) {
       console.error('❌ Azure TTS generation error:', error);
