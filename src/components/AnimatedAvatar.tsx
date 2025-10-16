@@ -52,6 +52,20 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const visemeBlend = useRef<number>(0); // 0 to 1 for smooth transitions
   const expressionIntensity = useRef<number>(0); // For eyebrow/eye animations
   const headTilt = useRef<number>(0); // Slight head movements
+  
+  // CRITICAL: Use ref to avoid stale closure in animation loop
+  const isSpeakingRef = useRef(isSpeaking);
+  const externalAnalyserRef = useRef(externalAnalyser);
+  
+  // Update refs when props change
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+    console.log('🎤 isSpeaking prop changed to:', isSpeaking);
+  }, [isSpeaking]);
+  
+  useEffect(() => {
+    externalAnalyserRef.current = externalAnalyser;
+  }, [externalAnalyser]);
 
 
   // Load MediaPipe Face Landmarker
@@ -169,23 +183,23 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     // Get audio amplitude and detect phonemes/visemes
     let amplitude = 0;
     
-    if (isSpeaking && externalAnalyser) {
-      const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
-      externalAnalyser.getByteFrequencyData(dataArray);
+    if (isSpeakingRef.current && externalAnalyserRef.current) {
+      const dataArray = new Uint8Array(externalAnalyserRef.current.frequencyBinCount);
+      externalAnalyserRef.current.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
       // DEBUG: ALWAYS log when isSpeaking is true
       console.log('🎵 Audio analysis (isSpeaking=true):', {
         amplitude: currentAmplitude.toFixed(3),
-        binCount: externalAnalyser.frequencyBinCount,
-        sampleRate: externalAnalyser.context.sampleRate,
-        contextState: externalAnalyser.context.state,
+        binCount: externalAnalyserRef.current.frequencyBinCount,
+        sampleRate: externalAnalyserRef.current.context.sampleRate,
+        contextState: externalAnalyserRef.current.context.state,
         hasData: dataArray.some(v => v > 0),
         avgFreq: (dataArray.reduce((a, b) => a + b, 0) / dataArray.length).toFixed(1)
       });
       
       // Detect phoneme from frequency analysis
-      const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
+      const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyserRef.current.context.sampleRate);
       
       // Smooth viseme transitions
       if (detectedViseme !== targetViseme) {
@@ -224,13 +238,13 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     console.log('🔍 Warping check:', {
       hasFaceMesh: !!faceMesh,
       faceMeshLandmarks: faceMesh?.landmarks?.length || 0,
-      isSpeaking,
+      isSpeaking: isSpeakingRef.current,
       amplitude: amplitude.toFixed(3),
-      willWarp: !!(faceMesh && isSpeaking)
+      willWarp: !!(faceMesh && isSpeakingRef.current)
     });
 
     // Apply PIXEL WARPING for entire face using clean Phoneme-to-Viseme mapping
-    if (faceMesh && isSpeaking) {
+    if (faceMesh && isSpeakingRef.current) {
       // Apply controlled 3.5x amplification (single scaling point to make movement visible)
       const effectiveAmplitude = Math.min(1, amplitude * 3.5);
       
@@ -239,7 +253,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         : getVisemeParameters('neutral', 1);
       
       console.log('🎭 WARPING NOW:', { 
-        isSpeaking, 
+        isSpeaking: isSpeakingRef.current, 
         rawAmplitude: amplitude.toFixed(3),
         effectiveAmplitude: effectiveAmplitude.toFixed(3),
         viseme: targetViseme,
@@ -250,7 +264,7 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       applyFullFaceWarping(ctx, tempCtx, effectiveAmplitude, canvas, blendedViseme, expressionIntensity.current, effectiveAmplitude > 0.05);
     } else {
       // No warping, just draw the base image
-      console.log('❌ NOT warping - faceMesh:', !!faceMesh, 'isSpeaking:', isSpeaking);
+      console.log('❌ NOT warping - faceMesh:', !!faceMesh, 'isSpeaking:', isSpeakingRef.current);
       ctx.drawImage(tempCanvas, 0, 0);
     }
     
