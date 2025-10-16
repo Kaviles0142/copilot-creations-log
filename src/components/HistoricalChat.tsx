@@ -279,13 +279,19 @@ const HistoricalChat = () => {
       console.log('📊 Analyser created');
     }
     
-    // Create audio element and connect to analyser ONCE
+    // Create audio element ONCE (reuse for all playback)
     if (!audioElementRef.current) {
       audioElementRef.current = new Audio();
+      audioElementRef.current.crossOrigin = 'anonymous';
+      console.log('🔊 Audio element created (will be reused)');
+    }
+    
+    // Create source node ONLY ONCE after element exists
+    if (!sourceNodeRef.current && audioElementRef.current) {
       sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
       sourceNodeRef.current.connect(analyserRef.current);
       analyserRef.current.connect(audioContextRef.current.destination);
-      console.log('✅ Audio pipeline: Element -> Source -> Analyser -> Destination');
+      console.log('✅ Audio pipeline connected: Element -> Source -> Analyser -> Destination');
     }
   };
 
