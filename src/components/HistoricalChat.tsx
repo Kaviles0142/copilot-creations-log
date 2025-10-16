@@ -1277,6 +1277,7 @@ const HistoricalChat = () => {
             audio.play().then(() => {
               setIsPlayingAudio(true);
               setCurrentAudio(audio);
+              setIsSpeaking(true);
               console.log('🔊 FakeYou voice playing');
             }).catch(err => {
               console.error('❌ Audio playback failed:', err);
@@ -1669,11 +1670,13 @@ const HistoricalChat = () => {
       const audio = new Audio(audioUrl);
       setCurrentAudio(audio);
       setIsPlayingAudio(true);
+      setIsSpeaking(true);
       
       audio.onended = () => {
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
+        setIsSpeaking(false);
         console.log('Audio playback completed');
       };
 
@@ -1681,6 +1684,7 @@ const HistoricalChat = () => {
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
+        setIsSpeaking(false);
         console.error('Error playing audio');
       };
 
