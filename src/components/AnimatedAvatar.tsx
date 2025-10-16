@@ -244,7 +244,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         console.log('🎭 WARPING:', { 
           raw: amplitude.toFixed(3),
           effective: effectiveAmplitude.toFixed(3),
-          viseme: targetViseme,
+          current: currentViseme,
+          target: targetViseme,
+          blend: visemeBlend.current.toFixed(2),
           jaw: blendedViseme.jawDrop.toFixed(1)
         });
       }
