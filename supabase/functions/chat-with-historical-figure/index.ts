@@ -50,7 +50,8 @@ serve(async (req) => {
       currentEvents: 0,
       historicalContext: 0,
       webArticles: 0,
-      googleSearch: 0
+      googleSearch: 0,
+      duckDuckGoSearch: 0
     };
     let currentEventsAvailable = false;
 
@@ -413,7 +414,52 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 5. Fetch cached YouTube transcripts from database
+        // 5. DuckDuckGo Search for additional web context
+        (async () => {
+          try {
+            console.log('🦆 Starting DuckDuckGo search...');
+            
+            const searchQuery = `${figure.name} ${message.substring(0, 100)}`;
+            
+            const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
+              body: { 
+                query: searchQuery,
+                limit: 5
+              }
+            });
+
+            console.log('🦆 DuckDuckGo Raw Response:', JSON.stringify(ddgResponse, null, 2));
+            
+            // Handle response structure
+            let ddgResults: any[] = [];
+            if (ddgResponse.data) {
+              if (Array.isArray(ddgResponse.data.data)) {
+                ddgResults = ddgResponse.data.data;
+              } else if (Array.isArray(ddgResponse.data)) {
+                ddgResults = ddgResponse.data;
+              }
+            }
+            
+            console.log(`🦆 Parsed ${ddgResults.length} DuckDuckGo results`);
+            
+            if (ddgResults.length > 0) {
+              sourcesUsed.duckDuckGoSearch = ddgResults.length;
+              let ddgText = '\n\n🦆 DUCKDUCKGO SEARCH RESULTS:\n';
+              ddgResults.forEach((result: any) => {
+                ddgText += `\n📄 ${result.title}\n`;
+                ddgText += `${result.snippet}\n`;
+                if (result.url) ddgText += `Source: ${result.url}\n`;
+              });
+              console.log(`Found ${ddgResults.length} DuckDuckGo search results`);
+              return ddgText;
+            }
+          } catch (error) {
+            console.log('DuckDuckGo search error:', error);
+          }
+          return '';
+        })(),
+
+        // 6. Fetch cached YouTube transcripts from database
         (async () => {
           try {
             const { data: transcripts, error } = await supabase
