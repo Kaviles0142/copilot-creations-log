@@ -1771,16 +1771,19 @@ const HistoricalChat = () => {
       audioElementRef.current.src = audioUrl;
       setCurrentAudio(audioElementRef.current);
       
+      // CRITICAL: Always attach event handlers for each playback
       audioElementRef.current.onplay = () => {
         console.log('▶️ Audio playing - Context state:', audioContextRef.current?.state);
         setIsSpeaking(true);
       };
       
       audioElementRef.current.onpause = () => {
+        console.log('⏸️ Audio paused');
         setIsSpeaking(false);
       };
       
       audioElementRef.current.onended = () => {
+        console.log('⏹️ Audio ended');
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
@@ -1789,14 +1792,14 @@ const HistoricalChat = () => {
       };
 
       audioElementRef.current.onerror = () => {
+        console.error('❌ Audio error');
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
         setIsSpeaking(false);
-        console.error('Error playing audio');
       };
 
-      // CRITICAL: Play audio AFTER context is running
+      // CRITICAL: Play audio AFTER context is running and handlers are attached
       await audioElementRef.current.play();
       setIsPlayingAudio(true);
     } catch (error) {
