@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
 import { Volume2, Loader2 } from 'lucide-react';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import Meyda from 'meyda';
 
 interface AnimatedAvatarProps {
   imageUrl: string | null;
@@ -185,8 +186,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         console.log('🎵 Amplitude:', currentAmplitude.toFixed(3), 'Max:', Math.max(...dataArray));
       }
       
-      // Detect phoneme from frequency analysis
-      const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
+      // Detect phoneme using Meyda audio features
+      const detectedViseme = detectVisemeFromMeyda(externalAnalyser);
       
       // Smooth viseme transitions
       if (detectedViseme !== targetViseme) {
@@ -275,72 +276,72 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     };
   };
 
-  const detectVisemeFromFrequency = (frequencyData: Uint8Array, sampleRate: number): string => {
-    const binCount = frequencyData.length;
+  const detectVisemeFromMeyda = (analyser: AnalyserNode): string => {
+    const bufferLength = analyser.fftSize;
+    const audioBuffer = new Float32Array(bufferLength);
+    analyser.getFloatTimeDomainData(audioBuffer);
     
-    // Analyze specific frequency ranges for phoneme detection
-    // Low: 0-500Hz, Mid: 500-2000Hz, High: 2000Hz+
-    const getLowEnergy = () => {
-      let sum = 0;
-      const endBin = Math.floor((500 / (sampleRate / 2)) * binCount);
-      for (let i = 0; i < endBin; i++) sum += frequencyData[i];
-      return sum / endBin; // Keep as raw value
-    };
+    // Extract audio features using Meyda
+    // @ts-ignore - Meyda typing issues
+    const features = Meyda.extract(['mfcc', 'spectralCentroid', 'rms', 'zcr'], audioBuffer);
     
-    const getMidEnergy = () => {
-      let sum = 0;
-      const startBin = Math.floor((500 / (sampleRate / 2)) * binCount);
-      const endBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
-      for (let i = startBin; i < endBin; i++) sum += frequencyData[i];
-      return sum / (endBin - startBin); // Keep as raw value
-    };
+    if (!features || !features.mfcc) return 'neutral';
     
-    const getHighEnergy = () => {
-      let sum = 0;
-      const startBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
-      for (let i = startBin; i < binCount; i++) sum += frequencyData[i];
-      return sum / (binCount - startBin); // Keep as raw value
-    };
+    const { mfcc, spectralCentroid, rms, zcr } = features as any;
     
-    const low = getLowEnergy();
-    const mid = getMidEnergy();
-    const high = getHighEnergy();
-    const total = low + mid + high;
+    // Use MFCC coefficients and other features for phoneme detection
+    const mfcc0 = mfcc[0] || 0;
+    const mfcc1 = mfcc[1] || 0;
+    const mfcc2 = mfcc[2] || 0;
+    const centroid = spectralCentroid || 0;
+    const energy = rms || 0;
+    const zeroCrossing = zcr || 0;
     
-    // Calculate ratios
-    const lowRatio = low / total;
-    const midRatio = mid / total;
-    const highRatio = high / total;
+    console.log('🎵 Meyda Features:', { 
+      mfcc0: mfcc0.toFixed(2), 
+      mfcc1: mfcc1.toFixed(2), 
+      mfcc2: mfcc2.toFixed(2),
+      centroid: centroid.toFixed(2), 
+      energy: energy.toFixed(4),
+      zcr: zeroCrossing.toFixed(4)
+    });
+    
+    // Low energy threshold
+    if (energy < 0.01) return 'neutral';
     
     let detectedViseme = 'neutral';
     
-    // Vowel A - balanced mid and low
-    if (midRatio > 0.4 && lowRatio > 0.3) {
+    // Vowel detection based on MFCC patterns and spectral centroid
+    // A - open vowel, lower spectral centroid, balanced MFCCs
+    if (centroid < 1500 && mfcc0 > -20 && Math.abs(mfcc1) < 15) {
       detectedViseme = 'A';
     }
-    // Vowel E - mid-high dominant
-    else if (midRatio > 0.45 && highRatio > 0.25) {
+    // E - mid-high formant, higher spectral centroid
+    else if (centroid > 1500 && centroid < 2500 && mfcc1 > 0) {
       detectedViseme = 'E';
     }
-    // Vowel I - high frequencies
-    else if (highRatio > 0.4) {
+    // I - high formant, high spectral centroid
+    else if (centroid > 2500 && zeroCrossing > 0.1) {
       detectedViseme = 'I';
     }
-    // Vowel O - low dominant
-    else if (lowRatio > 0.5) {
+    // O - rounded vowel, low centroid, low ZCR
+    else if (centroid < 1000 && zeroCrossing < 0.08 && mfcc0 < -15) {
       detectedViseme = 'O';
     }
-    // Vowel U - very low dominant
-    else if (lowRatio > 0.6) {
+    // U - very rounded, very low centroid
+    else if (centroid < 800 && mfcc0 < -20) {
       detectedViseme = 'U';
     }
-    // Consonants
-    else if (high > 80 && highRatio > 0.5) {
+    // S - fricative, high frequency, high ZCR
+    else if (centroid > 3000 && zeroCrossing > 0.15) {
       detectedViseme = 'S';
     }
-    else if (low > 60 && mid < 20) {
+    // M - nasal, low frequency, specific MFCC pattern
+    else if (centroid < 1200 && zeroCrossing < 0.05 && Math.abs(mfcc2) > 10) {
       detectedViseme = 'M';
     }
+    
+    console.log('🎯 Detected Viseme:', detectedViseme);
     
     return detectedViseme;
   };
