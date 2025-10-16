@@ -1723,8 +1723,10 @@ const HistoricalChat = () => {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       
-      if (audioContextRef.current.state === 'suspended') {
+      // CRITICAL: Resume audio context FIRST
+      if (audioContextRef.current.state !== 'running') {
         await audioContextRef.current.resume();
+        console.log('🎧 AudioContext resumed, state:', audioContextRef.current.state);
       }
       
       if (!analyserRef.current) {
@@ -1740,20 +1742,8 @@ const HistoricalChat = () => {
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
-        console.log('✅ Audio pipeline connected: Element -> Source -> Analyser -> Destination');
-      } else {
-        console.log('🎧 Reusing existing audio element and source node');
+        console.log('✅ Audio pipeline created');
       }
-      
-      // Verify connection by testing analyser immediately
-      const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-      analyserRef.current.getByteFrequencyData(testArray);
-      console.log('🔍 Pre-play analyser test:', {
-        contextState: audioContextRef.current.state,
-        hasSourceNode: !!sourceNodeRef.current,
-        analyserConnected: !!analyserRef.current,
-        binCount: analyserRef.current.frequencyBinCount
-      });
       
       // Stop current audio if playing
       if (currentAudio) {
@@ -1772,19 +1762,14 @@ const HistoricalChat = () => {
       const audioUrl = URL.createObjectURL(audioBlob);
       
       audioElementRef.current.src = audioUrl;
-      
-      // CRITICAL: Set currentAudio BEFORE setting handlers so AnimatedAvatar has reference
       setCurrentAudio(audioElementRef.current);
       
-      // CRITICAL: Always set these handlers before playing
       audioElementRef.current.onplay = () => {
-        console.log('▶️ Audio playing - setting isSpeaking = true');
+        console.log('▶️ Audio playing - Context state:', audioContextRef.current?.state);
         setIsSpeaking(true);
-        setCurrentAudio(audioElementRef.current); // Update again to trigger re-render
       };
       
       audioElementRef.current.onpause = () => {
-        console.log('⏸️ Audio paused');
         setIsSpeaking(false);
       };
       
@@ -1794,7 +1779,6 @@ const HistoricalChat = () => {
         setCurrentAudio(null);
         setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl);
-        console.log('Audio playback completed');
       };
 
       audioElementRef.current.onerror = () => {
@@ -1805,6 +1789,7 @@ const HistoricalChat = () => {
         console.error('Error playing audio');
       };
 
+      // CRITICAL: Play audio AFTER context is running
       await audioElementRef.current.play();
       setIsPlayingAudio(true);
     } catch (error) {
