@@ -278,13 +278,21 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
   const detectVisemeFromFrequency = (frequencyData: Uint8Array, sampleRate: number): string => {
     const binCount = frequencyData.length;
     
+    // Calculate total energy first to decide if we should detect
+    const totalEnergy = frequencyData.reduce((sum, val) => sum + val, 0) / binCount;
+    
+    // CRITICAL: Much lower threshold - if there's ANY meaningful audio, detect visemes
+    if (totalEnergy < 10) { // Lowered from normalized 0.1 to raw value 10
+      return 'neutral';
+    }
+    
     // Analyze specific frequency ranges for phoneme detection
     // Low: 0-500Hz, Mid: 500-2000Hz, High: 2000Hz+
     const getLowEnergy = () => {
       let sum = 0;
       const endBin = Math.floor((500 / (sampleRate / 2)) * binCount);
       for (let i = 0; i < endBin; i++) sum += frequencyData[i];
-      return (sum / endBin) / 255; // Normalize to 0-1
+      return sum / endBin; // Keep as raw value
     };
     
     const getMidEnergy = () => {
@@ -292,25 +300,20 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const startBin = Math.floor((500 / (sampleRate / 2)) * binCount);
       const endBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
       for (let i = startBin; i < endBin; i++) sum += frequencyData[i];
-      return (sum / (endBin - startBin)) / 255; // Normalize to 0-1
+      return sum / (endBin - startBin); // Keep as raw value
     };
     
     const getHighEnergy = () => {
       let sum = 0;
       const startBin = Math.floor((2000 / (sampleRate / 2)) * binCount);
       for (let i = startBin; i < binCount; i++) sum += frequencyData[i];
-      return (sum / (binCount - startBin)) / 255; // Normalize to 0-1
+      return sum / (binCount - startBin); // Keep as raw value
     };
     
     const low = getLowEnergy();
     const mid = getMidEnergy();
     const high = getHighEnergy();
     const total = low + mid + high;
-    
-    // MUCH LOWER threshold - if there's ANY audio energy, detect visemes
-    if (total < 0.1) {
-      return 'neutral';
-    }
     
     // Calculate ratios
     const lowRatio = low / total;
