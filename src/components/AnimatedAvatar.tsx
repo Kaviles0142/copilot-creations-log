@@ -302,18 +302,22 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const high = getHighEnergy();
     const total = low + mid + high;
     
-    // DEBUG: Log frequency analysis occasionally
-    if (Math.random() < 0.03) {
+    // DEBUG: Log frequency analysis MORE OFTEN to see what's happening
+    if (Math.random() < 0.1) {
       console.log('🎤 Frequency analysis:', {
         low: low.toFixed(1),
         mid: mid.toFixed(1),
         high: high.toFixed(1),
-        total: total.toFixed(1)
+        total: total.toFixed(1),
+        threshold: 'checking if total < 0.1'
       });
     }
     
-    // Lower threshold to trigger visemes more easily
-    if (total < 0.5) return 'neutral';
+    // MUCH LOWER threshold - if there's ANY audio energy, detect visemes
+    if (total < 0.1) {
+      console.log('⚠️ Total energy too low:', total.toFixed(3));
+      return 'neutral';
+    }
     
     // Calculate ratios
     const lowRatio = low / total;
@@ -351,14 +355,16 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       detectedViseme = 'M';
     }
     
-    if (Math.random() < 0.03) {
-      console.log('👄 Viseme detection:', {
-        lowRatio: lowRatio.toFixed(2),
-        midRatio: midRatio.toFixed(2),
-        highRatio: highRatio.toFixed(2),
-        detected: detectedViseme
-      });
-    }
+    // Log EVERY detection to see what's happening
+    console.log('👄 Viseme detection:', {
+      lowRatio: lowRatio.toFixed(2),
+      midRatio: midRatio.toFixed(2),
+      highRatio: highRatio.toFixed(2),
+      detected: detectedViseme,
+      low: low.toFixed(1),
+      mid: mid.toFixed(1),
+      high: high.toFixed(1)
+    });
     
     return detectedViseme;
   };
