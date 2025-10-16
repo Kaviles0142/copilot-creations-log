@@ -178,18 +178,12 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       const dataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
       externalAnalyser.getByteFrequencyData(dataArray);
       
-      // DEBUG: Check what we're actually getting
-      console.log('🔍 Analyser data check:', {
-        frequencyBinCount: externalAnalyser.frequencyBinCount,
-        dataArrayLength: dataArray.length,
-        firstTenValues: Array.from(dataArray.slice(0, 10)),
-        maxValue: Math.max(...dataArray),
-        hasNonZero: dataArray.some(v => v > 0)
-      });
-      
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
-      console.log('🎵 Reading analyser - amplitude:', currentAmplitude.toFixed(3));
+      // Log only occasionally to avoid spam
+      if (Math.random() < 0.05) {
+        console.log('🎵 Amplitude:', currentAmplitude.toFixed(3), 'Max:', Math.max(...dataArray));
+      }
       
       // Detect phoneme from frequency analysis
       const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
@@ -213,27 +207,9 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       }
       amplitude = amplitudeHistory.current[0] || currentAmplitude;
     } else {
-      // Try to read analyser data anyway to test
-      if (externalAnalyser) {
-        const testDataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
-        externalAnalyser.getByteFrequencyData(testDataArray);
-        const testSum = testDataArray.reduce((acc, val) => acc + val, 0);
-        const testAverage = testSum / testDataArray.length;
-        
-        console.log('🧪 ANALYSER TEST (not speaking):', {
-          isSpeaking,
-          hasAnalyser: true,
-          frequencyBinCount: externalAnalyser.frequencyBinCount,
-          dataArraySum: testSum,
-          averageAmplitude: testAverage.toFixed(3),
-          maxValue: Math.max(...testDataArray),
-          firstTenValues: Array.from(testDataArray.slice(0, 10))
-        });
-      } else {
-        console.log('❌ No analyser available:', {
-          isSpeaking,
-          hasAnalyser: false
-        });
+      // Log state occasionally when not speaking
+      if (Math.random() < 0.01) {
+        console.log('⏸️ Not speaking - isSpeaking:', isSpeaking, 'hasAnalyser:', !!externalAnalyser);
       }
       
       // Blend back to neutral
@@ -247,18 +223,14 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       headTilt.current *= 0.95;
     }
 
-    // DEBUG: Check state before warping
-    console.log('🔍 Warping check:', {
-      hasFaceMesh: !!faceMesh,
-      faceMeshLandmarks: faceMesh?.landmarks?.length || 0,
-      isSpeaking,
-      hasAnalyser: !!externalAnalyser,
-      amplitude: amplitude.toFixed(3),
-      willWarp: !!(faceMesh && isSpeaking)
-    });
+    // Log critical state once when it changes
+    const shouldWarp = !!(faceMesh && isSpeaking);
+    if (Math.random() < 0.02) {
+      console.log('🧠 faceMesh:', !!faceMesh, '| 🎤 isSpeaking:', isSpeaking, '| 📊 amplitude:', amplitude.toFixed(3), '| ✅ willWarp:', shouldWarp);
+    }
 
     // Apply PIXEL WARPING
-    if (faceMesh && isSpeaking) {
+    if (shouldWarp) {
       // Apply controlled 3.5x amplification (single scaling point to make movement visible)
       const effectiveAmplitude = Math.min(1, amplitude * 3.5);
       
@@ -266,17 +238,18 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         ? getBlendedViseme(currentViseme, targetViseme, visemeBlend.current, effectiveAmplitude)
         : getVisemeParameters('neutral', 1);
       
-      console.log('🎭 WARPING NOW:', { 
-        isSpeaking, 
-        rawAmplitude: amplitude.toFixed(3),
-        effectiveAmplitude: effectiveAmplitude.toFixed(3),
-        viseme: targetViseme,
-        jawDrop: blendedViseme.jawDrop.toFixed(1)
-      });
+      // Log warping action occasionally
+      if (Math.random() < 0.05) {
+        console.log('🎭 WARPING:', { 
+          raw: amplitude.toFixed(3),
+          effective: effectiveAmplitude.toFixed(3),
+          viseme: targetViseme,
+          jaw: blendedViseme.jawDrop.toFixed(1)
+        });
+      }
       
       applyFullFaceWarping(ctx, tempCtx, effectiveAmplitude, canvas, blendedViseme, expressionIntensity.current, effectiveAmplitude > 0.05);
     } else {
-      console.log('❌ NOT warping - faceMesh:', !!faceMesh, 'isSpeaking:', isSpeaking);
       ctx.drawImage(tempCanvas, 0, 0);
     }
     
@@ -334,21 +307,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const high = getHighEnergy();
     const total = low + mid + high;
     
-    // DEBUG: Log frequency analysis MORE OFTEN to see what's happening
-    if (Math.random() < 0.1) {
-      console.log('🎤 Frequency analysis:', {
-        low: low.toFixed(1),
-        mid: mid.toFixed(1),
-        high: high.toFixed(1),
-        total: total.toFixed(1),
-        threshold: 'checking if total < 0.1',
-        isSpeaking: isSpeaking  // ADD THIS TO SEE THE STATE
-      });
-    }
-    
     // MUCH LOWER threshold - if there's ANY audio energy, detect visemes
     if (total < 0.1) {
-      console.log('⚠️ Total energy too low:', total.toFixed(3));
       return 'neutral';
     }
     
@@ -357,7 +317,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     const midRatio = mid / total;
     const highRatio = high / total;
     
-    // DEBUG: Log ratios and detection result
     let detectedViseme = 'neutral';
     
     // Vowel A - balanced mid and low
@@ -387,17 +346,6 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     else if (low > 60 && mid < 20) {
       detectedViseme = 'M';
     }
-    
-    // Log EVERY detection to see what's happening
-    console.log('👄 Viseme detection:', {
-      lowRatio: lowRatio.toFixed(2),
-      midRatio: midRatio.toFixed(2),
-      highRatio: highRatio.toFixed(2),
-      detected: detectedViseme,
-      low: low.toFixed(1),
-      mid: mid.toFixed(1),
-      high: high.toFixed(1)
-    });
     
     return detectedViseme;
   };
