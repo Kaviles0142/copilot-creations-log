@@ -174,15 +174,15 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       externalAnalyser.getByteFrequencyData(dataArray);
       const currentAmplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
       
-      // DEBUG: Log audio analysis every 30 frames
-      if (Math.random() < 0.03) {
-        console.log('🎵 Audio analysis:', {
-          amplitude: currentAmplitude.toFixed(3),
-          binCount: externalAnalyser.frequencyBinCount,
-          sampleRate: externalAnalyser.context.sampleRate,
-          hasData: dataArray.some(v => v > 0)
-        });
-      }
+      // DEBUG: ALWAYS log when isSpeaking is true
+      console.log('🎵 Audio analysis (isSpeaking=true):', {
+        amplitude: currentAmplitude.toFixed(3),
+        binCount: externalAnalyser.frequencyBinCount,
+        sampleRate: externalAnalyser.context.sampleRate,
+        contextState: externalAnalyser.context.state,
+        hasData: dataArray.some(v => v > 0),
+        avgFreq: (dataArray.reduce((a, b) => a + b, 0) / dataArray.length).toFixed(1)
+      });
       
       // Detect phoneme from frequency analysis
       const detectedViseme = detectVisemeFromFrequency(dataArray, externalAnalyser.context.sampleRate);
