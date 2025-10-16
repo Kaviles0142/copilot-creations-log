@@ -203,10 +203,28 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
       }
       amplitude = amplitudeHistory.current[0] || currentAmplitude;
     } else {
-      console.log('❌ Cannot read analyser:', {
-        isSpeaking,
-        hasAnalyser: !!externalAnalyser
-      });
+      // Try to read analyser data anyway to test
+      if (externalAnalyser) {
+        const testDataArray = new Uint8Array(externalAnalyser.frequencyBinCount);
+        externalAnalyser.getByteFrequencyData(testDataArray);
+        const testSum = testDataArray.reduce((acc, val) => acc + val, 0);
+        const testAverage = testSum / testDataArray.length;
+        
+        console.log('🧪 ANALYSER TEST (not speaking):', {
+          isSpeaking,
+          hasAnalyser: true,
+          frequencyBinCount: externalAnalyser.frequencyBinCount,
+          dataArraySum: testSum,
+          averageAmplitude: testAverage.toFixed(3),
+          maxValue: Math.max(...testDataArray),
+          firstTenValues: Array.from(testDataArray.slice(0, 10))
+        });
+      } else {
+        console.log('❌ No analyser available:', {
+          isSpeaking,
+          hasAnalyser: false
+        });
+      }
       
       // Blend back to neutral
       if (targetViseme !== 'neutral') {

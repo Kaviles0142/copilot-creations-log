@@ -15,7 +15,6 @@ import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import ConversationHistory from "./ConversationHistory";
 import AnimatedAvatar from "./AnimatedAvatar";
-import AudioDebugVisualizer from "./AudioDebugVisualizer";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -2339,19 +2338,13 @@ const HistoricalChat = () => {
 
         {/* Animated Avatar - Phase 1 */}
         {selectedFigure && (
-          <div className="border-b border-border bg-card px-6 py-4 space-y-4">
+          <div className="border-b border-border bg-card px-6 py-4">
             <AnimatedAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
               isSpeaking={isSpeaking}
               audioElement={currentAudio}
               analyser={analyser}
-            />
-            
-            {/* Audio Debug Visualizer */}
-            <AudioDebugVisualizer 
-              analyser={analyser}
-              isPlaying={isPlayingAudio}
             />
           </div>
         )}
