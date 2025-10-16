@@ -1759,7 +1759,17 @@ const HistoricalChat = () => {
       
       audioElementRef.current.src = audioUrl;
       setCurrentAudio(audioElementRef.current);
-      setIsSpeaking(true);
+      
+      // CRITICAL: Always set these handlers before playing
+      audioElementRef.current.onplay = () => {
+        console.log('▶️ Audio playing - setting isSpeaking = true');
+        setIsSpeaking(true);
+      };
+      
+      audioElementRef.current.onpause = () => {
+        console.log('⏸️ Audio paused');
+        setIsSpeaking(false);
+      };
       
       audioElementRef.current.onended = () => {
         setIsPlayingAudio(false);
