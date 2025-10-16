@@ -316,7 +316,8 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
         mid: mid.toFixed(1),
         high: high.toFixed(1),
         total: total.toFixed(1),
-        threshold: 'checking if total < 0.1'
+        threshold: 'checking if total < 0.1',
+        isSpeaking: isSpeaking  // ADD THIS TO SEE THE STATE
       });
     }
     
