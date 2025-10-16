@@ -102,46 +102,88 @@ const AnimatedAvatar = ({ imageUrl, isLoading, isSpeaking, audioElement, analyse
     img.onload = async () => {
       imageRef.current = img;
       
-      try {
-        console.log('🔍 Detecting face mesh with MediaPipe...');
-        const results = faceLandmarkerRef.current!.detect(img);
-        
-        if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-          const landmarks = results.faceLandmarks[0];
+      // Try multiple detection strategies
+      const tryDetectFace = async (imageSource: HTMLImageElement | HTMLCanvasElement, attempt: number = 1) => {
+        try {
+          console.log(`🔍 Detecting face mesh (attempt ${attempt})...`);
+          const results = faceLandmarkerRef.current!.detect(imageSource);
           
-          // MediaPipe provides 478 landmarks - we need specific ones for mouth and eyes
-          // Mouth outer: indices 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308
-          // Mouth inner: indices 78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415
-          // Left eye: indices 33, 160, 158, 133, 153, 144
-          // Right eye: indices 362, 385, 387, 263, 373, 380
-          
-          const mouthOuter = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308];
-          const leftEyeIndices = [33, 160, 158, 133, 153, 144];
-          const rightEyeIndices = [362, 385, 387, 263, 373, 380];
-          
-          // Scale to canvas size
-          const scaleX = 512;
-          const scaleY = 512;
-          
-          const faceMeshData = {
-            landmarks: landmarks.map(l => ({ x: l.x * scaleX, y: l.y * scaleY, z: l.z })),
-            mouthOuter,
-            leftEyeIndices,
-            rightEyeIndices
-          };
-          
-          setFaceMesh(faceMeshData);
-          
-          console.log('✅ Face mesh detected with 478 landmarks');
-          console.log('👄 Mouth position:', {
-            x: faceMeshData.landmarks[61].x.toFixed(1),
-            y: faceMeshData.landmarks[61].y.toFixed(1)
-          });
-        } else {
-          console.warn('⚠️ No face detected, using fallback');
+          if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+            const landmarks = results.faceLandmarks[0];
+            
+            // MediaPipe provides 478 landmarks - we need specific ones for mouth and eyes
+            const mouthOuter = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308];
+            const leftEyeIndices = [33, 160, 158, 133, 153, 144];
+            const rightEyeIndices = [362, 385, 387, 263, 373, 380];
+            
+            // Scale to canvas size
+            const scaleX = 512;
+            const scaleY = 512;
+            
+            const faceMeshData = {
+              landmarks: landmarks.map(l => ({ x: l.x * scaleX, y: l.y * scaleY, z: l.z })),
+              mouthOuter,
+              leftEyeIndices,
+              rightEyeIndices
+            };
+            
+            setFaceMesh(faceMeshData);
+            
+            console.log('✅ Face mesh detected with 478 landmarks');
+            console.log('👄 Mouth position:', {
+              x: faceMeshData.landmarks[61].x.toFixed(1),
+              y: faceMeshData.landmarks[61].y.toFixed(1)
+            });
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error(`❌ Error detecting face mesh (attempt ${attempt}):`, error);
+          return false;
         }
-      } catch (error) {
-        console.error('❌ Error detecting face mesh:', error);
+      };
+      
+      // First attempt: Try with original image
+      let detected = await tryDetectFace(img, 1);
+      
+      // Second attempt: Try with enhanced contrast/brightness
+      if (!detected) {
+        console.log('🎨 Trying with enhanced image...');
+        const enhancedCanvas = document.createElement('canvas');
+        enhancedCanvas.width = 512;
+        enhancedCanvas.height = 512;
+        const enhancedCtx = enhancedCanvas.getContext('2d');
+        
+        if (enhancedCtx) {
+          // Draw image with enhanced brightness/contrast
+          enhancedCtx.filter = 'brightness(1.2) contrast(1.3)';
+          enhancedCtx.drawImage(img, 0, 0, 512, 512);
+          enhancedCtx.filter = 'none';
+          
+          detected = await tryDetectFace(enhancedCanvas, 2);
+        }
+      }
+      
+      // Third attempt: Try with different brightness/contrast
+      if (!detected) {
+        console.log('🎨 Trying with alternate enhancement...');
+        const enhancedCanvas = document.createElement('canvas');
+        enhancedCanvas.width = 512;
+        enhancedCanvas.height = 512;
+        const enhancedCtx = enhancedCanvas.getContext('2d');
+        
+        if (enhancedCtx) {
+          // Try with different filter settings
+          enhancedCtx.filter = 'brightness(0.9) contrast(1.5) saturate(1.2)';
+          enhancedCtx.drawImage(img, 0, 0, 512, 512);
+          enhancedCtx.filter = 'none';
+          
+          detected = await tryDetectFace(enhancedCanvas, 3);
+        }
+      }
+      
+      if (!detected) {
+        console.warn('⚠️ No face detected after all attempts, using fallback animation');
       }
       
       drawFrame();
