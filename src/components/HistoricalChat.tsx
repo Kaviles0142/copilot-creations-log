@@ -1725,7 +1725,7 @@ const HistoricalChat = () => {
 
   const playAudioFromBase64 = async (audioContent: string) => {
     try {
-      // Initialize audio context and analyser if needed
+      // Initialize audio context
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
@@ -1736,21 +1736,24 @@ const HistoricalChat = () => {
         console.log('🎧 AudioContext resumed, state:', audioContextRef.current.state);
       }
       
-      if (!analyser) {
-        const newAnalyser = audioContextRef.current.createAnalyser();
-        newAnalyser.fftSize = 256;
-        newAnalyser.smoothingTimeConstant = 0.8;
-        setAnalyser(newAnalyser);
+      // CRITICAL: Create analyser synchronously and store in both state AND local variable
+      let currentAnalyser = analyser;
+      if (!currentAnalyser) {
+        currentAnalyser = audioContextRef.current.createAnalyser();
+        currentAnalyser.fftSize = 256;
+        currentAnalyser.smoothingTimeConstant = 0.8;
+        setAnalyser(currentAnalyser); // Update state for component
+        console.log('📊 Created new analyser');
       }
       
-      // CRITICAL: Create audio element and source node ONCE
-      if (!audioElementRef.current && analyser) {
+      // CRITICAL: Create audio element and connect to analyser
+      if (!audioElementRef.current) {
         console.log('🎧 Creating new audio element and source node');
         audioElementRef.current = new Audio();
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-        sourceNodeRef.current.connect(analyser);
-        analyser.connect(audioContextRef.current.destination);
-        console.log('✅ Audio pipeline created');
+        sourceNodeRef.current.connect(currentAnalyser);
+        currentAnalyser.connect(audioContextRef.current.destination);
+        console.log('✅ Audio pipeline: Element -> Source -> Analyser -> Destination');
       }
       
       // Stop current audio if playing
