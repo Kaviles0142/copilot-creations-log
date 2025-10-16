@@ -1266,24 +1266,49 @@ const HistoricalChat = () => {
             duration: 2000,
           });
           
-          // Try direct access to cdn-2.fakeyou.com URLs
+          // Initialize audio context and analyser if needed
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+          
+          if (audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume();
+          }
+          
+          if (!analyserRef.current) {
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            analyserRef.current.fftSize = 256;
+            analyserRef.current.smoothingTimeConstant = 0.8;
+          }
+          
+          // Use the connected audio element
+          if (!audioElementRef.current) {
+            audioElementRef.current = new Audio();
+            sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+            sourceNodeRef.current.connect(analyserRef.current);
+            analyserRef.current.connect(audioContextRef.current.destination);
+          }
+          
+          // Stop current audio if playing
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+          }
+          
           console.log('🎵 Final Audio URL:', audioUrl);
-          console.log('🔗 Attempting direct audio access...');
+          console.log('🔗 Loading audio into connected element...');
           
-          const audio = new Audio();
-          audio.crossOrigin = 'anonymous';
-          audio.src = audioUrl;
+          audioElementRef.current.crossOrigin = 'anonymous';
+          audioElementRef.current.src = audioUrl;
+          audioElementRef.current.playbackRate = 0.85;
           
-          // Slow down playback for more natural, conversational pacing
-          audio.playbackRate = 0.85;
-          
-          audio.onloadeddata = () => {
-            console.log('📡 Audio loaded, starting playback at 0.85x speed for natural conversation');
-            audio.play().then(() => {
+          audioElementRef.current.onloadeddata = () => {
+            console.log('📡 Audio loaded, starting playback at 0.85x speed');
+            audioElementRef.current!.play().then(() => {
               setIsPlayingAudio(true);
-              setCurrentAudio(audio);
+              setCurrentAudio(audioElementRef.current!);
               setIsSpeaking(true);
-              console.log('🔊 FakeYou voice playing');
+              console.log('🔊 FakeYou voice playing with analyser connected');
             }).catch(err => {
               console.error('❌ Audio playback failed:', err);
               setIsPlayingAudio(false);
@@ -1291,9 +1316,10 @@ const HistoricalChat = () => {
             });
           };
           
-          audio.onerror = (e) => {
+          audioElementRef.current.onerror = (e) => {
             console.error('❌ Audio load failed:', e);
             setIsPlayingAudio(false);
+            setIsSpeaking(false);
             
             toast({
               title: "Audio playback error",
@@ -1302,10 +1328,11 @@ const HistoricalChat = () => {
             });
           };
           
-          audio.onended = () => {
+          audioElementRef.current.onended = () => {
             console.log('✅ Audio playback completed');
             setIsPlayingAudio(false);
             setCurrentAudio(null);
+            setIsSpeaking(false);
           };
           
           return; // Success!
@@ -1662,7 +1689,36 @@ const HistoricalChat = () => {
 
   const playAudioFromBase64 = async (audioContent: string) => {
     try {
-      // Convert base64 to audio blob and play
+      // Initialize audio context and analyser if needed
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      
+      if (!analyserRef.current) {
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+      }
+      
+      // Use the connected audio element
+      if (!audioElementRef.current) {
+        audioElementRef.current = new Audio();
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+        sourceNodeRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+      }
+      
+      // Stop current audio if playing
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      
+      // Convert base64 to audio blob
       const binaryString = atob(audioContent);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -1672,20 +1728,20 @@ const HistoricalChat = () => {
       const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      const audio = new Audio(audioUrl);
-      setCurrentAudio(audio);
-      setIsPlayingAudio(true);
+      audioElementRef.current.src = audioUrl;
+      setCurrentAudio(audioElementRef.current);
       setIsSpeaking(true);
       
-      audio.onended = () => {
+      audioElementRef.current.onended = () => {
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
         setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
         console.log('Audio playback completed');
       };
 
-      audio.onerror = () => {
+      audioElementRef.current.onerror = () => {
         setIsPlayingAudio(false);
         setIsPaused(false);
         setCurrentAudio(null);
@@ -1693,12 +1749,14 @@ const HistoricalChat = () => {
         console.error('Error playing audio');
       };
 
-      await audio.play();
+      await audioElementRef.current.play();
+      setIsPlayingAudio(true);
     } catch (error) {
       console.error('Error in playAudioFromBase64:', error);
       setIsPlayingAudio(false);
       setIsPaused(false);
       setCurrentAudio(null);
+      setIsSpeaking(false);
     }
   };
 
