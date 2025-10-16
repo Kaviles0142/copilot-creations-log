@@ -90,9 +90,6 @@ const HistoricalChat = () => {
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-  const [availableFakeYouVoices, setAvailableFakeYouVoices] = useState<any[]>([]);
-  const [selectedFakeYouVoice, setSelectedFakeYouVoice] = useState<any | null>(null);
-  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const [isGreetingPlaying, setIsGreetingPlaying] = useState(false); // Track if greeting is playing
@@ -196,7 +193,6 @@ const HistoricalChat = () => {
       createAuthenticVoice(selectedFigure);
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
-      fetchFakeYouVoicesForFigure(selectedFigure);
       
       // Phase 1: Generate static avatar portrait and play greeting
       generateAvatarPortraitAndGreeting(selectedFigure);
@@ -399,143 +395,6 @@ const HistoricalChat = () => {
   };
 
 
-  // Fetch available FakeYou voices for the selected figure
-  const fetchFakeYouVoicesForFigure = async (figure: HistoricalFigure) => {
-    setIsLoadingVoices(true);
-    try {
-      console.log('🔍 Fetching FakeYou voices for:', figure.name);
-      
-      const figureName = figure.name.toLowerCase();
-      console.log(`🎯 Figure name: "${figure.name}" (lowercase: "${figureName}")`);
-      
-      // Build search term for backend
-      let searchTerm = '';
-      let excludeTerms: string[] = [];
-      
-      if (figureName.includes('robert') && figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
-        excludeTerms = ['john'];
-        console.log('🔍 Searching for Robert F. Kennedy voices');
-      } else if (figureName.includes('john') && figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
-        excludeTerms = ['robert', 'bobby', 'rfk'];
-        console.log('🔍 Searching for John F. Kennedy voices');
-      } else if (figureName.includes('kennedy')) {
-        searchTerm = 'kennedy';
-        console.log('🔍 Searching for Kennedy voices');
-      } else if (figureName.includes('trump')) {
-        searchTerm = 'trump';
-        console.log('🔍 Searching for Trump voices');
-      } else if (figureName.includes('martin luther king')) {
-        searchTerm = 'martin luther king';
-        console.log('🔍 Searching for Martin Luther King Jr. voices');
-      } else {
-        // For other figures, use last significant word
-        const words = figureName.split(' ');
-        const suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
-        const lastName = words.reverse().find(word => !suffixes.includes(word.toLowerCase()));
-        searchTerm = lastName || figureName;
-        console.log('🔍 Searching for:', searchTerm);
-      }
-      
-      // Pass search term to backend for more efficient filtering
-      const { data: voicesData, error: voicesError } = await supabase.functions.invoke('fakeyou-tts', {
-        body: { 
-          action: 'list_voices',
-          searchTerm: searchTerm
-        }
-      });
-
-      if (voicesError) {
-        console.error('Error fetching voices:', voicesError);
-        setAvailableFakeYouVoices([]);
-        return;
-      }
-
-      let candidateVoices = voicesData.voices || [];
-      console.log(`📋 Backend returned ${candidateVoices.length} voices for "${searchTerm}"`);
-      
-      // Apply client-side exclusions if needed
-      const matchingVoices = candidateVoices.filter((voice: any) => {
-        const voiceTitle = voice.title.toLowerCase();
-        
-        // Check exclusions
-        for (const excludeTerm of excludeTerms) {
-          if (voiceTitle.includes(excludeTerm)) {
-            console.log(`❌ Excluded: "${voice.title}" (contains "${excludeTerm}")`);
-            return false;
-          }
-        }
-        
-        console.log(`✅ Included: "${voice.title}"`);
-        return true;
-      });
-      
-      console.log(`✅ Final count: ${matchingVoices.length} matching voices`);
-      console.log('📝 All voices:', matchingVoices.map(v => v.title));
-      
-      
-      console.log(`✅ Final FakeYou count: ${matchingVoices.length} voices`);
-      
-      // Option B: Only use fresh API search results (no database cloned voices)
-      const allVoices = [...matchingVoices.map((v: any) => ({ ...v, provider: 'fakeyou' }))];
-      console.log(`✅ Using ${matchingVoices.length} voices from FakeYou API search`);
-      
-      // Option B: Always add exactly 4 fallback voices (no database check needed)
-      const isMale = detectGender(figure);
-      
-      // Add 2 Resemble AI fallback voices
-      allVoices.push({
-        voiceToken: `resemble_marketplace_${isMale ? 'male' : 'female'}`,
-        title: `${figure.name} (Resemble AI - British Voice)`,
-        provider: 'resemble',
-        voiceId: isMale ? '0f2e6952' : 'c16f90a5'
-      });
-      
-      allVoices.push({
-        voiceToken: `resemble_marketplace_american_${isMale ? 'male' : 'female'}`,
-        title: `${figure.name} (Resemble AI - American Voice)`,
-        provider: 'resemble',
-        voiceId: isMale ? 'b605397b' : '02fc35a6'
-      });
-      
-      // Add 2 FakeYou generic fallback voices
-      allVoices.push({
-        voiceToken: `fakeyou_generic_${isMale ? 'male' : 'female'}`,
-        title: `${figure.name} (FakeYou - American Voice)`,
-        provider: 'fakeyou',
-        voiceId: isMale ? 'weight_pr6qyqxgc1h0pg4rd8xystpq9' : 'weight_tvdbzhy28dhrmcyajf94s8vv5'
-      });
-      
-      allVoices.push({
-        voiceToken: `fakeyou_generic_british_${isMale ? 'male' : 'female'}`,
-        title: `${figure.name} (FakeYou - British Voice)`,
-        provider: 'fakeyou',
-        voiceId: isMale ? 'weight_169mscrb9sf8pjcnekk3ct9a8' : 'weight_9j9s0sdz9z9gp4hjre3kcndmc'
-      });
-      
-      console.log(`📢 Added 4 fallback voices (2 Resemble + 2 FakeYou)`);
-      
-      console.log(`📊 Total voices from all providers: ${allVoices.length}`);
-      
-      setAvailableFakeYouVoices(allVoices);
-      
-      if (allVoices.length > 0) {
-        setSelectedFakeYouVoice(allVoices[0]);
-        console.log(`🎙️ Auto-selected: "${allVoices[0].title}" (${allVoices[0].provider})`);
-      } else {
-        setSelectedFakeYouVoice(null);
-      }
-      
-      
-    } catch (error) {
-      console.error('❌ Error:', error);
-      setAvailableFakeYouVoices([]);
-      setSelectedFakeYouVoice(null);
-    } finally {
-      setIsLoadingVoices(false);
-    }
-  };
 
   // Get exclusion terms to filter out related but different figures
   const getExcludeTermsForFigure = (figureName: string): string[] => {
@@ -902,9 +761,9 @@ const HistoricalChat = () => {
         generateVoiceWithSelection(aiResponse, selectedFigure!, selectedVoiceId).catch(voiceError => {
           console.error('Voice generation failed:', voiceError);
           toast({
-            title: "FakeYou unavailable, switching to backup TTS",
-            description: "Using fallback voice",
-            variant: "default",
+            title: "Voice generation failed",
+            description: "Could not generate Azure TTS voice",
+            variant: "destructive",
             duration: 3000,
           });
           // Fallback to standard TTS
@@ -1005,29 +864,7 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
 
-      // Route to correct TTS provider based on voice ID
-      if (voiceId.startsWith('TM:')) {
-        // FakeYou voice
-        console.log('🎤 Using FakeYou TTS with voice token:', voiceId);
-        
-        const { data, error } = await supabase.functions.invoke('fakeyou-tts', {
-          body: {
-            action: 'generateTTS',
-            text: text,
-            voiceToken: voiceId
-          }
-        });
-
-        if (error || !data?.audioContent) {
-          throw new Error('FakeYou TTS failed');
-        }
-
-        console.log('✅ Successfully used FakeYou TTS');
-        playAudioFromBase64(data.audioContent);
-        return;
-      }
-      
-      // Azure TTS - Primary and ONLY voice generation method
+      // Azure TTS - Only voice generation method
       console.log('🎤 Using Azure TTS for voice generation');
       
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
@@ -1060,7 +897,7 @@ const HistoricalChat = () => {
   };
 
   const generateSpeech = async (text: string, figure: HistoricalFigure) => {
-    console.log('🔊 Starting speech generation for:', figure.name, 'Text:', text.substring(0, 50) + '...');
+    console.log('🔊 Starting Azure TTS generation for:', figure.name, 'Text:', text.substring(0, 50) + '...');
     
     if (!isAutoVoiceEnabled) {
       console.log('🔇 Auto voice is disabled, skipping speech');
@@ -1073,623 +910,21 @@ const HistoricalChat = () => {
         currentAudio.currentTime = 0;
       }
 
-      // Priority 1: Check if FakeYou has a voice for this figure
-      if (availableFakeYouVoices && availableFakeYouVoices.length > 0) {
-        console.log(`🎯 FakeYou voices available (${availableFakeYouVoices.length}), using FakeYou as PRIMARY`);
-        
-        // Use the first FakeYou voice (or selected one if available)
-        const voiceToUse = selectedFakeYouVoice || availableFakeYouVoices[0];
-        
-        try {
-          // Temporarily set selected voice if not already set
-          const wasSelected = selectedFakeYouVoice;
-          if (!wasSelected) {
-            setSelectedFakeYouVoice(voiceToUse);
-          }
-          
-          await generateFakeYouVoice(text, figure);
-          console.log('✅ FakeYou TTS successful');
-          return;
-        } catch (fakeYouError) {
-          console.log('❌ FakeYou TTS failed, falling back to Resemble AI:', fakeYouError);
-        }
-      } else {
-        console.log('ℹ️ No FakeYou voices available, will use Resemble AI fallback');
-      }
-
-      // Priority 2: Fallback to Resemble AI voices
-      console.log('🎤 Using Resemble AI fallback voice...');
-      generatePremiumSpeech(text, figure).then(() => {
-        console.log('✅ Resemble AI TTS successful');
-      }).catch((premiumError) => {
-        console.log('❌ Resemble AI TTS failed, falling back to browser speech:', premiumError);
-        if ('speechSynthesis' in window) {
-          generateBrowserSpeech(text, figure);
-        } else {
-          console.error('Speech synthesis not supported in this browser');
-        }
-      });
-    } catch (error) {
-      console.error('Error generating speech:', error);
-      setIsPlayingAudio(false);
-    }
-  };
-
-  const generateFakeYouVoice = async (text: string, figure: HistoricalFigure) => {
-    try {
-      console.log('🎤 Generating voice for:', figure.name);
-      
-      // Check if a voice is selected
-      if (!selectedFakeYouVoice) {
-        console.log('❌ No voice selected');
-        toast({
-          title: "No voice selected",
-          description: `Please select a voice for ${figure.name} from the dropdown`,
-          variant: "destructive",
-          duration: 4000,
-        });
-        throw new Error('No voice selected');
-      }
-      
-      // Check which provider to use
-      if (selectedFakeYouVoice.provider === 'resemble') {
-        console.log(`✅ Using Resemble AI voice: "${selectedFakeYouVoice.title}"`);
-        
-        toast({
-          title: "Generating Resemble AI voice",
-          description: `Using "${selectedFakeYouVoice.title}"...`,
-          duration: 3000,
-        });
-        
-        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
-          body: { 
-            text: text,
-            voice: selectedFakeYouVoice.voiceId,
-            figure_name: figure.name
-          }
-        });
-
-        if (error) {
-          console.error('❌ Resemble AI TTS Error:', error);
-          throw error;
-        }
-
-        if (!data?.audioContent) {
-          console.error('❌ No audio content received from Resemble AI');
-          throw new Error('No audio content');
-        }
-
-        console.log('✅ Resemble AI TTS successful');
-        playAudioFromBase64(data.audioContent);
-        return;
-      }
-      
-      if (selectedFakeYouVoice.provider === 'elevenlabs') {
-        console.log(`✅ Using ElevenLabs voice: "${selectedFakeYouVoice.title}"`);
-        
-        toast({
-          title: "Generating ElevenLabs voice",
-          description: `Using "${selectedFakeYouVoice.title}"...`,
-          duration: 3000,
-        });
-        
-        const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
-          body: { 
-            text: text,
-            voice: selectedFakeYouVoice.voiceId // Use the voice ID directly
-          }
-        });
-
-        if (error) {
-          console.error('❌ ElevenLabs TTS Error:', error);
-          throw error;
-        }
-
-        if (!data?.audioContent) {
-          console.error('❌ No audio content received from ElevenLabs');
-          throw new Error('No audio content');
-        }
-
-        console.log('✅ ElevenLabs TTS successful');
-        playAudioFromBase64(data.audioContent);
-        return;
-      }
-      
-      // Otherwise use FakeYou
-      toast({
-        title: "Preparing voice response",
-        description: `Using "${selectedFakeYouVoice.title}" - this takes about 10-15 seconds...`,
-        duration: 4000,
-      });
-      
-      console.log(`✅ Using FakeYou voice: "${selectedFakeYouVoice.title}"`);
-      
-      // Step 3: Generate TTS
-      const { data: ttsData, error: ttsError } = await supabase.functions.invoke('fakeyou-tts', {
-        body: {
-          action: 'generate_tts',
-          text: text.substring(0, 2000), // Increased limit for longer responses
-          voiceToken: selectedFakeYouVoice.voiceId, // Use voiceId instead of voiceToken for FakeYou
-        },
-      });
-      
-      if (ttsError) {
-        console.error('TTS generation request error:', ttsError);
-        throw ttsError;
-      }
-      if (!ttsData.success) {
-        console.error('TTS generation failed:', ttsData);
-        throw new Error('TTS generation failed');
-      }
-      
-      const jobToken = ttsData.jobToken;
-      console.log('🔄 TTS job started:', jobToken);
-      
-      toast({
-        title: "Generating speech",
-        description: "This may take 10-30 seconds...",
-        duration: 3000,
-      });
-      
-      // Step 4: Poll for completion with timeout and fallback
-      let pollCount = 0;
-      const maxPolls = 20; // Reduced to 20 seconds max before fallback
-      
-      for (let i = 0; i < maxPolls; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        pollCount++;
-        
-        const { data: statusData, error: statusError } = await supabase.functions.invoke('fakeyou-tts', {
-          body: {
-            action: 'check_status',
-            jobToken: jobToken,
-          },
-        });
-        
-        if (statusError) {
-          console.error('Status check error:', statusError);
-          throw statusError;
-        }
-        if (!statusData.success) {
-          console.error('Status check failed:', statusData);
-          throw new Error('Status check failed');
-        }
-        
-        console.log(`⏳ Polling (${pollCount}/${maxPolls}): ${statusData.status}`);
-        
-        // Show progress every 5 seconds
-        if (pollCount % 5 === 0) {
-          toast({
-            title: "Still generating",
-            description: `${pollCount} seconds elapsed...`,
-            duration: 2000,
-          });
-        }
-        
-        if (statusData.isComplete && statusData.audioUrl) {
-          console.log('✅ FakeYou audio ready:', statusData.audioUrl);
-          
-          // Convert old Google Storage URLs to new CDN-2 format
-          let audioUrl = statusData.audioUrl;
-          if (audioUrl.includes('storage.googleapis.com/vocodes-public')) {
-            audioUrl = audioUrl.replace('https://storage.googleapis.com/vocodes-public', 'https://cdn-2.fakeyou.com');
-            console.log('🔄 Converted to CDN URL:', audioUrl);
-          }
-          
-          toast({
-            title: "Voice ready!",
-            description: `Playing ${figure.name}'s authentic voice`,
-            duration: 2000,
-          });
-          
-          // Use centralized audio pipeline initialization
-          initializeAudioPipeline();
-          
-          // Ensure audio context is running
-          if (audioContextRef.current!.state === 'suspended') {
-            await audioContextRef.current!.resume();
-          }
-          
-          // Stop current audio if playing
-          if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-          }
-          
-          console.log('🎵 Final Audio URL:', audioUrl);
-          console.log('🔗 Loading audio into connected element...');
-          
-          // Set audio properties on shared element
-          audioElementRef.current!.crossOrigin = 'anonymous';
-          audioElementRef.current!.src = audioUrl;
-          audioElementRef.current!.playbackRate = 0.85;
-          
-          // CRITICAL: Set event handlers BEFORE play
-          audioElementRef.current!.onplay = () => {
-            console.log('▶️ FakeYou audio PLAY event - Setting isSpeaking = TRUE');
-            setIsSpeaking(true);
-            setIsPlayingAudio(true);
-            setCurrentAudio(audioElementRef.current!);
-          };
-          
-          audioElementRef.current!.onended = () => {
-            console.log('⏹️ FakeYou audio ENDED event - Setting isSpeaking = FALSE');
-            setIsSpeaking(false);
-            setIsPlayingAudio(false);
-            setCurrentAudio(null);
-          };
-          
-          audioElementRef.current!.onerror = (e) => {
-            console.error('❌ FakeYou audio ERROR event:', e);
-            setIsSpeaking(false);
-            setIsPlayingAudio(false);
-            toast({
-              title: "Audio playback error",
-              description: "Failed to load audio file",
-              variant: "destructive",
-            });
-          };
-          
-          audioElementRef.current!.onloadeddata = () => {
-            console.log('📡 Audio loaded, starting playback at 0.85x speed');
-            audioElementRef.current!.play().catch(err => {
-              console.error('❌ Audio playback failed:', err);
-              setIsPlayingAudio(false);
-              setIsSpeaking(false);
-            });
-          };
-          
-          return; // Success!
-        }
-        
-        if (statusData.isFailed) {
-          console.error('❌ TTS generation failed on FakeYou servers');
-          throw new Error('TTS generation failed');
-        }
-      }
-      
-      // Timeout
-      console.error('⏱️ TTS generation timeout after', maxPolls, 'seconds');
-      throw new Error('TTS timeout - generation took too long');
+      // Use Azure TTS - the only voice generation method
+      await generateAndPlayTTS(text);
+      console.log('✅ Azure TTS successful');
       
     } catch (error) {
-      console.error('💥 FakeYou generation failed:', error);
+      console.error('Error generating speech with Azure TTS:', error);
       setIsPlayingAudio(false);
-      
       toast({
-        title: "Using fallback voice",
-        description: "FakeYou unavailable, switching to backup TTS",
-        variant: "default",
-        duration: 3000,
-      });
-      
-      throw error; // Re-throw to trigger fallback
-    }
-  };
-
-  const generateBrowserSpeech = (text: string, figure: HistoricalFigure) => {
-    speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Detect gender from figure information
-    const isMale = detectGender(figure);
-    console.log(`Detected gender for ${figure.name}: ${isMale ? 'Male' : 'Female'}`);
-    
-    let selectedVoice = null;
-    
-    if (isMale) {
-      // For male figures - prioritize definitively masculine voices
-      selectedVoice = availableVoices.find(v => {
-        const name = v.name.toLowerCase();
-        const lang = v.lang.toLowerCase();
-        
-        // First priority: Explicitly male voices
-        if (name.includes('male') || name.includes('man') || name.includes('david') || 
-            name.includes('mark') || name.includes('daniel') || name.includes('alex') ||
-            name.includes('james') || name.includes('michael') || name.includes('thomas') ||
-            name.includes('google us english') || name.includes('microsoft david') ||
-            name.includes('aaron') || name.includes('albert')) {
-          return lang.startsWith(selectedLanguage.split('-')[0]) || lang.startsWith('en');
-        }
-        return false;
-      });
-      
-      // Second priority: Voices that are NOT female
-      if (!selectedVoice) {
-        selectedVoice = availableVoices.find(v => {
-          const name = v.name.toLowerCase();
-          const lang = v.lang.toLowerCase();
-          
-          return (lang.startsWith(selectedLanguage.split('-')[0]) || lang.startsWith('en')) &&
-                 !name.includes('female') && !name.includes('woman') && 
-                 !name.includes('samantha') && !name.includes('victoria') &&
-                 !name.includes('kate') && !name.includes('susan') && !name.includes('anna') &&
-                 !name.includes('marie') && !name.includes('karen') && !name.includes('helen');
-        });
-      }
-    } else {
-      // For female figures - prioritize feminine voices
-      selectedVoice = availableVoices.find(v => {
-        const name = v.name.toLowerCase();
-        const lang = v.lang.toLowerCase();
-        
-        return (lang.startsWith(selectedLanguage.split('-')[0]) || lang.startsWith('en')) &&
-               (name.includes('female') || name.includes('woman') || name.includes('samantha') ||
-                name.includes('victoria') || name.includes('kate') || name.includes('susan') ||
-                name.includes('anna') || name.includes('marie') || name.includes('karen') ||
-                name.includes('helen') || name.includes('microsoft zira'));
+        title: "Voice generation failed",
+        description: "Could not generate voice response",
+        variant: "destructive",
       });
     }
-    
-    // Final fallback to any voice in the right language
-    if (!selectedVoice) {
-      selectedVoice = availableVoices.find(v => 
-        v.lang.startsWith(selectedLanguage.split('-')[0]) || v.lang.startsWith('en')
-      );
-    }
-
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-      console.log(`Selected voice for ${figure.name}: ${selectedVoice.name} (${selectedVoice.lang})`);
-    } else {
-      console.log(`No specific voice found for ${figure.name}, using default`);
-    }
-
-    utterance.lang = selectedLanguage;
-    
-    // Make voice sound more natural and less robotic
-    utterance.rate = 0.85;  // Slightly slower for more natural speech
-    utterance.pitch = getVoicePitch(figure);
-    utterance.volume = 0.9;
-    
-    // Add natural pauses and inflection by processing the text
-    const naturalText = addNaturalPauses(text);
-    utterance.text = naturalText;
-    
-    utterance.onstart = () => setIsPlayingAudio(true);
-    utterance.onend = () => {
-      setIsPlayingAudio(false);
-      setIsPaused(false);
-    };
-    utterance.onerror = () => {
-      setIsPlayingAudio(false);
-      setIsPaused(false);
-    };
-
-    speechSynthesis.speak(utterance);
   };
 
-  // Gender detection function
-  const detectGender = (figure: HistoricalFigure): boolean => {
-    // Known male figures
-    const maleNames = [
-      'albert einstein', 'winston churchill', 'abraham lincoln', 'napoleon',
-      'socrates', 'shakespeare', 'galileo', 'leonardo da vinci', 'julius caesar',
-      'isaac newton', 'charles darwin', 'thomas edison', 'benjamin franklin',
-      'george washington', 'martin luther king', 'nelson mandela', 'mozart',
-      'beethoven', 'bach', 'hendrix', 'elvis', 'john lennon', 'bob dylan',
-      'plato', 'aristotle', 'confucius', 'buddha', 'jesus', 'muhammad',
-      'tesla', 'jobs', 'gates', 'musk'
-    ];
-    
-    // Known female figures  
-    const femaleNames = [
-      'marie curie', 'cleopatra', 'joan of arc', 'anne frank', 'mother teresa',
-      'rosa parks', 'amelia earhart', 'virginia woolf', 'jane austen',
-      'frida kahlo', 'coco chanel', 'oprah winfrey', 'malala yousafzai',
-      'elizabeth', 'victoria', 'catherine', 'mary', 'helen keller'
-    ];
-    
-    const figureName = figure.name.toLowerCase();
-    const figureDesc = figure.description.toLowerCase();
-    
-    // Check explicit lists first
-    if (maleNames.some(name => figureName.includes(name))) return true;
-    if (femaleNames.some(name => figureName.includes(name))) return false;
-    
-    // Check for gender indicators in description
-    if (figureDesc.includes('he ') || figureDesc.includes('his ') || 
-        figureDesc.includes('him ') || figureDesc.includes('man') ||
-        figureDesc.includes('king') || figureDesc.includes('emperor') ||
-        figureDesc.includes('father') || figureDesc.includes('son') ||
-        figureDesc.includes('brother') || figureDesc.includes('male')) {
-      return true;
-    }
-    
-    if (figureDesc.includes('she ') || figureDesc.includes('her ') || 
-        figureDesc.includes('woman') || figureDesc.includes('queen') ||
-        figureDesc.includes('empress') || figureDesc.includes('mother') ||
-        figureDesc.includes('daughter') || figureDesc.includes('sister') ||
-        figureDesc.includes('female')) {
-      return false;
-    }
-    
-    // Default to male (most historical figures in databases are male)
-    return true;
-  };
-
-  // Add natural pauses and inflection to make speech less robotic
-  const addNaturalPauses = (text: string): string => {
-    let naturalText = text;
-    
-    // Add slight pauses after punctuation for more natural speech
-    naturalText = naturalText.replace(/\./g, '..');
-    naturalText = naturalText.replace(/,/g, ', ');
-    naturalText = naturalText.replace(/!/g, '!.');
-    naturalText = naturalText.replace(/\?/g, '?.');
-    
-    // Add emphasis markers for important words
-    naturalText = naturalText.replace(/\b(I am|I was|my|very|indeed|certainly|absolutely)\b/gi, '$1');
-    
-    return naturalText;
-  };
-
-  // Enhanced fallback voice selection with historical accuracy
-  const getFallbackVoice = (figure: HistoricalFigure): string => {
-    const isMale = detectGender(figure);
-    
-    if (isMale) {
-      const maleVoices = {
-        // Presidential/Political Figures - Authoritative, clear voices
-        'john-f-kennedy': 'Brian',          // Deep, presidential voice
-        'jfk': 'Brian',                     
-        'abraham-lincoln': 'Bill',          // Deep, resonant voice for Lincoln
-        'winston-churchill': 'George',      // British-accented voice
-        'franklin-d-roosevelt': 'Daniel',   // Confident presidential voice
-        
-        // Intellectual/Scientific - Thoughtful, measured voices  
-        'albert-einstein': 'Eric',          // Intellectual, slightly accented
-        'socrates': 'Will',                 // Wise, measured tone
-        'leonardo-da-vinci': 'Callum',      // Renaissance intellectual
-        'charles-darwin': 'Chris',          // Scientific, British accent
-        
-        // Military/Leadership - Strong, commanding voices
-        'napoleon': 'George',               // Commanding, authoritative
-        'alexander-the-great': 'Liam',      // Young but powerful
-        'julius-caesar': 'Bill',            // Roman authority
-        
-        // Literary/Artistic - Expressive, cultured voices
-        'shakespeare': 'Callum',            // British, dramatic
-        'mark-twain': 'Daniel',             // American storyteller
-        'edgar-allan-poe': 'Eric',          // Dark, mysterious
-        
-        // Religious/Philosophical - Gentle but authoritative
-        'martin-luther-king-jr': '2ts4Q14DjMa5I5EgteS4', // Custom MLK voice from ElevenLabs
-        'confucius': 'Will',                // Wise, calm
-        'gandhi': 'Eric',                   // Gentle but firm
-      };
-      
-      return maleVoices[figure.id] || 'Daniel'; // Default to presidential voice
-    } else {
-      const femaleVoices = {
-        // Scientific/Intellectual 
-        'marie-curie': 'Sarah',             // Intelligent, French-accented
-        'rosalind-franklin': 'Laura',       // Scientific, British
-        
-        // Historical Leaders
-        'cleopatra': 'Charlotte',           // Regal, commanding
-        'elizabeth-i': 'Jessica',           // Royal British accent
-        'catherine-the-great': 'Alice',     // Imperial, authoritative
-        
-        // Social/Political Activists
-        'joan-of-arc': 'Jessica',           // Young but determined French
-        'florence-nightingale': 'Laura',    // Caring but authoritative British
-        'eleanor-roosevelt': 'Sarah',       // First Lady elegance
-        
-        // Literary/Artistic
-        'jane-austen': 'Charlotte',         // Refined British
-        'virginia-woolf': 'Alice',          // Literary, thoughtful
-        'frida-kahlo': 'Aria',             // Passionate, artistic
-      };
-      
-      return femaleVoices[figure.id] || 'Sarah'; // Default to intellectual voice
-    }
-  };
-
-  const generatePremiumSpeech = async (text: string, figure: HistoricalFigure) => {
-    try {
-      // Option B: Skip database check for cloned voices
-      const clonedVoice = null;
-      
-      // Always skip this check in Option B
-      if (false) {
-        console.log(`🎯 Using Resemble CLONED voice: ${clonedVoice.voice_id} for ${figure.name}`);
-        
-        const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
-          body: { 
-            text: text,
-            voice: clonedVoice.voice_id,
-            figure_name: figure.name
-          }
-        });
-
-        // If Resemble works, use it
-        if (!error && data?.audioContent) {
-          console.log('✅ Successfully used Resemble cloned voice');
-          playAudioFromBase64(data.audioContent);
-          return;
-        } else {
-          console.warn('❌ Resemble cloned voice failed, trying fallback:', error);
-        }
-      }
-      
-      // No cloned voice, use Resemble AI fallback with characteristic preservation
-      console.log(`🎵 Using Resemble AI fallback for ${figure.name}`);
-      console.log(`📊 Figure details:`, { name: figure.name, description: figure.description, id: figure.id });
-      console.log(`📌 Selected FakeYou voice state:`, selectedFakeYouVoice);
-      
-      // Characteristic-preserving fallback: match gender AND accent from selected voice
-      let fallbackVoice = 'b605397b'; // Default: American Male
-      
-      if (selectedFakeYouVoice && selectedFakeYouVoice.voiceId) {
-        console.log(`🔄 Attempting to preserve characteristics from: "${selectedFakeYouVoice.title}" (ID: ${selectedFakeYouVoice.voiceId})`);
-        
-        // Create mapping from FakeYou to Resemble AI (preserving gender + accent)
-        const fakeYouToResembleMap: Record<string, string> = {
-          // FakeYou American -> Resemble American
-          'weight_pr6qyqxgc1h0pg4rd8xystpq9': 'b605397b', // American Male
-          'weight_tvdbzhy28dhrmcyajf94s8vv5': '02fc35a6', // American Female
-          
-          // FakeYou British -> Resemble British
-          'weight_169mscrb9sf8pjcnekk3ct9a8': '0f2e6952', // British Male
-          'weight_9j9s0sdz9z9gp4hjre3kcndmc': 'c16f90a5', // British Female
-        };
-        
-        console.log(`🔍 Looking up mapping for voice ID: ${selectedFakeYouVoice.voiceId}`);
-        const mappedVoice = fakeYouToResembleMap[selectedFakeYouVoice.voiceId];
-        
-        if (mappedVoice) {
-          fallbackVoice = mappedVoice;
-          console.log(`✅ MAPPED: FakeYou ${selectedFakeYouVoice.voiceId} -> Resemble ${fallbackVoice}`);
-        } else {
-          console.log(`⚠️ No direct mapping found for ${selectedFakeYouVoice.voiceId}, using gender-based fallback`);
-          const isMale = detectGender(figure);
-          fallbackVoice = isMale ? 'b605397b' : '02fc35a6'; // Default to American
-          console.log(`🎭 Gender-based fallback: ${isMale ? 'MALE' : 'FEMALE'} -> ${fallbackVoice}`);
-        }
-      } else {
-        console.log(`ℹ️ No selected voice available, using gender-based fallback`);
-        const isMale = detectGender(figure);
-        fallbackVoice = isMale ? 'b605397b' : '02fc35a6'; // Default to American
-        console.log(`🎭 Gender-based fallback: ${isMale ? 'MALE' : 'FEMALE'} -> ${fallbackVoice}`);
-      }
-      
-      const voiceCharacteristics = {
-        'b605397b': 'American Male',
-        '02fc35a6': 'American Female',
-        '0f2e6952': 'British Male',
-        'c16f90a5': 'British Female'
-      };
-      
-      console.log(`🎤 FINAL: Using Resemble fallback: ${voiceCharacteristics[fallbackVoice] || fallbackVoice}`);
-      
-      const { data, error } = await supabase.functions.invoke('resemble-text-to-speech', {
-        body: { 
-          text: text,
-          voice: fallbackVoice,
-          figure_name: figure.name
-        }
-      });
-
-      if (error) {
-        console.error('❌ Resemble fallback TTS Error:', error);
-        throw error;
-      }
-
-      if (!data?.audioContent) {
-        console.error('❌ No audio content received from Resemble TTS');
-        throw new Error('No audio content');
-      }
-
-      console.log('✅ Resemble fallback voice TTS successful');
-      playAudioFromBase64(data.audioContent);
-      
-    } catch (error) {
-      console.error('Error in generatePremiumSpeech:', error);
-      throw error;
-    }
-  };
 
   const playAudioFromBase64 = async (audioContent: string) => {
     try {
@@ -1810,25 +1045,25 @@ const HistoricalChat = () => {
           return result.voice_id;
         } else {
           console.log(`Auto-cloning failed for ${figure.name}:`, result.error || result.message);
-          // If cloning failed, use fallback voice
-          return getFallbackVoice(figure);
+          // Azure will auto-select appropriate voice
+          return null;
         }
       } else {
         console.error(`Auto-clone-voice API call failed for ${figure.name}:`, response.status, response.statusText);
         const errorText = await response.text();
         console.error('Error details:', errorText);
-        // If API call failed, use fallback voice
-        return getFallbackVoice(figure);
+        // Azure will auto-select appropriate voice
+        return null;
       }
 
-      // Fallback to preset voices if auto-cloning fails
-      return getFallbackVoice(figure);
+      // Azure will auto-select appropriate voice
+      return null;
       
     } catch (error) {
       console.error('Error getting/creating authentic voice:', error);
       console.error('Error details:', error.message || error);
-      console.error('Falling back to preset voice for:', figure.name);
-      return getFallbackVoice(figure);
+      console.error('Azure will auto-select voice for:', figure.name);
+      return null;
     }
   };
 
