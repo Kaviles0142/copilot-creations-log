@@ -752,42 +752,29 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // Voice generation now uses Phase 1 TTS system
-      /* Old voice system - preserved for future activation
-      if (isAutoVoiceEnabled && aiResponse.length > 20) {
-        console.log('🎙️ Starting voice generation for:', selectedFigure!.name);
-        console.log('🎯 Using voice ID:', selectedVoiceId);
-        
-        generateVoiceWithSelection(aiResponse, selectedFigure!, selectedVoiceId).catch(voiceError => {
-          console.error('Voice generation failed:', voiceError);
+      // START TTS IMMEDIATELY - Don't wait for UI updates
+      // This makes audio generation happen in parallel with text display
+      if (aiResponse.length > 20 && isAutoVoiceEnabled) {
+        console.log('🎤 IMMEDIATE TTS START for:', selectedFigure!.name);
+        // Fire and forget - don't await, let it run in parallel
+        generateAndPlayTTS(aiResponse).catch(err => {
+          console.error('Background TTS error:', err);
           toast({
             title: "Voice generation failed",
-            description: "Could not generate Azure TTS voice",
+            description: "Could not generate voice response",
             variant: "destructive",
-            duration: 3000,
-          });
-          // Fallback to standard TTS
-          generateSpeech(aiResponse, selectedFigure!).catch(speechError => {
-            console.error('All speech generation failed:', speechError);
+            duration: 2000,
           });
         });
       }
-      */
 
-      // Add message to UI immediately
+      // Add message to UI immediately (happens in parallel with TTS generation above)
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
       // Reset loading state immediately
       setIsLoading(false);
       setAbortController(null);
-      
-      // Phase 1: Start TTS generation in background (don't await)
-      if (aiResponse.length > 20) {
-        generateAndPlayTTS(aiResponse).catch(err => {
-          console.error('Background TTS error:', err);
-        });
-      }
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
