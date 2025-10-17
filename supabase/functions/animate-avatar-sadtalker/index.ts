@@ -111,7 +111,9 @@ serve(async (req) => {
         enhancer: "gfpgan",
         preprocess: "full",
         still: false,
-        expression_scale: 1.0
+        expression_scale: 1.2,
+        size: 512,
+        face_model_resolution: 512
       }
     });
 
