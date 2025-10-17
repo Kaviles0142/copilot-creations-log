@@ -101,6 +101,7 @@ const HistoricalChat = () => {
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // Only for first greeting
   const [hasGeneratedVideo, setHasGeneratedVideo] = useState(false); // Track if we already have a video
+  const [cachedGreetingVideoUrl, setCachedGreetingVideoUrl] = useState<string | null>(null); // Cached greeting video
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -207,10 +208,11 @@ const HistoricalChat = () => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
-    setHasGeneratedVideo(false); // Reset video state for new figure
+    setHasGeneratedVideo(false);
+    setCachedGreetingVideoUrl(null);
     
     try {
-      // Step 1: Generate avatar image
+      // Step 1: Generate/fetch avatar image
       const { data: avatarData, error: avatarError } = await supabase.functions.invoke('generate-avatar-portrait', {
         body: {
           figureName: figure.name,
@@ -224,11 +226,24 @@ const HistoricalChat = () => {
       setAvatarImageUrl(avatarData.imageUrl);
       setIsLoadingAvatarImage(false);
       
-      // Step 2: Generate greeting audio (but DON'T play it yet)
-      const greetingText = getGreetingForFigure(figure);
-      console.log('👋 Generating greeting audio for video:', greetingText);
+      // Check if we have a cached greeting video
+      if (avatarData.greetingVideoUrl) {
+        console.log('⚡ Using cached greeting video - instant playback!');
+        setCachedGreetingVideoUrl(avatarData.greetingVideoUrl);
+        setHasGeneratedVideo(true);
+        setIsGreetingPlaying(false); // Video will play immediately
+        
+        toast({
+          title: "Ready to Chat",
+          description: `${figure.name} is ready!`,
+        });
+        return;
+      }
       
-      // Generate the TTS but store it for the video generation
+      // No cached video - generate greeting audio for video creation
+      const greetingText = getGreetingForFigure(figure);
+      console.log('👋 Generating greeting audio for new video:', greetingText);
+      
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
           text: greetingText,
@@ -244,11 +259,8 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store the greeting audio for the RealisticAvatar to use
-      console.log('🎤 Greeting audio ready, sending to video generator');
+      console.log('🎤 Greeting audio ready, will generate video');
       setGreetingAudioUrl(data.audioContent);
-      
-      // The audio will play automatically when the video is ready via RealisticAvatar
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -1538,17 +1550,18 @@ const HistoricalChat = () => {
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              audioUrl={hasGeneratedVideo ? null : greetingAudioUrl} // Only pass audio for first video generation
+              audioUrl={hasGeneratedVideo ? null : greetingAudioUrl}
+              cachedVideoUrl={cachedGreetingVideoUrl}
+              figureId={selectedFigure.id}
               onVideoEnd={() => {
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
               }}
               onVideoReady={(videoUrl) => {
-                // Video is ready, now play the greeting audio with the video
-                console.log('✅ Video ready, marking as generated');
+                console.log('✅ Video generated and cached');
                 setHasGeneratedVideo(true);
-                setGreetingAudioUrl(null); // Clear greeting audio after first use
+                setGreetingAudioUrl(null);
               }}
             />
           </div>

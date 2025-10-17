@@ -36,10 +36,19 @@ serve(async (req) => {
       const cached = await cacheResponse.json();
       if (cached && cached.length > 0 && cached[0].cloudinary_url) {
         console.log('✅ Using cached portrait:', cached[0].cloudinary_url);
-        return new Response(JSON.stringify({
+        const response: any = {
           imageUrl: cached[0].cloudinary_url,
           cached: true,
-        }), {
+        };
+        
+        // Also return cached greeting video if it exists
+        if (cached[0].greeting_video_url) {
+          console.log('✅ Found cached greeting video:', cached[0].greeting_video_url);
+          response.greetingVideoUrl = cached[0].greeting_video_url;
+          response.cacheId = cached[0].id; // Return cache ID for updates
+        }
+        
+        return new Response(JSON.stringify(response), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -86,14 +95,15 @@ serve(async (req) => {
     console.log('✅ Portrait generated successfully');
 
     // Cache the image
+    let cacheId = null;
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/avatar_image_cache`, {
+      const cacheInsert = await fetch(`${SUPABASE_URL}/rest/v1/avatar_image_cache`, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
           'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
           'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify({
           figure_id: figureId,
@@ -102,7 +112,12 @@ serve(async (req) => {
           visual_prompt: prompt,
         }),
       });
-      console.log('💾 Portrait cached successfully');
+      
+      if (cacheInsert.ok) {
+        const insertedCache = await cacheInsert.json();
+        cacheId = insertedCache[0]?.id;
+        console.log('💾 Portrait cached successfully with ID:', cacheId);
+      }
     } catch (cacheError) {
       console.error('Cache save failed:', cacheError);
       // Continue anyway - cache failure isn't critical
@@ -111,6 +126,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       imageUrl,
       cached: false,
+      cacheId, // Return cache ID so we can update it later with greeting video
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
