@@ -61,26 +61,41 @@ serve(async (req) => {
     }
 
     console.log("🎬 Starting SadTalker animation...");
+    console.log("📸 Incoming image:", imageUrl.substring(0, 100));
+    console.log("🎤 Incoming audio:", audioUrl.substring(0, 100));
     
-    // Convert base64 to URLs if needed
+    // Convert base64/blob to URLs by uploading to storage
     let finalImageUrl = imageUrl;
     let finalAudioUrl = audioUrl;
 
+    // Handle image upload
     if (imageUrl.startsWith('data:')) {
       console.log('📤 Uploading image to storage...');
       const timestamp = Date.now();
       finalImageUrl = await base64ToUrl(imageUrl, `sadtalker/image-${timestamp}.png`, 'audio-files');
-      console.log('📸 Image URL:', finalImageUrl);
+      console.log('✅ Image uploaded:', finalImageUrl);
     }
 
-    if (audioUrl.startsWith('data:') || audioUrl.startsWith('//')) {
-      console.log('📤 Uploading audio to storage...');
+    // Handle audio upload - must convert blob/base64 to real URL
+    if (!audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
+      console.log('📤 Audio needs upload (blob or base64 detected)');
       const timestamp = Date.now();
-      // Handle base64 audio from Azure TTS
-      const audioBase64 = audioUrl.startsWith('//') ? audioUrl : audioUrl.split(',')[1];
-      finalAudioUrl = await base64ToUrl(`data:audio/mpeg;base64,${audioBase64}`, `sadtalker/audio-${timestamp}.mp3`, 'audio-files');
-      console.log('🎤 Audio URL:', finalAudioUrl);
+      
+      // If it's base64 audio from Azure (starts with //)
+      if (audioUrl.startsWith('//')) {
+        const audioBase64 = audioUrl;
+        finalAudioUrl = await base64ToUrl(`data:audio/mpeg;base64,${audioBase64}`, `sadtalker/audio-${timestamp}.mp3`, 'audio-files');
+      } 
+      // If it's a blob URL, we can't access it server-side - client must send base64
+      else {
+        throw new Error('Audio must be provided as base64 or HTTP URL, blob URLs are not supported');
+      }
+      console.log('✅ Audio uploaded:', finalAudioUrl);
     }
+
+    console.log('🚀 Final URLs for Replicate:');
+    console.log('📸 Image:', finalImageUrl);
+    console.log('🎤 Audio:', finalAudioUrl);
 
     const replicate = new Replicate({
       auth: REPLICATE_API_KEY,

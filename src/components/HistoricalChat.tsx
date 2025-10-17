@@ -364,8 +364,9 @@ const HistoricalChat = () => {
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      // Store audio URL for realistic avatar animation
-      setCurrentAudioUrl(audioUrl);
+      // Store BOTH blob URL for playback AND base64 for avatar animation
+      setCurrentAudioUrl(data.audioContent); // Store base64 for SadTalker
+      
       
       // Set source AFTER handlers
       audioElementRef.current!.src = audioUrl;
