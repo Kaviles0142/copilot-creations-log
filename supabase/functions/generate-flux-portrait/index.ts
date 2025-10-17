@@ -165,5 +165,5 @@ function generateEnvironmentalPrompt(figureName: string): string {
   const environmentDetail = environments[figureName] || 
     `in their characteristic historical setting, period-accurate clothing and environment, warm professional lighting, determined expression`;
 
-  return `Professional photorealistic portrait photograph of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic lighting, historically accurate, masterpiece quality. The subject's face should be clearly visible and well-lit, positioned prominently in the frame for facial animation. Sharp focus on face and upper body.`;
+  return `Photorealistic scene of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
 }
