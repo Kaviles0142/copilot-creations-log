@@ -377,12 +377,12 @@ const HistoricalChat = () => {
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      // Store BOTH blob URL for playback AND base64 for avatar animation
-      setCurrentAudioUrl(data.audioContent); // Store base64 for SadTalker
+      // Store base64 for avatar animation BEFORE setting the audio source
+      // This ensures RealisticAvatar gets the new audio URL
+      setCurrentAudioUrl(data.audioContent);
       
       // CRITICAL: Trigger new avatar video generation with each response
       console.log('🎬 Triggering new avatar animation for this response');
-      setHasGeneratedVideo(false); // Reset to allow new video generation
       
       
       // Set source AFTER handlers
@@ -1537,7 +1537,7 @@ const HistoricalChat = () => {
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              audioUrl={hasGeneratedVideo ? null : greetingAudioUrl} // Only pass audio for first video generation
+              audioUrl={currentAudioUrl || greetingAudioUrl} // Use current response audio or greeting
               onVideoEnd={() => {
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
