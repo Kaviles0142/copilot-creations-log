@@ -211,9 +211,9 @@ const HistoricalChat = () => {
     try {
       const greetingText = getGreetingForFigure(figure);
       
-      // OPTIMIZATION: Run avatar portrait and greeting audio generation IN PARALLEL
+      // OPTIMIZATION: Run FLUX environmental portrait and greeting audio generation IN PARALLEL
       const [avatarResult, audioResult] = await Promise.all([
-        supabase.functions.invoke('generate-avatar-portrait', {
+        supabase.functions.invoke('generate-flux-portrait', {
           body: {
             figureName: figure.name,
             figureId: figure.id
