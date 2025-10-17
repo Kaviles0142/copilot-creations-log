@@ -59,7 +59,7 @@ serve(async (req) => {
       auth: REPLICATE_API_KEY,
     });
 
-    const prompt = generateEnvironmentalPrompt(figureName);
+    const prompt = await generateEnvironmentalPrompt(figureName);
     console.log('📝 Environmental prompt:', prompt);
 
     console.log('🚀 Starting FLUX generation...');
@@ -128,7 +128,7 @@ serve(async (req) => {
   }
 });
 
-function generateEnvironmentalPrompt(figureName: string): string {
+async function generateEnvironmentalPrompt(figureName: string): Promise<string> {
   // Map historical figures to their characteristic environments
   const environments: Record<string, string> = {
     'Albert Einstein': 'in his Princeton office, 1940s, sitting at a wooden desk covered with physics papers and equations, chalkboards with E=mc² and relativity formulas visible in the background, warm afternoon sunlight streaming through tall windows, period-accurate dark suit, messy gray hair, thoughtful expression',
@@ -167,9 +167,66 @@ function generateEnvironmentalPrompt(figureName: string): string {
     'John F. Kennedy': 'in the Oval Office, early 1960s, sitting at the Resolute Desk with American flag and presidential seal visible, wearing a sharp dark navy suit with thin tie, warm professional lighting through the windows, confident and charismatic expression, iconic Kennedy profile',
   };
 
-  // Get environment-specific prompt or use generic fallback
-  const environmentDetail = environments[figureName] || 
-    `in their characteristic historical setting, period-accurate clothing and environment, warm professional lighting, determined expression`;
+  // If we have a predefined environment, use it
+  if (environments[figureName]) {
+    const environmentDetail = environments[figureName];
+    return `Photorealistic scene of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
+  }
 
-  return `Photorealistic scene of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
+  // Otherwise, use Lovable AI to generate a detailed environmental prompt
+  console.log(`🤖 Generating AI prompt for ${figureName}...`);
+  
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    console.warn('⚠️ LOVABLE_API_KEY not found, using generic fallback');
+    const environmentDetail = `in their characteristic historical setting, period-accurate clothing and environment, warm professional lighting, determined expression`;
+    return `Photorealistic scene of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
+  }
+
+  try {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{
+          role: 'user',
+          content: `Generate a detailed, vivid environmental scene description for a photorealistic portrait of ${figureName}. Include:
+1. Their most iconic location/setting (e.g., office, lab, studio, battlefield)
+2. Specific time period and era details
+3. Period-accurate clothing description
+4. Characteristic objects, tools, or props associated with them
+5. Lighting style appropriate to the era
+6. Their typical expression or demeanor
+
+Format: Write a single flowing description starting with "in [location], [time period]..." Do NOT include the person's name. Just describe the environment, clothing, and scene. Maximum 60 words.
+
+Example format: "in his Princeton office, 1940s, sitting at a wooden desk covered with physics papers and equations, chalkboards with formulas visible in the background, warm afternoon sunlight streaming through tall windows, period-accurate dark suit, messy gray hair, thoughtful expression"`
+        }]
+      })
+    });
+
+    if (!aiResponse.ok) {
+      throw new Error(`AI API error: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const aiGeneratedDetail = aiData.choices?.[0]?.message?.content?.trim();
+    
+    if (!aiGeneratedDetail) {
+      throw new Error('No content in AI response');
+    }
+
+    console.log(`✅ AI-generated detail: ${aiGeneratedDetail}`);
+    
+    return `Photorealistic scene of ${figureName} ${aiGeneratedDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
+  } catch (error) {
+    console.error('❌ AI prompt generation failed:', error);
+    // Fallback to generic prompt
+    const environmentDetail = `in their characteristic historical setting, period-accurate clothing and environment, warm professional lighting, determined expression`;
+    return `Photorealistic scene of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
+  }
 }
