@@ -17,6 +17,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [generationStatus, setGenerationStatus] = useState<string>(''); // Track current status
 
   useEffect(() => {
     if (!imageUrl || !audioUrl) {
@@ -49,13 +50,14 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
         }
 
         console.log('⏳ Prediction started:', startData.predictionId);
+        setGenerationStatus('Queued on Replicate servers...');
         
-        // Poll for completion (OPTIMIZED: faster polling interval)
+        // Increased timeout to 5 minutes (300 seconds) to handle slow Replicate queues
         let attempts = 0;
-        const maxAttempts = 90; // 90 attempts * 1 second = 1.5 minutes max
+        const maxAttempts = 300; // 300 attempts * 1 second = 5 minutes max
         
         while (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second (faster polling)
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
           
           const { data: checkData, error: checkError } = await supabase.functions.invoke('check-prediction', {
             body: {
@@ -69,9 +71,17 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
 
           console.log(`📊 Status check ${attempts + 1}:`, checkData.status);
 
+          // Update user-facing status based on Replicate's status
+          if (checkData.status === 'starting') {
+            setGenerationStatus(`Waiting in queue... (${attempts}s)`);
+          } else if (checkData.status === 'processing') {
+            setGenerationStatus(`Generating realistic avatar... (${attempts}s)`);
+          }
+
           if (checkData.status === 'succeeded') {
             console.log('✅ Video ready:', checkData.output);
             setVideoUrl(checkData.output);
+            setGenerationStatus('Complete!');
             onVideoReady?.(checkData.output); // Notify parent that video is ready
             return;
           } else if (checkData.status === 'failed') {
@@ -81,7 +91,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
           attempts++;
         }
 
-        throw new Error('Video generation timed out');
+        throw new Error('Video generation timed out after 5 minutes');
         
       } catch (err) {
         console.error('❌ Error generating realistic avatar:', err);
@@ -129,7 +139,8 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
           <div className="text-center space-y-4">
             <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
-            <p className="text-sm text-white">Generating photorealistic avatar...</p>
+            <p className="text-sm text-white font-medium">{generationStatus}</p>
+            <p className="text-xs text-white/70">This can take 1-3 minutes...</p>
           </div>
         </div>
       </Card>
