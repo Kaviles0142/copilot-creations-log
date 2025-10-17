@@ -98,7 +98,8 @@ serve(async (req) => {
     }
 
     const result = await response.json();
-    const videoUrl = result.video;
+    // fal.ai returns video as an object with url property
+    const videoUrl = result.video?.url || result.video;
     
     console.log('✅ Video generated:', videoUrl);
 
