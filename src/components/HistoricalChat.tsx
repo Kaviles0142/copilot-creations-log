@@ -245,6 +245,20 @@ const HistoricalChat = () => {
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
       
+      // FALLBACK: Play audio directly if video generation fails
+      // This ensures user hears the greeting even without animation
+      try {
+        const audioBlob = base64ToBlob(audioResult.data.audioContent, 'audio/mpeg');
+        const audioPlaybackUrl = URL.createObjectURL(audioBlob);
+        const fallbackAudio = new Audio(audioPlaybackUrl);
+        fallbackAudio.onended = () => setIsGreetingPlaying(false);
+        await fallbackAudio.play();
+        console.log('🔊 Playing greeting audio directly (fallback mode)');
+      } catch (playError) {
+        console.error('❌ Error playing greeting audio:', playError);
+        setIsGreetingPlaying(false);
+      }
+      
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
       toast({
