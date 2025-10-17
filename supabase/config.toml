@@ -1,9 +1,9 @@
 project_id = "trclpvryrjlafacocbnd"
 
-[functions.animate-avatar-sadtalker]
+[functions.fal-generate-portrait]
 verify_jwt = false
 
-[functions.check-prediction]
+[functions.fal-animate-avatar]
 verify_jwt = false
 
 [api]

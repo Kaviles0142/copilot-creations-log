@@ -33,69 +33,30 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
       try {
         setIsGenerating(true);
         setError(null);
-        console.log('🎬 Starting realistic avatar generation...');
+        console.log('🎬 Starting avatar animation with fal.ai');
         console.log('📸 Image:', imageUrl);
         console.log('🎤 Audio:', audioUrl);
 
-        // Start the generation
-        const { data: startData, error: startError } = await supabase.functions.invoke('animate-avatar-sadtalker', {
-          body: {
-            imageUrl,
-            audioUrl
-          }
+        setGenerationStatus('Animating your avatar...');
+
+        const { data, error: functionError } = await supabase.functions.invoke('fal-animate-avatar', {
+          body: { imageUrl, audioUrl }
         });
 
-        if (startError) {
-          throw startError;
+        if (functionError) {
+          console.error('❌ Animation error:', functionError);
+          throw new Error(functionError.message || 'Failed to animate avatar');
         }
 
-        if (!startData?.predictionId) {
-          throw new Error('No prediction ID returned');
+        if (!data?.videoUrl) {
+          throw new Error('No video URL returned');
         }
 
-        console.log('⏳ Prediction started:', startData.predictionId);
-        setGenerationStatus('Queued on Replicate servers...');
+        console.log('✅ Video ready:', data.videoUrl);
+        setVideoUrl(data.videoUrl);
+        setGenerationStatus('Avatar ready!');
         
-        // Increased timeout to 5 minutes (300 seconds) to handle slow Replicate queues
-        let attempts = 0;
-        const maxAttempts = 300; // 300 attempts * 1 second = 5 minutes max
-        
-        while (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-          
-          const { data: checkData, error: checkError } = await supabase.functions.invoke('check-prediction', {
-            body: {
-              predictionId: startData.predictionId
-            }
-          });
-
-          if (checkError) {
-            throw checkError;
-          }
-
-          console.log(`📊 Status check ${attempts + 1}:`, checkData.status);
-
-          // Update user-facing status based on Replicate's status
-          if (checkData.status === 'starting') {
-            setGenerationStatus(`Waiting in queue... (${attempts}s)`);
-          } else if (checkData.status === 'processing') {
-            setGenerationStatus(`Generating realistic avatar... (${attempts}s)`);
-          }
-
-          if (checkData.status === 'succeeded') {
-            console.log('✅ Video ready:', checkData.output);
-            setVideoUrl(checkData.output);
-            setGenerationStatus('Complete!');
-            onVideoReady?.(checkData.output); // Notify parent that video is ready
-            return;
-          } else if (checkData.status === 'failed') {
-            throw new Error(checkData.error || 'Video generation failed');
-          }
-
-          attempts++;
-        }
-
-        throw new Error('Video generation timed out after 5 minutes');
+        onVideoReady?.(data.videoUrl);
         
       } catch (err) {
         console.error('❌ Error generating realistic avatar:', err);
