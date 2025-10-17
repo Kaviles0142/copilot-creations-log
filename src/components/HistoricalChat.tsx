@@ -202,7 +202,7 @@ const HistoricalChat = () => {
     }
   }, [selectedFigure]);
   
-  // Generate avatar portrait and play greeting
+  // Generate avatar portrait and play greeting (optimized with parallel requests)
   const generateAvatarPortraitAndGreeting = async (figure: HistoricalFigure) => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
@@ -210,45 +210,41 @@ const HistoricalChat = () => {
     setHasGeneratedVideo(false); // Reset video state for new figure
     
     try {
-      // Step 1: Generate avatar image
-      const { data: avatarData, error: avatarError } = await supabase.functions.invoke('generate-avatar-portrait', {
-        body: {
-          figureName: figure.name,
-          figureId: figure.id
-        }
-      });
+      const greetingText = getGreetingForFigure(figure);
+      
+      // OPTIMIZATION: Run avatar portrait and greeting audio generation IN PARALLEL
+      const [avatarResult, audioResult] = await Promise.all([
+        supabase.functions.invoke('generate-avatar-portrait', {
+          body: {
+            figureName: figure.name,
+            figureId: figure.id
+          }
+        }),
+        supabase.functions.invoke('azure-text-to-speech', {
+          body: {
+            text: greetingText,
+            figure_name: figure.name,
+            figure_id: figure.id,
+            voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+          }
+        })
+      ]);
 
-      if (avatarError) throw avatarError;
+      if (avatarResult.error) throw avatarResult.error;
+      if (audioResult.error) throw audioResult.error;
 
-      console.log('✅ Avatar portrait ready:', avatarData.cached ? '(cached)' : '(new)');
-      setAvatarImageUrl(avatarData.imageUrl);
+      console.log('✅ Avatar portrait ready:', avatarResult.data.cached ? '(cached)' : '(new)');
+      console.log('🎤 Greeting audio ready');
+      
+      setAvatarImageUrl(avatarResult.data.imageUrl);
       setIsLoadingAvatarImage(false);
       
-      // Step 2: Generate greeting audio (but DON'T play it yet)
-      const greetingText = getGreetingForFigure(figure);
-      console.log('👋 Generating greeting audio for video:', greetingText);
-      
-      // Generate the TTS but store it for the video generation
-      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
-        body: {
-          text: greetingText,
-          figure_name: figure.name,
-          figure_id: figure.id,
-          voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
-        }
-      });
-
-      if (error) throw error;
-
-      if (!data?.audioContent) {
+      if (!audioResult.data?.audioContent) {
         throw new Error('No audio content received from Azure TTS');
       }
 
       // Store the greeting audio for the RealisticAvatar to use
-      console.log('🎤 Greeting audio ready, sending to video generator');
-      setGreetingAudioUrl(data.audioContent);
-      
-      // The audio will play automatically when the video is ready via RealisticAvatar
+      setGreetingAudioUrl(audioResult.data.audioContent);
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);

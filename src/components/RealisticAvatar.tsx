@@ -50,12 +50,12 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
 
         console.log('⏳ Prediction started:', startData.predictionId);
         
-        // Poll for completion
+        // Poll for completion (OPTIMIZED: faster polling interval)
         let attempts = 0;
-        const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+        const maxAttempts = 90; // 90 attempts * 1 second = 1.5 minutes max
         
         while (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second (faster polling)
           
           const { data: checkData, error: checkError } = await supabase.functions.invoke('check-prediction', {
             body: {
