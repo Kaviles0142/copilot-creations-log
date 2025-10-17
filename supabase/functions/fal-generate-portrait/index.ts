@@ -25,12 +25,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check cache for existing v2 portrait
+    // Check cache for existing v3 portrait (workspace/iconic setting focus)
     const { data: cachedImage } = await supabase
       .from('avatar_image_cache')
       .select('cloudinary_url, visual_prompt, created_at')
       .eq('figure_id', figureId)
-      .eq('cache_version', 'v2')
+      .eq('cache_version', 'v3')
       .single();
 
     if (cachedImage) {
@@ -38,7 +38,7 @@ serve(async (req) => {
       const thirtyDays = 30 * 24 * 60 * 60 * 1000;
 
       if (cacheAge < thirtyDays) {
-        console.log('✅ Using cached portrait (v2)');
+        console.log('✅ Using cached portrait (v3)');
         return new Response(
           JSON.stringify({ 
             imageUrl: cachedImage.cloudinary_url,
@@ -86,7 +86,7 @@ serve(async (req) => {
     const imageUrl = result.images[0].url;
     console.log('✅ Image generated:', imageUrl);
 
-    // Cache the result
+    // Cache the result as v3
     await supabase
       .from('avatar_image_cache')
       .upsert({
@@ -94,7 +94,7 @@ serve(async (req) => {
         figure_name: figureName,
         cloudinary_url: imageUrl,
         visual_prompt: environmentalPrompt,
-        cache_version: 'v2',
+        cache_version: 'v3',
         created_at: new Date().toISOString(),
       }, {
         onConflict: 'figure_id,cache_version'
