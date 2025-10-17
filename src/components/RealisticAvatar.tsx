@@ -9,9 +9,10 @@ interface RealisticAvatarProps {
   isLoading?: boolean;
   audioUrl?: string | null;
   onVideoEnd?: () => void;
+  onVideoReady?: (videoUrl: string) => void;
 }
 
-const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd }: RealisticAvatarProps) => {
+const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoReady }: RealisticAvatarProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -71,6 +72,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd }: Realisti
           if (checkData.status === 'succeeded') {
             console.log('✅ Video ready:', checkData.output);
             setVideoUrl(checkData.output);
+            onVideoReady?.(checkData.output); // Notify parent that video is ready
             return;
           } else if (checkData.status === 'failed') {
             throw new Error(checkData.error || 'Video generation failed');

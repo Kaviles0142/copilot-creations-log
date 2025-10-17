@@ -99,6 +99,8 @@ const HistoricalChat = () => {
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
+  const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // Only for first greeting
+  const [hasGeneratedVideo, setHasGeneratedVideo] = useState(false); // Track if we already have a video
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -205,6 +207,7 @@ const HistoricalChat = () => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
+    setHasGeneratedVideo(false); // Reset video state for new figure
     
     try {
       // Step 1: Generate avatar image
@@ -221,16 +224,31 @@ const HistoricalChat = () => {
       setAvatarImageUrl(avatarData.imageUrl);
       setIsLoadingAvatarImage(false);
       
-      // Step 2: Generate and play greeting
+      // Step 2: Generate greeting audio (but DON'T play it yet)
       const greetingText = getGreetingForFigure(figure);
-      console.log('👋 Playing greeting:', greetingText);
+      console.log('👋 Generating greeting audio for video:', greetingText);
       
-      await generateAndPlayTTS(greetingText);
-      
-      toast({
-        title: "Ready to Chat",
-        description: `${figure.name} has greeted you!`,
+      // Generate the TTS but store it for the video generation
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: {
+          text: greetingText,
+          figure_name: figure.name,
+          figure_id: figure.id,
+          voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+        }
       });
+
+      if (error) throw error;
+
+      if (!data?.audioContent) {
+        throw new Error('No audio content received from Azure TTS');
+      }
+
+      // Store the greeting audio for the RealisticAvatar to use
+      console.log('🎤 Greeting audio ready, sending to video generator');
+      setGreetingAudioUrl(data.audioContent);
+      
+      // The audio will play automatically when the video is ready via RealisticAvatar
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -1520,10 +1538,17 @@ const HistoricalChat = () => {
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              audioUrl={currentAudioUrl}
+              audioUrl={hasGeneratedVideo ? null : greetingAudioUrl} // Only pass audio for first video generation
               onVideoEnd={() => {
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
+                setIsGreetingPlaying(false);
+              }}
+              onVideoReady={(videoUrl) => {
+                // Video is ready, now play the greeting audio with the video
+                console.log('✅ Video ready, marking as generated');
+                setHasGeneratedVideo(true);
+                setGreetingAudioUrl(null); // Clear greeting audio after first use
               }}
             />
           </div>
