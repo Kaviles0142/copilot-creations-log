@@ -37,15 +37,16 @@ serve(async (req) => {
       auth: REPLICATE_API_KEY,
     });
 
-    // Use SadTalker model - verified working version from Replicate
+    // Use SadTalker model - lucataco version is actively maintained
     const output = await replicate.run(
-      "cjwbw/sadtalker:a519cc0cfebaaeade068b23899165a11ec76aaa1d2b313d40d214f204ec957a3",
+      "lucataco/sadtalker:85c698db7c0a66d5011435d0191db323034e1da04b912a6d365833141b6a285b",
       {
         input: {
           source_image: imageUrl,
           driven_audio: audioUrl,
           enhancer: "gfpgan",
           preprocess: "full",
+          still: true
         }
       }
     );
