@@ -74,9 +74,22 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
 
   useEffect(() => {
     if (videoRef.current && videoUrl) {
+      console.log('🎬 Setting up video playback with audio');
+      
+      videoRef.current.onloadeddata = () => {
+        console.log('✅ Video loaded, attempting autoplay');
+        videoRef.current?.play().catch(err => {
+          console.error('❌ Video autoplay failed:', err);
+        });
+      };
+      
       videoRef.current.onended = () => {
         console.log('📹 Video playback ended');
         onVideoEnd?.();
+      };
+      
+      videoRef.current.onerror = (err) => {
+        console.error('❌ Video playback error:', err);
       };
     }
   }, [videoUrl, onVideoEnd]);
