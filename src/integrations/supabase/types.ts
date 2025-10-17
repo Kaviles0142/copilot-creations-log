@@ -43,6 +43,7 @@ export type Database = {
       }
       avatar_image_cache: {
         Row: {
+          cache_version: string | null
           cloudinary_url: string
           created_at: string | null
           expires_at: string | null
@@ -53,6 +54,7 @@ export type Database = {
           visual_prompt: string | null
         }
         Insert: {
+          cache_version?: string | null
           cloudinary_url: string
           created_at?: string | null
           expires_at?: string | null
@@ -63,6 +65,7 @@ export type Database = {
           visual_prompt?: string | null
         }
         Update: {
+          cache_version?: string | null
           cloudinary_url?: string
           created_at?: string | null
           expires_at?: string | null
