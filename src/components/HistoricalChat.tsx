@@ -380,6 +380,10 @@ const HistoricalChat = () => {
       // Store BOTH blob URL for playback AND base64 for avatar animation
       setCurrentAudioUrl(data.audioContent); // Store base64 for SadTalker
       
+      // CRITICAL: Trigger new avatar video generation with each response
+      console.log('🎬 Triggering new avatar animation for this response');
+      setHasGeneratedVideo(false); // Reset to allow new video generation
+      
       
       // Set source AFTER handlers
       audioElementRef.current!.src = audioUrl;
