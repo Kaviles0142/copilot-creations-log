@@ -135,16 +135,24 @@ async function generateEnvironmentalPrompt(figureName: string): Promise<string> 
         model: 'google/gemini-2.5-flash',
         messages: [{
           role: 'user',
-          content: `Create a detailed environmental portrait prompt for ${figureName}. Show them in their ICONIC WORKPLACE - lab, office, study, or other significant work environment. Include:
-- Specific workplace setting (lab, desk, study, workshop, etc)
-- Period-accurate scientific equipment, books, or work materials visible
-- Natural lighting from windows or lamps
-- Their characteristic clothing/appearance
-- Focused, thoughtful expression as if working
-- Medium shot showing their workspace and personality
+          content: `Create a detailed environmental portrait prompt for ${figureName} in their MOST ICONIC WORKPLACE or historical moment. This should capture where they made their greatest contributions.
 
-IMPORTANT: Do NOT show them at home or standing casually. Show them WORKING in their iconic environment.
-Keep under 200 words. Start directly with the description.`
+For scientists: Laboratory, observatory, or study with period-accurate equipment
+For writers/artists: Writing desk, studio, or creative workspace with tools
+For leaders/politicians: Office, chamber, or significant historical setting
+For inventors: Workshop with inventions and tools
+For philosophers: Study with books and writing materials
+
+Include:
+- Specific workplace details (equipment, books, tools, documents)
+- Period-accurate setting and clothing
+- Natural or lamp lighting creating dramatic mood
+- Focused, engaged expression (working, thinking, creating)
+- Medium shot showing both subject and environment
+- Historic authenticity
+
+CRITICAL: Show them ACTIVELY ENGAGED in their work - not posed, not at home casually, not just standing. Capture the moment of their greatness.
+Keep under 200 words. Start with the description.`
         }],
       }),
     });
