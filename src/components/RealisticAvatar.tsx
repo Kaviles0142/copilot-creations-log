@@ -153,7 +153,17 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
         src={videoUrl}
         autoPlay
         playsInline
+        muted={false}
+        controls={false}
         className="w-full h-full object-cover"
+        onLoadedData={() => {
+          console.log('✅ Video loaded and ready to play');
+          videoRef.current?.play().catch(err => {
+            console.error('❌ Autoplay blocked:', err);
+          });
+        }}
+        onPlay={() => console.log('▶️ Video started playing')}
+        onEnded={() => console.log('⏹️ Video ended')}
         onError={(e) => {
           console.error('❌ Video playback error:', e);
           setError('Video playback failed');

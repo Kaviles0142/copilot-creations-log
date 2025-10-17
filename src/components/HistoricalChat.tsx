@@ -241,28 +241,11 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Play greeting audio immediately (don't wait for video)
-      console.log('🔊 Playing greeting audio immediately');
-      
-      const audioBlob = base64ToBlob(audioResult.data.audioContent, 'audio/mpeg');
-      const audioPlaybackUrl = URL.createObjectURL(audioBlob);
-      const greetingAudio = new Audio(audioPlaybackUrl);
-      
-      greetingAudio.onended = () => {
-        console.log('✅ Greeting finished');
-        setIsGreetingPlaying(false);
-      };
-      
-      greetingAudio.onerror = () => {
-        console.error('❌ Greeting audio error');
-        setIsGreetingPlaying(false);
-      };
-      
-      await greetingAudio.play();
-      
-      // Also store for potential background video animation
+      // Store data URL for video animation (audio will be synced in video)
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
+      
+      console.log('✅ Greeting audio ready - triggering video generation with synced audio');
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
