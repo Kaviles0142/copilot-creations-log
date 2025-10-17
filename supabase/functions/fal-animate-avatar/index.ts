@@ -87,6 +87,7 @@ serve(async (req) => {
       body: JSON.stringify({
         image_url: imageUrl,
         audio_url: finalAudioUrl,
+        prompt: "Animate this portrait to speak naturally and expressively with the provided audio",
       }),
     });
 

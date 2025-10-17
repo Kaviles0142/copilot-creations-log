@@ -373,20 +373,22 @@ const HistoricalChat = () => {
         setIsSpeaking(false);
       };
       
-      // Convert base64 to audio blob AFTER handlers are attached
-      const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
-      const audioUrl = URL.createObjectURL(audioBlob);
+      // Convert base64 to data URL for edge function
+      const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
       
-      // Store blob URL (not base64) for avatar animation
-      // fal.ai needs a public URL, not base64
-      setCurrentAudioUrl(audioUrl);
+      // Store data URL (not blob) for avatar animation
+      // Edge function will upload it to storage
+      setCurrentAudioUrl(audioDataUrl);
       
       // CRITICAL: Trigger new avatar video generation with each response
       console.log('🎬 Triggering new avatar animation for this response');
       
+      // Create blob for audio playback
+      const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
+      const playbackUrl = URL.createObjectURL(audioBlob);
       
       // Set source AFTER handlers
-      audioElementRef.current!.src = audioUrl;
+      audioElementRef.current!.src = playbackUrl;
       setCurrentAudio(audioElementRef.current!);
       
       // Load and play
