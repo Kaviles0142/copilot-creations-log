@@ -376,9 +376,9 @@ const HistoricalChat = () => {
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      // Store base64 for avatar animation BEFORE setting the audio source
-      // This ensures RealisticAvatar gets the new audio URL
-      setCurrentAudioUrl(data.audioContent);
+      // Store blob URL (not base64) for avatar animation
+      // fal.ai needs a public URL, not base64
+      setCurrentAudioUrl(audioUrl);
       
       // CRITICAL: Trigger new avatar video generation with each response
       console.log('🎬 Triggering new avatar animation for this response');
@@ -793,14 +793,18 @@ const HistoricalChat = () => {
 
           console.log('✅ TTS audio ready, storing for avatar generation');
           
+          // Convert base64 to blob URL for fal.ai
+          const audioBlob = base64ToBlob(ttsData.audioContent, 'audio/mpeg');
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
           // Store the pending response - will be shown when avatar video is ready
           setPendingResponse({
             text: aiResponse,
-            audioUrl: ttsData.audioContent
+            audioUrl: audioUrl // Use blob URL instead of base64
           });
           
           // Store audio URL to trigger avatar generation
-          setCurrentAudioUrl(ttsData.audioContent);
+          setCurrentAudioUrl(audioUrl);
           
           // Message and audio playback will happen in onVideoReady callback
           
