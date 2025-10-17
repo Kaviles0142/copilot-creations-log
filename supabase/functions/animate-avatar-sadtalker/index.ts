@@ -110,7 +110,8 @@ serve(async (req) => {
         driven_audio: finalAudioUrl,
         enhancer: "gfpgan",
         preprocess: "full",
-        still: true
+        still: false,
+        expression_scale: 1.0
       }
     });
 
