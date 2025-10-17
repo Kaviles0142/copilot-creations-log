@@ -193,11 +193,10 @@ const HistoricalChat = () => {
   useEffect(() => {
     if (selectedFigure && voiceCreatedForFigure.current !== selectedFigure.id) {
       voiceCreatedForFigure.current = selectedFigure.id;
-      createAuthenticVoice(selectedFigure);
       const figureLanguage = getFigureLanguage(selectedFigure);
       setSelectedLanguage(figureLanguage);
       
-      // Phase 1: Generate static avatar portrait and play greeting
+      // Generate static avatar portrait and play greeting (ONLY Azure TTS, no Resemble)
       generateAvatarPortraitAndGreeting(selectedFigure);
     }
   }, [selectedFigure]);
