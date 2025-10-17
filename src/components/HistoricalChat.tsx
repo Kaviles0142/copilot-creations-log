@@ -241,23 +241,29 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store the base64 greeting audio (convert to data URL for edge function)
+      // PLAY GREETING AUDIO IMMEDIATELY
+      console.log('🔊 Playing greeting audio for', figure.name);
+      
+      // Create audio element for greeting playback
+      const audioBlob = base64ToBlob(audioResult.data.audioContent, 'audio/mpeg');
+      const audioPlaybackUrl = URL.createObjectURL(audioBlob);
+      const greetingAudio = new Audio(audioPlaybackUrl);
+      
+      greetingAudio.onended = () => {
+        console.log('✅ Greeting audio finished');
+        setIsGreetingPlaying(false);
+      };
+      
+      greetingAudio.onerror = (err) => {
+        console.error('❌ Greeting audio error:', err);
+        setIsGreetingPlaying(false);
+      };
+      
+      await greetingAudio.play();
+      
+      // Also store data URL for potential video animation (runs in background)
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
-      
-      // FALLBACK: Play audio directly if video generation fails
-      // This ensures user hears the greeting even without animation
-      try {
-        const audioBlob = base64ToBlob(audioResult.data.audioContent, 'audio/mpeg');
-        const audioPlaybackUrl = URL.createObjectURL(audioBlob);
-        const fallbackAudio = new Audio(audioPlaybackUrl);
-        fallbackAudio.onended = () => setIsGreetingPlaying(false);
-        await fallbackAudio.play();
-        console.log('🔊 Playing greeting audio directly (fallback mode)');
-      } catch (playError) {
-        console.error('❌ Error playing greeting audio:', playError);
-        setIsGreetingPlaying(false);
-      }
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
