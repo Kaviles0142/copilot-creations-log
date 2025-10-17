@@ -25,6 +25,10 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
       return;
     }
 
+    // Clear previous video to trigger new generation
+    setVideoUrl(null);
+    setError(null);
+
     const generateRealisticVideo = async () => {
       try {
         setIsGenerating(true);
