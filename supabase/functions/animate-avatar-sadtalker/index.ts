@@ -37,9 +37,9 @@ serve(async (req) => {
       auth: REPLICATE_API_KEY,
     });
 
-    // Use SadTalker model for realistic talking head animation
+    // Use SadTalker model - verified working version from Replicate
     const output = await replicate.run(
-      "cjwbw/sadtalker:3aa3dac9353cc4d6bd62a3ed44d471aba1b9380cd20099b3fff8a31e4820c",
+      "cjwbw/sadtalker:a519cc0cfebaaeade068b23899165a11ec76aaa1d2b313d40d214f204ec957a3",
       {
         input: {
           source_image: imageUrl,
