@@ -210,9 +210,9 @@ const HistoricalChat = () => {
     try {
       const greetingText = getGreetingForFigure(figure);
       
-      // OPTIMIZATION: Run FLUX environmental portrait and greeting audio generation IN PARALLEL
+      // OPTIMIZATION: Run fal.ai environmental portrait and greeting audio generation IN PARALLEL
       const [avatarResult, audioResult] = await Promise.all([
-        supabase.functions.invoke('generate-flux-portrait', {
+        supabase.functions.invoke('fal-generate-portrait', {
           body: {
             figureName: figure.name,
             figureId: figure.id
@@ -241,8 +241,12 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store the greeting audio for the RealisticAvatar to use
-      setGreetingAudioUrl(audioResult.data.audioContent);
+      // Convert greeting audio base64 to blob URL for fal.ai
+      const audioBlob = base64ToBlob(audioResult.data.audioContent, 'audio/mpeg');
+      const greetingBlobUrl = URL.createObjectURL(audioBlob);
+      
+      // Store the greeting audio URL for the RealisticAvatar to use
+      setGreetingAudioUrl(greetingBlobUrl);
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
