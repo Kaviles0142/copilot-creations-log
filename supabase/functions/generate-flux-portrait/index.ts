@@ -164,6 +164,7 @@ function generateEnvironmentalPrompt(figureName: string): string {
     'Neil Armstrong': 'in the NASA control room, 1960s, wearing astronaut suit, mission control equipment visible, professional lighting, focused determined expression',
     'Steve Jobs': 'in a minimalist modern office, 1990s, wearing black turtleneck and jeans, clean design aesthetic, Apple products visible, natural diffused lighting, visionary expression',
     'Elon Musk': 'in a futuristic workspace, modern era, surrounded by rockets and technology, wearing casual modern clothing, dramatic industrial lighting, innovative expression',
+    'John F. Kennedy': 'in the Oval Office, early 1960s, sitting at the Resolute Desk with American flag and presidential seal visible, wearing a sharp dark navy suit with thin tie, warm professional lighting through the windows, confident and charismatic expression, iconic Kennedy profile',
   };
 
   // Get environment-specific prompt or use generic fallback
