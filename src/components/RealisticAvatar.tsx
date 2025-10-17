@@ -104,14 +104,31 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd }: Realisti
     }
   }, [videoUrl, onVideoEnd]);
 
-  if (isLoading || isGenerating) {
+  if (isLoading) {
     return (
       <Card className="w-full max-w-md mx-auto aspect-square flex items-center justify-center bg-muted">
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
-          <p className="text-sm text-muted-foreground">
-            {isGenerating ? 'Generating photorealistic avatar...' : 'Loading...'}
-          </p>
+          <p className="text-sm text-muted-foreground">Loading portrait...</p>
+        </div>
+      </Card>
+    );
+  }
+
+  // Show portrait with overlay when generating video
+  if (isGenerating && imageUrl) {
+    return (
+      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+        <img 
+          src={imageUrl} 
+          alt="Avatar" 
+          className="w-full h-full object-cover opacity-50"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
+            <p className="text-sm text-white">Generating photorealistic avatar...</p>
+          </div>
         </div>
       </Card>
     );
