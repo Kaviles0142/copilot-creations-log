@@ -100,7 +100,7 @@ const HistoricalChat = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // Only for first greeting
-  const [hasGeneratedVideo, setHasGeneratedVideo] = useState(false); // Track if we already have a video
+  const [pendingResponse, setPendingResponse] = useState<{text: string, audioUrl: string} | null>(null); // Hold response until video ready
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -206,7 +206,6 @@ const HistoricalChat = () => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
-    setHasGeneratedVideo(false); // Reset video state for new figure
     
     try {
       const greetingText = getGreetingForFigure(figure);
@@ -774,27 +773,55 @@ const HistoricalChat = () => {
         sourcesUsed: sourcesUsed,
       };
 
-      // START TTS IMMEDIATELY - Don't wait for UI updates
-      // This makes audio generation happen in parallel with text display
+      // Generate TTS and prepare for avatar video
       if (aiResponse.length > 20 && isAutoVoiceEnabled) {
         console.log('🎤 IMMEDIATE TTS START for:', selectedFigure!.name);
-        // Fire and forget - don't await, let it run in parallel
-        generateAndPlayTTS(aiResponse).catch(err => {
-          console.error('Background TTS error:', err);
+        
+        try {
+          // Generate TTS audio
+          const { data: ttsData, error: ttsError } = await supabase.functions.invoke('azure-text-to-speech', {
+            body: {
+              text: aiResponse,
+              figure_name: selectedFigure!.name,
+              figure_id: selectedFigure!.id,
+              voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+            }
+          });
+
+          if (ttsError) throw ttsError;
+          if (!ttsData?.audioContent) throw new Error('No audio content received');
+
+          console.log('✅ TTS audio ready, storing for avatar generation');
+          
+          // Store the pending response - will be shown when avatar video is ready
+          setPendingResponse({
+            text: aiResponse,
+            audioUrl: ttsData.audioContent
+          });
+          
+          // Store audio URL to trigger avatar generation
+          setCurrentAudioUrl(ttsData.audioContent);
+          
+          // Message and audio playback will happen in onVideoReady callback
+          
+        } catch (error) {
+          console.error('❌ TTS generation error:', error);
+          // If TTS fails, show message without avatar
+          setMessages(prev => [...prev, assistantMessage]);
+          await saveMessage(assistantMessage, conversationId);
           toast({
             title: "Voice generation failed",
-            description: "Could not generate voice response",
+            description: "Showing text response only",
             variant: "destructive",
-            duration: 2000,
           });
-        });
+        }
+      } else {
+        // No TTS needed, show message immediately
+        setMessages(prev => [...prev, assistantMessage]);
+        await saveMessage(assistantMessage, conversationId);
       }
-
-      // Add message to UI immediately (happens in parallel with TTS generation above)
-      setMessages(prev => [...prev, assistantMessage]);
-      await saveMessage(assistantMessage, conversationId);
       
-      // Reset loading state immediately
+      // Reset loading state
       setIsLoading(false);
       setAbortController(null);
 
@@ -1543,11 +1570,74 @@ const HistoricalChat = () => {
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
               }}
-              onVideoReady={(videoUrl) => {
-                // Video is ready, now play the greeting audio with the video
-                console.log('✅ Video ready, marking as generated');
-                setHasGeneratedVideo(true);
-                setGreetingAudioUrl(null); // Clear greeting audio after first use
+              onVideoReady={async (videoUrl) => {
+                console.log('✅ Video ready, now showing text and playing audio');
+                
+                // If we have a pending response, now show it and play audio
+                if (pendingResponse) {
+                  const assistantMessage: Message = {
+                    id: (Date.now() + 1).toString(),
+                    content: pendingResponse.text,
+                    type: "assistant",
+                    timestamp: new Date(),
+                  };
+                  
+                  // Add message to UI
+                  setMessages(prev => [...prev, assistantMessage]);
+                  if (currentConversationId) {
+                    await saveMessage(assistantMessage, currentConversationId);
+                  }
+                  
+                  // Now play the audio
+                  initializeAudioPipeline();
+                  if (audioContextRef.current!.state === 'suspended') {
+                    await audioContextRef.current!.resume();
+                  }
+                  
+                  if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                  }
+                  
+                  // Set up audio event handlers
+                  audioElementRef.current!.onplay = () => {
+                    console.log('▶️ Audio PLAY event fired');
+                    setIsSpeaking(true);
+                    setIsPlayingAudio(true);
+                  };
+                  
+                  audioElementRef.current!.onended = () => {
+                    console.log('⏹️ Audio ENDED');
+                    setIsSpeaking(false);
+                    setIsPlayingAudio(false);
+                    setCurrentAudio(null);
+                  };
+                  
+                  audioElementRef.current!.onerror = (err) => {
+                    console.error('❌ Audio ERROR:', err);
+                    setIsSpeaking(false);
+                    setIsPlayingAudio(false);
+                  };
+                  
+                  audioElementRef.current!.onpause = () => {
+                    console.log('⏸️ Audio PAUSED');
+                    setIsSpeaking(false);
+                  };
+                  
+                  // Convert base64 to blob and play
+                  const audioBlob = base64ToBlob(pendingResponse.audioUrl, 'audio/mpeg');
+                  const audioUrl = URL.createObjectURL(audioBlob);
+                  audioElementRef.current!.src = audioUrl;
+                  setCurrentAudio(audioElementRef.current!);
+                  audioElementRef.current!.load();
+                  await audioElementRef.current!.play();
+                  
+                  // Clear pending response
+                  setPendingResponse(null);
+                } else {
+                  // For greeting, just clear the greeting audio
+                  setGreetingAudioUrl(null);
+                }
               }}
             />
           </div>
