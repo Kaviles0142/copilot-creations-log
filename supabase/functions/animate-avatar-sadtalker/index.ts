@@ -101,26 +101,27 @@ serve(async (req) => {
       auth: REPLICATE_API_KEY,
     });
 
-    // Use SadTalker model - lucataco version is actively maintained
-    const output = await replicate.run(
-      "lucataco/sadtalker:85c698db7c0a66d5011435d0191db323034e1da04b912a6d365833141b6a285b",
-      {
-        input: {
-          source_image: finalImageUrl,
-          driven_audio: finalAudioUrl,
-          enhancer: "gfpgan",
-          preprocess: "full",
-          still: true
-        }
+    // Use SadTalker model with predictions.create for async processing
+    console.log('🎬 Creating Replicate prediction...');
+    const prediction = await replicate.predictions.create({
+      version: "85c698db7c0a66d5011435d0191db323034e1da04b912a6d365833141b6a285b",
+      input: {
+        source_image: finalImageUrl,
+        driven_audio: finalAudioUrl,
+        enhancer: "gfpgan",
+        preprocess: "full",
+        still: true
       }
-    );
+    });
 
-    console.log("✅ SadTalker animation complete!");
-    console.log("📹 Video URL:", output);
+    console.log("✅ Prediction created:", prediction.id);
+    console.log("⏳ Status:", prediction.status);
 
+    // Return prediction ID immediately - client will poll for completion
     return new Response(
       JSON.stringify({ 
-        videoUrl: output,
+        predictionId: prediction.id,
+        status: prediction.status,
         success: true 
       }), 
       {

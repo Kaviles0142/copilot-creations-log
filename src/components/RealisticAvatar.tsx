@@ -27,27 +27,59 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd }: Realisti
       try {
         setIsGenerating(true);
         setError(null);
-        console.log('🎬 Generating realistic avatar video...');
+        console.log('🎬 Starting realistic avatar generation...');
         console.log('📸 Image:', imageUrl);
         console.log('🎤 Audio:', audioUrl);
 
-        const { data, error } = await supabase.functions.invoke('animate-avatar-sadtalker', {
+        // Start the generation
+        const { data: startData, error: startError } = await supabase.functions.invoke('animate-avatar-sadtalker', {
           body: {
             imageUrl,
             audioUrl
           }
         });
 
-        if (error) {
-          throw error;
+        if (startError) {
+          throw startError;
         }
 
-        if (!data?.videoUrl) {
-          throw new Error('No video URL returned from SadTalker');
+        if (!startData?.predictionId) {
+          throw new Error('No prediction ID returned');
         }
 
-        console.log('✅ Realistic video generated:', data.videoUrl);
-        setVideoUrl(data.videoUrl);
+        console.log('⏳ Prediction started:', startData.predictionId);
+        
+        // Poll for completion
+        let attempts = 0;
+        const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+        
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          
+          const { data: checkData, error: checkError } = await supabase.functions.invoke('check-prediction', {
+            body: {
+              predictionId: startData.predictionId
+            }
+          });
+
+          if (checkError) {
+            throw checkError;
+          }
+
+          console.log(`📊 Status check ${attempts + 1}:`, checkData.status);
+
+          if (checkData.status === 'succeeded') {
+            console.log('✅ Video ready:', checkData.output);
+            setVideoUrl(checkData.output);
+            return;
+          } else if (checkData.status === 'failed') {
+            throw new Error(checkData.error || 'Video generation failed');
+          }
+
+          attempts++;
+        }
+
+        throw new Error('Video generation timed out');
         
       } catch (err) {
         console.error('❌ Error generating realistic avatar:', err);
