@@ -14,7 +14,7 @@ import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import ConversationHistory from "./ConversationHistory";
-import AnimatedAvatar from "./AnimatedAvatar";
+import RealisticAvatar from "./RealisticAvatar";
 
 import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,10 +94,11 @@ const HistoricalChat = () => {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const [isGreetingPlaying, setIsGreetingPlaying] = useState(false); // Track if greeting is playing
   
-  // Phase 1 avatar state
+  // Realistic avatar state
   const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -362,6 +363,9 @@ const HistoricalChat = () => {
       // Convert base64 to audio blob AFTER handlers are attached
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Store audio URL for realistic avatar animation
+      setCurrentAudioUrl(audioUrl);
       
       // Set source AFTER handlers
       audioElementRef.current!.src = audioUrl;
@@ -1509,15 +1513,17 @@ const HistoricalChat = () => {
           )}
         </div>
 
-        {/* Animated Avatar - Phase 1 */}
+        {/* Realistic Avatar - Sora-Level */}
         {selectedFigure && (
           <div className="border-b border-border bg-card px-6 py-4">
-            <AnimatedAvatar 
+            <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              isSpeaking={isSpeaking}
-              audioElement={currentAudio}
-              analyser={analyserRef.current}
+              audioUrl={currentAudioUrl}
+              onVideoEnd={() => {
+                setIsSpeaking(false);
+                setIsPlayingAudio(false);
+              }}
             />
           </div>
         )}
