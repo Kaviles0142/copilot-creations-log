@@ -8,34 +8,16 @@ interface RealisticAvatarProps {
   imageUrl: string | null;
   isLoading?: boolean;
   audioUrl?: string | null;
-  cachedVideoUrl?: string | null;
-  figureId?: string;
   onVideoEnd?: () => void;
-  onVideoReady?: (videoUrl: string) => void;
 }
 
-const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, cachedVideoUrl, figureId, onVideoEnd, onVideoReady }: RealisticAvatarProps) => {
+const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd }: RealisticAvatarProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Use cached video if available
   useEffect(() => {
-    if (cachedVideoUrl) {
-      console.log('⚡ Using cached greeting video');
-      setVideoUrl(cachedVideoUrl);
-      setIsGenerating(false);
-      onVideoReady?.(cachedVideoUrl);
-    }
-  }, [cachedVideoUrl, onVideoReady]);
-
-  useEffect(() => {
-    // Skip if we already have a cached video
-    if (cachedVideoUrl) {
-      return;
-    }
-    
     if (!imageUrl || !audioUrl) {
       console.log('⏸️ No image or audio URL provided');
       return;
@@ -89,19 +71,6 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, cachedVideoUrl, figure
           if (checkData.status === 'succeeded') {
             console.log('✅ Video ready:', checkData.output);
             setVideoUrl(checkData.output);
-            onVideoReady?.(checkData.output);
-            
-            // Save video URL to cache for future use
-            if (figureId) {
-              console.log('💾 Saving greeting video to cache');
-              supabase.functions.invoke('update-greeting-video', {
-                body: {
-                  figureId,
-                  greetingVideoUrl: checkData.output,
-                }
-              }).catch(err => console.error('Failed to cache greeting video:', err));
-            }
-            
             return;
           } else if (checkData.status === 'failed') {
             throw new Error(checkData.error || 'Video generation failed');
@@ -124,7 +93,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, cachedVideoUrl, figure
     };
 
     generateRealisticVideo();
-  }, [imageUrl, audioUrl, cachedVideoUrl, figureId, onVideoReady]);
+  }, [imageUrl, audioUrl]);
 
   useEffect(() => {
     if (videoRef.current && videoUrl) {

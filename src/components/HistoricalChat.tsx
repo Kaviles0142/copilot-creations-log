@@ -99,9 +99,6 @@ const HistoricalChat = () => {
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
-  const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // Only for first greeting
-  const [hasGeneratedVideo, setHasGeneratedVideo] = useState(false); // Track if we already have a video
-  const [cachedGreetingVideoUrl, setCachedGreetingVideoUrl] = useState<string | null>(null); // Cached greeting video
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -208,11 +205,9 @@ const HistoricalChat = () => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
-    setHasGeneratedVideo(false);
-    setCachedGreetingVideoUrl(null);
     
     try {
-      // Step 1: Generate/fetch avatar image
+      // Step 1: Generate avatar image
       const { data: avatarData, error: avatarError } = await supabase.functions.invoke('generate-avatar-portrait', {
         body: {
           figureName: figure.name,
@@ -226,41 +221,16 @@ const HistoricalChat = () => {
       setAvatarImageUrl(avatarData.imageUrl);
       setIsLoadingAvatarImage(false);
       
-      // Check if we have a cached greeting video
-      if (avatarData.greetingVideoUrl) {
-        console.log('⚡ Using cached greeting video - instant playback!');
-        setCachedGreetingVideoUrl(avatarData.greetingVideoUrl);
-        setHasGeneratedVideo(true);
-        setIsGreetingPlaying(false); // Video will play immediately
-        
-        toast({
-          title: "Ready to Chat",
-          description: `${figure.name} is ready!`,
-        });
-        return;
-      }
-      
-      // No cached video - generate greeting audio for video creation
+      // Step 2: Generate and play greeting
       const greetingText = getGreetingForFigure(figure);
-      console.log('👋 Generating greeting audio for new video:', greetingText);
+      console.log('👋 Playing greeting:', greetingText);
       
-      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
-        body: {
-          text: greetingText,
-          figure_name: figure.name,
-          figure_id: figure.id,
-          voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
-        }
+      await generateAndPlayTTS(greetingText);
+      
+      toast({
+        title: "Ready to Chat",
+        description: `${figure.name} has greeted you!`,
       });
-
-      if (error) throw error;
-
-      if (!data?.audioContent) {
-        throw new Error('No audio content received from Azure TTS');
-      }
-
-      console.log('🎤 Greeting audio ready, will generate video');
-      setGreetingAudioUrl(data.audioContent);
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -1550,18 +1520,10 @@ const HistoricalChat = () => {
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              audioUrl={hasGeneratedVideo ? null : greetingAudioUrl}
-              cachedVideoUrl={cachedGreetingVideoUrl}
-              figureId={selectedFigure.id}
+              audioUrl={currentAudioUrl}
               onVideoEnd={() => {
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
-                setIsGreetingPlaying(false);
-              }}
-              onVideoReady={(videoUrl) => {
-                console.log('✅ Video generated and cached');
-                setHasGeneratedVideo(true);
-                setGreetingAudioUrl(null);
               }}
             />
           </div>
