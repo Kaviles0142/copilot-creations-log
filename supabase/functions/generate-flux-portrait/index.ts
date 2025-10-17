@@ -24,7 +24,8 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Check cache first
+    // Check cache first (v2 = environmental scenes, v1 = old portraits)
+    const CACHE_VERSION = 'v2';
     const cacheResponse = await fetch(`${SUPABASE_URL}/rest/v1/avatar_image_cache?figure_id=eq.${figureId}&select=*`, {
       headers: {
         'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -34,7 +35,8 @@ serve(async (req) => {
 
     if (cacheResponse.ok) {
       const cached = await cacheResponse.json();
-      if (cached && cached.length > 0 && cached[0].cloudinary_url) {
+      // Only use cache if it has v2 (environmental) version
+      if (cached && cached.length > 0 && cached[0].cloudinary_url && cached[0].cache_version === CACHE_VERSION) {
         console.log('✅ Using cached FLUX portrait:', cached[0].cloudinary_url);
         return new Response(JSON.stringify({
           imageUrl: cached[0].cloudinary_url,
@@ -42,6 +44,8 @@ serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      } else if (cached && cached.length > 0) {
+        console.log('🔄 Old cache version found, regenerating...');
       }
     }
 
@@ -97,6 +101,7 @@ serve(async (req) => {
           figure_name: figureName,
           cloudinary_url: imageUrl,
           visual_prompt: prompt,
+          cache_version: 'v2', // Mark as environmental scene version
         }),
       });
       console.log('💾 FLUX portrait cached successfully');
