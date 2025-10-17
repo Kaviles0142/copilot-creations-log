@@ -129,51 +129,7 @@ serve(async (req) => {
 });
 
 async function generateEnvironmentalPrompt(figureName: string): Promise<string> {
-  // Map historical figures to their characteristic environments
-  const environments: Record<string, string> = {
-    'Albert Einstein': 'in his Princeton office, 1940s, sitting at a wooden desk covered with physics papers and equations, chalkboards with E=mc² and relativity formulas visible in the background, warm afternoon sunlight streaming through tall windows, period-accurate dark suit, messy gray hair, thoughtful expression',
-    'Marie Curie': 'in her laboratory at the Radium Institute, Paris, early 1900s, surrounded by glass beakers and scientific equipment, wearing a dark Victorian-era dress with a white lab coat, soft natural lighting from large windows, determined expression',
-    'Leonardo da Vinci': 'in his Renaissance workshop studio, Florence, 1490s, surrounded by anatomical sketches and engineering drawings, wooden work tables with brushes and sketches, warm candlelight, wearing period-accurate Renaissance clothing',
-    'Cleopatra': 'in the royal palace of Alexandria, ancient Egypt, adorned with gold jewelry and royal headdress, ornate Egyptian columns and hieroglyphs in the background, warm golden lighting, regal posture',
-    'Winston Churchill': 'in the Cabinet War Rooms, London, 1940s, sitting at a desk with maps and documents, cigar in hand, wearing a dark suit, dramatic wartime lighting, determined expression',
-    'Abraham Lincoln': 'in the White House office, 1860s, sitting at a wooden desk with documents and quill pen, period-accurate dark suit with bow tie, warm candlelight, thoughtful expression',
-    'Mahatma Gandhi': 'sitting cross-legged in a simple room with white walls, wearing traditional dhoti and glasses, spinning wheel visible in the background, soft natural daylight, peaceful expression',
-    'Nelson Mandela': 'in his office during the 1990s, wearing a colorful traditional shirt, South African flag visible, warm professional lighting, confident and dignified expression',
-    'Martin Luther King Jr.': 'at his desk preparing a speech, 1960s, wearing a dark suit and tie, American flag in the background, warm office lighting, inspired expression',
-    'Rosa Parks': 'sitting with dignity, 1950s, wearing period-accurate modest dress, soft portrait lighting, determined and peaceful expression',
-    'Nikola Tesla': 'in his laboratory workshop, 1890s, surrounded by electrical coils and scientific equipment, dramatic lighting with electrical sparks visible in the background, period-accurate dark suit, intense focused expression',
-    'Charles Darwin': 'in his study at Down House, 1870s, surrounded by specimen jars and botanical samples, writing desk covered with notes, warm natural lighting, white beard, contemplative expression',
-    'Jane Austen': 'in her writing room, early 1800s England, sitting at a small wooden writing desk with quill and papers, wearing a Regency-era dress, soft natural window lighting, thoughtful expression',
-    'Galileo Galilei': 'in his observatory tower, 1630s Italy, with telescope and astronomical charts, wearing Renaissance-era clothing, dramatic lighting from candles and the night sky visible through windows',
-    'Shakespeare': 'in his writing chamber at the Globe Theatre, 1600s, wooden desk covered with manuscripts and quill pens, Tudor-era clothing, warm candlelight, creative expression',
-    'Socrates': 'in an ancient Greek courtyard, 5th century BC Athens, wearing traditional toga, stone columns and Mediterranean sunlight, surrounded by scrolls, engaged in thought',
-    'Confucius': 'in a traditional Chinese study, ancient China, wearing traditional scholar robes, bamboo scrolls and calligraphy visible, soft natural lighting, wise expression',
-    'Buddha': 'meditating under the Bodhi tree, ancient India, wearing simple robes, peaceful garden setting with soft dappled sunlight, serene expression',
-    'Mozart': 'at his harpsichord in 18th century Vienna, wearing period-accurate powdered wig and ornate coat, sheet music scattered around, warm candlelit room, passionate expression',
-    'Beethoven': 'in his chaotic music studio, early 1800s Vienna, at the piano surrounded by scattered sheet music, wearing disheveled period clothing, dramatic lighting, intense expression',
-    'Frida Kahlo': 'in her Casa Azul studio, 1940s Mexico, surrounded by colorful paintings and Mexican folk art, wearing traditional Tehuana dress with flowers in her hair, vibrant natural lighting',
-    'Van Gogh': 'in his artist studio, 1880s France, surrounded by canvases and paint tubes, wearing paint-stained clothes, dramatic sunlight through windows, passionate expression',
-    'Pablo Picasso': 'in his Montmartre studio, 1920s Paris, surrounded by cubist paintings and sculptures, wearing a striped shirt, dramatic artistic lighting, creative intensity',
-    'Ernest Hemingway': 'at his writing desk in Key West, 1930s, wearing a simple shirt, typewriter and papers visible, fishing trophies on the wall, warm Florida sunlight',
-    'Virginia Woolf': 'in her Bloomsbury study, 1920s London, at her writing desk surrounded by books, wearing period-accurate dress, soft natural window lighting, contemplative expression',
-    'Mark Twain': 'in his Hartford study, 1880s, at his desk with pen and papers, wearing white suit, smoking a cigar, warm lamp lighting, humorous expression',
-    'Harriet Tubman': 'portrait with determined expression, 1860s, wearing period-accurate clothing, soft natural lighting, background suggesting the Underground Railroad era',
-    'Frederick Douglass': 'in his study, 1870s, at a desk with books and papers, wearing formal Victorian suit, dramatic portrait lighting, powerful dignified expression',
-    'Susan B. Anthony': 'in her office, 1890s, surrounded by suffrage pamphlets and documents, wearing Victorian-era dress, determined expression, natural window lighting',
-    'Amelia Earhart': 'standing by her aircraft, 1930s, wearing flight jacket and goggles, airplane propeller visible in background, golden hour lighting, adventurous expression',
-    'Neil Armstrong': 'in the NASA control room, 1960s, wearing astronaut suit, mission control equipment visible, professional lighting, focused determined expression',
-    'Steve Jobs': 'in a minimalist modern office, 1990s, wearing black turtleneck and jeans, clean design aesthetic, Apple products visible, natural diffused lighting, visionary expression',
-    'Elon Musk': 'in a futuristic workspace, modern era, surrounded by rockets and technology, wearing casual modern clothing, dramatic industrial lighting, innovative expression',
-    'John F. Kennedy': 'in the Oval Office, early 1960s, sitting at the Resolute Desk with American flag and presidential seal visible, wearing a sharp dark navy suit with thin tie, warm professional lighting through the windows, confident and charismatic expression, iconic Kennedy profile',
-  };
-
-  // If we have a predefined environment, use it
-  if (environments[figureName]) {
-    const environmentDetail = environments[figureName];
-    return `Photorealistic scene of ${figureName} ${environmentDetail}. Ultra high resolution, 8K quality, cinematic composition, historically accurate, masterpiece quality, photo-realistic environmental photography. The subject should be naturally positioned within their environment, with clear facial features visible for animation. Professional lighting and composition.`;
-  }
-
-  // Otherwise, use Lovable AI to generate a detailed environmental prompt
+  // Use Lovable AI to generate a detailed environmental prompt for ANY figure
   console.log(`🤖 Generating AI prompt for ${figureName}...`);
   
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
