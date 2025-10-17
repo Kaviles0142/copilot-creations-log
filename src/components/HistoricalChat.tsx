@@ -241,12 +241,9 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Convert greeting audio base64 to blob URL for fal.ai
-      const audioBlob = base64ToBlob(audioResult.data.audioContent, 'audio/mpeg');
-      const greetingBlobUrl = URL.createObjectURL(audioBlob);
-      
-      // Store the greeting audio URL for the RealisticAvatar to use
-      setGreetingAudioUrl(greetingBlobUrl);
+      // Store the base64 greeting audio (convert to data URL for edge function)
+      const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
+      setGreetingAudioUrl(greetingDataUrl);
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);

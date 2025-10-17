@@ -135,14 +135,16 @@ async function generateEnvironmentalPrompt(figureName: string): Promise<string> 
         model: 'google/gemini-2.5-flash',
         messages: [{
           role: 'user',
-          content: `Create a detailed environmental portrait prompt for ${figureName}. The scene should capture their most iconic historical moment or setting with photorealistic detail. Include:
-- Specific historical location and time period
-- Environmental details (weather, lighting, surroundings)
+          content: `Create a detailed environmental portrait prompt for ${figureName}. Show them in their ICONIC WORKPLACE - lab, office, study, or other significant work environment. Include:
+- Specific workplace setting (lab, desk, study, workshop, etc)
+- Period-accurate scientific equipment, books, or work materials visible
+- Natural lighting from windows or lamps
 - Their characteristic clothing/appearance
-- Emotional expression fitting the moment
-- Camera angle and composition
+- Focused, thoughtful expression as if working
+- Medium shot showing their workspace and personality
 
-Keep it under 200 words. Start directly with the description, no preamble.`
+IMPORTANT: Do NOT show them at home or standing casually. Show them WORKING in their iconic environment.
+Keep under 200 words. Start directly with the description.`
         }],
       }),
     });
@@ -162,5 +164,5 @@ Keep it under 200 words. Start directly with the description, no preamble.`
 }
 
 function getFallbackPrompt(figureName: string): string {
-  return `Photorealistic environmental portrait of ${figureName} in their most iconic historical setting, dramatic natural lighting, detailed facial features, period-accurate clothing, expressive eyes, cinematic composition, ultra high resolution, 8K, masterpiece quality`;
+  return `Photorealistic environmental portrait of ${figureName} in their iconic workplace - laboratory, office, or study with period-accurate scientific equipment and books visible, seated at desk or workbench, focused expression, natural window lighting, detailed facial features, period-accurate clothing, cinematic composition, ultra high resolution, 8K, masterpiece quality, professional photography`;
 }
