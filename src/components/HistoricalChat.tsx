@@ -1647,10 +1647,8 @@ const HistoricalChat = () => {
                     setIsSpeaking(false);
                   };
                   
-                  // Convert base64 to blob and play
-                  const audioBlob = base64ToBlob(pendingResponse.audioUrl, 'audio/mpeg');
-                  const audioUrl = URL.createObjectURL(audioBlob);
-                  audioElementRef.current!.src = audioUrl;
+                  // pendingResponse.audioUrl is already a blob URL, use it directly
+                  audioElementRef.current!.src = pendingResponse.audioUrl;
                   setCurrentAudio(audioElementRef.current!);
                   audioElementRef.current!.load();
                   await audioElementRef.current!.play();
