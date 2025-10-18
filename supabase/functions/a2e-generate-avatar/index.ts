@@ -109,7 +109,8 @@ serve(async (req) => {
     while (attempts < maxAttempts && !videoUrl) {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       
-      const statusResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/detail/${taskId}`, {
+      // Try the direct endpoint without /detail
+      const statusResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/${taskId}`, {
         headers: {
           'Authorization': `Bearer ${A2E_API_KEY}`,
         },
