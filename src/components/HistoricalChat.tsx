@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import VoiceCloningManager from '@/components/VoiceCloningManager';
 import { Button } from "@/components/ui/button";
@@ -176,12 +176,26 @@ const HistoricalChat = () => {
     }
   }, [selectedLanguage]);
 
+  // Clear avatar cache on component mount
+  useEffect(() => {
+    const clearCache = async () => {
+      console.log('🧹 Clearing avatar cache on mount...');
+      try {
+        await supabase.functions.invoke('clear-avatar-cache');
+        console.log('✅ Avatar cache cleared successfully');
+      } catch (error) {
+        console.error('Failed to clear avatar cache:', error);
+      }
+    };
+    clearCache();
+  }, []);
+
   // Initialize speech synthesis voices
   useEffect(() => {
     const loadVoices = () => {
       const voices = speechSynthesis.getVoices();
       setAvailableVoices(voices);
-    };
+  };
 
     loadVoices();
     speechSynthesis.onvoiceschanged = loadVoices;
