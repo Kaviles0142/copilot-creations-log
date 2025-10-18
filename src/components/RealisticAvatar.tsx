@@ -38,67 +38,33 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
     const generateVideo = async () => {
       try {
         setIsGenerating(true);
-        setGenerationStatus('Generating animated avatar...');
-        console.log('🎬 Starting A2E avatar generation');
+        setGenerationStatus('Generating animated avatar with Fal.ai...');
+        console.log('🎬 Starting Fal.ai avatar generation');
 
-        // Start generation and get taskId
-        const { data, error } = await supabase.functions.invoke('a2e-generate-avatar', {
+        const { data, error } = await supabase.functions.invoke('fal-animate-avatar', {
           body: {
             imageUrl,
             audioUrl,
-            figureName: 'Historical Figure',
           },
         });
 
         if (error) {
-          console.error('❌ A2E generation error:', error);
+          console.error('❌ Fal.ai generation error:', error);
           throw error;
         }
 
-        if (!data.success || !data.taskId) {
-          throw new Error(data.error || 'Failed to start generation');
+        if (!data.videoUrl) {
+          throw new Error(data.error || 'Failed to generate video');
         }
 
-        console.log('✅ Generation started, taskId:', data.taskId);
-        
-        // Poll for completion
-        const maxAttempts = 60;
-        let attempts = 0;
-        
-        while (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          const { data: statusData, error: statusError } = await supabase.functions.invoke('a2e-check-status', {
-            body: { taskId: data.taskId }
-          });
+        console.log('✅ Video generated:', data.videoUrl);
+        setVideoUrl(data.videoUrl);
+        setError(null);
+        setIsGenerating(false);
 
-          if (statusError) {
-            console.error('Status check error:', statusError);
-            attempts++;
-            continue;
-          }
-
-          console.log(`📊 Status ${attempts + 1}:`, statusData.status);
-          setGenerationStatus(`Processing... (${attempts * 5}s)`);
-
-          if (statusData.status === 'completed' && statusData.videoUrl) {
-            console.log('✅ Video ready:', statusData.videoUrl);
-            setVideoUrl(statusData.videoUrl);
-            setError(null);
-            setIsGenerating(false);
-
-            if (onVideoReady) {
-              onVideoReady(statusData.videoUrl);
-            }
-            return;
-          } else if (statusData.status === 'failed' || statusData.status === 'error') {
-            throw new Error('Generation failed');
-          }
-
-          attempts++;
+        if (onVideoReady) {
+          onVideoReady(data.videoUrl);
         }
-
-        throw new Error('Generation timed out');
       } catch (err) {
         console.error('❌ Failed to generate avatar video:', err);
         setError('Failed to generate avatar video');
