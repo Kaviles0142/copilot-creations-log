@@ -35,13 +35,29 @@ export const StreamingAvatar = ({ avatarId, onReady, onError }: StreamingAvatarP
           body: { avatar_id: avatarId, expire_seconds: 3600 }
         });
 
-        if (tokenError || !tokenData) {
-          throw new Error('Failed to get streaming token');
+        console.log('Raw response:', { tokenData, tokenError });
+
+        if (tokenError) {
+          console.error('Token error:', tokenError);
+          throw new Error(`Token error: ${tokenError.message || JSON.stringify(tokenError)}`);
+        }
+
+        if (!tokenData) {
+          throw new Error('No token data received from A2E');
         }
 
         console.log('✅ Token received:', tokenData);
 
-        const { appId, channel, token, uid } = tokenData;
+        // Extract data from A2E response structure
+        const agoraData = tokenData.data || tokenData;
+        
+        // Validate required fields
+        if (!agoraData.appId || !agoraData.channel || !agoraData.token || !agoraData.uid) {
+          console.error('Missing required fields in token data:', agoraData);
+          throw new Error(`Missing required fields. Got: ${JSON.stringify(agoraData)}`);
+        }
+
+        const { appId, channel, token, uid } = agoraData;
         channelRef.current = channel;
 
         // Create Agora client
