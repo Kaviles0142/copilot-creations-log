@@ -812,20 +812,23 @@ const HistoricalChat = () => {
 
           console.log('✅ TTS audio ready, storing for avatar generation');
           
-          // Convert base64 to blob URL for fal.ai
+          // Create data URL for edge function (can be uploaded to storage)
+          const audioDataUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
+          
+          // Create blob URL for local audio playback
           const audioBlob = base64ToBlob(ttsData.audioContent, 'audio/mpeg');
-          const audioUrl = URL.createObjectURL(audioBlob);
+          const audioBlobUrl = URL.createObjectURL(audioBlob);
           
           // Store the pending response - will be shown when avatar video is ready
-          console.log('📝 Storing pending response with audio URL:', audioUrl.substring(0, 50));
+          console.log('📝 Storing pending response with blob URL for playback');
           setPendingResponse({
             text: aiResponse,
-            audioUrl: audioUrl // Use blob URL instead of base64
+            audioUrl: audioBlobUrl // Use blob URL for playback
           });
           
-          // Store audio URL to trigger avatar generation
-          console.log('🎬 Setting currentAudioUrl to trigger new avatar video');
-          setCurrentAudioUrl(audioUrl);
+          // Store data URL to trigger avatar generation (edge function needs data URL)
+          console.log('🎬 Setting currentAudioUrl (data URL) to trigger new avatar video');
+          setCurrentAudioUrl(audioDataUrl);
           
           // Message and audio playback will happen in onVideoReady callback
           
