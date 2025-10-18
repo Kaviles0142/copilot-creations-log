@@ -33,7 +33,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
       try {
         setIsGenerating(true);
         setError(null);
-        console.log('🎬 Starting avatar animation with fal.ai');
+        console.log('🎬 Starting A2E avatar generation');
         console.log('📸 Image:', imageUrl);
         console.log('🎤 Audio:', audioUrl);
 

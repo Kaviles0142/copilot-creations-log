@@ -6,6 +6,10 @@ verify_jwt = false
 [functions.fal-animate-avatar]
 verify_jwt = false
 
+[functions.a2e-generate-avatar]
+verify_jwt = false
+
+
 [api]
 enabled = true
 port = 54321

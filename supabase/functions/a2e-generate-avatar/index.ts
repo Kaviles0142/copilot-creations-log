@@ -87,7 +87,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Failed to generate avatar video',
+        error: error instanceof Error ? error.message : 'Failed to generate avatar video',
       }),
       {
         status: 500,
