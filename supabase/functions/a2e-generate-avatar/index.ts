@@ -22,7 +22,7 @@ serve(async (req) => {
       throw new Error('A2E_API_KEY not configured');
     }
 
-    console.log('🎬 Generating A2E avatar video');
+    console.log('🎬 Generating Talking Photo with A2E');
 
     // Step 1: Upload audio to Supabase storage if it's a data URL
     let publicAudioUrl = audioUrl;
@@ -63,75 +63,44 @@ serve(async (req) => {
 
     const BASE_URL = 'https://video.a2e.ai';
     
-    // Step 2: Get list of available avatars to find a valid anchor_id
-    console.log('Step 2: Fetching available avatars...');
-    const avatarsResponse = await fetch(`${BASE_URL}/api/v1/anchor/character_list?type=0`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${A2E_API_KEY}`,
-      },
-    });
-
-    if (!avatarsResponse.ok) {
-      const error = await avatarsResponse.text();
-      console.error('❌ Failed to fetch avatars:', error);
-      throw new Error(`Failed to fetch avatars: ${error}`);
-    }
-
-    const avatarsData = await avatarsResponse.json();
-    
-    // Use the first available public avatar
-    const firstAvatar = avatarsData.data?.[0];
-    if (!firstAvatar || !firstAvatar._id) {
-      throw new Error('No public avatars available');
-    }
-    
-    const anchorId = firstAvatar._id;
-    console.log('✅ Using avatar:', firstAvatar.name || 'Unknown', 'ID:', anchorId);
-    
-    // Step 3: Start video generation
-    console.log('Step 3: Generating video with A2E...');
-    const generateVideoResponse = await fetch(`${BASE_URL}/api/v1/video/generate`, {
+    // Step 2: Start Talking Photo generation
+    console.log('Step 2: Starting Talking Photo generation...');
+    const startResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/start`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${A2E_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title: `${figureName} Avatar`,
-        anchor_id: anchorId,
-        anchor_type: 0,
-        audioSrc: publicAudioUrl,
-        web_bg_width: 0,
-        web_bg_height: 0,
-        web_people_width: 0,
-        web_people_height: 0,
-        web_people_x: 0,
-        web_people_y: 0,
-        isSkipRs: true,
+        name: `${figureName} Talking Avatar`,
+        image_url: imageUrl,
+        audio_url: publicAudioUrl,
+        duration: 10,
+        prompt: "speaking, looking at the camera, detailed eyes, clear teeth, static view point, still background, elegant, clear facial features, stable camera, professional shooting angle",
+        negative_prompt: "vivid colors, overexposed, flickering, blurry details, subtitles, logo, style, artwork, painting, image, static, overall grayish, worst quality, low quality, JPEG compression artifacts, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, motionless person, cluttered background, three legs, crowded background, walking backwards"
       }),
     });
 
-    if (!generateVideoResponse.ok) {
-      const error = await generateVideoResponse.text();
-      console.error('❌ Video generation failed:', error);
-      throw new Error(`Video generation failed: ${error}`);
+    if (!startResponse.ok) {
+      const error = await startResponse.text();
+      console.error('❌ Talking Photo start failed:', error);
+      throw new Error(`Talking Photo start failed: ${error}`);
     }
 
-    const videoData = await generateVideoResponse.json();
-    const taskId = videoData.data?._id || videoData._id;
-    console.log('✅ Video generation started, task ID:', taskId);
+    const startData = await startResponse.json();
+    const taskId = startData.data?.id || startData.id;
+    console.log('✅ Talking Photo task started, ID:', taskId);
 
-    // Step 4: Poll for completion
-    console.log('Step 4: Polling for video completion...');
+    // Step 3: Poll for completion
+    console.log('Step 3: Polling for completion...');
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max (5 second intervals)
+    const maxAttempts = 60; // 5 minutes max
     let videoUrl = null;
 
     while (attempts < maxAttempts && !videoUrl) {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       
-      const statusResponse = await fetch(`${BASE_URL}/api/v1/video/status/${taskId}`, {
+      const statusResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/detail/${taskId}`, {
         headers: {
           'Authorization': `Bearer ${A2E_API_KEY}`,
         },
@@ -139,13 +108,16 @@ serve(async (req) => {
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
-        console.log(`📊 Status check ${attempts + 1}: ${statusData.status || 'processing'}`);
+        console.log(`📊 Status check ${attempts + 1}: ${statusData.data?.status || statusData.status || 'processing'}`);
         
-        if (statusData.status === 'completed' && statusData.videoUrl) {
-          videoUrl = statusData.videoUrl;
+        const status = statusData.data?.status || statusData.status;
+        const result = statusData.data?.result || statusData.result;
+        
+        if (status === 'completed' && result) {
+          videoUrl = result;
           console.log('✅ Video ready:', videoUrl);
-        } else if (statusData.status === 'failed') {
-          throw new Error('Video generation failed');
+        } else if (status === 'failed') {
+          throw new Error('Talking Photo generation failed');
         }
       }
       
@@ -153,7 +125,7 @@ serve(async (req) => {
     }
 
     if (!videoUrl) {
-      throw new Error('Video generation timed out');
+      throw new Error('Talking Photo generation timed out');
     }
 
     return new Response(
