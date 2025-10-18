@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,18 +15,56 @@ serve(async (req) => {
   try {
     const { imageUrl, audioUrl, figureName } = await req.json();
     const A2E_API_KEY = Deno.env.get('A2E_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!A2E_API_KEY) {
       throw new Error('A2E_API_KEY not configured');
     }
 
     console.log('🎬 Generating A2E avatar video');
-    console.log('🎤 Audio URL:', audioUrl);
+
+    // Step 1: Upload audio to Supabase storage if it's a data URL
+    let publicAudioUrl = audioUrl;
+    
+    if (audioUrl.startsWith('data:')) {
+      console.log('📤 Uploading audio to storage...');
+      
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+      
+      // Convert base64 to blob
+      const base64Data = audioUrl.split(',')[1];
+      const audioBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      
+      // Upload to storage
+      const fileName = `a2e-audio-${Date.now()}.mp3`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('audio-files')
+        .upload(fileName, audioBuffer, {
+          contentType: 'audio/mpeg',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('❌ Audio upload failed:', uploadError);
+        throw new Error('Failed to upload audio to storage');
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('audio-files')
+        .getPublicUrl(fileName);
+      
+      publicAudioUrl = publicUrl;
+      console.log('✅ Audio uploaded:', publicAudioUrl);
+    }
+
+    console.log('🎤 Using audio URL:', publicAudioUrl);
 
     const BASE_URL = 'https://video.a2e.ai';
     
-    // Step 1: Start video generation
-    console.log('Step 1: Generating video with public avatar...');
+    // Step 2: Start video generation
+    console.log('Step 2: Generating video with A2E...');
     const generateVideoResponse = await fetch(`${BASE_URL}/api/v1/video/generate`, {
       method: 'POST',
       headers: {
@@ -36,7 +75,7 @@ serve(async (req) => {
         title: `${figureName} Avatar`,
         anchor_id: 'default',
         anchor_type: 0,
-        audioSrc: audioUrl,
+        audioSrc: publicAudioUrl,
         web_bg_width: 0,
         web_bg_height: 0,
         web_people_width: 0,
@@ -57,8 +96,8 @@ serve(async (req) => {
     const taskId = videoData.data?._id || videoData._id;
     console.log('✅ Video generation started, task ID:', taskId);
 
-    // Step 2: Poll for completion
-    console.log('Step 2: Polling for video completion...');
+    // Step 3: Poll for completion
+    console.log('Step 3: Polling for video completion...');
     let attempts = 0;
     const maxAttempts = 60; // 5 minutes max (5 second intervals)
     let videoUrl = null;
