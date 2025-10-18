@@ -77,8 +77,8 @@ serve(async (req) => {
       throw new Error('FAL_API_KEY not configured');
     }
 
-    // Generate video using fal.ai AI Avatar
-    const response = await fetch('https://fal.run/fal-ai/ai-avatar', {
+    // Generate video using fal.ai Stable Avatar (supports up to 5 minutes)
+    const response = await fetch('https://fal.run/fal-ai/stable-avatar', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${FAL_API_KEY}`,
