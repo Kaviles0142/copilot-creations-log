@@ -778,7 +778,7 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
             },
             body: JSON.stringify({
               model: provider.model,
-              max_tokens: 2000,
+              max_tokens: 4096,
               messages: [
                 { role: 'user', content: `${systemPrompt}\n\nUser: ${message}` }
               ]
@@ -812,7 +812,7 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: message }
               ],
-              max_tokens: 2000,
+              max_tokens: 4096,
               temperature: 0.8
             }),
           });
