@@ -23,42 +23,29 @@ serve(async (req) => {
     console.log('📸 Image URL:', imageUrl);
     console.log('🎤 Audio URL:', audioUrl);
 
-    // Step 1: Create avatar from image
-    console.log('Step 1: Creating avatar...');
-    const createAvatarResponse = await fetch('https://api.a2e.ai/v1/avatars/create', {
+    // Use A2E's public avatar system - no need to create custom avatars
+    // We'll use a public avatar ID and the provided audio
+    const BASE_URL = 'https://video.a2e.ai';
+    
+    console.log('Step 1: Generating video with public avatar...');
+    const generateVideoResponse = await fetch(`${BASE_URL}/api/v1/video/generate`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${A2E_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        image_url: imageUrl,
-        name: figureName || 'Historical Figure',
-      }),
-    });
-
-    if (!createAvatarResponse.ok) {
-      const error = await createAvatarResponse.text();
-      console.error('❌ Avatar creation failed:', error);
-      throw new Error(`Avatar creation failed: ${error}`);
-    }
-
-    const avatarData = await createAvatarResponse.json();
-    const avatarId = avatarData.avatar_id;
-    console.log('✅ Avatar created:', avatarId);
-
-    // Step 2: Generate video with avatar and audio
-    console.log('Step 2: Generating video...');
-    const generateVideoResponse = await fetch('https://api.a2e.ai/v1/videos/generate', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${A2E_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        avatar_id: avatarId,
-        audio_url: audioUrl,
-        quality: 'high',
+        title: `${figureName} Avatar`,
+        anchor_id: 'default', // Use a default/public avatar for now
+        anchor_type: 0, // 0 = system provided
+        audioSrc: audioUrl,
+        web_bg_width: 0, // No background matting
+        web_bg_height: 0,
+        web_people_width: 0,
+        web_people_height: 0,
+        web_people_x: 0,
+        web_people_y: 0,
+        isSkipRs: true, // Skip smart motion for faster generation
       }),
     });
 
@@ -69,13 +56,15 @@ serve(async (req) => {
     }
 
     const videoData = await generateVideoResponse.json();
-    console.log('✅ Video generated:', videoData.video_url);
+    console.log('✅ Video generation started:', videoData);
 
+    // Note: A2E returns a task ID, need to poll for completion
+    // For now, return the task info
     return new Response(
       JSON.stringify({
         success: true,
-        videoUrl: videoData.video_url,
-        avatarId: avatarId,
+        taskId: videoData.data?._id || videoData._id,
+        message: 'Video generation started',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
