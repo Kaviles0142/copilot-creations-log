@@ -18,10 +18,17 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generationStatus, setGenerationStatus] = useState<string>(''); // Track current status
+  const processedAudioRef = useRef<string | null>(null); // Track processed audio URLs
 
   useEffect(() => {
     if (!imageUrl || !audioUrl) {
       console.log('⏸️ No image or audio URL provided');
+      return;
+    }
+
+    // Prevent processing the same audio URL multiple times
+    if (processedAudioRef.current === audioUrl) {
+      console.log('⏭️ Already processed this audio URL, skipping');
       return;
     }
 
@@ -31,6 +38,9 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
     setVideoUrl(null);
     setError(null);
     setIsGenerating(false);
+    
+    // Mark this audio as processed
+    processedAudioRef.current = audioUrl;
     
     // Notify parent that "video" is ready (it's actually just the static image)
     if (onVideoReady) {
