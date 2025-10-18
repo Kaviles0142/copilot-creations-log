@@ -1657,8 +1657,48 @@ const HistoricalChat = () => {
                   
                   // Clear pending response
                   setPendingResponse(null);
-                } else {
-                  // For greeting, just clear the greeting audio
+                } else if (greetingAudioUrl) {
+                  // Play greeting audio
+                  console.log('🎤 Playing greeting audio');
+                  initializeAudioPipeline();
+                  if (audioContextRef.current!.state === 'suspended') {
+                    await audioContextRef.current!.resume();
+                  }
+                  
+                  if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                  }
+                  
+                  // Set up audio event handlers
+                  audioElementRef.current!.onplay = () => {
+                    console.log('▶️ Greeting audio PLAY event fired');
+                    setIsSpeaking(true);
+                    setIsPlayingAudio(true);
+                  };
+                  
+                  audioElementRef.current!.onended = () => {
+                    console.log('⏹️ Greeting audio ENDED');
+                    setIsSpeaking(false);
+                    setIsPlayingAudio(false);
+                    setIsGreetingPlaying(false);
+                    setCurrentAudio(null);
+                  };
+                  
+                  audioElementRef.current!.onerror = (err) => {
+                    console.error('❌ Greeting audio ERROR:', err);
+                    setIsSpeaking(false);
+                    setIsPlayingAudio(false);
+                    setIsGreetingPlaying(false);
+                  };
+                  
+                  // Play greeting audio (it's already a data URL)
+                  audioElementRef.current!.src = greetingAudioUrl;
+                  setCurrentAudio(audioElementRef.current!);
+                  audioElementRef.current!.load();
+                  await audioElementRef.current!.play();
+                  
+                  // Clear greeting audio after playing
                   setGreetingAudioUrl(null);
                 }
               }}
