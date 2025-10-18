@@ -43,19 +43,12 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
 
         console.log('📤 Calling fal-animate-avatar with:', { imageUrl: imageUrl.substring(0, 50), audioUrl: audioUrl?.substring(0, 50) });
         
-        // Add 30 second timeout
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Avatar generation timeout after 30 seconds')), 30000);
-        });
-        
-        const invokePromise = supabase.functions.invoke('fal-animate-avatar', {
+        const { data, error } = await supabase.functions.invoke('fal-animate-avatar', {
           body: {
             imageUrl,
             audioUrl,
           },
         });
-        
-        const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as any;
 
         console.log('📥 Response from fal-animate-avatar:', { data, error });
 
