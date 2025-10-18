@@ -63,8 +63,34 @@ serve(async (req) => {
 
     const BASE_URL = 'https://video.a2e.ai';
     
-    // Step 2: Start video generation
-    console.log('Step 2: Generating video with A2E...');
+    // Step 2: Get list of available avatars to find a valid anchor_id
+    console.log('Step 2: Fetching available avatars...');
+    const avatarsResponse = await fetch(`${BASE_URL}/api/v1/anchor/character_list?type=0`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${A2E_API_KEY}`,
+      },
+    });
+
+    if (!avatarsResponse.ok) {
+      const error = await avatarsResponse.text();
+      console.error('❌ Failed to fetch avatars:', error);
+      throw new Error(`Failed to fetch avatars: ${error}`);
+    }
+
+    const avatarsData = await avatarsResponse.json();
+    
+    // Use the first available public avatar
+    const firstAvatar = avatarsData.data?.[0];
+    if (!firstAvatar || !firstAvatar._id) {
+      throw new Error('No public avatars available');
+    }
+    
+    const anchorId = firstAvatar._id;
+    console.log('✅ Using avatar:', firstAvatar.name || 'Unknown', 'ID:', anchorId);
+    
+    // Step 3: Start video generation
+    console.log('Step 3: Generating video with A2E...');
     const generateVideoResponse = await fetch(`${BASE_URL}/api/v1/video/generate`, {
       method: 'POST',
       headers: {
@@ -73,7 +99,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         title: `${figureName} Avatar`,
-        anchor_id: 'default',
+        anchor_id: anchorId,
         anchor_type: 0,
         audioSrc: publicAudioUrl,
         web_bg_width: 0,
@@ -96,8 +122,8 @@ serve(async (req) => {
     const taskId = videoData.data?._id || videoData._id;
     console.log('✅ Video generation started, task ID:', taskId);
 
-    // Step 3: Poll for completion
-    console.log('Step 3: Polling for video completion...');
+    // Step 4: Poll for completion
+    console.log('Step 4: Polling for video completion...');
     let attempts = 0;
     const maxAttempts = 60; // 5 minutes max (5 second intervals)
     let videoUrl = null;
