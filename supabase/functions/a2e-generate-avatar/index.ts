@@ -100,68 +100,11 @@ serve(async (req) => {
     
     console.log('✅ Talking Photo task started, ID:', taskId);
 
-    // Step 3: Poll for completion
-    console.log('Step 3: Polling for completion...');
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max
-    let videoUrl = null;
-
-    while (attempts < maxAttempts && !videoUrl) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      
-      // Try the direct endpoint without /detail
-      const statusResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${A2E_API_KEY}`,
-        },
-      });
-
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        console.log(`📊 Status check ${attempts + 1}:`, JSON.stringify(statusData));
-        
-        // A2E uses data.current_status for status
-        const status = statusData.data?.current_status || statusData.current_status;
-        
-        if (status === 'completed' || status === 'success' || status === 'done') {
-          // Log the COMPLETE response structure
-          console.log('🔍 FULL COMPLETION RESPONSE:', JSON.stringify(statusData, null, 2));
-          
-          // A2E uses data.result_url for the final video
-          const resultUrl = statusData.data?.result_url || statusData.result_url;
-          
-          if (resultUrl) {
-            videoUrl = resultUrl;
-            console.log('✅ Video URL found:', videoUrl);
-            console.log('✅ URL type check - contains .mp4:', videoUrl.includes('.mp4'));
-          } else {
-            console.error('❌ Status is completed but result_url is empty');
-            console.error('❌ Full data object:', JSON.stringify(statusData.data, null, 2));
-          }
-        } else if (status === 'failed' || status === 'error') {
-          const errorMsg = statusData.data?.failed_message || statusData.failed_message || 'Unknown error';
-          console.error('❌ Generation failed:', errorMsg);
-          throw new Error(`Talking Photo generation failed: ${errorMsg}`);
-        } else {
-          // Still processing
-          console.log(`⏳ Status: ${status}, waiting...`);
-        }
-      } else {
-        const errorText = await statusResponse.text();
-        console.error(`❌ Status check failed with status ${statusResponse.status}:`, errorText);
-      }
-      
-      attempts++;
-    }
-
-    if (!videoUrl) {
-      throw new Error('Talking Photo generation timed out');
-    }
-
+    // Return taskId immediately for frontend polling
     return new Response(
       JSON.stringify({
         success: true,
-        videoUrl: videoUrl,
+        taskId: taskId,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
