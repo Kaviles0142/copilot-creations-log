@@ -1594,9 +1594,12 @@ const HistoricalChat = () => {
                 setIsGreetingPlaying(false);
               }}
               onVideoReady={async (videoUrl) => {
-                console.log('✅ Video ready, now showing text and playing audio');
+                console.log('✅ Video ready:', videoUrl);
                 
-                // If we have a pending response, now show it and play audio
+                // Check if videoUrl is actually a video (not audio)
+                const isVideo = videoUrl.includes('.mp4') || videoUrl.includes('.webm') || videoUrl.includes('video');
+                
+                // If we have a pending response, now show it
                 if (pendingResponse) {
                   const assistantMessage: Message = {
                     id: (Date.now() + 1).toString(),
@@ -1611,52 +1614,57 @@ const HistoricalChat = () => {
                     await saveMessage(assistantMessage, currentConversationId);
                   }
                   
-                  // Now play the audio
-                  initializeAudioPipeline();
-                  if (audioContextRef.current!.state === 'suspended') {
-                    await audioContextRef.current!.resume();
+                  // Only play audio separately if the video generation failed (fallback to audio only)
+                  if (!isVideo) {
+                    console.log('🎤 Playing audio only (no video)');
+                    initializeAudioPipeline();
+                    if (audioContextRef.current!.state === 'suspended') {
+                      await audioContextRef.current!.resume();
+                    }
+                    
+                    if (currentAudio) {
+                      currentAudio.pause();
+                      currentAudio.currentTime = 0;
+                    }
+                    
+                    // Set up audio event handlers
+                    audioElementRef.current!.onplay = () => {
+                      console.log('▶️ Audio PLAY event fired');
+                      setIsSpeaking(true);
+                      setIsPlayingAudio(true);
+                    };
+                    
+                    audioElementRef.current!.onended = () => {
+                      console.log('⏹️ Audio ENDED');
+                      setIsSpeaking(false);
+                      setIsPlayingAudio(false);
+                      setCurrentAudio(null);
+                    };
+                    
+                    audioElementRef.current!.onerror = (err) => {
+                      console.error('❌ Audio ERROR:', err);
+                      setIsSpeaking(false);
+                      setIsPlayingAudio(false);
+                    };
+                    
+                    audioElementRef.current!.onpause = () => {
+                      console.log('⏸️ Audio PAUSED');
+                      setIsSpeaking(false);
+                    };
+                    
+                    // pendingResponse.audioUrl is already a blob URL, use it directly
+                    audioElementRef.current!.src = pendingResponse.audioUrl;
+                    setCurrentAudio(audioElementRef.current!);
+                    audioElementRef.current!.load();
+                    await audioElementRef.current!.play();
+                  } else {
+                    console.log('🎬 Video has embedded audio, not playing separately');
                   }
-                  
-                  if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
-                  }
-                  
-                  // Set up audio event handlers
-                  audioElementRef.current!.onplay = () => {
-                    console.log('▶️ Audio PLAY event fired');
-                    setIsSpeaking(true);
-                    setIsPlayingAudio(true);
-                  };
-                  
-                  audioElementRef.current!.onended = () => {
-                    console.log('⏹️ Audio ENDED');
-                    setIsSpeaking(false);
-                    setIsPlayingAudio(false);
-                    setCurrentAudio(null);
-                  };
-                  
-                  audioElementRef.current!.onerror = (err) => {
-                    console.error('❌ Audio ERROR:', err);
-                    setIsSpeaking(false);
-                    setIsPlayingAudio(false);
-                  };
-                  
-                  audioElementRef.current!.onpause = () => {
-                    console.log('⏸️ Audio PAUSED');
-                    setIsSpeaking(false);
-                  };
-                  
-                  // pendingResponse.audioUrl is already a blob URL, use it directly
-                  audioElementRef.current!.src = pendingResponse.audioUrl;
-                  setCurrentAudio(audioElementRef.current!);
-                  audioElementRef.current!.load();
-                  await audioElementRef.current!.play();
                   
                   // Clear pending response
                   setPendingResponse(null);
-                } else if (greetingAudioUrl) {
-                  // Play greeting audio
+                } else if (greetingAudioUrl && !isVideo) {
+                  // Only play greeting audio separately if no video
                   console.log('🎤 Playing greeting audio');
                   initializeAudioPipeline();
                   if (audioContextRef.current!.state === 'suspended') {
