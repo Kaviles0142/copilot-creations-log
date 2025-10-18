@@ -63,27 +63,28 @@ serve(async (req) => {
 
     const BASE_URL = 'https://video.a2e.ai';
     
-    // Step 2: Start Talking Video generation
-    console.log('Step 2: Starting Talking Video generation...');
-    const startResponse = await fetch(`${BASE_URL}/api/v1/talkingVideo/start`, {
+    // Step 2: Start Talking Photo generation
+    console.log('Step 2: Starting Talking Photo generation...');
+    const startResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/start`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${A2E_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: `${figureName} Talking Video`,
+        name: `${figureName} Talking Avatar`,
         image_url: imageUrl,
         audio_url: publicAudioUrl,
-        prompt: "speaking, looking at the camera, detailed eyes, clear teeth, natural head movement, elegant, clear facial features, professional lighting",
-        negative_prompt: "vivid colors, overexposed, flickering, blurry details, subtitles, logo, worst quality, low quality, static, motionless"
+        duration: 10,
+        prompt: "speaking, looking at the camera, detailed eyes, clear teeth, static view point, still background, elegant, clear facial features, stable camera, professional shooting angle",
+        negative_prompt: "vivid colors, overexposed, flickering, blurry details, subtitles, logo, style, artwork, painting, image, static, overall grayish, worst quality, low quality, JPEG compression artifacts, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, motionless person, cluttered background, three legs, crowded background, walking backwards"
       }),
     });
 
     if (!startResponse.ok) {
       const error = await startResponse.text();
-      console.error('❌ Talking Video start failed:', error);
-      throw new Error(`Talking Video start failed: ${error}`);
+      console.error('❌ Talking Photo start failed:', error);
+      throw new Error(`Talking Photo start failed: ${error}`);
     }
 
     const startData = await startResponse.json();
@@ -97,7 +98,7 @@ serve(async (req) => {
       throw new Error('Failed to get task ID from A2E API');
     }
     
-    console.log('✅ Talking Video task started, ID:', taskId);
+    console.log('✅ Talking Photo task started, ID:', taskId);
 
     // Step 3: Poll for completion
     console.log('Step 3: Polling for completion...');
@@ -108,7 +109,7 @@ serve(async (req) => {
     while (attempts < maxAttempts && !videoUrl) {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       
-      const statusResponse = await fetch(`${BASE_URL}/api/v1/talkingVideo/detail/${taskId}`, {
+      const statusResponse = await fetch(`${BASE_URL}/api/v1/talkingPhoto/detail/${taskId}`, {
         headers: {
           'Authorization': `Bearer ${A2E_API_KEY}`,
         },
@@ -141,7 +142,7 @@ serve(async (req) => {
     }
 
     if (!videoUrl) {
-      throw new Error('Talking Video generation timed out');
+      throw new Error('Talking Photo generation timed out');
     }
 
     return new Response(
