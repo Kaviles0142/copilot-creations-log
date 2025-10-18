@@ -59,12 +59,19 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
         }
 
         console.log('✅ A2E video generated:', data.videoUrl);
+        console.log('🔍 Setting videoUrl state to:', data.videoUrl);
+        console.log('🔍 Current isGenerating:', isGenerating);
+        console.log('🔍 Current error:', error);
+        
         setVideoUrl(data.videoUrl);
         setError(null);
         setIsGenerating(false);
+        
+        console.log('🔍 After setState - should show video element now');
 
         // Notify parent that video is ready
         if (onVideoReady) {
+          console.log('📤 Calling onVideoReady with:', data.videoUrl);
           onVideoReady(data.videoUrl);
         }
       } catch (err) {
@@ -145,6 +152,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
 
   if (error || !videoUrl) {
     // Fallback to static image if video generation fails
+    console.log('🖼️ Rendering STATIC IMAGE fallback - error:', error, 'videoUrl:', videoUrl);
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden">
         <img 
@@ -156,6 +164,10 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
     );
   }
 
+  // Render the video element
+  console.log('🎥 Rendering VIDEO element with URL:', videoUrl);
+  console.log('🎥 isGenerating:', isGenerating, 'error:', error);
+  
   return (
     <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
       <video
