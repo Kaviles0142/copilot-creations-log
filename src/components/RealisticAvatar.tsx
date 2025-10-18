@@ -37,47 +37,34 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
         console.log('📸 Image:', imageUrl);
         console.log('🎤 Audio:', audioUrl);
 
-        setGenerationStatus('Animating your avatar... This may take 1-2 minutes');
+        setGenerationStatus('Creating your realistic avatar...');
 
-        // Start the generation (fire and forget)
-        supabase.functions.invoke('fal-animate-avatar', {
-          body: { imageUrl, audioUrl }
-        }).then(({ data, error: functionError }) => {
-          if (functionError) {
-            console.error('❌ Animation error:', functionError);
-            setError(functionError.message || 'Failed to animate avatar');
-            setIsGenerating(false);
-            toast.error('Failed to generate realistic avatar', {
-              description: 'Falling back to static image'
-            });
-            return;
-          }
-
-          if (!data?.videoUrl) {
-            console.error('❌ No video URL returned');
-            setError('No video URL returned');
-            setIsGenerating(false);
-            return;
-          }
-
-          console.log('✅ Video ready:', data.videoUrl);
-          setVideoUrl(data.videoUrl);
-          setGenerationStatus('Avatar ready!');
-          setIsGenerating(false);
-          
-          onVideoReady?.(data.videoUrl);
-        }).catch(err => {
-          console.error('❌ Error generating realistic avatar:', err);
-          setError(err instanceof Error ? err.message : 'Failed to generate video');
-          setIsGenerating(false);
-          toast.error('Video generation in progress', {
-            description: 'This is taking longer than expected, showing static image'
-          });
+        const { data, error: functionError } = await supabase.functions.invoke('a2e-generate-avatar', {
+          body: { imageUrl, audioUrl, figureName: 'Historical Figure' }
         });
+
+        if (functionError) {
+          console.error('❌ A2E error:', functionError);
+          throw new Error(functionError.message || 'Failed to generate avatar');
+        }
+
+        if (!data?.videoUrl) {
+          throw new Error('No video URL returned');
+        }
+
+        console.log('✅ A2E Video ready:', data.videoUrl);
+        setVideoUrl(data.videoUrl);
+        setGenerationStatus('Avatar ready!');
+        
+        onVideoReady?.(data.videoUrl);
         
       } catch (err) {
-        console.error('❌ Error starting video generation:', err);
-        setError(err instanceof Error ? err.message : 'Failed to start generation');
+        console.error('❌ Error generating A2E avatar:', err);
+        setError(err instanceof Error ? err.message : 'Failed to generate video');
+        toast.error('Failed to generate realistic avatar', {
+          description: 'Falling back to static image'
+        });
+      } finally {
         setIsGenerating(false);
       }
     };
