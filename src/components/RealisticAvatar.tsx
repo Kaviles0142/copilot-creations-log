@@ -32,20 +32,54 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
       return;
     }
 
-    // TEMPORARILY DISABLED: A2E needs proper avatar ID configuration
-    // For now, just show static image and play audio
-    console.log('🖼️ Showing static image with audio (A2E disabled temporarily)');
-    setVideoUrl(null);
-    setError(null);
-    setIsGenerating(false);
-    
-    // Mark this audio as processed
+    // Mark this audio as processed immediately to prevent duplicates
     processedAudioRef.current = audioUrl;
-    
-    // Notify parent that "video" is ready (it's actually just the static image)
-    if (onVideoReady) {
-      onVideoReady(audioUrl);
-    }
+
+    const generateVideo = async () => {
+      try {
+        setIsGenerating(true);
+        setGenerationStatus('Generating animated avatar...');
+        console.log('🎬 Starting A2E avatar generation');
+
+        const { data, error } = await supabase.functions.invoke('a2e-generate-avatar', {
+          body: {
+            imageUrl,
+            audioUrl,
+            figureName: 'Historical Figure',
+          },
+        });
+
+        if (error) {
+          console.error('❌ A2E generation error:', error);
+          throw error;
+        }
+
+        if (!data.success || !data.videoUrl) {
+          throw new Error(data.error || 'Failed to generate video');
+        }
+
+        console.log('✅ A2E video generated:', data.videoUrl);
+        setVideoUrl(data.videoUrl);
+        setError(null);
+        setIsGenerating(false);
+
+        // Notify parent that video is ready
+        if (onVideoReady) {
+          onVideoReady(data.videoUrl);
+        }
+      } catch (err) {
+        console.error('❌ Failed to generate avatar video:', err);
+        setError('Failed to generate avatar video');
+        setIsGenerating(false);
+        
+        // Fall back to just playing audio without video
+        if (onVideoReady) {
+          onVideoReady(audioUrl);
+        }
+      }
+    };
+
+    generateVideo();
   }, [imageUrl, audioUrl, onVideoReady]);
 
   useEffect(() => {

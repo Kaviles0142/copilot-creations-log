@@ -20,13 +20,11 @@ serve(async (req) => {
     }
 
     console.log('🎬 Generating A2E avatar video');
-    console.log('📸 Image URL:', imageUrl);
     console.log('🎤 Audio URL:', audioUrl);
 
-    // Use A2E's public avatar system - no need to create custom avatars
-    // We'll use a public avatar ID and the provided audio
     const BASE_URL = 'https://video.a2e.ai';
     
+    // Step 1: Start video generation
     console.log('Step 1: Generating video with public avatar...');
     const generateVideoResponse = await fetch(`${BASE_URL}/api/v1/video/generate`, {
       method: 'POST',
@@ -36,16 +34,16 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         title: `${figureName} Avatar`,
-        anchor_id: 'default', // Use a default/public avatar for now
-        anchor_type: 0, // 0 = system provided
+        anchor_id: 'default',
+        anchor_type: 0,
         audioSrc: audioUrl,
-        web_bg_width: 0, // No background matting
+        web_bg_width: 0,
         web_bg_height: 0,
         web_people_width: 0,
         web_people_height: 0,
         web_people_x: 0,
         web_people_y: 0,
-        isSkipRs: true, // Skip smart motion for faster generation
+        isSkipRs: true,
       }),
     });
 
@@ -56,15 +54,47 @@ serve(async (req) => {
     }
 
     const videoData = await generateVideoResponse.json();
-    console.log('✅ Video generation started:', videoData);
+    const taskId = videoData.data?._id || videoData._id;
+    console.log('✅ Video generation started, task ID:', taskId);
 
-    // Note: A2E returns a task ID, need to poll for completion
-    // For now, return the task info
+    // Step 2: Poll for completion
+    console.log('Step 2: Polling for video completion...');
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutes max (5 second intervals)
+    let videoUrl = null;
+
+    while (attempts < maxAttempts && !videoUrl) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      
+      const statusResponse = await fetch(`${BASE_URL}/api/v1/video/status/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${A2E_API_KEY}`,
+        },
+      });
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        console.log(`📊 Status check ${attempts + 1}: ${statusData.status || 'processing'}`);
+        
+        if (statusData.status === 'completed' && statusData.videoUrl) {
+          videoUrl = statusData.videoUrl;
+          console.log('✅ Video ready:', videoUrl);
+        } else if (statusData.status === 'failed') {
+          throw new Error('Video generation failed');
+        }
+      }
+      
+      attempts++;
+    }
+
+    if (!videoUrl) {
+      throw new Error('Video generation timed out');
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
-        taskId: videoData.data?._id || videoData._id,
-        message: 'Video generation started',
+        videoUrl: videoUrl,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
