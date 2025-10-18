@@ -817,12 +817,14 @@ const HistoricalChat = () => {
           const audioUrl = URL.createObjectURL(audioBlob);
           
           // Store the pending response - will be shown when avatar video is ready
+          console.log('📝 Storing pending response with audio URL:', audioUrl.substring(0, 50));
           setPendingResponse({
             text: aiResponse,
             audioUrl: audioUrl // Use blob URL instead of base64
           });
           
           // Store audio URL to trigger avatar generation
+          console.log('🎬 Setting currentAudioUrl to trigger new avatar video');
           setCurrentAudioUrl(audioUrl);
           
           // Message and audio playback will happen in onVideoReady callback
