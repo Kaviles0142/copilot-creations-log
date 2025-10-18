@@ -120,44 +120,35 @@ serve(async (req) => {
         const statusData = await statusResponse.json();
         console.log(`📊 Status check ${attempts + 1}:`, JSON.stringify(statusData));
         
-        const status = statusData.data?.status || statusData.status;
+        // A2E uses data.current_status for status
+        const status = statusData.data?.current_status || statusData.current_status;
         
         if (status === 'completed' || status === 'success' || status === 'done') {
-          // Log the COMPLETE response structure to find the video URL
+          // Log the COMPLETE response structure
           console.log('🔍 FULL COMPLETION RESPONSE:', JSON.stringify(statusData, null, 2));
-          console.log('🔍 statusData.data:', JSON.stringify(statusData.data, null, 2));
-          console.log('🔍 statusData.result:', statusData.result);
-          console.log('🔍 statusData.data?.result:', statusData.data?.result);
-          console.log('🔍 statusData.data?.video_url:', statusData.data?.video_url);
-          console.log('🔍 statusData.data?.output:', statusData.data?.output);
-          console.log('🔍 statusData.data?.video:', statusData.data?.video);
           
-          // Try multiple possible fields for the video URL
-          const possibleVideoUrl = 
-            statusData.data?.result || 
-            statusData.result || 
-            statusData.data?.video_url || 
-            statusData.video_url ||
-            statusData.data?.output ||
-            statusData.data?.video ||
-            statusData.data?.url;
+          // A2E uses data.result_url for the final video
+          const resultUrl = statusData.data?.result_url || statusData.result_url;
           
-          if (possibleVideoUrl) {
-            videoUrl = possibleVideoUrl;
+          if (resultUrl) {
+            videoUrl = resultUrl;
             console.log('✅ Video URL found:', videoUrl);
             console.log('✅ URL type check - contains .mp4:', videoUrl.includes('.mp4'));
-            console.log('✅ URL type check - contains video:', videoUrl.includes('video'));
           } else {
-            console.error('❌ Status is completed but no video URL found in any expected field');
-            console.error('❌ Available fields:', Object.keys(statusData.data || statusData));
+            console.error('❌ Status is completed but result_url is empty');
+            console.error('❌ Full data object:', JSON.stringify(statusData.data, null, 2));
           }
         } else if (status === 'failed' || status === 'error') {
-          const errorMsg = statusData.data?.error || statusData.error || 'Unknown error';
+          const errorMsg = statusData.data?.failed_message || statusData.failed_message || 'Unknown error';
           console.error('❌ Generation failed:', errorMsg);
           throw new Error(`Talking Photo generation failed: ${errorMsg}`);
+        } else {
+          // Still processing
+          console.log(`⏳ Status: ${status}, waiting...`);
         }
       } else {
-        console.error(`❌ Status check failed with status ${statusResponse.status}`);
+        const errorText = await statusResponse.text();
+        console.error(`❌ Status check failed with status ${statusResponse.status}:`, errorText);
       }
       
       attempts++;
