@@ -41,6 +41,8 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
         setGenerationStatus('Generating animated avatar with Fal.ai...');
         console.log('🎬 Starting Fal.ai avatar generation');
 
+        console.log('📤 Calling fal-animate-avatar with:', { imageUrl: imageUrl.substring(0, 50), audioUrl: audioUrl?.substring(0, 50) });
+        
         const { data, error } = await supabase.functions.invoke('fal-animate-avatar', {
           body: {
             imageUrl,
@@ -48,8 +50,11 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
           },
         });
 
+        console.log('📥 Response from fal-animate-avatar:', { data, error });
+
         if (error) {
           console.error('❌ Fal.ai generation error:', error);
+          toast.error('Failed to generate video: ' + error.message);
           throw error;
         }
 
