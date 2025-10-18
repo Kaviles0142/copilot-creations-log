@@ -120,14 +120,35 @@ serve(async (req) => {
         console.log(`📊 Status check ${attempts + 1}:`, JSON.stringify(statusData));
         
         const status = statusData.data?.status || statusData.status;
-        const result = statusData.data?.result || statusData.result || statusData.data?.video_url || statusData.video_url;
         
         if (status === 'completed' || status === 'success' || status === 'done') {
-          if (result) {
-            videoUrl = result;
-            console.log('✅ Video ready:', videoUrl);
+          // Log the COMPLETE response structure to find the video URL
+          console.log('🔍 FULL COMPLETION RESPONSE:', JSON.stringify(statusData, null, 2));
+          console.log('🔍 statusData.data:', JSON.stringify(statusData.data, null, 2));
+          console.log('🔍 statusData.result:', statusData.result);
+          console.log('🔍 statusData.data?.result:', statusData.data?.result);
+          console.log('🔍 statusData.data?.video_url:', statusData.data?.video_url);
+          console.log('🔍 statusData.data?.output:', statusData.data?.output);
+          console.log('🔍 statusData.data?.video:', statusData.data?.video);
+          
+          // Try multiple possible fields for the video URL
+          const possibleVideoUrl = 
+            statusData.data?.result || 
+            statusData.result || 
+            statusData.data?.video_url || 
+            statusData.video_url ||
+            statusData.data?.output ||
+            statusData.data?.video ||
+            statusData.data?.url;
+          
+          if (possibleVideoUrl) {
+            videoUrl = possibleVideoUrl;
+            console.log('✅ Video URL found:', videoUrl);
+            console.log('✅ URL type check - contains .mp4:', videoUrl.includes('.mp4'));
+            console.log('✅ URL type check - contains video:', videoUrl.includes('video'));
           } else {
-            console.error('❌ Status is completed but no result URL found:', JSON.stringify(statusData));
+            console.error('❌ Status is completed but no video URL found in any expected field');
+            console.error('❌ Available fields:', Object.keys(statusData.data || statusData));
           }
         } else if (status === 'failed' || status === 'error') {
           const errorMsg = statusData.data?.error || statusData.error || 'Unknown error';
