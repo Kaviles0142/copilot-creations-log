@@ -25,52 +25,18 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
       return;
     }
 
-    // Clear previous video to trigger new generation
+    // TEMPORARILY DISABLED: A2E needs proper avatar ID configuration
+    // For now, just show static image and play audio
+    console.log('🖼️ Showing static image with audio (A2E disabled temporarily)');
     setVideoUrl(null);
     setError(null);
-
-    const generateRealisticVideo = async () => {
-      try {
-        setIsGenerating(true);
-        setError(null);
-        console.log('🎬 Starting A2E avatar generation');
-        console.log('📸 Image:', imageUrl);
-        console.log('🎤 Audio:', audioUrl);
-
-        setGenerationStatus('Creating your realistic avatar...');
-
-        const { data, error: functionError } = await supabase.functions.invoke('a2e-generate-avatar', {
-          body: { imageUrl, audioUrl, figureName: 'Historical Figure' }
-        });
-
-        if (functionError) {
-          console.error('❌ A2E error:', functionError);
-          throw new Error(functionError.message || 'Failed to generate avatar');
-        }
-
-        if (!data?.videoUrl) {
-          throw new Error('No video URL returned');
-        }
-
-        console.log('✅ A2E Video ready:', data.videoUrl);
-        setVideoUrl(data.videoUrl);
-        setGenerationStatus('Avatar ready!');
-        
-        onVideoReady?.(data.videoUrl);
-        
-      } catch (err) {
-        console.error('❌ Error generating A2E avatar:', err);
-        setError(err instanceof Error ? err.message : 'Failed to generate video');
-        toast.error('Failed to generate realistic avatar', {
-          description: 'Falling back to static image'
-        });
-      } finally {
-        setIsGenerating(false);
-      }
-    };
-
-    generateRealisticVideo();
-  }, [imageUrl, audioUrl]);
+    setIsGenerating(false);
+    
+    // Notify parent that "video" is ready (it's actually just the static image)
+    if (onVideoReady) {
+      onVideoReady(audioUrl);
+    }
+  }, [imageUrl, audioUrl, onVideoReady]);
 
   useEffect(() => {
     if (videoRef.current && videoUrl) {
