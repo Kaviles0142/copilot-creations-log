@@ -88,7 +88,16 @@ serve(async (req) => {
     }
 
     const startData = await startResponse.json();
-    const taskId = startData.data?.id || startData.id;
+    console.log('📋 Start response:', JSON.stringify(startData));
+    
+    // Try multiple possible response structures
+    const taskId = startData.data?.id || startData.data?.task_id || startData.id || startData.task_id || startData.data?._id;
+    
+    if (!taskId) {
+      console.error('❌ No task ID found in response:', JSON.stringify(startData));
+      throw new Error('Failed to get task ID from A2E API');
+    }
+    
     console.log('✅ Talking Photo task started, ID:', taskId);
 
     // Step 3: Poll for completion
@@ -108,17 +117,25 @@ serve(async (req) => {
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
-        console.log(`📊 Status check ${attempts + 1}: ${statusData.data?.status || statusData.status || 'processing'}`);
+        console.log(`📊 Status check ${attempts + 1}:`, JSON.stringify(statusData));
         
         const status = statusData.data?.status || statusData.status;
-        const result = statusData.data?.result || statusData.result;
+        const result = statusData.data?.result || statusData.result || statusData.data?.video_url || statusData.video_url;
         
-        if (status === 'completed' && result) {
-          videoUrl = result;
-          console.log('✅ Video ready:', videoUrl);
-        } else if (status === 'failed') {
-          throw new Error('Talking Photo generation failed');
+        if (status === 'completed' || status === 'success' || status === 'done') {
+          if (result) {
+            videoUrl = result;
+            console.log('✅ Video ready:', videoUrl);
+          } else {
+            console.error('❌ Status is completed but no result URL found:', JSON.stringify(statusData));
+          }
+        } else if (status === 'failed' || status === 'error') {
+          const errorMsg = statusData.data?.error || statusData.error || 'Unknown error';
+          console.error('❌ Generation failed:', errorMsg);
+          throw new Error(`Talking Photo generation failed: ${errorMsg}`);
         }
+      } else {
+        console.error(`❌ Status check failed with status ${statusResponse.status}`);
       }
       
       attempts++;
