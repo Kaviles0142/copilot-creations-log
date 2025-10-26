@@ -54,37 +54,66 @@ serve(async (req) => {
     const environmentalPrompt = await generateEnvironmentalPrompt(figureName);
     console.log('📝 Generated prompt:', environmentalPrompt.substring(0, 100) + '...');
 
-    // Generate image using fal.ai FLUX
-    const FAL_API_KEY = Deno.env.get('FAL_API_KEY');
-    if (!FAL_API_KEY) {
-      throw new Error('FAL_API_KEY not configured');
+    // Generate image using OpenAI DALL-E (internal, not external fal.ai)
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
-    console.log('🚀 Calling fal.ai FLUX model...');
-    const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
+    console.log('🚀 Calling OpenAI DALL-E...');
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Key ${FAL_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: 'gpt-image-1',
         prompt: environmentalPrompt,
-        image_size: 'square_hd',
-        num_inference_steps: 4,
-        num_images: 1,
-        enable_safety_checker: false,
+        n: 1,
+        size: '1024x1024',
+        quality: 'high',
+        output_format: 'png'
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ fal.ai error:', response.status, errorText);
-      throw new Error(`fal.ai error: ${response.status}`);
+      console.error('❌ OpenAI DALL-E error:', response.status, errorText);
+      throw new Error(`OpenAI DALL-E error: ${response.status}`);
     }
 
     const result = await response.json();
-    const imageUrl = result.images[0].url;
-    console.log('✅ Image generated:', imageUrl);
+    const base64Image = result.data?.[0]?.b64_json;
+    
+    if (!base64Image) {
+      throw new Error('No image generated from DALL-E');
+    }
+    
+    console.log('✅ Image generated via OpenAI DALL-E');
+
+    // Upload to Supabase Storage (internal storage)
+    const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
+    const fileName = `portraits/${figureId}-${Date.now()}.png`;
+    
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/audio-files/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'image/png',
+      },
+      body: imageBuffer,
+    });
+
+    if (!uploadResponse.ok) {
+      const uploadError = await uploadResponse.text();
+      console.error('❌ Storage upload error:', uploadError);
+      throw new Error(`Failed to upload to Supabase Storage: ${uploadError}`);
+    }
+
+    const imageUrl = `${supabaseUrl}/storage/v1/object/public/audio-files/${fileName}`;
+    console.log('✅ Image uploaded to Supabase Storage:', imageUrl);
 
     // Cache the result as v3
     await supabase
