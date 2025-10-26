@@ -23,7 +23,7 @@ serve(async (req) => {
     const { error } = await supabase
       .from('avatar_image_cache')
       .delete()
-      .neq('id', 0); // Delete all rows (neq with impossible condition)
+      .gte('created_at', '1970-01-01'); // Delete all rows
 
     if (error) {
       console.error('Error clearing cache:', error);

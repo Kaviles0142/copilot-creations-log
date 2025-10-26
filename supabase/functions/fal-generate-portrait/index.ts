@@ -92,7 +92,7 @@ serve(async (req) => {
     
     console.log('✅ Image generated via OpenAI DALL-E');
 
-    // Upload to Supabase Storage (internal storage)
+    // Upload to Supabase Storage and cache
     const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
     const fileName = `portraits/${figureId}-${Date.now()}.png`;
     
@@ -128,6 +128,8 @@ serve(async (req) => {
       }, {
         onConflict: 'figure_id,cache_version'
       });
+
+    console.log('💾 Portrait cached successfully');
 
     return new Response(
       JSON.stringify({ 
