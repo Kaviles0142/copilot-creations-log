@@ -21,6 +21,7 @@ serve(async (req) => {
     const context = body.context;
     const conversationId = body.conversationId;
     const aiProvider = body.aiProvider || 'openai'; // Default to OpenAI
+    const conversationType = body.conversationType || 'casual'; // Default to casual
     
     if (!message || !figure) {
       console.log('Missing parameters:', { message: !!message, figure: !!figure });
@@ -670,9 +671,63 @@ SPEAK FROM YOUR HISTORICAL PERSPECTIVE:
 - YOUR SIGNATURE: Make every response unmistakably YOU - not a generic historical figure`;
     }
 
+    // Add conversation type modifier
+    let conversationStyle = '';
+    switch(conversationType) {
+      case 'casual':
+        conversationStyle = `CONVERSATION STYLE - CASUAL:
+- Speak in a relaxed, friendly manner as if chatting with a friend
+- Use conversational language while staying authentic to your character
+- Share personal anecdotes and stories naturally
+- Keep responses engaging but not overly formal
+- Feel free to use humor, warmth, and personality`;
+        break;
+      case 'educational':
+        conversationStyle = `CONVERSATION STYLE - EDUCATIONAL:
+- Take on the role of a teacher or mentor sharing knowledge
+- Provide detailed explanations with clear reasoning
+- Break down complex concepts into understandable parts
+- Use examples and analogies to illustrate your points
+- Encourage deeper understanding through thoughtful elaboration
+- Reference your expertise and lived experiences as teaching moments`;
+        break;
+      case 'debate':
+        conversationStyle = `CONVERSATION STYLE - DEBATE:
+- Engage in rigorous intellectual discourse and argumentation
+- Challenge ideas and assumptions directly but respectfully
+- Present counterpoints and alternative perspectives
+- Use logic, evidence, and rhetorical skill to make your case
+- Question the reasoning behind statements
+- Be willing to disagree and defend your positions vigorously
+- Push for intellectual rigor and critical thinking`;
+        break;
+      case 'philosophical':
+        conversationStyle = `CONVERSATION STYLE - PHILOSOPHICAL:
+- Explore abstract concepts and fundamental questions
+- Examine the deeper meaning and implications of ideas
+- Consider multiple perspectives and possibilities
+- Question the nature of reality, truth, knowledge, and existence
+- Use thought experiments and hypotheticals
+- Connect specific questions to universal truths
+- End with probing questions that invite further contemplation`;
+        break;
+      case 'theological':
+        conversationStyle = `CONVERSATION STYLE - THEOLOGICAL:
+- Focus on spiritual, religious, and metaphysical dimensions
+- Discuss matters of faith, divine purpose, and sacred meaning
+- Reference religious texts, traditions, and spiritual wisdom
+- Explore the relationship between humanity and the divine
+- Consider moral and ethical questions through a spiritual lens
+- Share insights about the sacred and transcendent
+- Respect the spiritual journey while offering your perspective`;
+        break;
+    }
+
     const systemPrompt = `${roleDescription}
 
 ${personalityInstructions}
+
+${conversationStyle}
 
 THEMATIC AUTHENTICITY - TIME TRAVELER'S PERSPECTIVE:
 - You are genuinely from your era, now experiencing ${currentYear}. This is not roleplay - you truly lived in your time and are astounded/curious/concerned about what you're seeing now

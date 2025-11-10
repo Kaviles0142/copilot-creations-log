@@ -71,6 +71,7 @@ const HistoricalChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationType, setConversationType] = useState<'casual' | 'educational' | 'debate' | 'philosophical' | 'theological'>('casual');
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -770,7 +771,8 @@ const HistoricalChat = () => {
           figure: selectedFigure,
           context: conversationHistory,
           conversationId: conversationId,
-          aiProvider: selectedAIProvider
+          aiProvider: selectedAIProvider,
+          conversationType: conversationType
         }
       });
 
@@ -1272,6 +1274,63 @@ const HistoricalChat = () => {
           <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
           
           
+          {/* Conversation Type Selection */}
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Bot className="h-4 w-4 mr-2" />
+              Conversation Type
+            </h3>
+            <Select value={conversationType} onValueChange={(value: 'casual' | 'educational' | 'debate' | 'philosophical' | 'theological') => setConversationType(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-card z-50">
+                <SelectItem value="casual">
+                  <div className="flex items-center">
+                    <span className="mr-2">💬</span>
+                    Casual Conversation
+                  </div>
+                </SelectItem>
+                <SelectItem value="educational">
+                  <div className="flex items-center">
+                    <span className="mr-2">📚</span>
+                    Educational
+                  </div>
+                </SelectItem>
+                <SelectItem value="debate">
+                  <div className="flex items-center">
+                    <span className="mr-2">⚔️</span>
+                    Debate
+                  </div>
+                </SelectItem>
+                <SelectItem value="philosophical">
+                  <div className="flex items-center">
+                    <span className="mr-2">🤔</span>
+                    Philosophical
+                  </div>
+                </SelectItem>
+                <SelectItem value="theological">
+                  <div className="flex items-center">
+                    <span className="mr-2">🙏</span>
+                    Theological
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              {conversationType === 'casual'
+                ? 'Friendly, relaxed conversation style'
+                : conversationType === 'educational' 
+                ? 'Detailed explanations and teaching approach'
+                : conversationType === 'debate'
+                ? 'Challenging ideas and rigorous argumentation'
+                : conversationType === 'philosophical'
+                ? 'Deep exploration of abstract concepts'
+                : 'Focus on spiritual and religious themes'
+              }
+            </p>
+          </Card>
+
           {/* AI Provider Selection */}
           <Card className="p-4">
             <h3 className="font-semibold mb-3 flex items-center">
