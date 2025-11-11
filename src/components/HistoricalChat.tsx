@@ -1522,70 +1522,66 @@ const HistoricalChat = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="border-b border-border bg-card px-6 py-4">
-          {selectedFigure ? (
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h2 className="font-semibold">{selectedFigure.name}</h2>
-                <p className="text-sm text-muted-foreground">{selectedFigure.period}</p>
-                <p className="text-xs text-green-600">
-                  🎙️ Speaking in {selectedLanguage.split('-')[1]} 
-                  {selectedLanguage.startsWith(getFigureLanguage(selectedFigure).split('-')[0]) 
-                    ? ' (Native Language)' 
-                    : ' (Translated)'}
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/* Music Session Button for Musical Figures */}
-                {(selectedFigure.id === 'hendrix' || 
-                  selectedFigure.id === 'mozart' || 
-                  selectedFigure.id === 'beethoven' || 
-                  selectedFigure.id === 'bach' ||
-                  selectedFigure.name?.toLowerCase().includes('musician') ||
-                  selectedFigure.name?.toLowerCase().includes('composer') ||
-                  selectedFigure.description?.toLowerCase().includes('music')) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowMusicInterface(true)}
-                    className="border-purple-500 text-purple-600 hover:bg-purple-50"
-                  >
-                    <Guitar className="h-4 w-4 mr-2" />
-                    Live Music Session
-                  </Button>
-                )}
-                
-                {currentAudio && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleAudio}
-                    className="ml-2"
-                  >
-                    {isPlayingAudio ? (
-                      <VolumeX className="h-4 w-4" />
-                    ) : (
-                      <Volume2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header and Avatar Section - Side by Side */}
+        {selectedFigure ? (
+          <div className="border-b border-border bg-card flex flex-shrink-0">
+            {/* Header - Left Side */}
+            <div className="flex-1 px-6 py-4 border-r border-border">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-semibold">{selectedFigure.name}</h2>
+                  <p className="text-sm text-muted-foreground">{selectedFigure.period}</p>
+                  <p className="text-xs text-green-600">
+                    🎙️ Speaking in {selectedLanguage.split('-')[1]} 
+                    {selectedLanguage.startsWith(getFigureLanguage(selectedFigure).split('-')[0]) 
+                      ? ' (Native Language)' 
+                      : ' (Translated)'}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {/* Music Session Button for Musical Figures */}
+                  {(selectedFigure.id === 'hendrix' || 
+                    selectedFigure.id === 'mozart' || 
+                    selectedFigure.id === 'beethoven' || 
+                    selectedFigure.id === 'bach' ||
+                    selectedFigure.name?.toLowerCase().includes('musician') ||
+                    selectedFigure.name?.toLowerCase().includes('composer') ||
+                    selectedFigure.description?.toLowerCase().includes('music')) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowMusicInterface(true)}
+                      className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                    >
+                      <Guitar className="h-4 w-4 mr-2" />
+                      Live Music Session
+                    </Button>
+                  )}
+                  
+                  {currentAudio && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleAudio}
+                      className="ml-2"
+                    >
+                      {isPlayingAudio ? (
+                        <VolumeX className="h-4 w-4" />
+                      ) : (
+                        <Volume2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          ) : (
-            <h2 className="text-lg font-semibold text-muted-foreground">
-              Select a historical figure to start chatting
-            </h2>
-          )}
-        </div>
-
-        {/* Realistic Avatar - Sora-Level */}
-        {selectedFigure && (
-          <div className="border-b border-border bg-card px-6 py-4">
+            
+            {/* Realistic Avatar - Right Side */}
+            <div className="px-6 py-4 w-80">
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
@@ -1711,11 +1707,18 @@ const HistoricalChat = () => {
                 }
               }}
             />
+            </div>
+          </div>
+        ) : (
+          <div className="border-b border-border bg-card px-6 py-4 flex-shrink-0">
+            <h2 className="text-lg font-semibold text-muted-foreground">
+              Select a historical figure to start chatting
+            </h2>
           </div>
         )}
 
         {/* Messages */}
-        <div className="flex-1">
+        <div className="flex-1 overflow-y-auto">
           <ChatMessages 
             messages={messages} 
             selectedFigure={selectedFigure}
@@ -1723,9 +1726,9 @@ const HistoricalChat = () => {
           />
         </div>
 
-        {/* Input */}
+        {/* Input - Fixed at bottom */}
         {selectedFigure && (
-          <div className="border-t border-border bg-card p-4">
+          <div className="border-t border-border bg-card p-4 flex-shrink-0">
             <div className="flex space-x-2">
               <div className="flex-1 relative">
                 <Textarea
