@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square, Pause, RotateCcw, Play } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square, Pause, RotateCcw, Play, Search } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -1270,7 +1270,10 @@ const HistoricalChat = () => {
         <div className="p-6 space-y-4">
           {/* Find Historical Figures - Priority #1 */}
           <div>
-            <h3 className="font-semibold mb-3">🔍 Find Historical Figures</h3>
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Search className="h-4 w-4 mr-2" />
+              Find Historical Figures
+            </h3>
             <HistoricalFigureSearch 
               selectedFigure={selectedFigure}
               onSelectFigure={(figure) => {
