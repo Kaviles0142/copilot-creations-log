@@ -1789,13 +1789,13 @@ const HistoricalChat = () => {
                   disabled={isLoading}
                   variant="ghost"
                   size="sm"
-                  className={`absolute right-2 top-2 h-8 w-8 ${
+                  className={`absolute right-2 top-2 h-10 w-10 rounded-full transition-all duration-200 ${
                     isListening 
-                      ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
-                      : 'text-muted-foreground hover:text-primary'
+                      ? 'text-red-500 animate-pulse bg-red-100 dark:bg-red-950 border-2 border-red-300 dark:border-red-800 shadow-lg scale-110' 
+                      : 'text-purple-500 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/30 hover:scale-110 hover:shadow-md border-2 border-transparent hover:border-purple-300 dark:hover:border-purple-700'
                   }`}
                 >
-                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                 </Button>
               </div>
               {isLoading ? (
@@ -1804,9 +1804,9 @@ const HistoricalChat = () => {
                   onClick={handleStopGeneration}
                   size="icon"
                   variant="destructive"
-                  className="h-[60px] w-[60px]"
+                  className="h-[60px] w-[60px] hover:scale-105 transition-transform shadow-md hover:shadow-lg"
                 >
-                  <Square className="h-4 w-4" />
+                  <Square className="h-6 w-6" />
                 </Button>
               ) : isPlayingAudio ? (
                 // Show pause and stop buttons during audio playback
@@ -1815,17 +1815,17 @@ const HistoricalChat = () => {
                     onClick={handlePauseAudio}
                     size="icon"
                     variant="secondary"
-                    className="h-[60px] w-[60px]"
+                    className="h-[60px] w-[60px] hover:scale-105 transition-transform shadow-md hover:shadow-lg"
                   >
-                    <Pause className="h-4 w-4" />
+                    <Pause className="h-6 w-6" />
                   </Button>
                   <Button 
                     onClick={handleStopGeneration}
                     size="icon"
                     variant="destructive"
-                    className="h-[60px] w-[60px]"
+                    className="h-[60px] w-[60px] hover:scale-105 transition-transform shadow-md hover:shadow-lg"
                   >
-                    <Square className="h-4 w-4" />
+                    <Square className="h-6 w-6" />
                   </Button>
                 </div>
               ) : isPaused ? (
@@ -1835,17 +1835,17 @@ const HistoricalChat = () => {
                     onClick={handleResumeAudio}
                     size="icon"
                     variant="default"
-                    className="h-[60px] w-[60px]"
+                    className="h-[60px] w-[60px] hover:scale-105 transition-transform shadow-md hover:shadow-lg"
                   >
-                    <Play className="h-4 w-4" />
+                    <Play className="h-6 w-6" />
                   </Button>
                   <Button 
                     onClick={handleReplayAudio}
                     size="icon"
                     variant="outline"
-                    className="h-[60px] w-[60px]"
+                    className="h-[60px] w-[60px] hover:scale-105 transition-transform shadow-md hover:shadow-lg"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="h-6 w-6" />
                   </Button>
                 </div>
               ) : (
@@ -1854,10 +1854,10 @@ const HistoricalChat = () => {
                   onClick={handleSendMessage}
                   disabled={!inputMessage.trim() || isGreetingPlaying}
                   size="icon"
-                  className="h-[60px] w-[60px]"
+                  className="h-[60px] w-[60px] bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 hover:from-purple-600 hover:via-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   title={isGreetingPlaying ? "Please wait for greeting to finish..." : ""}
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-7 w-7" />
                 </Button>
               )}
             </div>
