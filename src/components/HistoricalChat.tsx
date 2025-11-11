@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square, Pause, RotateCcw, Play, Search } from "lucide-react";
+import { Upload, Send, User, Bot, Volume2, VolumeX, Mic, MicOff, Save, RefreshCw, Guitar, Globe, Square, Pause, RotateCcw, Play, Search, Menu, X } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
@@ -92,6 +92,7 @@ const HistoricalChat = () => {
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
   const [isGreetingPlaying, setIsGreetingPlaying] = useState(false); // Track if greeting is playing
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar toggle for mobile
   
   // Realistic avatar state
   const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
@@ -1264,10 +1265,36 @@ const HistoricalChat = () => {
   };
 
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full bg-background relative">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className="w-80 border-r border-border bg-card overflow-y-auto">
+      <div className={`
+        w-80 border-r border-border bg-card overflow-y-auto
+        fixed lg:static inset-y-0 left-0 z-50
+        transform transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
         <div className="p-6 space-y-4">
+          {/* Close button for mobile */}
+          <div className="lg:hidden flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold">Menu</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarOpen(false)}
+              className="hover:bg-accent"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
           {/* Find Historical Figures - Priority #1 */}
           <div>
             <h3 className="font-semibold mb-3 flex items-center">
@@ -1282,6 +1309,7 @@ const HistoricalChat = () => {
                 setCurrentConversationId(null);
                 setDocuments([]);
                 setBooks([]);
+                setIsSidebarOpen(false); // Close sidebar on mobile after selection
               }}
             />
 
@@ -1514,6 +1542,7 @@ const HistoricalChat = () => {
                 setMessages([]);
                 setCurrentConversationId(null);
                 setDocuments([]);
+                setIsSidebarOpen(false); // Close sidebar on mobile after selection
               }}
             />
           </div>
@@ -1523,6 +1552,22 @@ const HistoricalChat = () => {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile Menu Button */}
+        <div className="lg:hidden border-b border-border bg-card px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="hover:bg-accent"
+          >
+            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+          <h2 className="text-sm font-semibold">
+            {selectedFigure ? selectedFigure.name : 'Select a Figure'}
+          </h2>
+          <div className="w-10" /> {/* Spacer for centering */}
+        </div>
+
         {/* Header and Avatar Section - Side by Side */}
         {selectedFigure ? (
           <div className="border-b border-border bg-card flex flex-shrink-0">
