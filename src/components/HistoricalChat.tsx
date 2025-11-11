@@ -1268,8 +1268,104 @@ const HistoricalChat = () => {
       {/* Sidebar */}
       <div className="w-80 border-r border-border bg-card overflow-y-auto">
         <div className="p-6 space-y-4">
-          <h1 className="text-2xl font-bold mb-6">Historical Avatars</h1>
-          
+          {/* Find Historical Figures - Priority #1 */}
+          <div>
+            <h3 className="font-semibold mb-3">🔍 Find Historical Figures</h3>
+            <HistoricalFigureSearch 
+              selectedFigure={selectedFigure}
+              onSelectFigure={(figure) => {
+                setSelectedFigure(figure);
+                setMessages([]);
+                setCurrentConversationId(null);
+                setDocuments([]);
+                setBooks([]);
+              }}
+            />
+
+            {/* Conversation History for Selected Figure */}
+            {selectedFigure && (
+              <div className="mt-4">
+                <ConversationHistory
+                  onSelectConversation={(conversation) => {
+                    setCurrentConversationId(conversation.id);
+                    loadConversation(conversation.id);
+                  }}
+                  selectedFigureId={selectedFigure.id}
+                  onConversationDelete={() => {
+                    setMessages([]);
+                    setCurrentConversationId(null);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Speech Language - Priority #2 */}
+          <Card className="p-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center">
+                <Globe className="mr-2 h-4 w-4" />
+                Speech Language
+              </label>
+              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en-US">🇺🇸 English (US)</SelectItem>
+                  <SelectItem value="en-GB">🇬🇧 English (UK)</SelectItem>
+                  <SelectItem value="fr-FR">🇫🇷 French</SelectItem>
+                  <SelectItem value="de-DE">🇩🇪 German</SelectItem>
+                  <SelectItem value="it-IT">🇮🇹 Italian</SelectItem>
+                  <SelectItem value="es-ES">🇪🇸 Spanish</SelectItem>
+                  <SelectItem value="pt-BR">🇧🇷 Portuguese</SelectItem>
+                  <SelectItem value="ru-RU">🇷🇺 Russian</SelectItem>
+                  <SelectItem value="ja-JP">🇯🇵 Japanese</SelectItem>
+                  <SelectItem value="zh-CN">🇨🇳 Chinese</SelectItem>
+                  <SelectItem value="ar-SA">🇸🇦 Arabic</SelectItem>
+                  <SelectItem value="hi-IN">🇮🇳 Hindi</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Free browser-based text-to-speech in multiple languages
+              </p>
+            </div>
+          </Card>
+
+          {/* Document Management - Priority #3 */}
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setShowFileUpload(!showFileUpload)}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Documents
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => {
+                setMessages([]);
+                setCurrentConversationId(null);
+                setDocuments([]);
+                if (selectedFigure) {
+                  createNewConversation(selectedFigure);
+                }
+              }}
+              disabled={!selectedFigure}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              New Conversation
+            </Button>
+
+            {showFileUpload && (
+              <Card className="p-4">
+                <FileUpload onFileUpload={(files) => console.log('Files uploaded:', files)} />
+              </Card>
+            )}
+          </div>
           
           {/* AI Provider Selection */}
           <Card className="p-4">
@@ -1418,102 +1514,7 @@ const HistoricalChat = () => {
               }}
             />
           </div>
-          
-          <div className="space-y-4">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => setShowFileUpload(!showFileUpload)}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Documents
-            </Button>
 
-
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => {
-                setMessages([]);
-                setCurrentConversationId(null);
-                setDocuments([]);
-                if (selectedFigure) {
-                  createNewConversation(selectedFigure);
-                }
-              }}
-              disabled={!selectedFigure}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              New Conversation
-            </Button>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center">
-                <Globe className="mr-2 h-4 w-4" />
-                Speech Language
-              </label>
-              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en-US">🇺🇸 English (US)</SelectItem>
-                  <SelectItem value="en-GB">🇬🇧 English (UK)</SelectItem>
-                  <SelectItem value="fr-FR">🇫🇷 French</SelectItem>
-                  <SelectItem value="de-DE">🇩🇪 German</SelectItem>
-                  <SelectItem value="it-IT">🇮🇹 Italian</SelectItem>
-                  <SelectItem value="es-ES">🇪🇸 Spanish</SelectItem>
-                  <SelectItem value="pt-BR">🇧🇷 Portuguese</SelectItem>
-                  <SelectItem value="ru-RU">🇷🇺 Russian</SelectItem>
-                  <SelectItem value="ja-JP">🇯🇵 Japanese</SelectItem>
-                  <SelectItem value="zh-CN">🇨🇳 Chinese</SelectItem>
-                  <SelectItem value="ar-SA">🇸🇦 Arabic</SelectItem>
-                  <SelectItem value="hi-IN">🇮🇳 Hindi</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Free browser-based text-to-speech in multiple languages
-              </p>
-            </div>
-
-            {showFileUpload && (
-              <Card className="p-4">
-                <FileUpload onFileUpload={(files) => console.log('Files uploaded:', files)} />
-              </Card>
-            )}
-
-            <div>
-              <h3 className="font-semibold mb-3">🔍 Find Historical Figures</h3>
-              <HistoricalFigureSearch 
-                selectedFigure={selectedFigure}
-                onSelectFigure={(figure) => {
-                  setSelectedFigure(figure);
-                  setMessages([]);
-                  setCurrentConversationId(null);
-                  setDocuments([]);
-                  setBooks([]);
-                }}
-              />
-
-              {/* Conversation History for Selected Figure */}
-              {selectedFigure && (
-                <div className="mt-4">
-                  <ConversationHistory
-                    onSelectConversation={(conversation) => {
-                      setCurrentConversationId(conversation.id);
-                      loadConversation(conversation.id);
-                    }}
-                    selectedFigureId={selectedFigure.id}
-                    onConversationDelete={() => {
-                      setMessages([]);
-                      setCurrentConversationId(null);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-          </div>
         </div>
       </div>
 
