@@ -1304,14 +1304,14 @@ const HistoricalChat = () => {
           </div>
 
           {/* Speech Language - Priority #2 */}
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-border shadow-sm hover:shadow-md transition-shadow">
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center">
                 <Globe className="mr-2 h-4 w-4" />
                 Speech Language
               </label>
               <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full border-2 border-border bg-muted/70 hover:bg-accent hover:border-primary/50 hover:shadow-md focus:outline-none focus:ring-0 focus:bg-accent focus:border-primary/50 transition-all duration-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1339,7 +1339,7 @@ const HistoricalChat = () => {
           <div className="space-y-3">
             <Button
               variant="outline"
-              className="w-full justify-start"
+              className="w-full justify-start border-2 border-border bg-muted/70 hover:bg-accent hover:border-primary/50 hover:shadow-md hover:scale-[1.02] transition-all duration-200"
               onClick={() => setShowFileUpload(!showFileUpload)}
             >
               <Upload className="mr-2 h-4 w-4" />
@@ -1348,7 +1348,7 @@ const HistoricalChat = () => {
 
             <Button
               variant="outline"
-              className="w-full justify-start"
+              className="w-full justify-start border-2 border-border bg-muted/70 hover:bg-accent hover:border-primary/50 hover:shadow-md hover:scale-[1.02] transition-all duration-200"
               onClick={() => {
                 setMessages([]);
                 setCurrentConversationId(null);
@@ -1364,20 +1364,20 @@ const HistoricalChat = () => {
             </Button>
 
             {showFileUpload && (
-              <Card className="p-4">
+              <Card className="p-4 border-2 border-border shadow-sm">
                 <FileUpload onFileUpload={(files) => console.log('Files uploaded:', files)} />
               </Card>
             )}
           </div>
           
           {/* AI Provider Selection */}
-          <Card className="p-4">
+          <Card className="p-4 border-2 border-border shadow-sm hover:shadow-md transition-shadow">
             <h3 className="font-semibold mb-3 flex items-center">
               <Bot className="h-4 w-4 mr-2" />
               AI Provider
             </h3>
             <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude' | 'azure') => setSelectedAIProvider(value)}>
-              <SelectTrigger>
+              <SelectTrigger className="border-2 border-border bg-muted/70 hover:bg-accent hover:border-primary/50 hover:shadow-md focus:outline-none focus:ring-0 focus:bg-accent focus:border-primary/50 transition-all duration-200">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-card z-50">
@@ -1460,8 +1460,8 @@ const HistoricalChat = () => {
               .filter(v => v.gender === gender)
               .slice(0, 5);
             
-            return (
-              <Card className="p-4">
+              return (
+              <Card className="p-4 border-2 border-border shadow-sm hover:shadow-md transition-shadow">
                 <h3 className="font-semibold mb-3 flex items-center">
                   <Volume2 className="h-4 w-4 mr-2" />
                   Azure Voice Selection
@@ -1478,7 +1478,7 @@ const HistoricalChat = () => {
                     });
                   }}
                 >
-                  <SelectTrigger className="bg-background">
+                  <SelectTrigger className="border-2 border-border bg-muted/70 hover:bg-accent hover:border-primary/50 hover:shadow-md focus:outline-none focus:ring-0 focus:bg-accent focus:border-primary/50 transition-all duration-200">
                     <SelectValue placeholder="Select Azure voice" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover z-50">

@@ -192,12 +192,13 @@ const HistoricalFigureSearch = ({ selectedFigure, onSelectFigure }: HistoricalFi
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyPress={handleKeyPress}
-          className="flex-1"
+          className="flex-1 border-2 border-border bg-muted/70 hover:bg-accent hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-0 focus-visible:bg-accent focus-visible:border-primary/50 transition-all duration-200"
         />
         <Button 
           onClick={searchHistoricalFigure}
           disabled={isSearching || !searchQuery.trim()}
           size="icon"
+          className="border-2 hover:scale-105 hover:shadow-lg transition-all duration-200"
         >
           {isSearching ? (
             <Loader2 className="h-4 w-4 animate-spin" />
