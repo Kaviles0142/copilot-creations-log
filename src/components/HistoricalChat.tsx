@@ -10,7 +10,6 @@ import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import FileUpload from "./FileUpload";
 import FigureList from "./FigureList";
-import DocumentUpload from "./DocumentUpload";
 import ConversationExport from "./ConversationExport";
 import FigureRecommendations from "./FigureRecommendations";
 import ConversationHistory from "./ConversationHistory";
@@ -1419,12 +1418,6 @@ const HistoricalChat = () => {
               }}
             />
           </div>
-          {/* Document Upload */}
-          <DocumentUpload
-            conversationId={currentConversationId}
-            onDocumentUploaded={setDocuments}
-            documents={documents}
-          />
           
           <div className="space-y-4">
             <Button
