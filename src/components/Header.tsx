@@ -10,11 +10,11 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b-2 border-purple-500/20 bg-gradient-to-r from-purple-50/90 via-blue-50/90 to-indigo-50/90 dark:from-purple-950/40 dark:via-blue-950/40 dark:to-indigo-950/40 backdrop-blur-xl supports-[backdrop-filter]:bg-gradient-to-r shadow-lg">
+    <header className="sticky top-0 z-50 w-full border-b-2 border-purple-500/20 bg-gradient-to-r from-purple-50/90 via-blue-50/90 to-indigo-50/90 dark:from-purple-950/40 dark:via-blue-950/40 dark:to-indigo-950/40 backdrop-blur-xl supports-[backdrop-filter]:bg-gradient-to-r shadow-[0_4px_16px_rgba(0,0,0,0.15)]">
       <div className="container flex h-16 items-center justify-between px-4 md:px-6">
         {/* Logo - Left */}
         <div className="flex items-center gap-2 min-w-[120px]">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200">
             <span className="text-white font-bold text-xl">H</span>
           </div>
           <span className="hidden sm:inline-block font-semibold text-lg bg-gradient-to-r from-purple-700 to-blue-700 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">HistoryAI</span>
