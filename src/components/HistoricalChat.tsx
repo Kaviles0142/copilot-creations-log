@@ -1264,7 +1264,7 @@ const HistoricalChat = () => {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-full bg-background">
       {/* Sidebar */}
       <div className="w-80 border-r border-border bg-card overflow-y-auto">
         <div className="p-6 space-y-4">

@@ -18,13 +18,17 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Header />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/avatar-test" element={<AvatarTest />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <div className="h-screen flex flex-col overflow-hidden">
+            <Header />
+            <div className="flex-1 overflow-hidden">
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/avatar-test" element={<AvatarTest />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+          </div>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
