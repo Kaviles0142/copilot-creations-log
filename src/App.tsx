@@ -11,6 +11,8 @@ import Index from "./pages/Index";
 import AvatarTest from "./pages/AvatarTest";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import Pricing from "./pages/Pricing";
+import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +33,7 @@ const App = () => (
                     {/* Public Routes */}
                     <Route path="/signin" element={<SignIn />} />
                     <Route path="/signup" element={<SignUp />} />
+                    <Route path="/pricing" element={<Pricing />} />
                     
                     {/* Protected Routes */}
                     <Route
@@ -46,6 +49,14 @@ const App = () => (
                       element={
                         <ProtectedRoute>
                           <AvatarTest />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/account"
+                      element={
+                        <ProtectedRoute>
+                          <Account />
                         </ProtectedRoute>
                       }
                     />

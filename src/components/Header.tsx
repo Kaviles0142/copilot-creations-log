@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, User as UserIcon } from "lucide-react";
+import { Moon, Sun, LogOut, User as UserIcon, Crown, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
@@ -84,6 +84,15 @@ const Header = () => {
                     </p>
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/account')} className="cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/pricing')} className="cursor-pointer">
+                  <Crown className="mr-2 h-4 w-4 text-amber-500" />
+                  Membership
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
