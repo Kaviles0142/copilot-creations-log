@@ -890,6 +890,7 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
         if (response) {
           response = response.replace(/\basteric\b|\basterisk\b/gi, '');
           response = response.replace(/\*(.*?)\*/g, '"$1"');
+          response = response.replace(/\\"/g, '"'); // Remove escape backslashes before quotes
           console.log("🧹 Cleaned response text (removed/converted formatting artifacts)");
         }
         
