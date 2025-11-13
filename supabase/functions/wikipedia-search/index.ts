@@ -21,33 +21,26 @@ serve(async (req) => {
 
     console.log(`Searching Wikipedia for: "${query}"`);
 
-    // Search Wikipedia
-    const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
+    // First, try using Wikipedia's opensearch API which has better fuzzy matching and suggestions
+    const opensearchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=${encodeURIComponent(query)}&limit=${limit}&origin=*`;
     
-    const searchResponse = await fetch(searchUrl, {
+    const opensearchResponse = await fetch(opensearchUrl, {
       headers: {
         'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
         'Accept': 'application/json'
       }
     });
 
-    if (!searchResponse.ok) {
-      // If direct page lookup fails, try search API
-      const fallbackUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srsearch=${encodeURIComponent(query)}&srlimit=${limit}&origin=*`;
+    if (opensearchResponse.ok) {
+      const opensearchData = await opensearchResponse.json();
+      // opensearch returns: [query, [titles], [descriptions], [urls]]
       
-      const fallbackResponse = await fetch(fallbackUrl, {
-        headers: {
-          'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
-          'Accept': 'application/json'
-        }
-      });
-
-      const fallbackData = await fallbackResponse.json();
-      
-      if (fallbackData.query?.search?.length > 0) {
-        // Get detailed info for the first result
-        const firstResult = fallbackData.query.search[0];
-        const detailUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstResult.title)}`;
+      if (opensearchData[1]?.length > 0) {
+        const firstTitle = opensearchData[1][0];
+        console.log(`OpenSearch suggested: ${firstTitle}`);
+        
+        // Get detailed info for the best match
+        const detailUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle)}`;
         
         const detailResponse = await fetch(detailUrl, {
           headers: {
@@ -60,6 +53,13 @@ serve(async (req) => {
           const detailData = await detailResponse.json();
           console.log(`Found Wikipedia article: ${detailData.title}`);
           
+          // Build search results from opensearch data
+          const searchResults = opensearchData[1].map((title: string, index: number) => ({
+            title: title,
+            snippet: opensearchData[2][index] || '',
+            url: opensearchData[3][index] || `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
+          }));
+          
           return new Response(
             JSON.stringify({
               success: true,
@@ -70,11 +70,7 @@ serve(async (req) => {
                 thumbnail: detailData.thumbnail?.source,
                 description: detailData.description
               },
-              searchResults: fallbackData.query.search.slice(0, limit).map((result: any) => ({
-                title: result.title,
-                snippet: result.snippet.replace(/<[^>]*>/g, ''), // Remove HTML tags
-                url: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, '_'))}`
-              }))
+              searchResults: searchResults
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -82,6 +78,19 @@ serve(async (req) => {
           );
         }
       }
+    }
+
+    // Fallback to direct page lookup if opensearch doesn't work
+    const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
+    
+    const searchResponse = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!searchResponse.ok) {
 
       // No results found - return success with empty data instead of error
       console.log(`No Wikipedia articles found for: "${query}"`);
