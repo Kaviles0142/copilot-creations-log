@@ -21,6 +21,7 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
   const processedAudioRef = useRef<string | null>(null); // Track processed audio URLs
 
   useEffect(() => {
+    // fal.ai integration disabled - using static image fallback
     if (!imageUrl || !audioUrl) {
       console.log('⏸️ No image or audio URL provided');
       return;
@@ -35,54 +36,12 @@ const RealisticAvatar = ({ imageUrl, isLoading, audioUrl, onVideoEnd, onVideoRea
     // Mark this audio as processed immediately to prevent duplicates
     processedAudioRef.current = audioUrl;
 
-    const generateVideo = async () => {
-      try {
-        setIsGenerating(true);
-        setGenerationStatus('Generating animated avatar...');
-        console.log('🎬 Starting Fal.ai avatar generation');
-
-        console.log('📤 Calling fal-animate-avatar with:', { imageUrl: imageUrl.substring(0, 50), audioUrl: audioUrl?.substring(0, 50) });
-        
-        const { data, error } = await supabase.functions.invoke('fal-animate-avatar', {
-          body: {
-            imageUrl,
-            audioUrl,
-          },
-        });
-
-        console.log('📥 Response from fal-animate-avatar:', { data, error });
-
-        if (error) {
-          console.error('❌ Fal.ai generation error:', error);
-          toast.error('Failed to generate video: ' + error.message);
-          throw error;
-        }
-
-        if (!data.videoUrl) {
-          throw new Error(data.error || 'Failed to generate video');
-        }
-
-        console.log('✅ Video generated:', data.videoUrl);
-        setVideoUrl(data.videoUrl);
-        setError(null);
-        setIsGenerating(false);
-
-        if (onVideoReady) {
-          onVideoReady(data.videoUrl);
-        }
-      } catch (err) {
-        console.error('❌ Failed to generate avatar video:', err);
-        setError('Failed to generate avatar video');
-        setIsGenerating(false);
-        
-        // Fall back to just playing audio without video
-        if (onVideoReady) {
-          onVideoReady(audioUrl);
-        }
-      }
-    };
-
-    generateVideo();
+    console.log('📢 Using static avatar (fal.ai disabled)');
+    
+    // Immediately use audio without video generation
+    if (onVideoReady) {
+      onVideoReady(audioUrl);
+    }
   }, [imageUrl, audioUrl, onVideoReady]);
 
   useEffect(() => {
