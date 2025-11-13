@@ -893,9 +893,17 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
         
         // Post-process response to clean formatting artifacts
         if (response) {
+          // Remove references to markdown/formatting elements
           response = response.replace(/\basteric\b|\basterisk\b/gi, '');
-          response = response.replace(/\*(.*?)\*/g, '"$1"');
+          response = response.replace(/\bback ?slash\b/gi, ''); // Remove "backslash" or "back slash"
+          response = response.replace(/\bforward ?slash\b/gi, ''); // Remove "forwardslash" or "forward slash"
+          
+          // Clean up formatting
+          response = response.replace(/\*(.*?)\*/g, '"$1"'); // Convert *text* to "text"
           response = response.replace(/\\"/g, '"'); // Remove escape backslashes before quotes
+          response = response.replace(/\\\\/g, ''); // Remove double backslashes
+          response = response.replace(/\\/g, ''); // Remove single backslashes
+          
           console.log("🧹 Cleaned response text (removed/converted formatting artifacts)");
         }
         
