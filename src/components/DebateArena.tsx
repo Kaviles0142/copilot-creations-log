@@ -80,28 +80,28 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           if (!newMessage.is_user_message) {
             setCurrentSpeaker(newMessage.figure_id);
             
-            // Play audio if enabled (non-blocking)
+            // Play audio if enabled and wait for it to finish
             if (audioEnabled) {
-              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
+              await playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
             
-            setTimeout(() => setCurrentSpeaker(null), 2000);
+            setCurrentSpeaker(null);
 
-            // Auto-trigger next turn for non-moderated formats
+            // Auto-trigger next turn for non-moderated formats after audio finishes
             if (format !== "moderated") {
-              // Trigger next speaker immediately (don't wait for audio)
-              setTimeout(async () => {
-                const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
-                  body: {
-                    sessionId,
-                    currentTurn: newMessage.turn_number + 1,
-                  },
-                });
-                
-                if (error) {
-                  console.error("Error auto-continuing debate:", error);
-                }
-              }, 1000);
+              // Wait a moment after audio before next speaker
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              
+              const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
+                body: {
+                  sessionId,
+                  currentTurn: newMessage.turn_number + 1,
+                },
+              });
+              
+              if (error) {
+                console.error("Error auto-continuing debate:", error);
+              }
             }
           }
         }
