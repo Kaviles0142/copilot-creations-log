@@ -53,7 +53,8 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
 
   useEffect(() => {
     loadMessages();
-    subscribeToMessages();
+    const cleanup = subscribeToMessages();
+    return cleanup; // Return cleanup function to properly unsubscribe
   }, [sessionId]);
 
   useEffect(() => {
