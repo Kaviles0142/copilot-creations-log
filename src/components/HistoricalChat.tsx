@@ -1217,27 +1217,9 @@ const HistoricalChat = () => {
   };
 
   const searchYoutube = async (query: string) => {
-    try {
-      const response = await fetch('https://trclpvryrjlafacocbnd.supabase.co/functions/v1/youtube-search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query, maxResults: 3 }),
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        return data.results;
-      } else {
-        console.error('YouTube search failed:', data.error);
-        return null;
-      }
-    } catch (error) {
-      console.error('Error searching YouTube:', error);
-      return null;
-    }
+    // DISABLED: YouTube integration not currently in use
+    console.log('YouTube search disabled - integration not active');
+    return null;
   };
 
   const handleYoutubeSearch = async (query: string) => {

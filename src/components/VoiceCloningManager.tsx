@@ -67,13 +67,13 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
   const searchForHistoricalAudio = async () => {
     setIsSearching(true);
     try {
-      // Search YouTube for historical speeches
-      const youtubeResults = await searchYouTube();
-      
-      // Search web for historical audio files
-      const webResults = await searchWeb();
-      
-      setSearchResults([...youtubeResults, ...webResults]);
+      // YouTube and web search disabled - manual upload only
+      toast({
+        title: "Search Disabled",
+        description: "Please use manual audio upload instead",
+        variant: "destructive",
+      });
+      setSearchResults([]);
       
     } catch (error) {
       console.error('Error searching for audio:', error);
@@ -88,6 +88,11 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
   };
 
   const searchYouTube = async (): Promise<AudioSource[]> => {
+    // DISABLED: YouTube integration not currently in use
+    console.log('YouTube search disabled - use manual upload instead');
+    return [];
+    
+    /* KEPT FOR FUTURE USE
     try {
       const { data, error } = await supabase.functions.invoke('youtube-search', {
         body: {
@@ -119,6 +124,10 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
   };
 
   const extractYouTubeAudio = async (videoUrl: string): Promise<string> => {
+    // DISABLED: YouTube audio extraction not currently in use
+    throw new Error('YouTube audio extraction is disabled - please use manual upload');
+    
+    /* KEPT FOR FUTURE USE
     const { data, error } = await supabase.functions.invoke('extract-youtube-audio', {
       body: { videoUrl }
     });
@@ -127,6 +136,7 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
     if (data.error) throw new Error(data.error);
 
     return data.audioUrl;
+    */
   };
 
   const cloneVoiceFromSource = async (audioSource: AudioSource) => {
@@ -134,13 +144,14 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
     try {
       let audioUrl = audioSource.url;
 
-      // If it's a YouTube video, extract audio first
+      // YouTube extraction disabled
       if (audioSource.source === 'youtube') {
         toast({
-          title: "Extracting Audio",
-          description: "Extracting audio from YouTube video...",
+          title: "YouTube Disabled",
+          description: "YouTube audio extraction is not available. Please use manual upload.",
+          variant: "destructive",
         });
-        audioUrl = await extractYouTubeAudio(audioSource.url);
+        return;
       }
 
       setSelectedAudioUrl(audioUrl);
