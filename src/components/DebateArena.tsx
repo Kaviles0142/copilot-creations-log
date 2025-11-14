@@ -82,7 +82,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             
             // Play audio if enabled
             if (audioEnabled) {
-              await playAudio(newMessage.content);
+              await playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
             
             setTimeout(() => setCurrentSpeaker(null), 5000);
@@ -96,10 +96,17 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     };
   };
 
-  const playAudio = async (text: string) => {
+  const playAudio = async (text: string, figureName: string, figureId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
-        body: { text }
+      console.log('🎤 Generating Azure TTS for:', figureName);
+      
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: {
+          text,
+          figure_name: figureName,
+          figure_id: figureId,
+          voice: 'auto' // Let Azure auto-select based on nationality
+        }
       });
 
       if (error) throw error;
