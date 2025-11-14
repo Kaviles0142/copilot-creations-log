@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Sparkles, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,14 +13,17 @@ interface Figure {
   name: string;
 }
 
+type DebateFormat = "round-robin" | "free-for-all" | "moderated";
+
 interface DebateFigureSelectorProps {
-  onStartDebate: (topic: string, figures: Figure[]) => void;
+  onStartDebate: (topic: string, figures: Figure[], format: DebateFormat) => void;
 }
 
 export default function DebateFigureSelector({ onStartDebate }: DebateFigureSelectorProps) {
   const [topic, setTopic] = useState("");
   const [selectedFigures, setSelectedFigures] = useState<Figure[]>([]);
   const [figureInput, setFigureInput] = useState("");
+  const [format, setFormat] = useState<DebateFormat>("round-robin");
 
   const addFigure = () => {
     const name = figureInput.trim();
@@ -65,6 +69,25 @@ export default function DebateFigureSelector({ onStartDebate }: DebateFigureSele
           />
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="format">Debate Format</Label>
+          <Select value={format} onValueChange={(value) => setFormat(value as DebateFormat)}>
+            <SelectTrigger id="format" className="bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50">
+              <SelectItem value="round-robin">Round-Robin - Each figure takes turns in order</SelectItem>
+              <SelectItem value="free-for-all">Free-for-All - AI decides who responds based on context</SelectItem>
+              <SelectItem value="moderated">Moderated - You control who speaks</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {format === "round-robin" && "Figures will speak one after another in sequence"}
+            {format === "free-for-all" && "The AI will pick the most relevant figure to respond"}
+            {format === "moderated" && "Click on a figure's avatar to make them speak"}
+          </p>
+        </div>
+
         <div className="space-y-3">
           <Label htmlFor="figure-input">Add Historical Figures (2-4)</Label>
           <p className="text-sm text-muted-foreground">
@@ -104,7 +127,7 @@ export default function DebateFigureSelector({ onStartDebate }: DebateFigureSele
         </div>
 
         <Button
-          onClick={() => onStartDebate(topic, selectedFigures)}
+          onClick={() => onStartDebate(topic, selectedFigures, format)}
           disabled={!canStart}
           className="w-full"
           size="lg"
