@@ -349,6 +349,7 @@ export type Database = {
           current_turn: number
           figure_ids: string[]
           figure_names: string[]
+          format: string
           id: string
           status: string
           topic: string
@@ -360,6 +361,7 @@ export type Database = {
           current_turn?: number
           figure_ids: string[]
           figure_names: string[]
+          format?: string
           id?: string
           status?: string
           topic: string
@@ -371,6 +373,7 @@ export type Database = {
           current_turn?: number
           figure_ids?: string[]
           figure_names?: string[]
+          format?: string
           id?: string
           status?: string
           topic?: string

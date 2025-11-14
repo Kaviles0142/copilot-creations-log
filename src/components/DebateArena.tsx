@@ -129,6 +129,34 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     }
   };
 
+  const handleFigureClick = async (figureId: string) => {
+    if (format !== "moderated" || isProcessing) return;
+
+    setIsProcessing(true);
+    
+    try {
+      const turnNumber = messages.length;
+      
+      const { error } = await supabase.functions.invoke("debate-orchestrator", {
+        body: {
+          sessionId,
+          selectedFigureId: figureId,
+          currentTurn: turnNumber,
+        },
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to make figure speak",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="p-4 bg-primary/5 border-primary">
@@ -143,8 +171,9 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             className={`p-4 transition-all ${
               currentSpeaker === figure.id
                 ? "ring-2 ring-primary shadow-lg"
-                : ""
+                : format === "moderated" ? "cursor-pointer hover:bg-muted" : ""
             }`}
+            onClick={() => format === "moderated" && !isProcessing && handleFigureClick(figure.id)}
           >
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-20 w-20">
@@ -156,6 +185,9 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
                 <p className="font-semibold text-sm">{figure.name}</p>
                 {currentSpeaker === figure.id && (
                   <p className="text-xs text-primary animate-pulse">Speaking...</p>
+                )}
+                {format === "moderated" && !isProcessing && (
+                  <p className="text-xs text-muted-foreground">Click to speak</p>
                 )}
               </div>
             </div>
