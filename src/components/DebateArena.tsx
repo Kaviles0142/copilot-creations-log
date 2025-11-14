@@ -151,7 +151,12 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     try {
       console.log('🔊 Generating TTS for debate...');
       const { data, error } = await supabase.functions.invoke("azure-text-to-speech", {
-        body: { text, figureId, figureName },
+        body: { 
+          text, 
+          figure_id: figureId, 
+          figure_name: figureName,
+          voice: 'auto'
+        },
       });
 
       if (error) {
