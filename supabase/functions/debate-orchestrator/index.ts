@@ -6,13 +6,63 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to pick most relevant figure for free-for-all mode
+async function pickRelevantFigure(session: any, conversationHistory: string, previousMessages: any[]): Promise<number> {
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  if (!OPENAI_API_KEY) return 0;
+
+  // If no messages yet, start with first figure
+  if (!previousMessages || previousMessages.length === 0) return 0;
+
+  const lastSpeaker = previousMessages[previousMessages.length - 1]?.figure_name;
+  const availableFigures = session.figure_names.filter((name: string) => name !== lastSpeaker);
+
+  const prompt = `Given this debate conversation:
+
+${conversationHistory}
+
+Topic: ${session.topic}
+
+Available figures who haven't just spoken: ${availableFigures.join(', ')}
+
+Who should respond next based on the conversation context? Reply with ONLY the name from the available figures list.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 50,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const selectedName = data.choices[0].message.content.trim();
+      const index = session.figure_names.indexOf(selectedName);
+      return index >= 0 ? index : 0;
+    }
+  } catch (error) {
+    console.error('Error picking figure:', error);
+  }
+
+  return 0; // Fallback to first figure
+}
+
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { sessionId, userMessage, currentTurn } = await req.json();
+    const { sessionId, userMessage, currentTurn, selectedFigureId } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -41,10 +91,27 @@ serve(async (req) => {
       `${msg.figure_name}: ${msg.content}`
     ).join('\n\n') || '';
 
-    // Determine which figure should respond next
-    const currentFigureIndex = currentTurn % session.figure_names.length;
-    const currentFigureId = session.figure_ids[currentFigureIndex];
-    const currentFigureName = session.figure_names[currentFigureIndex];
+    let currentFigureId: string;
+    let currentFigureName: string;
+    let currentFigureIndex: number;
+
+    // Determine next speaker based on format
+    if (session.format === 'moderated' && selectedFigureId) {
+      // Moderated: User selected specific figure
+      currentFigureIndex = session.figure_ids.indexOf(selectedFigureId);
+      currentFigureId = selectedFigureId;
+      currentFigureName = session.figure_names[currentFigureIndex];
+    } else if (session.format === 'free-for-all') {
+      // Free-for-all: AI picks most relevant figure
+      currentFigureIndex = await pickRelevantFigure(session, conversationHistory, previousMessages || []);
+      currentFigureId = session.figure_ids[currentFigureIndex];
+      currentFigureName = session.figure_names[currentFigureIndex];
+    } else {
+      // Round-robin: Sequential order
+      currentFigureIndex = currentTurn % session.figure_names.length;
+      currentFigureId = session.figure_ids[currentFigureIndex];
+      currentFigureName = session.figure_names[currentFigureIndex];
+    }
 
     // Build debate-aware prompt
     const otherFigures = session.figure_names.filter((_: string, i: number) => i !== currentFigureIndex);
@@ -117,12 +184,11 @@ Now respond to the latest point raised.`;
 
     console.log(`✅ ${currentFigureName} responded (turn ${currentTurn})`);
 
-    // Auto-trigger next figure if we have less than 4 consecutive AI turns
-    // This prevents infinite loops while allowing natural debate flow
+    // Auto-trigger next figure only for non-moderated modes
     const recentMessages = previousMessages?.slice(-3) || [];
     const consecutiveAiTurns = recentMessages.filter(m => !m.is_user_message).length;
     
-    if (consecutiveAiTurns < 3 && !userMessage) {
+    if (session.format !== 'moderated' && consecutiveAiTurns < 3 && !userMessage) {
       // Automatically call the next figure after a brief delay
       setTimeout(async () => {
         try {

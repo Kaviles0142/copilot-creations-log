@@ -30,6 +30,7 @@ export default function DebateMode() {
           topic: debateTopic,
           figure_ids: selectedFigures.map(f => f.id),
           figure_names: selectedFigures.map(f => f.name),
+          format: debateFormat,
           status: "active",
         })
         .select()
