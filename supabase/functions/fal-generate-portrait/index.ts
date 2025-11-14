@@ -26,12 +26,12 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check cache for existing v3 portrait (workspace/iconic setting focus)
-    const { data: cachedImage } = await supabase
+    const { data: cachedImage, error: cacheError } = await supabase
       .from('avatar_image_cache')
       .select('cloudinary_url, visual_prompt, created_at')
       .eq('figure_id', figureId)
       .eq('cache_version', 'v3')
-      .single();
+      .maybeSingle();
 
     if (cachedImage) {
       const cacheAge = Date.now() - new Date(cachedImage.created_at).getTime();
