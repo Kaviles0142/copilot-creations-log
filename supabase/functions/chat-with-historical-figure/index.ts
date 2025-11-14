@@ -84,7 +84,7 @@ serve(async (req) => {
           const rssNewsResponse = await supabase.functions.invoke('rss-news-scraper', {
             body: { 
               query: message.toLowerCase(), // Pass the user's message to find relevant news
-              num: 10
+              num: 5 // Reduced from 10 to 5 for faster response
             }
           });
 
@@ -198,13 +198,13 @@ serve(async (req) => {
                 }
               });
 
-              // Fetch actual book content from OpenLibrary
+              // Fetch actual book content from OpenLibrary (REDUCED for speed)
               try {
                 const bookContentResponse = await supabase.functions.invoke('fetch-book-content', {
                   body: { 
                     figureName: figure.name,
                     figureId: figure.id,
-                    maxBooks: 3
+                    maxBooks: 1 // Reduced from 3 to 1 for faster response
                   }
                 });
 
@@ -250,7 +250,7 @@ serve(async (req) => {
               .from('documents')
               .select('filename, parsed_content')
               .eq('conversation_id', conversationId)
-              .limit(5); // Maximum documents
+              .limit(2); // Reduced from 5 to 2 for faster response
 
             if (documents && documents.length > 0) {
               sourcesUsed.documents = documents.length;
@@ -269,76 +269,8 @@ serve(async (req) => {
           return '';
         })() : Promise.resolve(''),
 
-        // 3. YouTube search + transcripts
-        (async () => {
-          try {
-            const youtubeResponse = await supabase.functions.invoke('youtube-search', {
-              body: { 
-                query: `${figure.name} speech interview`,
-                maxResults: 5 // Maximum YouTube videos
-              }
-            });
-
-            console.log('🎥 YouTube Raw Response:', JSON.stringify(youtubeResponse, null, 2));
-            
-            // Defensive: handle multiple response structures
-            let videos: any[] = [];
-            if (youtubeResponse.data) {
-              if (Array.isArray(youtubeResponse.data.results)) {
-                videos = youtubeResponse.data.results;
-              } else if (Array.isArray(youtubeResponse.data)) {
-                videos = youtubeResponse.data;
-              }
-            }
-            
-            console.log(`🎥 Parsed ${videos.length} YouTube videos`);
-            
-            if (videos.length > 0) {
-              sourcesUsed.youtube = videos.length;
-              let youtubeText = '\n\n🎥 YOUTUBE:\n';
-              
-              // Check for existing transcripts
-              const videoIds = videos.map((v: any) => v.id);
-              const { data: transcripts } = await supabase
-                .from('youtube_transcripts')
-                .select('video_id, transcript, video_title')
-                .in('video_id', videoIds)
-                .gt('expires_at', new Date().toISOString());
-
-              const transcriptMap = new Map(
-                transcripts?.map(t => [t.video_id, t.transcript]) || []
-              );
-
-              videos.forEach((video: any) => {
-                youtubeText += `- "${video.title}"\n`;
-                
-                // Use transcript if available, otherwise use description
-                if (transcriptMap.has(video.id)) {
-                  const transcript = transcriptMap.get(video.id);
-                  youtubeText += `  [FULL TRANSCRIPT]: ${transcript.substring(0, 2000)}...\n`;
-                  console.log(`Using cached transcript for ${video.id}`);
-                } else if (video.description) {
-                  youtubeText += `  ${video.description.substring(0, 500)}...\n`;
-                  
-                  // Trigger background transcription (non-blocking)
-                  supabase.functions.invoke('youtube-transcribe', {
-                    body: { 
-                      videoId: video.id,
-                      videoTitle: video.title,
-                      figureId: figure.id,
-                      figureName: figure.name
-                    }
-                  }).catch(err => console.log(`Background transcription failed for ${video.id}:`, err));
-                }
-              });
-              
-              return youtubeText;
-            }
-          } catch (error) {
-            console.log('YouTube search error:', error);
-          }
-          return '';
-        })(),
+        // 3. YouTube search + transcripts (SKIP for faster response)
+        Promise.resolve(''),
 
         // 2. Wikipedia search
         (async () => {
