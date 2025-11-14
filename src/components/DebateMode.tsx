@@ -39,7 +39,7 @@ export default function DebateMode() {
       if (error) throw error;
 
       // Trigger first figure's opening statement
-      const { error: orchestratorError } = await supabase.functions.invoke("debate-orchestrator", {
+      const { data: orchestratorData, error: orchestratorError } = await supabase.functions.invoke("debate-orchestrator", {
         body: {
           sessionId: data.id,
           currentTurn: 0,
@@ -48,6 +48,18 @@ export default function DebateMode() {
 
       if (orchestratorError) {
         console.error("Error starting debate:", orchestratorError);
+      }
+
+      // Auto-trigger subsequent speakers if needed
+      if (orchestratorData?.shouldContinue) {
+        setTimeout(async () => {
+          await supabase.functions.invoke("debate-orchestrator", {
+            body: {
+              sessionId: data.id,
+              currentTurn: orchestratorData.nextTurn,
+            },
+          });
+        }, 2000);
       }
 
       setSessionId(data.id);

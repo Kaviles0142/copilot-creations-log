@@ -184,33 +184,19 @@ Now respond to the latest point raised.`;
 
     console.log(`✅ ${currentFigureName} responded (turn ${currentTurn})`);
 
-    // Auto-trigger next figure only for non-moderated modes
+    // Don't use setTimeout in edge functions - it won't work
+    // Instead, return a flag indicating whether to continue
     const recentMessages = previousMessages?.slice(-3) || [];
-    const consecutiveAiTurns = recentMessages.filter(m => !m.is_user_message).length;
-    
-    if (session.format !== 'moderated' && consecutiveAiTurns < 3 && !userMessage) {
-      // Automatically call the next figure after a brief delay
-      setTimeout(async () => {
-        try {
-          await fetch(`${supabaseUrl}/functions/v1/debate-orchestrator`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              sessionId,
-              currentTurn: currentTurn + 1,
-            }),
-          });
-        } catch (error) {
-          console.error('Error triggering next turn:', error);
-        }
-      }, 2000); // 2 second delay between responses
-    }
+    const consecutiveAiTurns = recentMessages.filter((m: any) => !m.is_user_message).length;
+    const shouldContinue = session.format !== 'moderated' && consecutiveAiTurns < 3 && !userMessage;
 
     return new Response(
-      JSON.stringify({ success: true, speaker: currentFigureName }),
+      JSON.stringify({ 
+        success: true, 
+        speaker: currentFigureName,
+        shouldContinue,
+        nextTurn: currentTurn + 1
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
