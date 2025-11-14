@@ -77,7 +77,7 @@ serve(async (req) => {
             messages: [
               {
                 role: 'user',
-                content: `What is the nationality of "${figureName}"? Reply with ONLY the nationality (e.g., "french", "german", "greek", "american", "egyptian", "chinese", "italian", "spanish", "russian", "japanese", "indian", "english", "british"). Be specific and use lowercase. Single word only.`
+                content: `What is the nationality of "${figureName}"? Reply with ONLY the nationality (e.g., "french", "german", "greek", "american", "egyptian", "chinese", "italian", "spanish", "russian", "japanese", "indian", "english", "british", "nepalese", "tibetan", "thai", "korean", "vietnamese"). Be specific and use lowercase. Single word only.`
               }
             ],
           }),
@@ -114,6 +114,31 @@ serve(async (req) => {
         'english': 'american',
         'american': 'american',
         'british': 'british',
+        // Asian nationalities
+        'nepalese': 'indian',     // Buddha - use Indian accent
+        'tibetan': 'chinese',
+        'thai': 'chinese',
+        'korean': 'chinese',
+        'vietnamese': 'chinese',
+        'mongolian': 'chinese',
+        'burmese': 'indian',
+        'bangladeshi': 'indian',
+        'pakistani': 'indian',
+        'sri lankan': 'indian',
+        // Middle Eastern
+        'persian': 'greek',
+        'iranian': 'greek',
+        'iraqi': 'greek',
+        'saudi': 'greek',
+        'turkish': 'greek',
+        // Additional European
+        'polish': 'russian',
+        'ukrainian': 'russian',
+        'dutch': 'german',
+        'austrian': 'german',
+        'swiss': 'german',
+        'portuguese': 'spanish',
+        'brazilian': 'spanish',
       };
       return mapping[nationality] || 'american';
     };
