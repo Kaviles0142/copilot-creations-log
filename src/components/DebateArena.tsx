@@ -40,8 +40,10 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioEnabledRef = useRef(true); // Use ref to avoid closure issues
+  const audioEnabledRef = useRef(true);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   // Sync audioEnabled state with ref
@@ -135,19 +137,60 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           text,
           figure_name: figureName,
           figure_id: figureId,
-          voice: 'auto' // Let Azure auto-select based on nationality
+          voice: 'auto'
         }
       });
 
       if (error) throw error;
 
       if (data?.audioContent) {
-        const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-        // Play audio in background without blocking next turn
-        audio.play().catch(err => console.error('Audio playback error:', err));
+        // Initialize audio element if needed (same as single chat)
+        if (!audioElementRef.current) {
+          audioElementRef.current = new Audio();
+          audioElementRef.current.crossOrigin = 'anonymous';
+        }
+
+        // Stop current audio if playing
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        }
+
+        // Set up event handlers (same as single chat)
+        audioElementRef.current.onplay = () => {
+          console.log('▶️ Audio playing:', figureName);
+        };
+
+        audioElementRef.current.onended = () => {
+          console.log('⏹️ Audio ended:', figureName);
+          setCurrentAudio(null);
+        };
+
+        audioElementRef.current.onerror = (err) => {
+          console.error('❌ Audio error:', err);
+          setCurrentAudio(null);
+        };
+
+        // Convert base64 to blob (same as single chat)
+        const byteCharacters = atob(data.audioContent);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
+        const playbackUrl = URL.createObjectURL(audioBlob);
+
+        // Set source and play (same as single chat)
+        audioElementRef.current.src = playbackUrl;
+        setCurrentAudio(audioElementRef.current);
+        audioElementRef.current.load();
+        await audioElementRef.current.play();
+        console.log('🔊 Audio playing for:', figureName);
       }
     } catch (error) {
       console.error('Error playing audio:', error);
+      setCurrentAudio(null);
     }
   };
 
