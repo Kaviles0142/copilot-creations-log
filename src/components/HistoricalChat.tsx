@@ -34,6 +34,9 @@ export interface Message {
     historicalContext: number;
     webArticles: number;
   };
+  aiProvider?: string;
+  model?: string;
+  fallbackUsed?: boolean;
 }
 
 export interface HistoricalFigure {
@@ -792,6 +795,9 @@ const HistoricalChat = () => {
         type: "assistant",
         timestamp: new Date(),
         sourcesUsed: sourcesUsed,
+        aiProvider: usedProvider,
+        model: result.model,
+        fallbackUsed: result.fallbackUsed
       };
 
       // Generate TTS and prepare for avatar video
@@ -1319,17 +1325,33 @@ const HistoricalChat = () => {
               <Bot className="h-4 w-4 mr-2" />
               AI Provider
             </h3>
+            
+            {/* Show actual provider used in last response */}
+            {messages.length > 0 && messages[messages.length - 1].type === 'assistant' && messages[messages.length - 1].aiProvider && (
+              <div className="mb-3 p-2 bg-muted/50 rounded-lg">
+                <p className="text-xs font-medium mb-1">Currently Using:</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold capitalize">
+                    {messages[messages.length - 1].aiProvider === 'openai' && '🤖 OpenAI'}
+                    {messages[messages.length - 1].aiProvider === 'grok' && '🚀 Grok'}
+                    {messages[messages.length - 1].aiProvider === 'anthropic' && '🧠 Claude'}
+                    {messages[messages.length - 1].aiProvider === 'lovable-ai' && '✨ Lovable AI'}
+                  </span>
+                  {messages[messages.length - 1].fallbackUsed && (
+                    <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded">Fallback</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {messages[messages.length - 1].model}
+                </p>
+              </div>
+            )}
+            
             <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude' | 'azure') => setSelectedAIProvider(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-card z-50">
-                <SelectItem value="claude">
-                  <div className="flex items-center">
-                    <span className="mr-2">🧠</span>
-                    Claude (Anthropic)
-                  </div>
-                </SelectItem>
                 <SelectItem value="openai">
                   <div className="flex items-center">
                     <span className="mr-2">🤖</span>
@@ -1340,6 +1362,12 @@ const HistoricalChat = () => {
                   <div className="flex items-center">
                     <span className="mr-2">🚀</span>
                     Grok (X.AI)
+                  </div>
+                </SelectItem>
+                <SelectItem value="claude">
+                  <div className="flex items-center">
+                    <span className="mr-2">🧠</span>
+                    Claude (Anthropic)
                   </div>
                 </SelectItem>
                 <SelectItem value="azure">
@@ -1361,6 +1389,7 @@ const HistoricalChat = () => {
               }
             </p>
           </Card>
+
 
           {/* Azure Voice Selection */}
           {selectedFigure && (() => {
