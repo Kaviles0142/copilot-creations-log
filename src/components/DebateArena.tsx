@@ -73,12 +73,18 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           table: "debate_messages",
           filter: `debate_session_id=eq.${sessionId}`,
         },
-        (payload) => {
+        async (payload) => {
           setMessages((prev) => [...prev, payload.new as DebateMessage]);
           
           const newMessage = payload.new as DebateMessage;
-          if (!newMessage.is_user_message && audioEnabled) {
+          if (!newMessage.is_user_message) {
             setCurrentSpeaker(newMessage.figure_id);
+            
+            // Play audio if enabled
+            if (audioEnabled) {
+              await playAudio(newMessage.content);
+            }
+            
             setTimeout(() => setCurrentSpeaker(null), 5000);
           }
         }
@@ -88,6 +94,23 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const playAudio = async (text: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+        body: { text }
+      });
+
+      if (error) throw error;
+
+      if (data?.audioContent) {
+        const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
+        await audio.play();
+      }
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -109,7 +132,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
         is_user_message: true,
       });
 
-      const { error } = await supabase.functions.invoke("debate-orchestrator", {
+      const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
         body: {
           sessionId,
           userMessage,
@@ -118,6 +141,18 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
       });
 
       if (error) throw error;
+
+      // Auto-trigger next figure if needed
+      if (data?.shouldContinue) {
+        setTimeout(async () => {
+          await supabase.functions.invoke("debate-orchestrator", {
+            body: {
+              sessionId,
+              currentTurn: data.nextTurn,
+            },
+          });
+        }, 2000);
+      }
     } catch (error) {
       toast({
         title: "Error",
