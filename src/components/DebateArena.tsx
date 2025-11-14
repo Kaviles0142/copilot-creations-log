@@ -99,28 +99,16 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             console.log('🔊 Audio enabled:', audioEnabledRef.current);
             if (audioEnabledRef.current) {
               console.log('🎵 Triggering audio for:', newMessage.figure_name);
-              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
+              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id, newMessage.turn_number, format);
+            } else if (format !== "moderated") {
+              // If audio is disabled, trigger next turn immediately with a small delay
+              setTimeout(async () => {
+                console.log('⏭️ Auto-triggering next turn (no audio):', newMessage.turn_number + 1);
+                await triggerNextTurn(newMessage.turn_number + 1);
+              }, 2000);
             }
             
             setTimeout(() => setCurrentSpeaker(null), 2000);
-
-            // Auto-trigger next turn for non-moderated formats
-            if (format !== "moderated") {
-              // Trigger next speaker after a delay
-              setTimeout(async () => {
-                console.log('⏭️ Auto-triggering next turn:', newMessage.turn_number + 1);
-                const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
-                  body: {
-                    sessionId,
-                    currentTurn: newMessage.turn_number + 1,
-                  },
-                });
-                
-                if (error) {
-                  console.error("Error auto-continuing debate:", error);
-                }
-              }, 1000);
-            }
           }
         }
       )
@@ -131,7 +119,24 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     };
   };
 
-  const playAudio = async (text: string, figureName: string, figureId: string) => {
+  const triggerNextTurn = async (nextTurnNumber: number) => {
+    console.log('⏭️ Triggering next turn:', nextTurnNumber);
+    const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
+      body: {
+        sessionId,
+        topic,
+        figures,
+        format,
+        currentTurn: nextTurnNumber,
+      },
+    });
+
+    if (error) {
+      console.error("Error triggering next turn:", error);
+    }
+  };
+
+  const playAudio = async (text: string, figureName: string, figureId: string, turnNumber: number, debateFormat: DebateFormat) => {
     console.log('🎵 playAudio called for:', figureName);
     
     // Stop current audio if playing
@@ -156,6 +161,13 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           description: "Could not generate speech audio",
           variant: "destructive",
         });
+        
+        // Even on TTS error, trigger next turn if not moderated
+        if (debateFormat !== "moderated") {
+          setTimeout(async () => {
+            await triggerNextTurn(turnNumber + 1);
+          }, 2000);
+        }
         return;
       }
 
@@ -174,12 +186,27 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           setIsPlayingAudio(false);
           setIsPaused(false);
           setCurrentAudio(null);
+          
+          // Auto-trigger next turn AFTER audio finishes for non-moderated formats
+          if (debateFormat !== "moderated") {
+            console.log('⏭️ Audio finished, triggering next turn:', turnNumber + 1);
+            setTimeout(async () => {
+              await triggerNextTurn(turnNumber + 1);
+            }, 1000); // Small 1 second pause between speakers
+          }
         };
         
         audio.onerror = (err) => {
           console.error('❌ Audio playback error:', err);
           setIsPlayingAudio(false);
           setIsPaused(false);
+          
+          // Even on playback error, trigger next turn if not moderated
+          if (debateFormat !== "moderated") {
+            setTimeout(async () => {
+              await triggerNextTurn(turnNumber + 1);
+            }, 2000);
+          }
         };
         
         audio.onpause = () => {
@@ -199,6 +226,13 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
         description: "Failed to play audio",
         variant: "destructive",
       });
+      
+      // Even on error, trigger next turn if not moderated
+      if (debateFormat !== "moderated") {
+        setTimeout(async () => {
+          await triggerNextTurn(turnNumber + 1);
+        }, 2000);
+      }
     }
   };
 
