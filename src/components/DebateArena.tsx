@@ -41,7 +41,13 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioEnabledRef = useRef(true); // Use ref to avoid closure issues
   const { toast } = useToast();
+
+  // Sync audioEnabled state with ref
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
 
   useEffect(() => {
     loadMessages();
@@ -76,14 +82,18 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
         async (payload) => {
           const newMessage = payload.new as DebateMessage;
           
+          console.log('📩 New debate message received:', newMessage.figure_name, 'Turn:', newMessage.turn_number);
+          
           // Add message to display immediately
           setMessages((prev) => [...prev, newMessage]);
           
           if (!newMessage.is_user_message) {
             setCurrentSpeaker(newMessage.figure_id);
             
-            // Play audio alongside the message if enabled
-            if (audioEnabled) {
+            // Play audio alongside the message if enabled (using ref to avoid closure)
+            console.log('🔊 Audio enabled:', audioEnabledRef.current);
+            if (audioEnabledRef.current) {
+              console.log('🎵 Triggering audio for:', newMessage.figure_name);
               playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
             
@@ -93,6 +103,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             if (format !== "moderated") {
               // Trigger next speaker after a delay
               setTimeout(async () => {
+                console.log('⏭️ Auto-triggering next turn:', newMessage.turn_number + 1);
                 const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
                   body: {
                     sessionId,
