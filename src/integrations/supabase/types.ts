@@ -345,6 +345,7 @@ export type Database = {
       }
       figure_metadata: {
         Row: {
+          cache_version: string | null
           created_at: string
           figure_id: string
           figure_name: string
@@ -354,6 +355,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cache_version?: string | null
           created_at?: string
           figure_id: string
           figure_name: string
@@ -363,6 +365,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cache_version?: string | null
           created_at?: string
           figure_id?: string
           figure_name?: string
@@ -587,10 +590,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_expired_news_cache: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_news_cache: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
