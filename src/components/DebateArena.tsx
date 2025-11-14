@@ -14,6 +14,8 @@ interface Figure {
   name: string;
 }
 
+type DebateFormat = "round-robin" | "free-for-all" | "moderated";
+
 interface DebateMessage {
   id: string;
   figure_id: string;
@@ -28,10 +30,11 @@ interface DebateArenaProps {
   sessionId: string;
   topic: string;
   figures: Figure[];
+  format: DebateFormat;
   onEnd: () => void;
 }
 
-export default function DebateArena({ sessionId, topic, figures, onEnd }: DebateArenaProps) {
+export default function DebateArena({ sessionId, topic, figures, format, onEnd }: DebateArenaProps) {
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);

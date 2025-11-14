@@ -9,13 +9,20 @@ interface Figure {
   name: string;
 }
 
+type DebateFormat = "round-robin" | "free-for-all" | "moderated";
+
 export default function DebateMode() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [topic, setTopic] = useState("");
   const [figures, setFigures] = useState<Figure[]>([]);
+  const [format, setFormat] = useState<DebateFormat>("round-robin");
   const { toast } = useToast();
 
-  const handleStartDebate = async (debateTopic: string, selectedFigures: Figure[]) => {
+  const handleStartDebate = async (
+    debateTopic: string, 
+    selectedFigures: Figure[],
+    debateFormat: DebateFormat
+  ) => {
     try {
       const { data, error } = await supabase
         .from("debate_sessions")
@@ -33,6 +40,7 @@ export default function DebateMode() {
       setSessionId(data.id);
       setTopic(debateTopic);
       setFigures(selectedFigures);
+      setFormat(debateFormat);
 
       toast({
         title: "Debate Started",
@@ -58,6 +66,7 @@ export default function DebateMode() {
     setSessionId(null);
     setTopic("");
     setFigures([]);
+    setFormat("round-robin");
   };
 
   if (sessionId) {
@@ -66,6 +75,7 @@ export default function DebateMode() {
         sessionId={sessionId}
         topic={topic}
         figures={figures}
+        format={format}
         onEnd={handleEndDebate}
       />
     );
