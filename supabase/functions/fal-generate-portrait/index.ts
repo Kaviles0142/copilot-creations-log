@@ -54,43 +54,43 @@ serve(async (req) => {
     const environmentalPrompt = await generateEnvironmentalPrompt(figureName);
     console.log('📝 Generated prompt:', environmentalPrompt.substring(0, 100) + '...');
 
-    // Generate image using OpenAI DALL-E 3
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+    // Generate image using Lovable AI (faster, no external API needed)
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    console.log('🚀 Calling OpenAI DALL-E 3...');
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    console.log('🚀 Generating portrait with Lovable AI...');
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: environmentalPrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'hd',
-        response_format: 'b64_json'
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [{
+          role: 'user',
+          content: environmentalPrompt
+        }],
+        modalities: ['image', 'text']
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ OpenAI DALL-E error:', response.status, errorText);
-      throw new Error(`OpenAI DALL-E error: ${response.status}`);
+      console.error('❌ Lovable AI error:', response.status, errorText);
+      throw new Error(`Lovable AI error: ${response.status}`);
     }
 
     const result = await response.json();
-    const base64Image = result.data?.[0]?.b64_json;
+    const base64Image = result.choices?.[0]?.message?.images?.[0]?.image_url?.url?.split(',')[1];
     
     if (!base64Image) {
-      throw new Error('No image generated from DALL-E');
+      throw new Error('No image generated from Lovable AI');
     }
     
-    console.log('✅ Image generated via OpenAI DALL-E 3');
+    console.log('✅ Portrait generated via Lovable AI');
 
     // Upload to Supabase Storage and cache
     const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
