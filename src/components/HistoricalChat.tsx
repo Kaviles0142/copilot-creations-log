@@ -225,23 +225,31 @@ const HistoricalChat = () => {
     try {
       const greetingText = getGreetingForFigure(figure);
       
-      // SKIP AVATAR GENERATION - Just generate greeting audio for faster response
-      // Avatar image will be generated only when explicitly requested
-      const audioResult = await supabase.functions.invoke('azure-text-to-speech', {
-        body: {
-          text: greetingText,
-          figure_name: figure.name,
-          figure_id: figure.id,
-          voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
-        }
-      });
+      // Generate avatar portrait and greeting audio IN PARALLEL
+      const [avatarResult, audioResult] = await Promise.all([
+        supabase.functions.invoke('fal-generate-portrait', {
+          body: {
+            figureName: figure.name,
+            figureId: figure.id
+          }
+        }),
+        supabase.functions.invoke('azure-text-to-speech', {
+          body: {
+            text: greetingText,
+            figure_name: figure.name,
+            figure_id: figure.id,
+            voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+          }
+        })
+      ]);
 
+      if (avatarResult.error) throw avatarResult.error;
       if (audioResult.error) throw audioResult.error;
 
-      console.log('🎤 Greeting audio ready (avatar image skipped for speed)');
+      console.log('✅ Avatar portrait ready:', avatarResult.data.cached ? '(cached)' : '(new)');
+      console.log('🎤 Greeting audio ready');
       
-      // Use default placeholder avatar instead of generating
-      setAvatarImageUrl('');
+      setAvatarImageUrl(avatarResult.data.imageUrl);
       setIsLoadingAvatarImage(false);
       
       if (!audioResult.data?.audioContent) {
