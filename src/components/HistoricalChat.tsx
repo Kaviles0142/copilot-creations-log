@@ -90,7 +90,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
-  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude' | 'azure'>('openai'); // OpenAI as default (matches backend priority)
+  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude' | 'lovable-ai'>('openai'); // OpenAI as default (matches backend priority)
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
@@ -1347,7 +1347,7 @@ const HistoricalChat = () => {
               </div>
             )}
             
-            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude' | 'azure') => setSelectedAIProvider(value)}>
+            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude' | 'lovable-ai') => setSelectedAIProvider(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -1370,10 +1370,10 @@ const HistoricalChat = () => {
                     Claude (Anthropic)
                   </div>
                 </SelectItem>
-                <SelectItem value="azure">
+                <SelectItem value="lovable-ai">
                   <div className="flex items-center">
-                    <span className="mr-2">🔷</span>
-                    Azure OpenAI (Bing)
+                    <span className="mr-2">✨</span>
+                    Lovable AI (Gemini)
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -1383,8 +1383,8 @@ const HistoricalChat = () => {
                 ? 'Claude offers intelligent, nuanced responses with superior reasoning'
                 : selectedAIProvider === 'openai' 
                 ? 'OpenAI provides reliable, well-structured responses'
-                : selectedAIProvider === 'azure'
-                ? 'Azure OpenAI powered by Bing for enterprise-grade AI'
+                : selectedAIProvider === 'lovable-ai'
+                ? 'Lovable AI powered by Google Gemini 2.5 Flash'
                 : 'Grok offers conversational, real-time aware responses'
               }
             </p>
