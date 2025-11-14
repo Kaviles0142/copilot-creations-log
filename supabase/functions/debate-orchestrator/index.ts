@@ -112,10 +112,36 @@ Now respond to the latest point raised.`;
     // Update session turn counter
     await supabase
       .from('debate_sessions')
-      .update({ current_turn: currentTurn })
+      .update({ current_turn: currentTurn + 1 })
       .eq('id', sessionId);
 
-    console.log(`✅ ${currentFigureName} responded in debate`);
+    console.log(`✅ ${currentFigureName} responded (turn ${currentTurn})`);
+
+    // Auto-trigger next figure if we have less than 4 consecutive AI turns
+    // This prevents infinite loops while allowing natural debate flow
+    const recentMessages = previousMessages?.slice(-3) || [];
+    const consecutiveAiTurns = recentMessages.filter(m => !m.is_user_message).length;
+    
+    if (consecutiveAiTurns < 3 && !userMessage) {
+      // Automatically call the next figure after a brief delay
+      setTimeout(async () => {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/debate-orchestrator`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sessionId,
+              currentTurn: currentTurn + 1,
+            }),
+          });
+        } catch (error) {
+          console.error('Error triggering next turn:', error);
+        }
+      }, 2000); // 2 second delay between responses
+    }
 
     return new Response(
       JSON.stringify({ success: true, speaker: currentFigureName }),
