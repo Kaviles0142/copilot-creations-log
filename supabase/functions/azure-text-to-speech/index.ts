@@ -197,14 +197,26 @@ serve(async (req) => {
     
     // Only auto-detect if user hasn't manually selected a voice
     if ((voice === 'auto' || !voice || voice === 'de-DE-ConradNeural') && figure_name && figure_id) {
+      // Cache version - increment this when mapping logic changes
+      const CACHE_VERSION = 'v2'; // Updated to force re-detection with new nationality mappings
+      
       // Check cache first
       const { data: cachedMetadata } = await supabase
         .from('figure_metadata')
-        .select('region, nationality')
+        .select('region, nationality, cache_version')
         .eq('figure_id', figure_id)
         .maybeSingle();
 
-      if (cachedMetadata?.region) {
+      // Auto-clear outdated cache
+      if (cachedMetadata && (!cachedMetadata.cache_version || cachedMetadata.cache_version !== CACHE_VERSION)) {
+        console.log(`🔄 Clearing outdated cache for ${figure_name} (old version: ${cachedMetadata.cache_version || 'v1'})`);
+        await supabase
+          .from('figure_metadata')
+          .delete()
+          .eq('figure_id', figure_id);
+      }
+
+      if (cachedMetadata?.region && cachedMetadata.cache_version === CACHE_VERSION) {
         console.log(`📦 Using cached region for ${figure_name}: ${cachedMetadata.region}`);
         detectedRegion = cachedMetadata.region;
       } else {
@@ -214,7 +226,7 @@ serve(async (req) => {
         
         console.log(`🗺️ Detected nationality: ${nationality}, mapped to region: ${detectedRegion}`);
         
-        // Cache the result
+        // Cache the result with version
         await supabase
           .from('figure_metadata')
           .upsert({
@@ -222,6 +234,7 @@ serve(async (req) => {
             figure_name,
             nationality,
             region: detectedRegion,
+            cache_version: CACHE_VERSION,
           }, {
             onConflict: 'figure_id'
           });
