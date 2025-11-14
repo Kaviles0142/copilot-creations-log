@@ -80,16 +80,16 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           if (!newMessage.is_user_message) {
             setCurrentSpeaker(newMessage.figure_id);
             
-            // Play audio if enabled and wait for it to finish
+            // Play audio if enabled (non-blocking)
             if (audioEnabled) {
-              await playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
+              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
             
             setTimeout(() => setCurrentSpeaker(null), 2000);
 
             // Auto-trigger next turn for non-moderated formats
             if (format !== "moderated") {
-              // Wait a bit after audio finishes before next speaker
+              // Trigger next speaker immediately (don't wait for audio)
               setTimeout(async () => {
                 const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
                   body: {
@@ -101,7 +101,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
                 if (error) {
                   console.error("Error auto-continuing debate:", error);
                 }
-              }, 2000);
+              }, 1000);
             }
           }
         }
