@@ -106,6 +106,8 @@ verify_jwt = false
 [functions.azure-text-to-speech]
 verify_jwt = false
 
+[functions.clear-figure-metadata]
+verify_jwt = false
 
 [functions.duckduckgo-search]
 verify_jwt = false
