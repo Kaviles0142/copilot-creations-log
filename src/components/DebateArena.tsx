@@ -132,12 +132,8 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
 
       if (data?.audioContent) {
         const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-        // Wait for audio to finish playing
-        await new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => resolve(); // Continue even if audio fails
-          audio.play().catch(() => resolve());
-        });
+        // Play audio in background without blocking next turn
+        audio.play().catch(err => console.error('Audio playback error:', err));
       }
     } catch (error) {
       console.error('Error playing audio:', error);
