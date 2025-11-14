@@ -37,6 +37,18 @@ export default function DebateMode() {
 
       if (error) throw error;
 
+      // Trigger first figure's opening statement
+      const { error: orchestratorError } = await supabase.functions.invoke("debate-orchestrator", {
+        body: {
+          sessionId: data.id,
+          currentTurn: 0,
+        },
+      });
+
+      if (orchestratorError) {
+        console.error("Error starting debate:", orchestratorError);
+      }
+
       setSessionId(data.id);
       setTopic(debateTopic);
       setFigures(selectedFigures);
