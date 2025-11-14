@@ -186,9 +186,8 @@ Now respond to the latest point raised.`;
 
     // Don't use setTimeout in edge functions - it won't work
     // Instead, return a flag indicating whether to continue
-    const recentMessages = previousMessages?.slice(-3) || [];
-    const consecutiveAiTurns = recentMessages.filter((m: any) => !m.is_user_message).length;
-    const shouldContinue = session.format !== 'moderated' && consecutiveAiTurns < 3 && !userMessage;
+    // Allow debate to continue indefinitely until user intervention
+    const shouldContinue = session.format !== 'moderated' && !userMessage;
 
     return new Response(
       JSON.stringify({ 
