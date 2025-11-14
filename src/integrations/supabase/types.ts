@@ -302,6 +302,83 @@ export type Database = {
         }
         Relationships: []
       }
+      debate_messages: {
+        Row: {
+          content: string
+          created_at: string
+          debate_session_id: string
+          figure_id: string
+          figure_name: string
+          id: string
+          is_user_message: boolean
+          turn_number: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          debate_session_id: string
+          figure_id: string
+          figure_name: string
+          id?: string
+          is_user_message?: boolean
+          turn_number: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          debate_session_id?: string
+          figure_id?: string
+          figure_name?: string
+          id?: string
+          is_user_message?: boolean
+          turn_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_messages_debate_session_id_fkey"
+            columns: ["debate_session_id"]
+            isOneToOne: false
+            referencedRelation: "debate_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debate_sessions: {
+        Row: {
+          created_at: string
+          current_turn: number
+          figure_ids: string[]
+          figure_names: string[]
+          id: string
+          status: string
+          topic: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          current_turn?: number
+          figure_ids: string[]
+          figure_names: string[]
+          id?: string
+          status?: string
+          topic: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          current_turn?: number
+          figure_ids?: string[]
+          figure_names?: string[]
+          id?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           conversation_id: string | null

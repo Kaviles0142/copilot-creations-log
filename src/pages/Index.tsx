@@ -1,5 +1,6 @@
 import { Suspense, useState } from "react";
 import HistoricalChat from "@/components/HistoricalChat";
+import DebateMode from "@/components/DebateMode";
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
 
@@ -35,9 +36,7 @@ const Index = () => {
           {mode === "chat" ? (
             <HistoricalChat />
           ) : (
-            <div className="text-center p-8 border rounded-lg">
-              <p className="text-muted-foreground">Debate mode coming soon...</p>
-            </div>
+            <DebateMode />
           )}
         </Suspense>
       </div>
