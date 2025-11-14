@@ -86,6 +86,22 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             }
             
             setTimeout(() => setCurrentSpeaker(null), 5000);
+
+            // Auto-trigger next turn for non-moderated formats
+            if (format !== "moderated") {
+              setTimeout(async () => {
+                const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
+                  body: {
+                    sessionId,
+                    currentTurn: newMessage.turn_number + 1,
+                  },
+                });
+                
+                if (error) {
+                  console.error("Error auto-continuing debate:", error);
+                }
+              }, 3000); // Wait 3 seconds before next speaker
+            }
           }
         }
       )
