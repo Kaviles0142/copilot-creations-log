@@ -74,13 +74,15 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           filter: `debate_session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          setMessages((prev) => [...prev, payload.new as DebateMessage]);
-          
           const newMessage = payload.new as DebateMessage;
+          
+          // Add message to display immediately
+          setMessages((prev) => [...prev, newMessage]);
+          
           if (!newMessage.is_user_message) {
             setCurrentSpeaker(newMessage.figure_id);
             
-            // Play audio if enabled (non-blocking)
+            // Play audio alongside the message if enabled
             if (audioEnabled) {
               playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
@@ -89,7 +91,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
 
             // Auto-trigger next turn for non-moderated formats
             if (format !== "moderated") {
-              // Trigger next speaker immediately (don't wait for audio)
+              // Trigger next speaker after a delay
               setTimeout(async () => {
                 const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
                   body: {
