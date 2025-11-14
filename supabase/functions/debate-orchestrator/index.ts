@@ -186,8 +186,9 @@ Now respond to the latest point raised.`;
 
     // Don't use setTimeout in edge functions - it won't work
     // Instead, return a flag indicating whether to continue
-    // Allow debate to continue indefinitely until user intervention
-    const shouldContinue = session.format !== 'moderated' && !userMessage;
+    // For non-moderated debates, continue as long as we haven't heard from all figures yet
+    const totalFigures = session.figure_names.length;
+    const shouldContinue = session.format !== 'moderated' && currentTurn < totalFigures;
 
     return new Response(
       JSON.stringify({ 
