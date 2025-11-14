@@ -3,24 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Users, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Users, Sparkles, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 
 interface Figure {
   id: string;
   name: string;
 }
-
-const POPULAR_FIGURES: Figure[] = [
-  { id: "abraham-lincoln", name: "Abraham Lincoln" },
-  { id: "marie-curie", name: "Marie Curie" },
-  { id: "albert-einstein", name: "Albert Einstein" },
-  { id: "winston-churchill", name: "Winston Churchill" },
-  { id: "cleopatra", name: "Cleopatra" },
-  { id: "leonardo-da-vinci", name: "Leonardo da Vinci" },
-  { id: "nelson-mandela", name: "Nelson Mandela" },
-  { id: "ada-lovelace", name: "Ada Lovelace" },
-];
 
 interface DebateFigureSelectorProps {
   onStartDebate: (topic: string, figures: Figure[]) => void;
@@ -29,13 +19,30 @@ interface DebateFigureSelectorProps {
 export default function DebateFigureSelector({ onStartDebate }: DebateFigureSelectorProps) {
   const [topic, setTopic] = useState("");
   const [selectedFigures, setSelectedFigures] = useState<Figure[]>([]);
+  const [figureInput, setFigureInput] = useState("");
 
-  const toggleFigure = (figure: Figure) => {
-    if (selectedFigures.find(f => f.id === figure.id)) {
-      setSelectedFigures(selectedFigures.filter(f => f.id !== figure.id));
-    } else if (selectedFigures.length < 4) {
-      setSelectedFigures([...selectedFigures, figure]);
+  const addFigure = () => {
+    const name = figureInput.trim();
+    if (!name) {
+      toast.error("Please enter a name");
+      return;
     }
+    if (selectedFigures.length >= 4) {
+      toast.error("Maximum 4 figures allowed");
+      return;
+    }
+    if (selectedFigures.find(f => f.name.toLowerCase() === name.toLowerCase())) {
+      toast.error("Figure already added");
+      return;
+    }
+
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    setSelectedFigures([...selectedFigures, { id, name }]);
+    setFigureInput("");
+  };
+
+  const removeFigure = (id: string) => {
+    setSelectedFigures(selectedFigures.filter(f => f.id !== id));
   };
 
   const canStart = topic.trim() && selectedFigures.length >= 2;
@@ -59,34 +66,41 @@ export default function DebateFigureSelector({ onStartDebate }: DebateFigureSele
         </div>
 
         <div className="space-y-3">
-          <Label>Select 2-4 Historical Figures</Label>
+          <Label htmlFor="figure-input">Add Historical Figures (2-4)</Label>
           <p className="text-sm text-muted-foreground">
-            Choose {selectedFigures.length}/4 figures
+            Enter any historical figure's name - {selectedFigures.length}/4 added
           </p>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {POPULAR_FIGURES.map((figure) => {
-              const isSelected = selectedFigures.find(f => f.id === figure.id);
-              const isDisabled = !isSelected && selectedFigures.length >= 4;
-              
-              return (
-                <div
-                  key={figure.id}
-                  className={`flex items-center space-x-2 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    isSelected ? "bg-primary/10 border-primary" : "hover:bg-muted"
-                  } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                  onClick={() => !isDisabled && toggleFigure(figure)}
-                >
-                  <Checkbox
-                    checked={!!isSelected}
-                    disabled={isDisabled}
-                    onCheckedChange={() => !isDisabled && toggleFigure(figure)}
-                  />
-                  <span className="text-sm font-medium">{figure.name}</span>
-                </div>
-              );
-            })}
+          <div className="flex gap-2">
+            <Input
+              id="figure-input"
+              placeholder="e.g., Abraham Lincoln, Marie Curie..."
+              value={figureInput}
+              onChange={(e) => setFigureInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addFigure()}
+            />
+            <Button 
+              onClick={addFigure}
+              disabled={selectedFigures.length >= 4}
+              size="icon"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
+
+          {selectedFigures.length > 0 && (
+            <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/50">
+              {selectedFigures.map((figure) => (
+                <Badge key={figure.id} variant="secondary" className="gap-1 px-3 py-1">
+                  {figure.name}
+                  <X 
+                    className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                    onClick={() => removeFigure(figure.id)}
+                  />
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         <Button
