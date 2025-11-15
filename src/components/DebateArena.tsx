@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Volume2, VolumeX, Pause, Play, RotateCcw, Square } from "lucide-react";
+import { Send, Volume2, VolumeX } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,8 +41,6 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -99,16 +97,28 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             console.log('🔊 Audio enabled:', audioEnabledRef.current);
             if (audioEnabledRef.current) {
               console.log('🎵 Triggering audio for:', newMessage.figure_name);
-              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id, newMessage.turn_number, format);
-            } else if (format !== "moderated") {
-              // If audio is disabled, trigger next turn immediately with a small delay
-              setTimeout(async () => {
-                console.log('⏭️ Auto-triggering next turn (no audio):', newMessage.turn_number + 1);
-                await triggerNextTurn(newMessage.turn_number + 1);
-              }, 2000);
+              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
             
             setTimeout(() => setCurrentSpeaker(null), 2000);
+
+            // Auto-trigger next turn for non-moderated formats
+            if (format !== "moderated") {
+              // Trigger next speaker after a delay
+              setTimeout(async () => {
+                console.log('⏭️ Auto-triggering next turn:', newMessage.turn_number + 1);
+                const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
+                  body: {
+                    sessionId,
+                    currentTurn: newMessage.turn_number + 1,
+                  },
+                });
+                
+                if (error) {
+                  console.error("Error auto-continuing debate:", error);
+                }
+              }, 1000);
+            }
           }
         }
       )
@@ -119,160 +129,69 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     };
   };
 
-  const triggerNextTurn = async (nextTurnNumber: number) => {
-    console.log('⏭️ Triggering next turn:', nextTurnNumber);
-    const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
-      body: {
-        sessionId,
-        topic,
-        figures,
-        format,
-        currentTurn: nextTurnNumber,
-      },
-    });
-
-    if (error) {
-      console.error("Error triggering next turn:", error);
-    }
-  };
-
-  const playAudio = async (text: string, figureName: string, figureId: string, turnNumber: number, debateFormat: DebateFormat) => {
-    console.log('🎵 playAudio called for:', figureName);
-    
-    // Stop current audio if playing
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-      setCurrentAudio(null);
-      setIsPlayingAudio(false);
-      setIsPaused(false);
-    }
-    
+  const playAudio = async (text: string, figureName: string, figureId: string) => {
     try {
-      console.log('🔊 Generating TTS for debate...');
-      const { data, error } = await supabase.functions.invoke("azure-text-to-speech", {
-        body: { 
-          text, 
-          figure_id: figureId, 
-          figure_name: figureName,
-          voice: 'auto'
-        },
-      });
-
-      if (error) {
-        console.error("TTS Error:", error);
-        toast({
-          title: "Audio Error",
-          description: "Could not generate speech audio",
-          variant: "destructive",
-        });
-        
-        // Even on TTS error, trigger next turn if not moderated
-        if (debateFormat !== "moderated") {
-          setTimeout(async () => {
-            await triggerNextTurn(turnNumber + 1);
-          }, 2000);
-        }
-        return;
-      }
-
-      if (data?.audioUrl) {
-        console.log('✅ Got audio URL, creating audio element');
-        const audio = new Audio(data.audioUrl);
-        
-        audio.onplay = () => {
-          console.log('▶️ Audio started playing');
-          setIsPlayingAudio(true);
-          setIsPaused(false);
-        };
-        
-        audio.onended = () => {
-          console.log('⏹️ Audio ended');
-          setIsPlayingAudio(false);
-          setIsPaused(false);
-          setCurrentAudio(null);
-          
-          // Auto-trigger next turn AFTER audio finishes for non-moderated formats
-          if (debateFormat !== "moderated") {
-            console.log('⏭️ Audio finished, triggering next turn:', turnNumber + 1);
-            setTimeout(async () => {
-              await triggerNextTurn(turnNumber + 1);
-            }, 1000); // Small 1 second pause between speakers
-          }
-        };
-        
-        audio.onerror = (err) => {
-          console.error('❌ Audio playback error:', err);
-          setIsPlayingAudio(false);
-          setIsPaused(false);
-          
-          // Even on playback error, trigger next turn if not moderated
-          if (debateFormat !== "moderated") {
-            setTimeout(async () => {
-              await triggerNextTurn(turnNumber + 1);
-            }, 2000);
-          }
-        };
-        
-        audio.onpause = () => {
-          console.log('⏸️ Audio paused');
-          if (audio.currentTime < audio.duration) {
-            setIsPaused(true);
-          }
-        };
-        
-        setCurrentAudio(audio);
-        await audio.play();
-      }
-    } catch (err) {
-      console.error("Error in playAudio:", err);
-      toast({
-        title: "Playback Error",
-        description: "Failed to play audio",
-        variant: "destructive",
-      });
+      console.log('🎤 Generating Azure TTS for:', figureName);
       
-      // Even on error, trigger next turn if not moderated
-      if (debateFormat !== "moderated") {
-        setTimeout(async () => {
-          await triggerNextTurn(turnNumber + 1);
-        }, 2000);
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: {
+          text,
+          figure_name: figureName,
+          figure_id: figureId,
+          voice: 'auto'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.audioContent) {
+        // Initialize audio element if needed (same as single chat)
+        if (!audioElementRef.current) {
+          audioElementRef.current = new Audio();
+          audioElementRef.current.crossOrigin = 'anonymous';
+        }
+
+        // Stop current audio if playing
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        }
+
+        // Set up event handlers (same as single chat)
+        audioElementRef.current.onplay = () => {
+          console.log('▶️ Audio playing:', figureName);
+        };
+
+        audioElementRef.current.onended = () => {
+          console.log('⏹️ Audio ended:', figureName);
+          setCurrentAudio(null);
+        };
+
+        audioElementRef.current.onerror = (err) => {
+          console.error('❌ Audio error:', err);
+          setCurrentAudio(null);
+        };
+
+        // Convert base64 to blob (same as single chat)
+        const byteCharacters = atob(data.audioContent);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
+        const playbackUrl = URL.createObjectURL(audioBlob);
+
+        // Set source and play (same as single chat)
+        audioElementRef.current.src = playbackUrl;
+        setCurrentAudio(audioElementRef.current);
+        audioElementRef.current.load();
+        await audioElementRef.current.play();
+        console.log('🔊 Audio playing for:', figureName);
       }
-    }
-  };
-
-  const handlePauseAudio = () => {
-    if (currentAudio && isPlayingAudio) {
-      currentAudio.pause();
-      setIsPlayingAudio(false);
-      setIsPaused(true);
-    }
-  };
-
-  const handleResumeAudio = () => {
-    if (currentAudio && isPaused) {
-      currentAudio.play();
-      setIsPlayingAudio(true);
-      setIsPaused(false);
-    }
-  };
-
-  const handleReplayAudio = () => {
-    if (currentAudio) {
-      currentAudio.currentTime = 0;
-      currentAudio.play();
-      setIsPlayingAudio(true);
-      setIsPaused(false);
-    }
-  };
-
-  const handleStopAudio = () => {
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
+    } catch (error) {
+      console.error('Error playing audio:', error);
       setCurrentAudio(null);
-      setIsPlayingAudio(false);
-      setIsPaused(false);
     }
   };
 
@@ -447,51 +366,12 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           placeholder="Add your perspective to the debate..."
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && !isProcessing && handleSendMessage()}
+          onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
           disabled={isProcessing}
         />
-        {isPlayingAudio ? (
-          // Show pause and stop buttons during audio playback
-          <div className="flex gap-2">
-            <Button 
-              onClick={handlePauseAudio}
-              size="icon"
-              variant="secondary"
-            >
-              <Pause className="h-4 w-4" />
-            </Button>
-            <Button 
-              onClick={handleStopAudio}
-              size="icon"
-              variant="destructive"
-            >
-              <Square className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : isPaused ? (
-          // Show play and replay buttons when paused
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleResumeAudio}
-              size="icon"
-              variant="default"
-            >
-              <Play className="h-4 w-4" />
-            </Button>
-            <Button 
-              onClick={handleReplayAudio}
-              size="icon"
-              variant="outline"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          // Show send button when ready
-          <Button onClick={handleSendMessage} disabled={isProcessing || !userInput.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        )}
+        <Button onClick={handleSendMessage} disabled={isProcessing || !userInput.trim()}>
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
 
       <Button variant="outline" onClick={onEnd} className="w-full">
