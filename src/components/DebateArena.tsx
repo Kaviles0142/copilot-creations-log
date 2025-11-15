@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Volume2, VolumeX } from "lucide-react";
+import { Send, Volume2, VolumeX, Pause, Play, RotateCcw, Square } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,6 +41,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -195,6 +196,41 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     }
   };
 
+  const handlePauseAudio = () => {
+    if (currentAudio && !isPaused) {
+      currentAudio.pause();
+      setIsPaused(true);
+      console.log('⏸️ Audio paused');
+    }
+  };
+
+  const handleResumeAudio = () => {
+    if (currentAudio && isPaused) {
+      currentAudio.play();
+      setIsPaused(false);
+      console.log('▶️ Audio resumed');
+    }
+  };
+
+  const handleReplayAudio = () => {
+    if (currentAudio) {
+      currentAudio.currentTime = 0;
+      currentAudio.play();
+      setIsPaused(false);
+      console.log('🔄 Audio replaying');
+    }
+  };
+
+  const handleStopAudio = () => {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      setCurrentAudio(null);
+      setIsPaused(false);
+      console.log('⏹️ Audio stopped');
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!userInput.trim() || isProcessing) return;
 
@@ -315,13 +351,50 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Debate Messages</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setAudioEnabled(!audioEnabled)}
-          >
-            {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </Button>
+          <div className="flex gap-2">
+            {currentAudio && !isPaused ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handlePauseAudio}
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleStopAudio}
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              </>
+            ) : currentAudio && isPaused ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResumeAudio}
+                >
+                  <Play className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleReplayAudio}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAudioEnabled(!audioEnabled)}
+            >
+              {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
         
         <ScrollArea className="h-[400px] pr-4">
