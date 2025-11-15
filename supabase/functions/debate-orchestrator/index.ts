@@ -134,13 +134,42 @@ ${conversationHistory}
 
 Now respond to the latest point raised.`;
 
-    // Call AI to generate response
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
-    }
+    const userPrompt = userMessage || 'Continue the debate based on the previous points.';
 
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Generate cache key from conversation context
+    const cacheKey = `debate_${sessionId}_${currentFigureName}_${currentTurn}_${conversationHistory.slice(-200)}`;
+    const cacheKeyHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(cacheKey))
+      .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+    // Check cache first
+    const { data: cachedResponse } = await supabase
+      .from('ai_response_cache')
+      .select('response_content, hit_count')
+      .eq('cache_key', cacheKeyHash)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    let figureResponse: string;
+
+    if (cachedResponse) {
+      console.log(`✅ Cache hit for ${currentFigureName} (used ${cachedResponse.hit_count} times)`);
+      figureResponse = cachedResponse.response_content;
+      
+      // Increment hit count
+      await supabase
+        .from('ai_response_cache')
+        .update({ hit_count: cachedResponse.hit_count + 1 })
+        .eq('cache_key', cacheKeyHash);
+    } else {
+      console.log(`🔄 Cache miss - calling OpenAI for ${currentFigureName}`);
+      
+      // Call AI to generate response
+      const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+      if (!OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY not configured');
+      }
+
+      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -163,8 +192,26 @@ Now respond to the latest point raised.`;
       throw new Error(`OpenAI API error: ${openAIResponse.status}`);
     }
 
-    const aiData = await openAIResponse.json();
-    const figureResponse = aiData.choices[0].message.content;
+      const aiData = await openAIResponse.json();
+      figureResponse = aiData.choices[0].message.content;
+
+      // Cache the response (expires in 24 hours)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
+      await supabase
+        .from('ai_response_cache')
+        .insert({
+          cache_key: cacheKeyHash,
+          response_content: figureResponse,
+          figure_name: currentFigureName,
+          ai_provider: 'openai',
+          model: 'gpt-4o-mini',
+          expires_at: expiresAt.toISOString(),
+        });
+      
+      console.log(`💾 Cached response for ${currentFigureName}`);
+    }
 
     // Save figure's response
     await supabase.from('debate_messages').insert({

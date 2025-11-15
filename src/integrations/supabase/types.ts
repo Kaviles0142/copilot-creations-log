@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_response_cache: {
+        Row: {
+          ai_provider: string
+          cache_key: string
+          created_at: string
+          expires_at: string
+          figure_name: string | null
+          hit_count: number | null
+          id: string
+          model: string | null
+          response_content: string
+        }
+        Insert: {
+          ai_provider: string
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          figure_name?: string | null
+          hit_count?: number | null
+          id?: string
+          model?: string | null
+          response_content: string
+        }
+        Update: {
+          ai_provider?: string
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          figure_name?: string | null
+          hit_count?: number | null
+          id?: string
+          model?: string | null
+          response_content?: string
+        }
+        Relationships: []
+      }
       audio_cache: {
         Row: {
           cached_audio: string
@@ -670,6 +706,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_ai_cache: { Args: never; Returns: undefined }
       cleanup_expired_news_cache: { Args: never; Returns: undefined }
     }
     Enums: {
