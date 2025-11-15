@@ -62,7 +62,7 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, userMessage, currentTurn, selectedFigureId, startNewRound, round } = await req.json();
+    const { sessionId, userMessage, currentTurn, selectedFigureId, startNewRound, round, figureIndexInRound } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -257,7 +257,6 @@ Now respond to the latest point raised.`;
     console.log(`✅ ${currentFigureName} responded (turn ${currentTurn})`);
 
     // Determine if we should continue to the next figure in this round
-    const { figureIndexInRound } = await req.json();
     const totalFigures = session.figure_names.length;
     const nextFigureIndex = (figureIndexInRound !== undefined ? figureIndexInRound : currentFigureIndex) + 1;
 
