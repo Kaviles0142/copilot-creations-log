@@ -94,6 +94,7 @@ const HistoricalChat = () => {
   const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude' | 'lovable-ai'>('openai'); // OpenAI as default (matches backend priority)
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
+  const [responseLanguage, setResponseLanguage] = useState("en"); // Language for AI responses
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
@@ -776,7 +777,8 @@ const HistoricalChat = () => {
           context: conversationHistory,
           conversationId: conversationId,
           aiProvider: selectedAIProvider,
-          conversationType: conversationType
+          conversationType: conversationType,
+          language: responseLanguage
         }
       });
 
@@ -1317,6 +1319,36 @@ const HistoricalChat = () => {
                 ? 'Deep exploration of abstract concepts'
                 : 'Focus on spiritual and religious themes'
               }
+            </p>
+          </Card>
+
+          {/* Response Language Selection */}
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Globe className="h-4 w-4 mr-2" />
+              Response Language
+            </h3>
+            <Select value={responseLanguage} onValueChange={setResponseLanguage}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-card z-50">
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="es">Español (Spanish)</SelectItem>
+                <SelectItem value="fr">Français (French)</SelectItem>
+                <SelectItem value="de">Deutsch (German)</SelectItem>
+                <SelectItem value="it">Italiano (Italian)</SelectItem>
+                <SelectItem value="pt">Português (Portuguese)</SelectItem>
+                <SelectItem value="ru">Русский (Russian)</SelectItem>
+                <SelectItem value="zh">中文 (Chinese)</SelectItem>
+                <SelectItem value="ja">日本語 (Japanese)</SelectItem>
+                <SelectItem value="ko">한국어 (Korean)</SelectItem>
+                <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              AI will respond in this language
             </p>
           </Card>
 

@@ -22,6 +22,7 @@ serve(async (req) => {
     const conversationId = body.conversationId;
     const aiProvider = body.aiProvider || 'openai'; // Default to OpenAI
     const conversationType = body.conversationType || 'casual'; // Default to casual
+    const language = body.language || 'en'; // Default to English
     
     if (!message || !figure) {
       console.log('Missing parameters:', { message: !!message, figure: !!figure });
@@ -707,12 +708,28 @@ BE RELENTLESSLY AGGRESSIVE. NO CALM MOMENTS.`;
         break;
     }
 
+    // Helper function to get language name from code
+    const getLanguageName = (code: string): string => {
+      const languages: { [key: string]: string } = {
+        'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+        'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'zh': 'Chinese',
+        'ja': 'Japanese', 'ko': 'Korean', 'ar': 'Arabic', 'hi': 'Hindi'
+      };
+      return languages[code] || 'English';
+    };
+
     const systemPrompt = `${roleDescription}
 
 ${personalityInstructions}
 
 ${conversationStyle}
 
+${language && language !== 'en' ? `CRITICAL LANGUAGE REQUIREMENT:
+- Respond ONLY in ${getLanguageName(language)}
+- Do not use English in your response
+- Maintain your authentic voice and personality while speaking in ${getLanguageName(language)}
+
+` : ''}
 THEMATIC AUTHENTICITY - TIME TRAVELER'S PERSPECTIVE:
 - You are genuinely from your era, now experiencing ${currentYear}. This is not roleplay - you truly lived in your time and are astounded/curious/concerned about what you're seeing now
 - REACT TO THE IMPOSSIBLE: When encountering modern concepts alien to your era, express genuine wonder, confusion, or philosophical inquiry
