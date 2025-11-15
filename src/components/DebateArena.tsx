@@ -39,6 +39,8 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const [userInput, setUserInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [isRoundComplete, setIsRoundComplete] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -71,6 +73,18 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
       .order("turn_number", { ascending: true });
 
     if (data) setMessages(data);
+
+    // Load session state
+    const { data: session } = await supabase
+      .from("debate_sessions")
+      .select("current_round, is_round_complete")
+      .eq("id", sessionId)
+      .single();
+
+    if (session) {
+      setCurrentRound(session.current_round);
+      setIsRoundComplete(session.is_round_complete);
+    }
   };
 
   const subscribeToMessages = () => {
@@ -104,23 +118,19 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
             
             setTimeout(() => setCurrentSpeaker(null), 2000);
 
-            // Auto-trigger next turn for non-moderated formats
-            if (format !== "moderated") {
-              // Trigger next speaker after a delay
-              setTimeout(async () => {
-                console.log('⏭️ Auto-triggering next turn:', newMessage.turn_number + 1);
-                const { data, error } = await supabase.functions.invoke("debate-orchestrator", {
-                  body: {
-                    sessionId,
-                    currentTurn: newMessage.turn_number + 1,
-                  },
-                });
-                
-                if (error) {
-                  console.error("Error auto-continuing debate:", error);
-                }
-              }, 1000);
-            }
+            // Check if round is complete after this message
+            setTimeout(async () => {
+              const { data: session } = await supabase
+                .from("debate_sessions")
+                .select("is_round_complete")
+                .eq("id", sessionId)
+                .single();
+
+              if (session?.is_round_complete) {
+                setIsRoundComplete(true);
+                setIsProcessing(false);
+              }
+            }, 500);
           }
         }
       )
@@ -319,11 +329,45 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     }
   };
 
+  const handleContinueRound = async () => {
+    setIsProcessing(true);
+    setIsRoundComplete(false);
+
+    try {
+      // Start the next round
+      const { error } = await supabase.functions.invoke("debate-orchestrator", {
+        body: {
+          sessionId,
+          startNewRound: true,
+          round: currentRound + 1,
+        },
+      });
+
+      if (error) throw error;
+      setCurrentRound(prev => prev + 1);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to continue debate",
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="p-4 bg-primary/5 border-primary">
-        <h2 className="text-xl font-bold mb-2">Debate Topic</h2>
-        <p className="text-muted-foreground">{topic}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold mb-2">Debate Topic</h2>
+            <p className="text-muted-foreground">{topic}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Round</p>
+            <p className="text-2xl font-bold text-primary">{currentRound}</p>
+          </div>
+        </div>
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -460,6 +504,17 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           </Button>
         )}
       </div>
+
+      {isRoundComplete && format !== "moderated" && (
+        <Button 
+          onClick={handleContinueRound} 
+          disabled={isProcessing}
+          className="w-full"
+          size="lg"
+        >
+          Continue to Round {currentRound + 1}
+        </Button>
+      )}
 
       <Button variant="outline" onClick={onEnd} className="w-full">
         End Debate

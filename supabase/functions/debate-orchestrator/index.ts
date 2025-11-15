@@ -62,13 +62,13 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, userMessage, currentTurn, selectedFigureId } = await req.json();
+    const { sessionId, userMessage, currentTurn, selectedFigureId, startNewRound, round } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log(`🎭 Orchestrating debate session: ${sessionId}, turn: ${currentTurn}`);
+    console.log(`🎭 Orchestrating debate session: ${sessionId}${startNewRound ? `, starting round ${round}` : `, turn: ${currentTurn}`}`);
 
     // Get session details
     const { data: session, error: sessionError } = await supabase
@@ -85,6 +85,37 @@ serve(async (req) => {
       .select('*')
       .eq('debate_session_id', sessionId)
       .order('turn_number', { ascending: true });
+
+    // If starting a new round, trigger all figures sequentially
+    if (startNewRound) {
+      console.log(`🔄 Starting new round ${round}`);
+      
+      // Update session to new round and mark as incomplete
+      await supabase
+        .from('debate_sessions')
+        .update({ 
+          current_round: round,
+          is_round_complete: false 
+        })
+        .eq('id', sessionId);
+
+      // Trigger first figure in the round
+      const { error: triggerError } = await supabase.functions.invoke("debate-orchestrator", {
+        body: {
+          sessionId,
+          currentTurn: (previousMessages?.length || 0),
+          figureIndexInRound: 0,
+          round,
+        },
+      });
+
+      if (triggerError) throw triggerError;
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Round started' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Build conversation history
     const conversationHistory = previousMessages?.map(msg => 
@@ -223,26 +254,41 @@ Now respond to the latest point raised.`;
       is_user_message: false,
     });
 
-    // Update session turn counter
-    await supabase
-      .from('debate_sessions')
-      .update({ current_turn: currentTurn + 1 })
-      .eq('id', sessionId);
-
     console.log(`✅ ${currentFigureName} responded (turn ${currentTurn})`);
 
-    // Don't use setTimeout in edge functions - it won't work
-    // Instead, return a flag indicating whether to continue
-    // For non-moderated debates, continue as long as we haven't heard from all figures yet
+    // Determine if we should continue to the next figure in this round
+    const { figureIndexInRound } = await req.json();
     const totalFigures = session.figure_names.length;
-    const shouldContinue = session.format !== 'moderated' && currentTurn < totalFigures;
+    const nextFigureIndex = (figureIndexInRound !== undefined ? figureIndexInRound : currentFigureIndex) + 1;
+
+    if (nextFigureIndex < totalFigures && session.format !== 'moderated') {
+      // Trigger next figure in the round
+      console.log(`⏭️ Triggering next figure (${nextFigureIndex + 1}/${totalFigures})`);
+      
+      setTimeout(async () => {
+        await supabase.functions.invoke("debate-orchestrator", {
+          body: {
+            sessionId,
+            currentTurn: currentTurn + 1,
+            figureIndexInRound: nextFigureIndex,
+            round: session.current_round,
+          },
+        });
+      }, 2000);
+    } else if (nextFigureIndex >= totalFigures) {
+      // Round complete - all figures have spoken
+      console.log(`✅ Round ${session.current_round} complete`);
+      
+      await supabase
+        .from('debate_sessions')
+        .update({ is_round_complete: true })
+        .eq('id', sessionId);
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         speaker: currentFigureName,
-        shouldContinue,
-        nextTurn: currentTurn + 1
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
