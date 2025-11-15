@@ -195,9 +195,9 @@ Now respond to the latest point raised.`;
       const aiData = await openAIResponse.json();
       figureResponse = aiData.choices[0].message.content;
 
-      // Cache the response (expires in 24 hours)
+      // Cache the response (expires in 7 days)
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
       await supabase
         .from('ai_response_cache')
