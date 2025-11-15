@@ -382,11 +382,13 @@ export type Database = {
       debate_sessions: {
         Row: {
           created_at: string
+          current_round: number
           current_turn: number
           figure_ids: string[]
           figure_names: string[]
           format: string
           id: string
+          is_round_complete: boolean
           status: string
           topic: string
           updated_at: string
@@ -394,11 +396,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_round?: number
           current_turn?: number
           figure_ids: string[]
           figure_names: string[]
           format?: string
           id?: string
+          is_round_complete?: boolean
           status?: string
           topic: string
           updated_at?: string
@@ -406,11 +410,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_round?: number
           current_turn?: number
           figure_ids?: string[]
           figure_names?: string[]
           format?: string
           id?: string
+          is_round_complete?: boolean
           status?: string
           topic?: string
           updated_at?: string
