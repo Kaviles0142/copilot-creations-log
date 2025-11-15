@@ -31,10 +31,11 @@ interface DebateArenaProps {
   topic: string;
   figures: Figure[];
   format: DebateFormat;
+  language: string;
   onEnd: () => void;
 }
 
-export default function DebateArena({ sessionId, topic, figures, format, onEnd }: DebateArenaProps) {
+export default function DebateArena({ sessionId, topic, figures, format, language, onEnd }: DebateArenaProps) {
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);

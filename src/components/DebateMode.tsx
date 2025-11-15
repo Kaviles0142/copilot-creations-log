@@ -16,12 +16,14 @@ export default function DebateMode() {
   const [topic, setTopic] = useState("");
   const [figures, setFigures] = useState<Figure[]>([]);
   const [format, setFormat] = useState<DebateFormat>("round-robin");
+  const [language, setLanguage] = useState("en");
   const { toast } = useToast();
 
   const handleStartDebate = async (
     debateTopic: string, 
     selectedFigures: Figure[],
-    debateFormat: DebateFormat
+    debateFormat: DebateFormat,
+    debateLanguage: string
   ) => {
     try {
       const { data, error } = await supabase
@@ -43,6 +45,7 @@ export default function DebateMode() {
         body: {
           sessionId: data.id,
           currentTurn: 0,
+          language: debateLanguage,
         },
       });
 
@@ -66,6 +69,7 @@ export default function DebateMode() {
       setTopic(debateTopic);
       setFigures(selectedFigures);
       setFormat(debateFormat);
+      setLanguage(debateLanguage);
 
       toast({
         title: "Debate Started",
@@ -101,6 +105,7 @@ export default function DebateMode() {
         topic={topic}
         figures={figures}
         format={format}
+        language={language}
         onEnd={handleEndDebate}
       />
     );

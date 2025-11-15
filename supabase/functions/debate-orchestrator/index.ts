@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper to get language name
+function getLanguageName(code: string): string {
+  const languages: Record<string, string> = {
+    'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+    'it': 'Italian', 'pt': 'Portuguese', 'ja': 'Japanese', 'zh': 'Chinese',
+    'ko': 'Korean', 'ar': 'Arabic', 'ru': 'Russian', 'hi': 'Hindi'
+  };
+  return languages[code] || 'English';
+}
+
 // Helper function to pick most relevant figure for free-for-all mode
 async function pickRelevantFigure(session: any, conversationHistory: string, previousMessages: any[]): Promise<number> {
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -62,7 +72,7 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, userMessage, currentTurn, selectedFigureId, startNewRound, round, figureIndexInRound } = await req.json();
+    const { sessionId, userMessage, currentTurn, selectedFigureId, startNewRound, round, figureIndexInRound, language } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -169,6 +179,7 @@ Instructions:
 - You can agree with valid points or counter arguments you disagree with
 - Keep your response focused and under 150 words
 - Engage directly with the debate, not just with the user
+${language && language !== 'en' ? `- CRITICAL: Respond ONLY in ${getLanguageName(language)}. Do not use English.` : ''}
 
 Previous debate conversation:
 ${conversationHistory}

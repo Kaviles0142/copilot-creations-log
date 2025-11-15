@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Sparkles, Plus, X } from "lucide-react";
+import { Users, Sparkles, Plus, X, Globe } from "lucide-react";
 import { toast } from "sonner";
 
 interface Figure {
@@ -16,14 +16,30 @@ interface Figure {
 type DebateFormat = "round-robin" | "free-for-all" | "moderated";
 
 interface DebateFigureSelectorProps {
-  onStartDebate: (topic: string, figures: Figure[], format: DebateFormat) => void;
+  onStartDebate: (topic: string, figures: Figure[], format: DebateFormat, language: string) => void;
 }
+
+const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "es", name: "Español" },
+  { code: "fr", name: "Français" },
+  { code: "de", name: "Deutsch" },
+  { code: "it", name: "Italiano" },
+  { code: "pt", name: "Português" },
+  { code: "ja", name: "日本語" },
+  { code: "zh", name: "中文" },
+  { code: "ko", name: "한국어" },
+  { code: "ar", name: "العربية" },
+  { code: "ru", name: "Русский" },
+  { code: "hi", name: "हिन्दी" },
+];
 
 export default function DebateFigureSelector({ onStartDebate }: DebateFigureSelectorProps) {
   const [topic, setTopic] = useState("");
   const [selectedFigures, setSelectedFigures] = useState<Figure[]>([]);
   const [figureInput, setFigureInput] = useState("");
   const [format, setFormat] = useState<DebateFormat>("round-robin");
+  const [language, setLanguage] = useState("en");
 
   const addFigure = () => {
     const name = figureInput.trim();
@@ -88,6 +104,28 @@ export default function DebateFigureSelector({ onStartDebate }: DebateFigureSele
           </p>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="language" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Response Language
+          </Label>
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger id="language" className="bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50 max-h-[300px]">
+              {LANGUAGES.map((lang) => (
+                <SelectItem key={lang.code} value={lang.code}>
+                  {lang.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Figures will respond in this language
+          </p>
+        </div>
+
         <div className="space-y-3">
           <Label htmlFor="figure-input">Add Historical Figures (2-4)</Label>
           <p className="text-sm text-muted-foreground">
@@ -127,7 +165,7 @@ export default function DebateFigureSelector({ onStartDebate }: DebateFigureSele
         </div>
 
         <Button
-          onClick={() => onStartDebate(topic, selectedFigures, format)}
+          onClick={() => onStartDebate(topic, selectedFigures, format, language)}
           disabled={!canStart}
           className="w-full"
           size="lg"
