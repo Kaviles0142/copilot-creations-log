@@ -38,6 +38,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -166,6 +167,8 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
         audioElementRef.current.onended = () => {
           console.log('⏹️ Audio ended:', figureName);
           setCurrentAudio(null);
+          setIsPlayingAudio(false);
+          setIsPaused(false);
         };
 
         audioElementRef.current.onerror = (err) => {
@@ -186,6 +189,8 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
         // Set source and play (same as single chat)
         audioElementRef.current.src = playbackUrl;
         setCurrentAudio(audioElementRef.current);
+        setIsPlayingAudio(true);
+        setIsPaused(false);
         audioElementRef.current.load();
         await audioElementRef.current.play();
         console.log('🔊 Audio playing for:', figureName);
@@ -199,6 +204,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const handlePauseAudio = () => {
     if (currentAudio && !isPaused) {
       currentAudio.pause();
+      setIsPlayingAudio(false);
       setIsPaused(true);
       console.log('⏸️ Audio paused');
     }
@@ -207,6 +213,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
   const handleResumeAudio = () => {
     if (currentAudio && isPaused) {
       currentAudio.play();
+      setIsPlayingAudio(true);
       setIsPaused(false);
       console.log('▶️ Audio resumed');
     }
@@ -216,6 +223,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
     if (currentAudio) {
       currentAudio.currentTime = 0;
       currentAudio.play();
+      setIsPlayingAudio(true);
       setIsPaused(false);
       console.log('🔄 Audio replaying');
     }
@@ -226,6 +234,7 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
       currentAudio.pause();
       currentAudio.currentTime = 0;
       setCurrentAudio(null);
+      setIsPlayingAudio(false);
       setIsPaused(false);
       console.log('⏹️ Audio stopped');
     }
@@ -351,50 +360,13 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Debate Messages</h3>
-          <div className="flex gap-2">
-            {currentAudio && !isPaused ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handlePauseAudio}
-                >
-                  <Pause className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleStopAudio}
-                >
-                  <Square className="h-4 w-4" />
-                </Button>
-              </>
-            ) : currentAudio && isPaused ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleResumeAudio}
-                >
-                  <Play className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleReplayAudio}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setAudioEnabled(!audioEnabled)}
-            >
-              {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setAudioEnabled(!audioEnabled)}
+          >
+            {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
         </div>
         
         <ScrollArea className="h-[400px] pr-4">
@@ -439,12 +411,54 @@ export default function DebateArena({ sessionId, topic, figures, format, onEnd }
           placeholder="Add your perspective to the debate..."
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+          onKeyPress={(e) => e.key === "Enter" && !isPlayingAudio && !isPaused && handleSendMessage()}
           disabled={isProcessing}
         />
-        <Button onClick={handleSendMessage} disabled={isProcessing || !userInput.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
+        {isPlayingAudio ? (
+          // Show pause and stop buttons during audio playback
+          <div className="flex gap-2">
+            <Button 
+              onClick={handlePauseAudio}
+              size="icon"
+              variant="secondary"
+              className="h-[60px] w-[60px]"
+            >
+              <Pause className="h-4 w-4" />
+            </Button>
+            <Button 
+              onClick={handleStopAudio}
+              size="icon"
+              variant="destructive"
+              className="h-[60px] w-[60px]"
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : isPaused ? (
+          // Show play and replay buttons when paused
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleResumeAudio}
+              size="icon"
+              variant="default"
+              className="h-[60px] w-[60px]"
+            >
+              <Play className="h-4 w-4" />
+            </Button>
+            <Button 
+              onClick={handleReplayAudio}
+              size="icon"
+              variant="outline"
+              className="h-[60px] w-[60px]"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={handleSendMessage} disabled={isProcessing || !userInput.trim()} size="icon" className="h-[60px] w-[60px]">
+            <Send className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <Button variant="outline" onClick={onEnd} className="w-full">
