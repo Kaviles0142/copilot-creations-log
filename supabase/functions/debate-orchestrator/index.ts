@@ -138,8 +138,18 @@ serve(async (req) => {
       currentFigureId = session.figure_ids[currentFigureIndex];
       currentFigureName = session.figure_names[currentFigureIndex];
     } else {
-      // Round-robin: Sequential order
-      currentFigureIndex = currentTurn % session.figure_names.length;
+      // Round-robin: Use figureIndexInRound if provided, otherwise calculate from turn
+      if (figureIndexInRound !== undefined) {
+        currentFigureIndex = figureIndexInRound;
+      } else {
+        // For the start of a round, figure out position based on messages in current round
+        const messagesInCurrentRound = previousMessages?.filter(m => {
+          // Assuming each round has session.figure_names.length messages
+          const roundStartTurn = (session.current_round - 1) * session.figure_names.length;
+          return m.turn_number >= roundStartTurn;
+        }).length || 0;
+        currentFigureIndex = messagesInCurrentRound % session.figure_names.length;
+      }
       currentFigureId = session.figure_ids[currentFigureIndex];
       currentFigureName = session.figure_names[currentFigureIndex];
     }
