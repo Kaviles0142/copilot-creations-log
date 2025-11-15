@@ -791,20 +791,48 @@ ${relevantKnowledge}
 
 Remember: You're ${figure.name} having a real conversation. Share your experiences, quote your own words, express genuine emotions. Make every response feel like YOU speaking, not someone speaking ABOUT you. NO stage directions - just authentic, passionate dialogue.`;
 
-    // Try AI providers in priority order with automatic fallback
+    // Generate cache key from conversation context
+    const contextForCache = figure.id + '_' + message.slice(0, 100) + '_' + relevantKnowledge.slice(0, 200) + '_' + conversationType;
+    const cacheKeyHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(contextForCache))
+      .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+    // Check cache first
+    const { data: cachedResponse } = await supabase
+      .from('ai_response_cache')
+      .select('response_content, hit_count, ai_provider, model')
+      .eq('cache_key', cacheKeyHash)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
     let response: string | null = null;
     let usedProvider = '';
-    
-    for (const provider of AI_PROVIDERS) {
-      const apiKey = Deno.env.get(provider.env);
+    let usedModel = '';
+
+    if (cachedResponse) {
+      console.log(`✅ Cache hit for ${figure.name} (${cachedResponse.ai_provider}/${cachedResponse.model}, used ${cachedResponse.hit_count} times)`);
+      response = cachedResponse.response_content;
+      usedProvider = cachedResponse.ai_provider;
+      usedModel = cachedResponse.model;
       
-      if (!apiKey) {
-        console.log(`${provider.name} not configured, skipping...`);
-        continue;
-      }
-      
-      try {
-        console.log(`Trying ${provider.name}...`);
+      // Increment hit count
+      await supabase
+        .from('ai_response_cache')
+        .update({ hit_count: cachedResponse.hit_count + 1 })
+        .eq('cache_key', cacheKeyHash);
+    } else {
+      console.log(`🔄 Cache miss - trying AI providers for ${figure.name}`);
+
+      // Try AI providers in priority order with automatic fallback
+      for (const provider of AI_PROVIDERS) {
+        const apiKey = Deno.env.get(provider.env);
+        
+        if (!apiKey) {
+          console.log(`${provider.name} not configured, skipping...`);
+          continue;
+        }
+        
+        try {
+          console.log(`Trying ${provider.name}...`);
         
         if (provider.name === 'Anthropic') {
           // Anthropic uses a different API format
@@ -868,6 +896,7 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
           const data = await aiResponse.json();
           response = data.choices[0].message.content;
           usedProvider = provider.name;
+          usedModel = provider.model;
         }
         
         // Post-process response to clean formatting artifacts
@@ -894,6 +923,26 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
         // Continue to next provider
       }
     }
+
+    // Cache the new response if we got one (expires in 30 days)
+    if (response && !cachedResponse) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      await supabase
+        .from('ai_response_cache')
+        .insert({
+          cache_key: cacheKeyHash,
+          response_content: response,
+          figure_name: figure.name,
+          ai_provider: usedProvider,
+          model: usedModel,
+          expires_at: expiresAt.toISOString(),
+        });
+      
+      console.log(`💾 Cached response for ${figure.name} (${usedProvider}/${usedModel})`);
+    }
+  }
     
     if (!response) {
       return new Response(JSON.stringify({ 
