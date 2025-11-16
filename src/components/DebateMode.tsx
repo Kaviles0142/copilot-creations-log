@@ -45,7 +45,7 @@ export default function DebateMode() {
         body: {
           sessionId: data.id,
           currentTurn: 0,
-          language: debateLanguage,
+          language: debateLanguage.split('-')[0],
         },
       });
 
@@ -60,7 +60,7 @@ export default function DebateMode() {
             body: {
               sessionId: data.id,
               currentTurn: orchestratorData.nextTurn,
-              language: debateLanguage,
+              language: debateLanguage.split('-')[0],
             },
           });
         }, 2000);

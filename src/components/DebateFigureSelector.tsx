@@ -20,18 +20,18 @@ interface DebateFigureSelectorProps {
 }
 
 const LANGUAGES = [
-  { code: "en", name: "English" },
-  { code: "es", name: "Español" },
-  { code: "fr", name: "Français" },
-  { code: "de", name: "Deutsch" },
-  { code: "it", name: "Italiano" },
-  { code: "pt", name: "Português" },
-  { code: "ja", name: "日本語" },
-  { code: "zh", name: "中文" },
-  { code: "ko", name: "한국어" },
-  { code: "ar", name: "العربية" },
-  { code: "ru", name: "Русский" },
-  { code: "hi", name: "हिन्दी" },
+  { code: "en-US", name: "English" },
+  { code: "es-ES", name: "Español" },
+  { code: "fr-FR", name: "Français" },
+  { code: "de-DE", name: "Deutsch" },
+  { code: "it-IT", name: "Italiano" },
+  { code: "pt-PT", name: "Português" },
+  { code: "ja-JP", name: "日本語" },
+  { code: "zh-CN", name: "中文" },
+  { code: "ko-KR", name: "한국어" },
+  { code: "ar-SA", name: "العربية" },
+  { code: "ru-RU", name: "Русский" },
+  { code: "hi-IN", name: "हिन्दी" },
 ];
 
 export default function DebateFigureSelector({ onStartDebate }: DebateFigureSelectorProps) {
