@@ -50,6 +50,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [currentRound, setCurrentRound] = useState(1);
   const [isRoundComplete, setIsRoundComplete] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
+  const [selectedFigure, setSelectedFigure] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -277,14 +278,31 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
     }
   };
 
-  const handleReplayAudio = () => {
-    if (currentAudio) {
+  const handleReplayAudio = async () => {
+    // If a figure is selected, play their last message
+    if (selectedFigure) {
+      const figureMessages = messages.filter(m => m.figure_id === selectedFigure && !m.is_user_message);
+      if (figureMessages.length > 0) {
+        const lastMessage = figureMessages[figureMessages.length - 1];
+        // Stop current audio and clear queue
+        handleStopAudio();
+        // Play selected figure's audio
+        console.log('🔄 Replaying:', lastMessage.figure_name);
+        await playAudioNow(lastMessage.content, lastMessage.figure_name, lastMessage.figure_id);
+      }
+    } else if (currentAudio) {
+      // No selection, replay current audio
       currentAudio.currentTime = 0;
       currentAudio.play();
       setIsPlayingAudio(true);
       setIsPaused(false);
       console.log('🔄 Audio replaying');
     }
+  };
+
+  const handleFigureSelect = (figureId: string) => {
+    setSelectedFigure(figureId);
+    console.log('👤 Selected figure:', figureId);
   };
 
   const handleStopAudio = () => {
@@ -294,8 +312,12 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       setCurrentAudio(null);
       setIsPlayingAudio(false);
       setIsPaused(false);
+      setCurrentSpeaker(null);
       console.log('⏹️ Audio stopped');
     }
+    // Clear queue to prevent auto-playing next
+    setAudioQueue([]);
+    setIsProcessingQueue(false);
   };
 
   const handleSendMessage = async () => {
@@ -422,12 +444,20 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         {figures.map((figure) => (
           <Card
             key={figure.id}
-            className={`p-4 transition-all ${
-              currentSpeaker === figure.id
+            className={`p-4 transition-all cursor-pointer ${
+              selectedFigure === figure.id
                 ? "ring-2 ring-primary shadow-lg"
-                : format === "moderated" ? "cursor-pointer hover:bg-muted" : ""
+                : currentSpeaker === figure.id
+                ? "ring-2 ring-accent shadow-md"
+                : "hover:bg-muted"
             }`}
-            onClick={() => format === "moderated" && !isProcessing && handleFigureClick(figure.id)}
+            onClick={() => {
+              if (format === "moderated" && !isProcessing) {
+                handleFigureClick(figure.id);
+              } else {
+                handleFigureSelect(figure.id);
+              }
+            }}
           >
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-20 w-20">
@@ -439,6 +469,9 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                 <p className="font-semibold text-sm">{figure.name}</p>
                 {currentSpeaker === figure.id && (
                   <p className="text-xs text-primary animate-pulse">Speaking...</p>
+                )}
+                {selectedFigure === figure.id && (
+                  <p className="text-xs text-accent font-semibold">Selected</p>
                 )}
                 {format === "moderated" && !isProcessing && (
                   <p className="text-xs text-muted-foreground">Click to speak</p>
