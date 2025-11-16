@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice, figure_name, figure_id } = await req.json();
+    const { text, voice, figure_name, figure_id, language } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -143,7 +143,59 @@ serve(async (req) => {
       return mapping[nationality] || 'american';
     };
 
-    // Region-to-voice mapping with Azure Neural Voices (GENDERED)
+    // Language-to-voice mapping with native Azure Neural Voices
+    const languageVoiceMap: { [key: string]: { male: string; female: string } } = {
+      'en-US': {
+        male: 'en-US-GuyNeural',
+        female: 'en-US-JennyNeural'
+      },
+      'es-ES': {
+        male: 'es-ES-AlvaroNeural',
+        female: 'es-ES-ElviraNeural'
+      },
+      'fr-FR': {
+        male: 'fr-FR-HenriNeural',
+        female: 'fr-FR-DeniseNeural'
+      },
+      'de-DE': {
+        male: 'de-DE-ConradNeural',
+        female: 'de-DE-KatjaNeural'
+      },
+      'it-IT': {
+        male: 'it-IT-DiegoNeural',
+        female: 'it-IT-ElsaNeural'
+      },
+      'ja-JP': {
+        male: 'ja-JP-KeitaNeural',
+        female: 'ja-JP-NanamiNeural'
+      },
+      'zh-CN': {
+        male: 'zh-CN-YunxiNeural',
+        female: 'zh-CN-XiaoxiaoNeural'
+      },
+      'ar-SA': {
+        male: 'ar-SA-HamedNeural',
+        female: 'ar-SA-ZariyahNeural'
+      },
+      'hi-IN': {
+        male: 'hi-IN-MadhurNeural',
+        female: 'hi-IN-SwaraNeural'
+      },
+      'ru-RU': {
+        male: 'ru-RU-DmitryNeural',
+        female: 'ru-RU-SvetlanaNeural'
+      },
+      'pt-BR': {
+        male: 'pt-BR-AntonioNeural',
+        female: 'pt-BR-FranciscaNeural'
+      },
+      'en-GB': {
+        male: 'en-GB-RyanNeural',
+        female: 'en-GB-SoniaNeural'
+      }
+    };
+
+    // Region-to-voice mapping with Azure Neural Voices (GENDERED) - for nationality fallback
     const regionVoiceMap: { [key: string]: { male: string; female: string } } = {
       'german': {
         male: 'de-DE-ConradNeural',
@@ -191,12 +243,21 @@ serve(async (req) => {
       }
     };
 
-    // Auto-select voice based on figure's region AND gender ONLY if voice is "auto" or undefined
+    // PRIORITY 1: User selected language (highest priority)
+    // PRIORITY 2: Figure's nationality/region (fallback)
     let selectedVoice = voice;
     let detectedRegion = 'american';
     
-    // Only auto-detect if user hasn't manually selected a voice
-    if ((voice === 'auto' || !voice || voice === 'de-DE-ConradNeural') && figure_name && figure_id) {
+    const gender = detectGender(figure_name || '');
+    console.log(`🎭 Detected gender: ${gender} for ${figure_name}`);
+    
+    // Check if user selected a language from dropdown
+    if (language && languageVoiceMap[language]) {
+      selectedVoice = languageVoiceMap[language][gender];
+      console.log(`🌍 Using language-specific voice: ${selectedVoice} for language: ${language}`);
+    }
+    // Only auto-detect nationality if no language was selected AND voice is "auto"
+    else if ((voice === 'auto' || !voice || voice === 'de-DE-ConradNeural') && figure_name && figure_id) {
       // Cache version - increment this when mapping logic changes
       const CACHE_VERSION = 'v2'; // Updated to force re-detection with new nationality mappings
       
@@ -216,12 +277,14 @@ serve(async (req) => {
           .eq('figure_id', figure_id);
       }
 
+      let nationality = '';
+      
       if (cachedMetadata?.region && cachedMetadata.cache_version === CACHE_VERSION) {
         console.log(`📦 Using cached region for ${figure_name}: ${cachedMetadata.region}`);
         detectedRegion = cachedMetadata.region;
       } else {
         // Detect nationality using AI
-        const nationality = await detectNationality(figure_name);
+        nationality = await detectNationality(figure_name);
         detectedRegion = mapNationalityToRegion(nationality);
         
         console.log(`🗺️ Detected nationality: ${nationality}, mapped to region: ${detectedRegion}`);
@@ -240,10 +303,11 @@ serve(async (req) => {
           });
       }
       
-      const detectedGender = detectGender(figure_name);
-      selectedVoice = regionVoiceMap[detectedRegion][detectedGender];
-      console.log(`🎤 Auto mode: ${detectedRegion} ${detectedGender} → Voice: ${selectedVoice}`);
-    } else {
+      console.log(`🌍 Using nationality-based region: ${detectedRegion} for ${figure_name}`);
+      
+      selectedVoice = regionVoiceMap[detectedRegion]?.[gender] || regionVoiceMap['american'][gender];
+      console.log(`🎤 Auto mode: ${detectedRegion} ${gender} → Voice: ${selectedVoice}`);
+    } else if (!language) {
       console.log(`🎤 Using manually selected voice: ${selectedVoice}`);
     }
 

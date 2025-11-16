@@ -243,7 +243,8 @@ const HistoricalChat = () => {
             text: greetingText,
             figure_name: figure.name,
             figure_id: figure.id,
-            voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+            voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
+            language: selectedLanguage
           }
         })
       ]);
@@ -340,7 +341,8 @@ const HistoricalChat = () => {
           text: text,
           figure_name: selectedFigure.name,
           figure_id: selectedFigure.id,
-          voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+          voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
+          language: selectedLanguage
         }
       });
 
@@ -814,7 +816,8 @@ const HistoricalChat = () => {
               text: aiResponse,
               figure_name: selectedFigure!.name,
               figure_id: selectedFigure!.id,
-              voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId
+              voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
+              language: selectedLanguage
             }
           });
 
@@ -947,7 +950,8 @@ const HistoricalChat = () => {
           text: text,
           voice: voiceId === 'auto' ? undefined : voiceId, // Let Azure auto-select if "auto"
           figure_name: figure.name,
-          figure_id: figure.id
+          figure_id: figure.id,
+          language: selectedLanguage
         }
       });
 
