@@ -60,6 +60,7 @@ export default function DebateMode() {
             body: {
               sessionId: data.id,
               currentTurn: orchestratorData.nextTurn,
+              language: debateLanguage,
             },
           });
         }, 2000);
