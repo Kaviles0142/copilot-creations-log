@@ -35,7 +35,13 @@ interface DebateArenaProps {
   onEnd: () => void;
 }
 
-// RESTORE POINT: Audio switches between speakers - only 4th plays completely
+// Audio queue system to prevent interruption
+interface AudioQueueItem {
+  text: string;
+  figureName: string;
+  figureId: string;
+}
+
 export default function DebateArena({ sessionId, topic, figures, format, language, onEnd }: DebateArenaProps) {
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [userInput, setUserInput] = useState("");
@@ -47,6 +53,8 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [audioQueue, setAudioQueue] = useState<AudioQueueItem[]>([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -111,11 +119,11 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           if (!newMessage.is_user_message) {
             setCurrentSpeaker(newMessage.figure_id);
             
-            // Play audio alongside the message if enabled (using ref to avoid closure)
+            // Add audio to queue if enabled (using ref to avoid closure)
             console.log('🔊 Audio enabled:', audioEnabledRef.current);
             if (audioEnabledRef.current) {
-              console.log('🎵 Triggering audio for:', newMessage.figure_name);
-              playAudio(newMessage.content, newMessage.figure_name, newMessage.figure_id);
+              console.log('➕ Adding to audio queue:', newMessage.figure_name);
+              addToAudioQueue(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
             
             setTimeout(() => setCurrentSpeaker(null), 2000);
@@ -143,7 +151,38 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
     };
   };
 
-  const playAudio = async (text: string, figureName: string, figureId: string) => {
+  // Add audio to queue instead of playing immediately
+  const addToAudioQueue = (text: string, figureName: string, figureId: string) => {
+    setAudioQueue(prev => [...prev, { text, figureName, figureId }]);
+  };
+
+  // Process audio queue - play next item if nothing is currently playing
+  useEffect(() => {
+    if (audioQueue.length > 0 && !isProcessingQueue && !isPlayingAudio) {
+      processNextAudio();
+    }
+  }, [audioQueue, isProcessingQueue, isPlayingAudio]);
+
+  const processNextAudio = async () => {
+    if (audioQueue.length === 0 || isProcessingQueue) return;
+
+    setIsProcessingQueue(true);
+    const nextItem = audioQueue[0];
+    
+    console.log('🎵 Playing next audio from queue:', nextItem.figureName, `(${audioQueue.length} in queue)`);
+    
+    try {
+      await playAudioNow(nextItem.text, nextItem.figureName, nextItem.figureId);
+    } catch (error) {
+      console.error('Error playing queued audio:', error);
+    } finally {
+      // Remove this item from queue
+      setAudioQueue(prev => prev.slice(1));
+      setIsProcessingQueue(false);
+    }
+  };
+
+  const playAudioNow = async (text: string, figureName: string, figureId: string) => {
     try {
       console.log('🎤 Generating Azure TTS for:', figureName);
       
@@ -159,21 +198,16 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       if (error) throw error;
 
       if (data?.audioContent) {
-        // Initialize audio element if needed (same as single chat)
+        // Initialize audio element if needed
         if (!audioElementRef.current) {
           audioElementRef.current = new Audio();
           audioElementRef.current.crossOrigin = 'anonymous';
         }
 
-        // Stop current audio if playing
-        if (currentAudio) {
-          currentAudio.pause();
-          currentAudio.currentTime = 0;
-        }
-
-        // Set up event handlers (same as single chat)
+        // Set up event handlers
         audioElementRef.current.onplay = () => {
           console.log('▶️ Audio playing:', figureName);
+          setIsPlayingAudio(true);
         };
 
         audioElementRef.current.onended = () => {
@@ -181,14 +215,16 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           setCurrentAudio(null);
           setIsPlayingAudio(false);
           setIsPaused(false);
+          // Queue will automatically process next item via useEffect
         };
 
         audioElementRef.current.onerror = (err) => {
           console.error('❌ Audio error:', err);
           setCurrentAudio(null);
+          setIsPlayingAudio(false);
         };
 
-        // Convert base64 to blob (same as single chat)
+        // Convert base64 to blob
         const byteCharacters = atob(data.audioContent);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -198,11 +234,9 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
         const playbackUrl = URL.createObjectURL(audioBlob);
 
-        // Set source and play (same as single chat)
+        // Set source and play
         audioElementRef.current.src = playbackUrl;
         setCurrentAudio(audioElementRef.current);
-        setIsPlayingAudio(true);
-        setIsPaused(false);
         audioElementRef.current.load();
         await audioElementRef.current.play();
         console.log('🔊 Audio playing for:', figureName);
@@ -210,6 +244,8 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
     } catch (error) {
       console.error('Error playing audio:', error);
       setCurrentAudio(null);
+      setIsPlayingAudio(false);
+      throw error;
     }
   };
 
