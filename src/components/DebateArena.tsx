@@ -35,6 +35,7 @@ interface DebateArenaProps {
   onEnd: () => void;
 }
 
+// RESTORE POINT: Audio switches between speakers - only 4th plays completely
 export default function DebateArena({ sessionId, topic, figures, format, language, onEnd }: DebateArenaProps) {
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [userInput, setUserInput] = useState("");
