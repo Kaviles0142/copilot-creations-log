@@ -82,7 +82,19 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       .eq("debate_session_id", sessionId)
       .order("turn_number", { ascending: true });
 
-    if (data) setMessages(data);
+    if (data) {
+      setMessages(data);
+      
+      // Add AI messages to audio queue if audio is enabled
+      if (audioEnabledRef.current) {
+        data.forEach(msg => {
+          if (!msg.is_user_message) {
+            console.log('➕ Adding existing message to audio queue:', msg.figure_name);
+            addToAudioQueue(msg.content, msg.figure_name, msg.figure_id);
+          }
+        });
+      }
+    }
 
     // Load session state
     const { data: session } = await supabase
