@@ -167,7 +167,38 @@ serve(async (req) => {
     // Build debate-aware prompt
     const otherFigures = session.figure_names.filter((_: string, i: number) => i !== currentFigureIndex);
     
-    const systemPrompt = `You are ${currentFigureName} participating in a DEBATE with:
+    // Check if this is the first speaker in the current round
+    const messagesInCurrentRound = previousMessages?.filter(m => {
+      const roundStartTurn = (session.current_round - 1) * session.figure_names.length;
+      return m.turn_number >= roundStartTurn;
+    }).length || 0;
+    
+    const isFirstSpeakerInRound = messagesInCurrentRound === 0;
+    
+    let systemPrompt: string;
+    let userPrompt: string;
+    
+    if (isFirstSpeakerInRound) {
+      // First speaker: Give fresh opinion without referencing others
+      systemPrompt = `You are ${currentFigureName} participating in a DEBATE with:
+${otherFigures.map((name: string) => `- ${name}`).join('\n')}
+
+Topic: ${session.topic}
+
+Instructions:
+- Stay in character as ${currentFigureName}
+- Give your perspective and opinion on the topic
+- DO NOT reference or respond to other participants (they haven't spoken yet in this round)
+- Present your viewpoint clearly and thoughtfully
+- Keep your response focused and under 150 words
+${language && language !== 'en' ? `- CRITICAL: Respond ONLY in ${getLanguageName(language)}. Do not use English.` : ''}
+
+Share your opinion on the topic above.`;
+
+      userPrompt = userMessage || `What is your perspective on: ${session.topic}`;
+    } else {
+      // Subsequent speakers: Respond to what others have said
+      systemPrompt = `You are ${currentFigureName} participating in a DEBATE with:
 ${otherFigures.map((name: string) => `- ${name}`).join('\n')}
 
 Topic: ${session.topic}
@@ -186,7 +217,8 @@ ${conversationHistory}
 
 Now respond to the latest point raised.`;
 
-    const userPrompt = userMessage || 'Continue the debate based on the previous points.';
+      userPrompt = userMessage || 'Continue the debate based on the previous points.';
+    }
 
     // Generate cache key from conversation context
     const cacheKey = `debate_${sessionId}_${currentFigureName}_${currentTurn}_${conversationHistory.slice(-200)}`;
