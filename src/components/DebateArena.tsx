@@ -353,6 +353,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           sessionId,
           userMessage,
           currentTurn: turnNumber + 1,
+          language,
         },
       });
 
@@ -365,6 +366,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
             body: {
               sessionId,
               currentTurn: data.nextTurn,
+              language,
             },
           });
         }, 2000);
@@ -393,6 +395,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           sessionId,
           selectedFigureId: figureId,
           currentTurn: turnNumber,
+          language,
         },
       });
 
@@ -419,6 +422,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           sessionId,
           startNewRound: true,
           round: currentRound + 1,
+          language,
         },
       });
 
