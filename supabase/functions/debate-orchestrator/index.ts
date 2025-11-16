@@ -54,15 +54,39 @@ Who should respond next based on the conversation context? Reply with ONLY the n
 
     if (response.ok) {
       const data = await response.json();
-      const selectedName = data.choices[0].message.content.trim();
-      const index = session.figure_names.indexOf(selectedName);
-      return index >= 0 ? index : 0;
+      const selectedName = data.choices[0].message.content.trim().toLowerCase();
+      
+      // Case-insensitive name matching
+      const index = session.figure_names.findIndex((name: string) => 
+        name.toLowerCase() === selectedName
+      );
+      
+      console.log(`🎯 AI selected: "${selectedName}", matched index: ${index}`);
+      
+      // If no match found, pick random available figure (not the last speaker)
+      if (index < 0) {
+        const randomIndex = Math.floor(Math.random() * availableFigures.length);
+        const randomFigure = availableFigures[randomIndex];
+        const fallbackIndex = session.figure_names.findIndex((name: string) => 
+          name.toLowerCase() === randomFigure.toLowerCase()
+        );
+        console.log(`⚠️ No match found, using random available figure: ${randomFigure} at index ${fallbackIndex}`);
+        return fallbackIndex >= 0 ? fallbackIndex : 0;
+      }
+      
+      return index;
     }
   } catch (error) {
     console.error('Error picking figure:', error);
   }
 
-  return 0; // Fallback to first figure
+  // Fallback: pick random from available figures
+  const randomIndex = Math.floor(Math.random() * availableFigures.length);
+  const randomFigure = availableFigures[randomIndex];
+  const fallbackIndex = session.figure_names.findIndex((name: string) => 
+    name.toLowerCase() === randomFigure.toLowerCase()
+  );
+  return fallbackIndex >= 0 ? fallbackIndex : 0;
 }
 
 
