@@ -42,6 +42,14 @@ interface AudioQueueItem {
   figureId: string;
 }
 
+// Helper function to capitalize names properly
+const capitalizeName = (name: string): string => {
+  return name
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 export default function DebateArena({ sessionId, topic, figures, format, language, onEnd }: DebateArenaProps) {
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [userInput, setUserInput] = useState("");
@@ -462,11 +470,11 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-20 w-20">
                 <AvatarFallback className="text-2xl">
-                  {figure.name.split(" ").map(n => n[0]).join("")}
+                  {capitalizeName(figure.name).split(" ").map(n => n[0]).join("")}
                 </AvatarFallback>
               </Avatar>
               <div className="text-center">
-                <p className="font-semibold text-sm">{figure.name}</p>
+                <p className="font-semibold text-sm">{capitalizeName(figure.name)}</p>
                 {currentSpeaker === figure.id && (
                   <p className="text-xs text-primary animate-pulse">Speaking...</p>
                 )}
@@ -506,7 +514,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                 {!message.is_user_message && (
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {message.figure_name.split(" ").map(n => n[0]).join("")}
+                      {capitalizeName(message.figure_name).split(" ").map(n => n[0]).join("")}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -519,7 +527,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                 >
                   {!message.is_user_message && (
                     <p className="text-xs font-semibold mb-1">
-                      {message.figure_name}
+                      {capitalizeName(message.figure_name)}
                     </p>
                   )}
                   <p className="text-sm">{message.content}</p>
