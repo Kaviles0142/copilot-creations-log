@@ -167,18 +167,25 @@ serve(async (req) => {
     // Build debate-aware prompt
     const otherFigures = session.figure_names.filter((_: string, i: number) => i !== currentFigureIndex);
     
-    // Check if this is the first speaker in the current round
-    const messagesInCurrentRound = previousMessages?.filter(m => {
-      const roundStartTurn = (session.current_round - 1) * session.figure_names.length;
-      return m.turn_number >= roundStartTurn;
-    }).length || 0;
+    // Determine if this is the first speaker based on format
+    let isFirstSpeaker = false;
     
-    const isFirstSpeakerInRound = messagesInCurrentRound === 0;
+    if (session.format === 'round-robin') {
+      // For round-robin: First speaker in the current round
+      const messagesInCurrentRound = previousMessages?.filter(m => {
+        const roundStartTurn = (session.current_round - 1) * session.figure_names.length;
+        return m.turn_number >= roundStartTurn;
+      }).length || 0;
+      isFirstSpeaker = messagesInCurrentRound === 0;
+    } else {
+      // For free-for-all and moderated: First speaker in the entire session
+      isFirstSpeaker = !previousMessages || previousMessages.length === 0;
+    }
     
     let systemPrompt: string;
     let userPrompt: string;
     
-    if (isFirstSpeakerInRound) {
+    if (isFirstSpeaker) {
       // First speaker: Give fresh opinion without referencing others
       systemPrompt = `You are ${currentFigureName} participating in a DEBATE with:
 ${otherFigures.map((name: string) => `- ${name}`).join('\n')}
@@ -188,7 +195,7 @@ Topic: ${session.topic}
 Instructions:
 - Stay in character as ${currentFigureName}
 - Give your perspective and opinion on the topic
-- DO NOT reference or respond to other participants (they haven't spoken yet in this round)
+- DO NOT reference or respond to other participants (they haven't spoken yet)
 - Present your viewpoint clearly and thoughtfully
 - Keep your response focused and under 150 words
 ${language && language !== 'en' ? `- CRITICAL: Respond ONLY in ${getLanguageName(language)}. Do not use English.` : ''}
