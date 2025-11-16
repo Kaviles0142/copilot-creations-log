@@ -278,14 +278,96 @@ const HistoricalChat = () => {
     }
   };
   
-  // Get appropriate greeting for historical figure
+  // Get appropriate greeting for historical figure in selected language
   const getGreetingForFigure = (figure: HistoricalFigure): string => {
-    const greetings = [
-      `Greetings! I am ${figure.name}. What would you like to discuss?`,
-      `Hello! ${figure.name} here. How may I enlighten you today?`,
-      `Welcome! I'm ${figure.name}. What questions do you have for me?`,
-      `Salutations! I am ${figure.name}. What shall we speak of?`,
-    ];
+    const languageGreetings: Record<string, string[]> = {
+      'en-US': [
+        `Greetings! I am ${figure.name}. What would you like to discuss?`,
+        `Hello! ${figure.name} here. How may I enlighten you today?`,
+        `Welcome! I'm ${figure.name}. What questions do you have for me?`,
+        `Salutations! I am ${figure.name}. What shall we speak of?`,
+      ],
+      'es-ES': [
+        `¡Saludos! Soy ${figure.name}. ¿De qué te gustaría hablar?`,
+        `¡Hola! ${figure.name} aquí. ¿Cómo puedo iluminarte hoy?`,
+        `¡Bienvenido! Soy ${figure.name}. ¿Qué preguntas tienes para mí?`,
+        `¡Saludos! Soy ${figure.name}. ¿De qué hablaremos?`,
+      ],
+      'fr-FR': [
+        `Salutations! Je suis ${figure.name}. De quoi aimeriez-vous discuter?`,
+        `Bonjour! ${figure.name} ici. Comment puis-je vous éclairer aujourd'hui?`,
+        `Bienvenue! Je suis ${figure.name}. Quelles questions avez-vous pour moi?`,
+        `Salutations! Je suis ${figure.name}. De quoi allons-nous parler?`,
+      ],
+      'de-DE': [
+        `Grüße! Ich bin ${figure.name}. Worüber möchten Sie sprechen?`,
+        `Hallo! ${figure.name} hier. Wie kann ich Sie heute erleuchten?`,
+        `Willkommen! Ich bin ${figure.name}. Welche Fragen haben Sie an mich?`,
+        `Grüße! Ich bin ${figure.name}. Worüber werden wir sprechen?`,
+      ],
+      'it-IT': [
+        `Saluti! Sono ${figure.name}. Di cosa vorresti discutere?`,
+        `Ciao! ${figure.name} qui. Come posso illuminarti oggi?`,
+        `Benvenuto! Sono ${figure.name}. Che domande hai per me?`,
+        `Saluti! Sono ${figure.name}. Di cosa parleremo?`,
+      ],
+      'pt-PT': [
+        `Saudações! Sou ${figure.name}. Do que gostaria de falar?`,
+        `Olá! ${figure.name} aqui. Como posso iluminá-lo hoje?`,
+        `Bem-vindo! Sou ${figure.name}. Que perguntas tem para mim?`,
+        `Saudações! Sou ${figure.name}. Do que vamos falar?`,
+      ],
+      'nl-NL': [
+        `Gegroet! Ik ben ${figure.name}. Waarover wilt u praten?`,
+        `Hallo! ${figure.name} hier. Hoe kan ik u vandaag verlichten?`,
+        `Welkom! Ik ben ${figure.name}. Welke vragen heeft u voor mij?`,
+        `Gegroet! Ik ben ${figure.name}. Waarover gaan we praten?`,
+      ],
+      'pl-PL': [
+        `Pozdrowienia! Jestem ${figure.name}. O czym chciałbyś porozmawiać?`,
+        `Cześć! ${figure.name} tutaj. Jak mogę cię dzisiaj oświecić?`,
+        `Witaj! Jestem ${figure.name}. Jakie masz do mnie pytania?`,
+        `Pozdrowienia! Jestem ${figure.name}. O czym będziemy rozmawiać?`,
+      ],
+      'ru-RU': [
+        `Приветствую! Я ${figure.name}. О чем вы хотели бы поговорить?`,
+        `Здравствуйте! ${figure.name} здесь. Как я могу просветить вас сегодня?`,
+        `Добро пожаловать! Я ${figure.name}. Какие у вас вопросы ко мне?`,
+        `Приветствую! Я ${figure.name}. О чем мы будем говорить?`,
+      ],
+      'ja-JP': [
+        `ご挨拶！私は${figure.name}です。何について話し合いたいですか？`,
+        `こんにちは！${figure.name}です。今日はどのようにお役に立てますか？`,
+        `ようこそ！私は${figure.name}です。私に何か質問がありますか？`,
+        `ご挨拶！私は${figure.name}です。何について話しましょうか？`,
+      ],
+      'zh-CN': [
+        `您好！我是${figure.name}。您想讨论什么？`,
+        `你好！${figure.name}在此。我今天能为您提供什么启发？`,
+        `欢迎！我是${figure.name}。您有什么问题要问我？`,
+        `您好！我是${figure.name}。我们要谈什么？`,
+      ],
+      'ko-KR': [
+        `안녕하세요! 저는 ${figure.name}입니다. 무엇에 대해 이야기하고 싶으신가요?`,
+        `안녕하세요! ${figure.name}입니다. 오늘 어떻게 도와드릴까요?`,
+        `환영합니다! 저는 ${figure.name}입니다. 저에게 무슨 질문이 있으신가요?`,
+        `안녕하세요! 저는 ${figure.name}입니다. 무엇에 대해 이야기할까요?`,
+      ],
+      'ar-SA': [
+        `تحياتي! أنا ${figure.name}. ماذا تريد أن تناقش؟`,
+        `مرحبا! ${figure.name} هنا. كيف يمكنني أن أنيرك اليوم؟`,
+        `أهلا بك! أنا ${figure.name}. ما هي أسئلتك لي؟`,
+        `تحياتي! أنا ${figure.name}. عن ماذا سنتحدث؟`,
+      ],
+      'hi-IN': [
+        `नमस्ते! मैं ${figure.name} हूं। आप किस बारे में चर्चा करना चाहेंगे?`,
+        `नमस्कार! ${figure.name} यहां। आज मैं आपको कैसे प्रबुद्ध कर सकता हूं?`,
+        `स्वागत है! मैं ${figure.name} हूं। मेरे लिए आपके क्या सवाल हैं?`,
+        `नमस्ते! मैं ${figure.name} हूं। हम किस बारे में बात करेंगे?`,
+      ],
+    };
+    
+    const greetings = languageGreetings[selectedLanguage] || languageGreetings['en-US'];
     return greetings[Math.floor(Math.random() * greetings.length)];
   };
 
