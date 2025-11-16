@@ -579,6 +579,19 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
+        ) : selectedFigure ? (
+          // Show play button when a figure is selected
+          <div className="flex flex-col items-center gap-2">
+            <Button 
+              onClick={handleReplayAudio}
+              size="icon"
+              variant="default"
+              className="h-[60px] w-[60px]"
+            >
+              <Play className="h-4 w-4" />
+            </Button>
+            <p className="text-xs text-muted-foreground">Play Selected</p>
+          </div>
         ) : (
           <Button onClick={handleSendMessage} disabled={isProcessing || !userInput.trim()} size="icon" className="h-[60px] w-[60px]">
             <Send className="h-4 w-4" />
