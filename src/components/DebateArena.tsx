@@ -64,6 +64,8 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [isPaused, setIsPaused] = useState(false);
   const [audioQueue, setAudioQueue] = useState<AudioQueueItem[]>([]);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
+  const [loadingAvatars, setLoadingAvatars] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -76,6 +78,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
 
   useEffect(() => {
     loadMessages();
+    loadAvatars();
     const cleanup = subscribeToMessages();
     return cleanup; // Return cleanup function to properly unsubscribe
   }, [sessionId]);
@@ -116,6 +119,53 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       setCurrentRound(session.current_round);
       setIsRoundComplete(session.is_round_complete);
     }
+  };
+
+  const loadAvatars = async () => {
+    console.log('🎭 Loading avatars for debate participants...');
+    setLoadingAvatars(true);
+    
+    const avatarPromises = figures.map(async (figure) => {
+      try {
+        // Check cache first
+        const { data: cached } = await supabase
+          .from('avatar_image_cache')
+          .select('cloudinary_url')
+          .eq('figure_id', figure.id)
+          .maybeSingle();
+
+        if (cached?.cloudinary_url) {
+          console.log(`✅ Found cached avatar for ${figure.name}`);
+          return { figureId: figure.id, url: cached.cloudinary_url };
+        }
+
+        // Generate new avatar
+        console.log(`📸 Generating avatar for ${figure.name}...`);
+        const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
+          body: {
+            figureName: figure.name,
+            figureId: figure.id
+          }
+        });
+
+        if (error) throw error;
+
+        return { figureId: figure.id, url: data.imageUrl };
+      } catch (error) {
+        console.error(`❌ Failed to load avatar for ${figure.name}:`, error);
+        return { figureId: figure.id, url: '' };
+      }
+    });
+
+    const results = await Promise.all(avatarPromises);
+    const avatarMap = results.reduce((acc, { figureId, url }) => {
+      acc[figureId] = url;
+      return acc;
+    }, {} as Record<string, string>);
+
+    setAvatarUrls(avatarMap);
+    setLoadingAvatars(false);
+    console.log('🎭 All avatars loaded');
   };
 
   const subscribeToMessages = () => {
@@ -474,9 +524,17 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           >
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-20 w-20">
-                <AvatarFallback className="text-2xl">
-                  {capitalizeName(figure.name).split(" ").map(n => n[0]).join("")}
-                </AvatarFallback>
+                {avatarUrls[figure.id] && !loadingAvatars ? (
+                  <img 
+                    src={avatarUrls[figure.id]} 
+                    alt={figure.name} 
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <AvatarFallback className="text-2xl">
+                    {capitalizeName(figure.name).split(" ").map(n => n[0]).join("")}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div className="text-center">
                 <p className="font-semibold text-sm">{capitalizeName(figure.name)}</p>
@@ -518,9 +576,17 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
               >
                 {!message.is_user_message && (
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>
-                      {capitalizeName(message.figure_name).split(" ").map(n => n[0]).join("")}
-                    </AvatarFallback>
+                    {avatarUrls[message.figure_id] && !loadingAvatars ? (
+                      <img 
+                        src={avatarUrls[message.figure_id]} 
+                        alt={message.figure_name} 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <AvatarFallback>
+                        {capitalizeName(message.figure_name).split(" ").map(n => n[0]).join("")}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                 )}
                 <div
