@@ -148,7 +148,17 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error(`❌ Edge function error for ${figure.name}:`, error);
+          throw error;
+        }
+
+        console.log(`✅ Avatar response for ${figure.name}:`, data);
+        
+        if (!data?.imageUrl) {
+          console.error(`❌ No imageUrl in response for ${figure.name}:`, data);
+          return { figureId: figure.id, url: '' };
+        }
 
         return { figureId: figure.id, url: data.imageUrl };
       } catch (error) {
