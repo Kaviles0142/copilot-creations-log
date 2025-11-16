@@ -94,7 +94,7 @@ const HistoricalChat = () => {
   const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude' | 'lovable-ai'>('openai'); // OpenAI as default (matches backend priority)
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
-  const [responseLanguage, setResponseLanguage] = useState("en"); // Language for AI responses
+  // Removed: responseLanguage now uses selectedLanguage for both text and speech
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("auto"); // Track voice selection from VoiceSettings
@@ -780,7 +780,7 @@ const HistoricalChat = () => {
           conversationId: conversationId,
           aiProvider: selectedAIProvider,
           conversationType: conversationType,
-          language: responseLanguage
+          language: selectedLanguage.split('-')[0] // Use language code from selectedLanguage (e.g., 'en' from 'en-US')
         }
       });
 
@@ -1326,33 +1326,31 @@ const HistoricalChat = () => {
             </p>
           </Card>
 
-          {/* Response Language Selection */}
+          {/* Unified Language Selection */}
           <Card className="p-4">
             <h3 className="font-semibold mb-3 flex items-center">
               <Globe className="h-4 w-4 mr-2" />
-              Response Language
+              Language
             </h3>
-            <Select value={responseLanguage} onValueChange={setResponseLanguage}>
+            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-card z-50">
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Español (Spanish)</SelectItem>
-                <SelectItem value="fr">Français (French)</SelectItem>
-                <SelectItem value="de">Deutsch (German)</SelectItem>
-                <SelectItem value="it">Italiano (Italian)</SelectItem>
-                <SelectItem value="pt">Português (Portuguese)</SelectItem>
-                <SelectItem value="ru">Русский (Russian)</SelectItem>
-                <SelectItem value="zh">中文 (Chinese)</SelectItem>
-                <SelectItem value="ja">日本語 (Japanese)</SelectItem>
-                <SelectItem value="ko">한국어 (Korean)</SelectItem>
-                <SelectItem value="ar">العربية (Arabic)</SelectItem>
-                <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
+                <SelectItem value="en-US">🇺🇸 English (US)</SelectItem>
+                <SelectItem value="en-GB">🇬🇧 English (UK)</SelectItem>
+                <SelectItem value="es-ES">🇪🇸 Español (Spanish)</SelectItem>
+                <SelectItem value="fr-FR">🇫🇷 Français (French)</SelectItem>
+                <SelectItem value="de-DE">🇩🇪 Deutsch (German)</SelectItem>
+                <SelectItem value="it-IT">🇮🇹 Italiano (Italian)</SelectItem>
+                <SelectItem value="ja-JP">🇯🇵 日本語 (Japanese)</SelectItem>
+                <SelectItem value="zh-CN">🇨🇳 中文 (Chinese)</SelectItem>
+                <SelectItem value="ar-SA">🇸🇦 العربية (Arabic)</SelectItem>
+                <SelectItem value="hi-IN">🇮🇳 हिन्दी (Hindi)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-2">
-              AI will respond in this language
+              Controls both text responses and native voice accents
             </p>
           </Card>
 
@@ -1584,34 +1582,6 @@ const HistoricalChat = () => {
               New Conversation
             </Button>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center">
-                <Globe className="mr-2 h-4 w-4" />
-                Speech Language
-              </label>
-              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en-US">🇺🇸 English (US)</SelectItem>
-                  <SelectItem value="en-GB">🇬🇧 English (UK)</SelectItem>
-                  <SelectItem value="fr-FR">🇫🇷 French</SelectItem>
-                  <SelectItem value="de-DE">🇩🇪 German</SelectItem>
-                  <SelectItem value="it-IT">🇮🇹 Italian</SelectItem>
-                  <SelectItem value="es-ES">🇪🇸 Spanish</SelectItem>
-                  <SelectItem value="pt-BR">🇧🇷 Portuguese</SelectItem>
-                  <SelectItem value="ru-RU">🇷🇺 Russian</SelectItem>
-                  <SelectItem value="ja-JP">🇯🇵 Japanese</SelectItem>
-                  <SelectItem value="zh-CN">🇨🇳 Chinese</SelectItem>
-                  <SelectItem value="ar-SA">🇸🇦 Arabic</SelectItem>
-                  <SelectItem value="hi-IN">🇮🇳 Hindi</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Free browser-based text-to-speech in multiple languages
-              </p>
-            </div>
 
             {showFileUpload && (
               <Card className="p-4">
