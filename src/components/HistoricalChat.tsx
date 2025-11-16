@@ -213,8 +213,7 @@ const HistoricalChat = () => {
   useEffect(() => {
     if (selectedFigure && voiceCreatedForFigure.current !== selectedFigure.id) {
       voiceCreatedForFigure.current = selectedFigure.id;
-      const figureLanguage = getFigureLanguage(selectedFigure);
-      setSelectedLanguage(figureLanguage);
+      // Removed auto-language switching - user's language selection takes priority
       
       // Generate static avatar portrait and play greeting (ONLY Azure TTS, no Resemble)
       generateAvatarPortraitAndGreeting(selectedFigure);
