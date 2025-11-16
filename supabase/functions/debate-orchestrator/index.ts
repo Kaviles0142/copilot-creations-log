@@ -355,6 +355,7 @@ Now respond to the latest point raised.`;
             currentTurn: currentTurn + 1,
             figureIndexInRound: nextFigureIndex,
             round: session.current_round,
+            language,
           },
         });
       }, 2000);
