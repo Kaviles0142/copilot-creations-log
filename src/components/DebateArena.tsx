@@ -129,16 +129,12 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           setMessages((prev) => [...prev, newMessage]);
           
           if (!newMessage.is_user_message) {
-            setCurrentSpeaker(newMessage.figure_id);
-            
             // Add audio to queue if enabled (using ref to avoid closure)
             console.log('🔊 Audio enabled:', audioEnabledRef.current);
             if (audioEnabledRef.current) {
               console.log('➕ Adding to audio queue:', newMessage.figure_name);
               addToAudioQueue(newMessage.content, newMessage.figure_name, newMessage.figure_id);
             }
-            
-            setTimeout(() => setCurrentSpeaker(null), 2000);
 
             // Check if round is complete after this message
             setTimeout(async () => {
@@ -220,6 +216,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         audioElementRef.current.onplay = () => {
           console.log('▶️ Audio playing:', figureName);
           setIsPlayingAudio(true);
+          setCurrentSpeaker(figureId);
         };
 
         audioElementRef.current.onended = () => {
@@ -227,6 +224,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           setCurrentAudio(null);
           setIsPlayingAudio(false);
           setIsPaused(false);
+          setCurrentSpeaker(null);
           // Queue will automatically process next item via useEffect
         };
 
