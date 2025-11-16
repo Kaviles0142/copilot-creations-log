@@ -209,7 +209,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           figure_name: figureName,
           figure_id: figureId,
           voice: 'auto',
-          language: 'en-US' // Debates default to English
+          language: language || 'en-US'
         }
       });
 
