@@ -244,53 +244,12 @@ const PodcastMode = () => {
     setCurrentSpeaker(speaker);
 
     try {
-      // Build context-aware prompt based on role and conversation history
-      let prompt = '';
+      // Simple message to let the edge function handle the conversation flow
       const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
       
-      // Get language name for instructions
-      const getLanguageName = (code: string): string => {
-        const languages: { [key: string]: string } = {
-          'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
-          'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'zh': 'Chinese',
-          'ja': 'Japanese', 'ko': 'Korean', 'ar': 'Arabic', 'hi': 'Hindi'
-        };
-        return languages[code] || 'English';
-      };
-      
-      const languageCode = selectedLanguage.split('-')[0];
-      const languageName = getLanguageName(languageCode);
-      const languageInstruction = languageCode !== 'en' 
-        ? `\n\nCRITICAL: You MUST respond ONLY in ${languageName}. Do not use English.` 
-        : '';
-      
-      if (speaker === 'host') {
-        prompt = `You are ${currentFigure.name}, the podcast host. You are having a thoughtful discussion with your guest ${otherFigure.name} about "${podcastTopic}".
-
-Your role as host:
-- Ask insightful follow-up questions based on what ${otherFigure.name} just said
-- Guide the conversation naturally
-- Show genuine curiosity about their perspective
-- Keep responses conversational and engaging (2-3 sentences)
-
-Recent conversation:
-${recentContext}
-
-As the host, what do you say next?${languageInstruction}`;
-      } else {
-        prompt = `You are ${currentFigure.name}, a guest on this podcast hosted by ${otherFigure.name}. The topic is "${podcastTopic}".
-
-Your role as guest:
-- Respond thoughtfully to the host's questions
-- Share your unique perspective and experiences
-- Build on what the host said
-- Keep responses conversational and engaging (2-3 sentences)
-
-Recent conversation:
-${recentContext}
-
-As the guest, how do you respond?${languageInstruction}`;
-      }
+      const prompt = speaker === 'host'
+        ? `Continue the podcast discussion about "${podcastTopic}" with guest ${otherFigure.name}. Recent context: ${recentContext}`
+        : `Respond to ${otherFigure.name}'s question about "${podcastTopic}". Recent context: ${recentContext}`;
 
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
