@@ -27,13 +27,23 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Check cache first - using Supabase client for proper query handling
+    console.log('🔍 Checking cache for figure_id:', figureId);
+    
     const { data: cachedImage, error: cacheError } = await supabase
       .from('avatar_image_cache')
       .select('*')
       .eq('figure_id', figureId)
       .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    console.log('📊 Cache query result:', { 
+      found: !!cachedImage, 
+      hasUrl: !!cachedImage?.cloudinary_url,
+      error: cacheError,
+      data: cachedImage 
+    });
 
     if (!cacheError && cachedImage && cachedImage.cloudinary_url) {
       console.log('✅ Using cached portrait from:', cachedImage.created_at);
