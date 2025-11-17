@@ -243,21 +243,28 @@ serve(async (req) => {
       }
     };
 
-    // PRIORITY 1: User selected language (highest priority)
-    // PRIORITY 2: Figure's nationality/region (fallback)
+    // PRIORITY 1: User selected language
+    // PRIORITY 2: For English - detect nationality for authentic accent
+    // PRIORITY 3: For other languages - use standard voice
     let selectedVoice = voice;
     let detectedRegion = 'american';
     
     const gender = detectGender(figure_name || '');
     console.log(`🎭 Detected gender: ${gender} for ${figure_name}`);
     
-    // Check if user selected a language from dropdown
-    if (language && languageVoiceMap[language]) {
+    // Special handling for English: detect nationality for authentic accent
+    if (language === 'en-US' && figure_name && figure_id) {
+      console.log(`🇬🇧 English selected - detecting nationality for authentic accent`);
+      // Continue to nationality detection below
+    }
+    // For non-English languages: use standard voice
+    else if (language && languageVoiceMap[language]) {
       selectedVoice = languageVoiceMap[language][gender];
       console.log(`🌍 Using language-specific voice: ${selectedVoice} for language: ${language}`);
     }
-    // Only auto-detect nationality if no language was selected AND voice is "auto"
-    else if ((voice === 'auto' || !voice || voice === 'de-DE-ConradNeural') && figure_name && figure_id) {
+    
+    // Detect nationality for: (1) English language selected, or (2) no language selected
+    if ((language === 'en-US' || !language || voice === 'auto') && figure_name && figure_id && !selectedVoice) {
       // Cache version - increment this when mapping logic changes
       const CACHE_VERSION = 'v2'; // Updated to force re-detection with new nationality mappings
       
@@ -303,11 +310,30 @@ serve(async (req) => {
           });
       }
       
-      console.log(`🌍 Using nationality-based region: ${detectedRegion} for ${figure_name}`);
+      console.log(`🌍 Detected region: ${detectedRegion} for ${figure_name}`);
       
-      selectedVoice = regionVoiceMap[detectedRegion]?.[gender] || regionVoiceMap['american'][gender];
-      console.log(`🎤 Auto mode: ${detectedRegion} ${gender} → Voice: ${selectedVoice}`);
-    } else if (!language) {
+      // For English: Map to English regional variants
+      if (language === 'en-US') {
+        const englishVariants: Record<string, { male: string, female: string }> = {
+          'british': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
+          'english': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
+          'scottish': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
+          'irish': { male: 'en-IE-ConnorNeural', female: 'en-IE-EmilyNeural' },
+          'australian': { male: 'en-AU-WilliamNeural', female: 'en-AU-NatashaNeural' },
+          'canadian': { male: 'en-CA-LiamNeural', female: 'en-CA-ClaraNeural' },
+          'indian': { male: 'en-IN-PrabhatNeural', female: 'en-IN-NeerjaNeural' },
+          'american': { male: 'en-US-GuyNeural', female: 'en-US-JennyNeural' }
+        };
+        
+        selectedVoice = englishVariants[detectedRegion]?.[gender] || englishVariants['american'][gender];
+        console.log(`🗣️ English with ${detectedRegion} accent: ${selectedVoice}`);
+      }
+      // For auto/no language: Use region-specific native voices
+      else {
+        selectedVoice = regionVoiceMap[detectedRegion]?.[gender] || regionVoiceMap['american'][gender];
+        console.log(`🎙️ Native ${detectedRegion} voice: ${selectedVoice}`);
+      }
+    } else if (!language && selectedVoice) {
       console.log(`🎤 Using manually selected voice: ${selectedVoice}`);
     }
 
