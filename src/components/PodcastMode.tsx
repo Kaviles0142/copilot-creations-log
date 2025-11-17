@@ -205,34 +205,60 @@ const PodcastMode = () => {
 
     setIsRecording(true);
     
-    // Start with host introduction
-    const introMessage = `Welcome to our podcast! Today we're discussing "${podcastTopic}". Let me introduce our guest, ${guest.name}.`;
-    
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: introMessage,
-      type: "assistant",
-      timestamp: new Date(),
-      speakerName: host.name
-    };
-    
-    setMessages([newMessage]);
-    setCurrentSpeaker('host');
-    
-    // Generate and play audio
-    if (isAutoVoiceEnabled) {
-      await generateAndPlayAudio(introMessage, host.name, host.id);
-    }
-    
-    toast({
-      title: "Podcast started!",
-      description: `${host.name} and ${guest.name} are ready to discuss "${podcastTopic}"`,
-    });
+    // Get AI-generated introduction in the correct language
+    try {
+      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
+        body: {
+          message: `Introduce the podcast topic "${podcastTopic}" and welcome guest ${guest.name}.`,
+          figure: {
+            id: host.id,
+            name: host.name,
+            period: host.period,
+            description: host.description
+          },
+          language: selectedLanguage.split('-')[0],
+          context: []
+        }
+      });
 
-    // Now get guest's response
-    setTimeout(() => {
-      continueConversation('guest');
-    }, 1000);
+      if (error) throw error;
+
+      const introMessage = data.response;
+      
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content: introMessage,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: host.name
+      };
+      
+      setMessages([newMessage]);
+      setCurrentSpeaker('host');
+      
+      // Generate and play audio
+      if (isAutoVoiceEnabled) {
+        await generateAndPlayAudio(introMessage, host.name, host.id);
+      }
+      
+      toast({
+        title: "Podcast started!",
+        description: `${host.name} and ${guest.name} are ready to discuss "${podcastTopic}"`,
+      });
+
+      // Now get guest's response
+      setTimeout(() => {
+        continueConversation('guest');
+      }, 1000);
+    } catch (error) {
+      console.error('Error starting podcast:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start podcast. Please try again.",
+        variant: "destructive"
+      });
+      setIsRecording(false);
+    }
   };
 
   const continueConversation = async (speaker: 'host' | 'guest') => {
