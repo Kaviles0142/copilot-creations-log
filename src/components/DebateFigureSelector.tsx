@@ -20,18 +20,18 @@ interface DebateFigureSelectorProps {
 }
 
 const LANGUAGES = [
-  { code: "en-US", name: "English" },
-  { code: "es-ES", name: "Español" },
-  { code: "fr-FR", name: "Français" },
-  { code: "de-DE", name: "Deutsch" },
-  { code: "it-IT", name: "Italiano" },
-  { code: "pt-PT", name: "Português" },
-  { code: "ja-JP", name: "日本語" },
-  { code: "zh-CN", name: "中文" },
-  { code: "ko-KR", name: "한국어" },
-  { code: "ar-SA", name: "العربية" },
-  { code: "ru-RU", name: "Русский" },
-  { code: "hi-IN", name: "हिन्दी" },
+  { code: "en-US", name: "🇺🇸 English" },
+  { code: "es-ES", name: "🇪🇸 Español (Spanish)" },
+  { code: "fr-FR", name: "🇫🇷 Français (French)" },
+  { code: "de-DE", name: "🇩🇪 Deutsch (German)" },
+  { code: "it-IT", name: "🇮🇹 Italiano (Italian)" },
+  { code: "pt-PT", name: "🇵🇹 Português (Portuguese)" },
+  { code: "ja-JP", name: "🇯🇵 日本語 (Japanese)" },
+  { code: "zh-CN", name: "🇨🇳 中文 (Chinese)" },
+  { code: "ko-KR", name: "🇰🇷 한국어 (Korean)" },
+  { code: "ar-SA", name: "🇸🇦 العربية (Arabic)" },
+  { code: "ru-RU", name: "🇷🇺 Русский (Russian)" },
+  { code: "hi-IN", name: "🇮🇳 हिन्दी (Hindi)" },
 ];
 
 export default function DebateFigureSelector({ onStartDebate }: DebateFigureSelectorProps) {
