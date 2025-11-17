@@ -244,47 +244,30 @@ const PodcastMode = () => {
     setCurrentSpeaker(speaker);
 
     try {
-      // Build context-aware prompt based on role and conversation history
-      let prompt = '';
-      const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
+      // Build context from recent conversation
+      const recentContext = messages.slice(-4).map(m => ({
+        role: m.type === 'user' ? 'user' : 'assistant',
+        content: `${m.speakerName}: ${m.content}`
+      }));
       
-      if (speaker === 'host') {
-        prompt = `You are ${currentFigure.name}, the podcast host. You are having a thoughtful discussion with your guest ${otherFigure.name} about "${podcastTopic}".
-
-Your role as host:
-- Ask insightful follow-up questions based on what ${otherFigure.name} just said
-- Guide the conversation naturally
-- Show genuine curiosity about their perspective
-- Keep responses conversational and engaging (2-3 sentences)
-
-Recent conversation:
-${recentContext}
-
-As the host, what do you say next?`;
-      } else {
-        prompt = `You are ${currentFigure.name}, a guest on this podcast hosted by ${otherFigure.name}. The topic is "${podcastTopic}".
-
-Your role as guest:
-- Respond thoughtfully to the host's questions
-- Share your unique perspective and experiences
-- Build on what the host said
-- Keep responses conversational and engaging (2-3 sentences)
-
-Recent conversation:
-${recentContext}
-
-As the guest, how do you respond?`;
-      }
+      // Simple prompt that describes the podcast context without English instructions
+      const contextMessage = speaker === 'host' 
+        ? `[Podcast host speaking about: "${podcastTopic}" with guest ${otherFigure!.name}. Continue the conversation as the host.]`
+        : `[Podcast guest speaking about: "${podcastTopic}" with host ${otherFigure!.name}. Respond to the host's question.]`;
 
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: prompt,
+          message: contextMessage,
           figure: {
             id: currentFigure.id,
-            name: currentFigure.name
+            name: currentFigure.name,
+            period: currentFigure.period,
+            description: currentFigure.description
           },
-          language: selectedLanguage.split('-')[0]
+          context: recentContext,
+          language: selectedLanguage.split('-')[0],
+          conversationType: 'casual'
         }
       });
 
