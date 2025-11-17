@@ -678,7 +678,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         )}
       </div>
 
-      {isRoundComplete && format !== "moderated" && (
+      {isRoundComplete && format === "free-for-all" && (
         <Button 
           onClick={handleContinueRound} 
           disabled={isProcessing}

@@ -363,9 +363,14 @@ Now respond to the latest point raised.`;
       // Round complete - all figures have spoken
       console.log(`✅ Round ${session.current_round} complete`);
       
+      // For round-robin: Mark debate as complete after first round (each figure spoke once)
+      const updateData = session.format === 'round-robin' && session.current_round === 1
+        ? { is_round_complete: true, status: 'completed' }
+        : { is_round_complete: true };
+      
       await supabase
         .from('debate_sessions')
-        .update({ is_round_complete: true })
+        .update(updateData)
         .eq('id', sessionId);
     }
 
