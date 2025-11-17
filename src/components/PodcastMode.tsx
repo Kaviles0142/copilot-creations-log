@@ -209,7 +209,7 @@ const PodcastMode = () => {
     try {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: `Introduce the podcast topic "${podcastTopic}" and welcome guest ${guest.name}.`,
+          message: `Start podcast about ${podcastTopic} with ${guest.name}`,
           figure: {
             id: host.id,
             name: host.name,
@@ -217,7 +217,7 @@ const PodcastMode = () => {
             description: host.description
           },
           language: selectedLanguage.split('-')[0],
-          context: []
+          conversationType: 'casual'
         }
       });
 
@@ -307,20 +307,13 @@ const PodcastMode = () => {
       // Generate and play audio, then continue conversation
       if (isAutoVoiceEnabled) {
         await generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
-        
-        // After audio finishes, continue with other speaker if still recording and under message limit
-        if (isRecording && messages.length < 10) {
-          setTimeout(() => {
-            continueConversation(speaker === 'host' ? 'guest' : 'host');
-          }, 1000);
-        }
-      } else {
-        // If auto-voice is off, just continue immediately
-        if (isRecording && messages.length < 10) {
-          setTimeout(() => {
-            continueConversation(speaker === 'host' ? 'guest' : 'host');
-          }, 1000);
-        }
+      }
+      
+      // After audio finishes (or if auto-voice is off), continue with other speaker
+      if (isRecording && messages.length < 10) {
+        setTimeout(() => {
+          continueConversation(speaker === 'host' ? 'guest' : 'host');
+        }, 1000);
       }
     } catch (error) {
       console.error('Error generating response:', error);
@@ -332,83 +325,94 @@ const PodcastMode = () => {
     }
   };
 
-  const generateAndPlayAudio = async (text: string, figureName: string, figureId: string) => {
-    try {
-      setIsSpeaking(true);
-      
-      console.log('🎤 Generating Azure TTS for:', figureName, 'with language:', selectedLanguage);
-      
-      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
-        body: {
-          text: text,
-          figure_name: figureName,
-          figure_id: figureId,
-          voice: 'auto',
-          language: selectedLanguage
+  const generateAndPlayAudio = async (text: string, figureName: string, figureId: string): Promise<void> => {
+    return new Promise(async (resolve) => {
+      try {
+        setIsSpeaking(true);
+        
+        console.log('🎤 Generating Azure TTS for:', figureName, 'with language:', selectedLanguage);
+        
+        const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+          body: {
+            text: text,
+            figure_name: figureName,
+            figure_id: figureId,
+            voice: 'auto',
+            language: selectedLanguage
+          }
+        });
+
+        if (error) throw error;
+
+        if (data?.audioContent) {
+          const audioBlob = new Blob(
+            [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
+            { type: 'audio/mpeg' }
+          );
+          const audioUrl = URL.createObjectURL(audioBlob);
+          setCurrentAudioUrl(audioUrl);
+          await playAudio(audioUrl);
+          resolve();
+        } else {
+          resolve();
         }
-      });
-
-      if (error) throw error;
-
-      if (data?.audioContent) {
-        const audioBlob = new Blob(
-          [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
-          { type: 'audio/mpeg' }
-        );
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setCurrentAudioUrl(audioUrl);
-        playAudio(audioUrl);
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        setIsSpeaking(false);
+        resolve();
       }
-    } catch (error) {
-      console.error('Error generating audio:', error);
-      setIsSpeaking(false);
-    }
+    });
   };
 
-  const playAudio = (url: string) => {
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.remove();
-    }
+  const playAudio = (url: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.remove();
+      }
 
-    const audio = new Audio(url);
-    audioElementRef.current = audio;
-    
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
-    }
-
-    if (!sourceNodeRef.current && audioContextRef.current) {
-      const source = audioContextRef.current.createMediaElementSource(audio);
-      const analyser = audioContextRef.current.createAnalyser();
-      analyser.fftSize = 256;
+      const audio = new Audio(url);
+      audioElementRef.current = audio;
       
-      source.connect(analyser);
-      analyser.connect(audioContextRef.current.destination);
-      
-      sourceNodeRef.current = source;
-      analyserRef.current = analyser;
-    }
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
 
-    audio.onended = () => {
-      setIsPlayingAudio(false);
-      setIsSpeaking(false);
-      setCurrentAudioUrl(null);
-      URL.revokeObjectURL(url);
-    };
+      if (!sourceNodeRef.current && audioContextRef.current) {
+        const source = audioContextRef.current.createMediaElementSource(audio);
+        const analyser = audioContextRef.current.createAnalyser();
+        analyser.fftSize = 256;
+        
+        source.connect(analyser);
+        analyser.connect(audioContextRef.current.destination);
+        
+        sourceNodeRef.current = source;
+        analyserRef.current = analyser;
+      }
 
-    audio.onerror = () => {
-      setIsPlayingAudio(false);
-      setIsSpeaking(false);
-      setCurrentAudioUrl(null);
-    };
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        setIsSpeaking(false);
+        setCurrentAudioUrl(null);
+        URL.revokeObjectURL(url);
+        resolve();
+      };
 
-    setCurrentAudio(audio);
-    setIsPlayingAudio(true);
-    audio.play().catch(error => {
-      console.error('Audio playback failed:', error);
-      setIsPlayingAudio(false);
-      setIsSpeaking(false);
+      audio.onerror = () => {
+        setIsPlayingAudio(false);
+        setIsSpeaking(false);
+        setCurrentAudioUrl(null);
+        resolve();
+      };
+
+      setCurrentAudio(audio);
+      setIsPlayingAudio(true);
+      audio.play().catch(error => {
+        console.error('Audio playback failed:', error);
+        setIsPlayingAudio(false);
+        setIsSpeaking(false);
+        resolve();
+      });
     });
   };
 
