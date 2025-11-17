@@ -171,7 +171,8 @@ const PodcastMode = () => {
       const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
         body: { 
           figureName: figure.name,
-          figureId: figure.id
+          figureId: figure.id,
+          context: 'podcast studio with professional microphone and soundproofing'
         }
       });
 

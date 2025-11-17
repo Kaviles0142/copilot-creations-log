@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { figureName, figureId } = await req.json();
+    const { figureName, figureId, context } = await req.json();
 
     if (!figureName) {
       throw new Error('figureName is required');
@@ -51,7 +51,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    const prompt = generateVisualPrompt(figureName);
+    const prompt = generateVisualPrompt(figureName, context);
     console.log('📝 Visual prompt:', prompt);
 
     const aiResponse = await fetch('https://api.openai.com/v1/images/generations', {
@@ -149,6 +149,10 @@ serve(async (req) => {
   }
 });
 
-function generateVisualPrompt(figureName: string): string {
-  return `Create a professional, photorealistic portrait photograph of ${figureName}. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. Professional studio lighting with a subtle gradient background appropriate to their era. Head and shoulders only, straight-on angle. Historically accurate facial features and period-appropriate attire visible from shoulders up. Ultra high resolution, 4K quality.`;
+function generateVisualPrompt(figureName: string, context?: string): string {
+  const contextText = context 
+    ? `${context}. The setting should complement their historical background while maintaining the ${context} environment.`
+    : 'Professional studio lighting with a subtle gradient background appropriate to their era.';
+    
+  return `Create a professional, photorealistic portrait photograph of ${figureName} in a ${context || 'studio setting'}. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. ${contextText} Head and shoulders only, straight-on angle. Historically accurate facial features and period-appropriate attire visible from shoulders up. Ultra high resolution, 4K quality.`;
 }
