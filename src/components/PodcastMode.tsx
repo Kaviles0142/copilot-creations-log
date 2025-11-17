@@ -523,24 +523,38 @@ As the guest, how do you respond?`;
           )}
         </div>
 
-        {/* Controls */}
-        <div className="flex gap-2 mb-6">
+        {/* Language Selection */}
+        <Card className="p-4 mb-6">
+          <h3 className="font-semibold mb-3 flex items-center">
+            <Globe className="h-4 w-4 mr-2" />
+            Response Language
+          </h3>
           <Select value={selectedLanguage} onValueChange={setSelectedLanguage} disabled={isRecording}>
-            <SelectTrigger className="w-[200px]">
-              <Globe className="mr-2 h-4 w-4" />
+            <SelectTrigger className="bg-background">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en-US">🇺🇸 English</SelectItem>
-              <SelectItem value="es-ES">🇪🇸 Español</SelectItem>
-              <SelectItem value="fr-FR">🇫🇷 Français</SelectItem>
-              <SelectItem value="de-DE">🇩🇪 Deutsch</SelectItem>
-              <SelectItem value="it-IT">🇮🇹 Italiano</SelectItem>
-              <SelectItem value="pt-PT">🇵🇹 Português</SelectItem>
-              <SelectItem value="ja-JP">🇯🇵 日本語</SelectItem>
-              <SelectItem value="zh-CN">🇨🇳 中文</SelectItem>
+            <SelectContent className="bg-background border z-50 max-h-[300px]">
+              <SelectItem value="en-US">🇺🇸 English (US)</SelectItem>
+              <SelectItem value="es-ES">🇪🇸 Español (Spanish)</SelectItem>
+              <SelectItem value="fr-FR">🇫🇷 Français (French)</SelectItem>
+              <SelectItem value="de-DE">🇩🇪 Deutsch (German)</SelectItem>
+              <SelectItem value="it-IT">🇮🇹 Italiano (Italian)</SelectItem>
+              <SelectItem value="pt-PT">🇵🇹 Português (Portuguese)</SelectItem>
+              <SelectItem value="ja-JP">🇯🇵 日本語 (Japanese)</SelectItem>
+              <SelectItem value="zh-CN">🇨🇳 中文 (Chinese)</SelectItem>
+              <SelectItem value="ko-KR">🇰🇷 한국어 (Korean)</SelectItem>
+              <SelectItem value="ar-SA">🇸🇦 العربية (Arabic)</SelectItem>
+              <SelectItem value="ru-RU">🇷🇺 Русский (Russian)</SelectItem>
+              <SelectItem value="hi-IN">🇮🇳 हिन्दी (Hindi)</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground mt-2">
+            Figures will respond in this language
+          </p>
+        </Card>
+
+        {/* Controls */}
+        <div className="flex gap-2 mb-6">
 
           <Button
             variant={isAutoVoiceEnabled ? "default" : "outline"}
