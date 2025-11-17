@@ -246,25 +246,21 @@ serve(async (req) => {
     // PRIORITY 1: User selected language
     // PRIORITY 2: For English - detect nationality for authentic accent
     // PRIORITY 3: For other languages - use standard voice
-    let selectedVoice = voice;
+    let selectedVoice = '';
     let detectedRegion = 'american';
     
     const gender = detectGender(figure_name || '');
     console.log(`🎭 Detected gender: ${gender} for ${figure_name}`);
     
-    // Special handling for English: detect nationality for authentic accent
-    if (language === 'en-US' && figure_name && figure_id) {
-      console.log(`🇬🇧 English selected - detecting nationality for authentic accent`);
-      // Continue to nationality detection below
-    }
-    // For non-English languages: use standard voice
-    else if (language && languageVoiceMap[language]) {
+    // For non-English languages: use standard voice from language map
+    if (language && language !== 'en-US' && languageVoiceMap[language]) {
       selectedVoice = languageVoiceMap[language][gender];
       console.log(`🌍 Using language-specific voice: ${selectedVoice} for language: ${language}`);
     }
     
-    // Detect nationality for: (1) English language selected, or (2) no language selected
-    if ((language === 'en-US' || !language || voice === 'auto') && figure_name && figure_id && !selectedVoice) {
+    // Detect nationality for: (1) English language selected, or (2) no language selected (auto mode)
+    if ((language === 'en-US' || !language) && figure_name && figure_id && !selectedVoice) {
+      console.log(`🔍 Detecting nationality for ${figure_name}...`);
       // Cache version - increment this when mapping logic changes
       const CACHE_VERSION = 'v2'; // Updated to force re-detection with new nationality mappings
       
@@ -333,9 +329,15 @@ serve(async (req) => {
         selectedVoice = regionVoiceMap[detectedRegion]?.[gender] || regionVoiceMap['american'][gender];
         console.log(`🎙️ Native ${detectedRegion} voice: ${selectedVoice}`);
       }
-    } else if (!language && selectedVoice) {
-      console.log(`🎤 Using manually selected voice: ${selectedVoice}`);
     }
+    
+    // Final fallback to American English if still no voice selected
+    if (!selectedVoice) {
+      selectedVoice = gender === 'male' ? 'en-US-GuyNeural' : 'en-US-JennyNeural';
+      console.log(`⚠️ Using fallback voice: ${selectedVoice}`);
+    }
+
+    console.log(`🎙️ Final selected voice: ${selectedVoice}`);
 
     // Build SSML for better control
     const ssml = `
