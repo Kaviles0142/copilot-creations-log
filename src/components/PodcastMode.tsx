@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,29 +42,34 @@ const PodcastMode = () => {
   const [guest, setGuest] = useState<HistoricalFigure | null>(null);
   const [selectingFor, setSelectingFor] = useState<'host' | 'guest' | null>(null);
   
-  // Session state
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [podcastTopic, setPodcastTopic] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("en-US");
-  
-  // Messages from database
+  // Conversation state
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [currentSpeaker, setCurrentSpeaker] = useState<'host' | 'guest'>('host');
+  const [podcastTopic, setPodcastTopic] = useState("");
+  
+  // Audio state
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState("en-US");
   
   // Avatar state
   const [hostAvatarUrl, setHostAvatarUrl] = useState<string | null>(null);
   const [guestAvatarUrl, setGuestAvatarUrl] = useState<string | null>(null);
   const [isLoadingHostAvatar, setIsLoadingHostAvatar] = useState(false);
   const [isLoadingGuestAvatar, setIsLoadingGuestAvatar] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
-  // Audio state
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
-  const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true);
-  const [currentSpeakerRole, setCurrentSpeakerRole] = useState<'host' | 'guest' | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   
   const { toast } = useToast();
 
-  // Speech recognition for topic input
+  // Initialize speech recognition
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [recordingTranscript, setRecordingTranscript] = useState("");
@@ -81,7 +86,9 @@ const PodcastMode = () => {
       
       recognition.onstart = () => {
         setIsListening(true);
+        setIsRecording(true);
         setRecordingTranscript("");
+        console.log('Voice recognition started in', selectedLanguage);
       };
       
       recognition.onresult = (event) => {
@@ -108,12 +115,15 @@ const PodcastMode = () => {
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
+        setIsRecording(false);
         setRecordingTranscript("");
       };
       
       recognition.onend = () => {
         setIsListening(false);
+        setIsRecording(false);
         setRecordingTranscript("");
+        console.log('Voice recognition ended');
       };
       
       setRecognition(recognition);
@@ -140,52 +150,6 @@ const PodcastMode = () => {
       }
     }
   };
-
-  // Realtime subscription for new messages
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'podcast_messages',
-          filter: `podcast_session_id=eq.${sessionId}`
-        },
-        async (payload) => {
-          const newMessage = payload.new as any;
-          
-          // Add message to UI
-          const message: Message = {
-            id: newMessage.id,
-            content: newMessage.content,
-            type: "assistant",
-            timestamp: new Date(newMessage.created_at),
-            speakerName: newMessage.figure_name
-          };
-          
-          setMessages(prev => [...prev, message]);
-          setCurrentSpeakerRole(newMessage.speaker_role);
-
-          // Generate and play audio if auto-voice is enabled
-          if (isAutoVoiceEnabled) {
-            await generateAndPlayAudio(
-              newMessage.content,
-              newMessage.figure_name,
-              newMessage.figure_id
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [sessionId, isAutoVoiceEnabled]);
 
   const handleFigureSelect = (figure: HistoricalFigure) => {
     if (selectingFor === 'host') {
@@ -241,45 +205,51 @@ const PodcastMode = () => {
 
     setIsRecording(true);
     
+    // Get AI-generated introduction in the correct language
     try {
-      // Create podcast session
-      const { data, error } = await supabase
-        .from("podcast_sessions")
-        .insert({
-          topic: podcastTopic,
-          host_id: host.id,
-          host_name: host.name,
-          guest_id: guest.id,
-          guest_name: guest.name,
+      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
+        body: {
+          message: `Start podcast about ${podcastTopic} with ${guest.name}`,
+          figure: {
+            id: host.id,
+            name: host.name,
+            period: host.period,
+            description: host.description
+          },
           language: selectedLanguage.split('-')[0],
-          status: "active",
-        })
-        .select()
-        .single();
+          conversationType: 'casual'
+        }
+      });
 
       if (error) throw error;
 
-      setSessionId(data.id);
-      setMessages([]);
-
+      const introMessage = data.response;
+      
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content: introMessage,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: host.name
+      };
+      
+      setMessages([newMessage]);
+      setCurrentSpeaker('host');
+      
+      // Generate and play audio
+      if (isAutoVoiceEnabled) {
+        await generateAndPlayAudio(introMessage, host.name, host.id);
+      }
+      
       toast({
         title: "Podcast started!",
         description: `${host.name} and ${guest.name} are ready to discuss "${podcastTopic}"`,
       });
 
-      // Trigger first speaker (host introduction)
-      const { error: orchestratorError } = await supabase.functions.invoke("podcast-orchestrator", {
-        body: {
-          sessionId: data.id,
-          currentTurn: 0,
-          language: selectedLanguage.split('-')[0],
-        },
-      });
-
-      if (orchestratorError) {
-        console.error("Error starting podcast:", orchestratorError);
-      }
-
+      // Now get guest's response
+      setTimeout(() => {
+        continueConversation('guest');
+      }, 1000);
     } catch (error) {
       console.error('Error starting podcast:', error);
       toast({
@@ -291,77 +261,169 @@ const PodcastMode = () => {
     }
   };
 
+  const continueConversation = async (speaker: 'host' | 'guest') => {
+    const currentFigure = speaker === 'host' ? host : guest;
+    const otherFigure = speaker === 'host' ? guest : host;
+    
+    if (!currentFigure || !otherFigure) return;
 
-  const generateAndPlayAudio = async (text: string, figureName: string, figureId: string): Promise<void> => {
+    setCurrentSpeaker(speaker);
+
     try {
-      console.log('🎤 Generating Azure TTS for:', figureName);
+      // Simple message to let the edge function handle the conversation flow
+      const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
       
-      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+      const prompt = speaker === 'host'
+        ? `Continue the podcast discussion about "${podcastTopic}" with guest ${otherFigure.name}. Recent context: ${recentContext}`
+        : `Respond to ${otherFigure.name}'s question about "${podcastTopic}". Recent context: ${recentContext}`;
+
+      // Get AI response from the current speaker
+      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          text: text,
-          figure_name: figureName,
-          figure_id: figureId,
-          voice: 'auto',
-          language: selectedLanguage
+          message: prompt,
+          figure: {
+            id: currentFigure.id,
+            name: currentFigure.name,
+            period: currentFigure.period,
+            description: currentFigure.description
+          },
+          language: selectedLanguage.split('-')[0],
+          conversationType: 'casual'
         }
       });
 
       if (error) throw error;
 
-      if (data?.audioContent) {
-        const audioBlob = new Blob(
-          [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
-          { type: 'audio/mpeg' }
-        );
-        const audioUrl = URL.createObjectURL(audioBlob);
-        await playAudio(audioUrl);
-        URL.revokeObjectURL(audioUrl);
+      const responseMessage: Message = {
+        id: Date.now().toString(),
+        content: data.response,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: currentFigure.name
+      };
+
+      setMessages(prev => [...prev, responseMessage]);
+
+      // Generate and play audio, then continue conversation
+      if (isAutoVoiceEnabled) {
+        await generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
+      }
+      
+      // After audio finishes (or if auto-voice is off), continue with other speaker
+      if (isRecording && messages.length < 10) {
+        setTimeout(() => {
+          continueConversation(speaker === 'host' ? 'guest' : 'host');
+        }, 1000);
       }
     } catch (error) {
-      console.error('Error generating audio:', error);
+      console.error('Error generating response:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate response",
+        variant: "destructive"
+      });
     }
+  };
+
+  const generateAndPlayAudio = async (text: string, figureName: string, figureId: string): Promise<void> => {
+    return new Promise(async (resolve) => {
+      try {
+        setIsSpeaking(true);
+        
+        console.log('🎤 Generating Azure TTS for:', figureName, 'with language:', selectedLanguage);
+        
+        const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+          body: {
+            text: text,
+            figure_name: figureName,
+            figure_id: figureId,
+            voice: 'auto',
+            language: selectedLanguage
+          }
+        });
+
+        if (error) throw error;
+
+        if (data?.audioContent) {
+          const audioBlob = new Blob(
+            [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
+            { type: 'audio/mpeg' }
+          );
+          const audioUrl = URL.createObjectURL(audioBlob);
+          setCurrentAudioUrl(audioUrl);
+          await playAudio(audioUrl);
+          resolve();
+        } else {
+          resolve();
+        }
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        setIsSpeaking(false);
+        resolve();
+      }
+    });
   };
 
   const playAudio = (url: string): Promise<void> => {
     return new Promise((resolve) => {
       if (currentAudio) {
         currentAudio.pause();
+        currentAudio.remove();
       }
 
       const audio = new Audio(url);
+      audioElementRef.current = audio;
+      
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+
+      if (!sourceNodeRef.current && audioContextRef.current) {
+        const source = audioContextRef.current.createMediaElementSource(audio);
+        const analyser = audioContextRef.current.createAnalyser();
+        analyser.fftSize = 256;
+        
+        source.connect(analyser);
+        analyser.connect(audioContextRef.current.destination);
+        
+        sourceNodeRef.current = source;
+        analyserRef.current = analyser;
+      }
 
       audio.onended = () => {
+        setIsPlayingAudio(false);
+        setIsSpeaking(false);
+        setCurrentAudioUrl(null);
+        URL.revokeObjectURL(url);
         resolve();
       };
 
       audio.onerror = () => {
+        setIsPlayingAudio(false);
+        setIsSpeaking(false);
+        setCurrentAudioUrl(null);
         resolve();
       };
 
       setCurrentAudio(audio);
+      setIsPlayingAudio(true);
       audio.play().catch(error => {
         console.error('Audio playback failed:', error);
+        setIsPlayingAudio(false);
+        setIsSpeaking(false);
         resolve();
       });
     });
   };
 
-  const stopPodcast = async () => {
-    if (sessionId) {
-      await supabase
-        .from("podcast_sessions")
-        .update({ status: "completed" })
-        .eq("id", sessionId);
-    }
-    
+  const stopPodcast = () => {
     setIsRecording(false);
-    setSessionId(null);
-    setMessages([]);
-    
     if (currentAudio) {
       currentAudio.pause();
       setCurrentAudio(null);
     }
+    setIsPlayingAudio(false);
+    setIsSpeaking(false);
     
     toast({
       title: "Podcast stopped",
@@ -533,7 +595,7 @@ const PodcastMode = () => {
                 <RealisticAvatar
                   imageUrl={hostAvatarUrl}
                   isLoading={isLoadingHostAvatar}
-                  audioUrl={currentSpeakerRole === 'host' && currentAudio ? currentAudio.src : null}
+                  audioUrl={currentSpeaker === 'host' ? currentAudioUrl : null}
                 />
               </div>
             )}
@@ -543,7 +605,7 @@ const PodcastMode = () => {
                 <RealisticAvatar
                   imageUrl={guestAvatarUrl}
                   isLoading={isLoadingGuestAvatar}
-                  audioUrl={currentSpeakerRole === 'guest' && currentAudio ? currentAudio.src : null}
+                  audioUrl={currentSpeaker === 'guest' ? currentAudioUrl : null}
                 />
               </div>
             )}
