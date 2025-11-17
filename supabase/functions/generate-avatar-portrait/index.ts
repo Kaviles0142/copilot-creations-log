@@ -21,10 +21,15 @@ serve(async (req) => {
 
     console.log('🎨 Generating portrait for:', figureName);
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role (bypasses RLS)
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Check cache first - using Supabase client for proper query handling
     console.log('🔍 Checking cache for figure_id:', figureId);
