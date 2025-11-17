@@ -66,6 +66,8 @@ const PodcastMode = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audioQueueRef = useRef<Array<() => Promise<void>>>([]);
+  const isProcessingAudioRef = useRef(false);
   
   const { toast } = useToast();
 
@@ -325,8 +327,27 @@ const PodcastMode = () => {
     }
   };
 
+  const processAudioQueue = async () => {
+    if (isProcessingAudioRef.current || audioQueueRef.current.length === 0) {
+      return;
+    }
+
+    isProcessingAudioRef.current = true;
+
+    while (audioQueueRef.current.length > 0) {
+      const audioTask = audioQueueRef.current.shift();
+      if (audioTask) {
+        await audioTask();
+        // Wait 2 seconds before playing the next audio
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
+    isProcessingAudioRef.current = false;
+  };
+
   const generateAndPlayAudio = async (text: string, figureName: string, figureId: string): Promise<void> => {
-    return new Promise(async (resolve) => {
+    const audioTask = () => new Promise<void>(async (resolve) => {
       try {
         setIsSpeaking(true);
         
@@ -362,6 +383,10 @@ const PodcastMode = () => {
         resolve();
       }
     });
+
+    // Add to queue and process
+    audioQueueRef.current.push(audioTask);
+    processAudioQueue();
   };
 
   const playAudio = (url: string): Promise<void> => {
