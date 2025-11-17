@@ -282,9 +282,12 @@ As the guest, how do you respond?`;
           message: prompt,
           figure: {
             id: currentFigure.id,
-            name: currentFigure.name
+            name: currentFigure.name,
+            period: currentFigure.period,
+            description: currentFigure.description
           },
-          language: selectedLanguage.split('-')[0]
+          language: selectedLanguage.split('-')[0],
+          conversationType: 'casual'
         }
       });
 
