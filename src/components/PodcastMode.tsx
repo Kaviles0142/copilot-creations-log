@@ -248,12 +248,10 @@ const PodcastMode = () => {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
           message: `As ${currentFigure.name}, respond to this podcast discussion about "${podcastTopic}". ${messages.length > 0 ? `Previous context: ${messages[messages.length - 1].content}` : ''}`,
-          figureId: currentFigure.id,
-          figureName: currentFigure.name,
-          conversationHistory: messages.slice(-3).map(m => ({
-            role: m.speakerName === currentFigure.name ? 'assistant' : 'user',
-            content: m.content
-          })),
+          figure: {
+            id: currentFigure.id,
+            name: currentFigure.name
+          },
           language: selectedLanguage.split('-')[0]
         }
       });
