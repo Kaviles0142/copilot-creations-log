@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
@@ -20,33 +21,29 @@ serve(async (req) => {
 
     console.log('🎨 Generating portrait for:', figureName);
 
-    // Check if we have a cached image
+    // Initialize Supabase client
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check cache first - look for valid cached image
-    const cacheResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/avatar_image_cache?figure_id=eq.${figureId}&expires_at=gt.${new Date().toISOString()}&select=*&limit=1`,
-      {
-        headers: {
-          'apikey': SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-      }
-    );
+    // Check cache first - using Supabase client for proper query handling
+    const { data: cachedImage, error: cacheError } = await supabase
+      .from('avatar_image_cache')
+      .select('*')
+      .eq('figure_id', figureId)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
 
-    if (cacheResponse.ok) {
-      const cached = await cacheResponse.json();
-      if (cached && cached.length > 0 && cached[0].cloudinary_url) {
-        console.log('✅ Using cached portrait from:', cached[0].created_at);
-        console.log('📸 Cache URL:', cached[0].cloudinary_url);
-        return new Response(JSON.stringify({
-          imageUrl: cached[0].cloudinary_url,
-          cached: true,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    if (!cacheError && cachedImage && cachedImage.cloudinary_url) {
+      console.log('✅ Using cached portrait from:', cachedImage.created_at);
+      console.log('📸 Cache URL:', cachedImage.cloudinary_url);
+      return new Response(JSON.stringify({
+        imageUrl: cachedImage.cloudinary_url,
+        cached: true,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('🎨 No valid cache found, generating new portrait...');
@@ -91,54 +88,48 @@ serve(async (req) => {
 
     console.log('✅ Portrait generated successfully via DALL-E');
 
-    // Upload image to Supabase Storage
+    // Upload image to Supabase Storage using client
     const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
     const fileName = `${figureId}-${Date.now()}.png`;
     
-    const uploadResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/audio-files/${fileName}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'image/png',
-      },
-      body: imageBuffer,
-    });
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('audio-files')
+      .upload(fileName, imageBuffer, {
+        contentType: 'image/png',
+        upsert: false
+      });
 
-    if (!uploadResponse.ok) {
-      const uploadError = await uploadResponse.text();
+    if (uploadError) {
       console.error('❌ Storage upload error:', uploadError);
-      throw new Error(`Failed to upload image to storage: ${uploadError}`);
+      throw new Error(`Failed to upload image to storage: ${uploadError.message}`);
     }
 
-    const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/audio-files/${fileName}`;
-    console.log('✅ Image uploaded to Supabase Storage:', imageUrl);
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('audio-files')
+      .getPublicUrl(fileName);
 
-    // Cache the image
-    try {
-      await fetch(`${SUPABASE_URL}/rest/v1/avatar_image_cache`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          figure_id: figureId,
-          figure_name: figureName,
-          cloudinary_url: imageUrl,
-          visual_prompt: prompt,
-        }),
+    console.log('✅ Image uploaded to Supabase Storage:', publicUrl);
+
+    // Cache the image using client
+    const { error: cacheInsertError } = await supabase
+      .from('avatar_image_cache')
+      .insert({
+        figure_id: figureId,
+        figure_name: figureName,
+        cloudinary_url: publicUrl,
+        visual_prompt: prompt,
       });
+
+    if (cacheInsertError) {
+      console.error('⚠️ Cache insert error:', cacheInsertError);
+    } else {
       console.log('💾 Portrait cached successfully');
-    } catch (cacheError) {
-      console.error('Cache save failed:', cacheError);
-      // Continue anyway - cache failure isn't critical
     }
 
     return new Response(JSON.stringify({
-      imageUrl,
+      imageUrl: publicUrl,
       cached: false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
