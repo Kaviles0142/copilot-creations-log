@@ -169,13 +169,16 @@ const PodcastMode = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
-        body: { figureName: figure.name }
+        body: { 
+          figureName: figure.name,
+          figureId: figure.id
+        }
       });
 
       if (error) throw error;
 
-      if (data?.cloudinaryUrl) {
-        setAvatarUrl(data.cloudinaryUrl);
+      if (data?.imageUrl) {
+        setAvatarUrl(data.imageUrl);
       }
     } catch (error) {
       console.error(`Error loading ${role} avatar:`, error);
