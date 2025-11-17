@@ -209,7 +209,7 @@ const PodcastMode = () => {
     try {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: `Start podcast about ${podcastTopic} with ${guest.name}`,
+          message: `As the podcast host, warmly welcome your guest ${guest.name} and introduce today's topic: "${podcastTopic}". Start the conversation with an engaging opening.`,
           figure: {
             id: host.id,
             name: host.name,
@@ -274,8 +274,8 @@ const PodcastMode = () => {
       const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
       
       const prompt = speaker === 'host'
-        ? `Continue the podcast discussion about "${podcastTopic}" with guest ${otherFigure.name}. Recent context: ${recentContext}`
-        : `Respond to ${otherFigure.name}'s question about "${podcastTopic}". Recent context: ${recentContext}`;
+        ? `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherFigure.name}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`
+        : `As the podcast guest, respond naturally to the host ${otherFigure.name}'s comments about "${podcastTopic}". Recent: ${recentContext}`;
 
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
