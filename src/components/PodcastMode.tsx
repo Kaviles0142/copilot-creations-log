@@ -209,7 +209,7 @@ const PodcastMode = () => {
     try {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: `As the podcast host, warmly welcome your guest ${guest.name} and introduce today's topic: "${podcastTopic}". Start the conversation with an engaging opening.`,
+          message: `You are ${host.name}, the podcast host. Begin by introducing yourself briefly, then welcome your guest ${guest.name}, and introduce today's topic: "${podcastTopic}". Make it engaging and conversational.`,
           figure: {
             id: host.id,
             name: host.name,
