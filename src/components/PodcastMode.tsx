@@ -342,7 +342,7 @@ As the guest, how do you respond?`;
           text: text,
           figure_name: figureName,
           figure_id: figureId,
-          voice: undefined, // Let Azure auto-select voice
+          voice: 'auto',
           language: selectedLanguage
         }
       });
