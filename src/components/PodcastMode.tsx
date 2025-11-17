@@ -220,7 +220,7 @@ const PodcastMode = () => {
     
     // Generate and play audio
     if (isAutoVoiceEnabled) {
-      await generateAndPlayAudio(introMessage, host.name);
+      await generateAndPlayAudio(introMessage, host.name, host.id);
     }
     
     toast({
@@ -229,12 +229,20 @@ const PodcastMode = () => {
     });
   };
 
-  const generateAndPlayAudio = async (text: string, figureName: string) => {
+  const generateAndPlayAudio = async (text: string, figureName: string, figureId: string) => {
     try {
       setIsSpeaking(true);
       
-      const { data, error } = await supabase.functions.invoke('generate-tts-audio', {
-        body: { text, figureName }
+      console.log('🎤 Generating Azure TTS for:', figureName);
+      
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: {
+          text,
+          figure_name: figureName,
+          figure_id: figureId,
+          voice: 'auto',
+          language: selectedLanguage
+        }
       });
 
       if (error) throw error;
