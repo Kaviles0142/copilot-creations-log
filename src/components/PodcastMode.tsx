@@ -339,10 +339,10 @@ As the guest, how do you respond?`;
       
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
-          text,
+          text: text,
           figure_name: figureName,
           figure_id: figureId,
-          voice: 'auto',
+          voice: undefined, // Let Azure auto-select voice
           language: selectedLanguage
         }
       });
