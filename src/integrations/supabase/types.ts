@@ -714,6 +714,16 @@ export type Database = {
     Functions: {
       cleanup_expired_ai_cache: { Args: never; Returns: undefined }
       cleanup_expired_news_cache: { Args: never; Returns: undefined }
+      get_cached_avatar: {
+        Args: { p_figure_id: string }
+        Returns: {
+          cloudinary_url: string
+          created_at: string
+          figure_id: string
+          figure_name: string
+          id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
