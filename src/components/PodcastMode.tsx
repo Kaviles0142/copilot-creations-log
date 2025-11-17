@@ -217,6 +217,7 @@ const PodcastMode = () => {
     };
     
     setMessages([newMessage]);
+    setCurrentSpeaker('host');
     
     // Generate and play audio
     if (isAutoVoiceEnabled) {
@@ -227,6 +228,67 @@ const PodcastMode = () => {
       title: "Podcast started!",
       description: `${host.name} and ${guest.name} are ready to discuss "${podcastTopic}"`,
     });
+
+    // Now get guest's response
+    setTimeout(() => {
+      continueConversation('guest');
+    }, 1000);
+  };
+
+  const continueConversation = async (speaker: 'host' | 'guest') => {
+    const currentFigure = speaker === 'host' ? host : guest;
+    const otherFigure = speaker === 'host' ? guest : host;
+    
+    if (!currentFigure || !otherFigure) return;
+
+    setCurrentSpeaker(speaker);
+
+    try {
+      // Get AI response from the current speaker
+      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
+        body: {
+          message: `As ${currentFigure.name}, respond to this podcast discussion about "${podcastTopic}". ${messages.length > 0 ? `Previous context: ${messages[messages.length - 1].content}` : ''}`,
+          figureId: currentFigure.id,
+          figureName: currentFigure.name,
+          conversationHistory: messages.slice(-3).map(m => ({
+            role: m.speakerName === currentFigure.name ? 'assistant' : 'user',
+            content: m.content
+          })),
+          language: selectedLanguage.split('-')[0]
+        }
+      });
+
+      if (error) throw error;
+
+      const responseMessage: Message = {
+        id: Date.now().toString(),
+        content: data.response,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: currentFigure.name
+      };
+
+      setMessages(prev => [...prev, responseMessage]);
+
+      // Generate and play audio
+      if (isAutoVoiceEnabled) {
+        await generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
+      }
+
+      // Continue conversation with other speaker after a delay
+      if (isRecording && messages.length < 10) {
+        setTimeout(() => {
+          continueConversation(speaker === 'host' ? 'guest' : 'host');
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error generating response:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate response",
+        variant: "destructive"
+      });
+    }
   };
 
   const generateAndPlayAudio = async (text: string, figureName: string, figureId: string) => {
