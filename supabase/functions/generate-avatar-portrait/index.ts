@@ -122,19 +122,25 @@ serve(async (req) => {
     console.log('✅ Image uploaded to Supabase Storage:', publicUrl);
 
     // Cache the image using client
-    const { error: cacheInsertError } = await supabase
+    console.log('💾 Attempting to cache:', { figure_id: figureId, figure_name: figureName, url: publicUrl });
+    
+    const { data: insertedData, error: cacheInsertError } = await supabase
       .from('avatar_image_cache')
       .insert({
         figure_id: figureId,
         figure_name: figureName,
         cloudinary_url: publicUrl,
         visual_prompt: prompt,
-      });
+      })
+      .select();
 
     if (cacheInsertError) {
-      console.error('⚠️ Cache insert error:', cacheInsertError);
+      console.error('❌ Cache insert FAILED:', cacheInsertError);
+      console.error('Error details:', JSON.stringify(cacheInsertError, null, 2));
+    } else if (insertedData && insertedData.length > 0) {
+      console.log('✅ Portrait cached successfully with ID:', insertedData[0].id);
     } else {
-      console.log('💾 Portrait cached successfully');
+      console.error('⚠️ Cache insert returned no data but no error');
     }
 
     return new Response(JSON.stringify({
