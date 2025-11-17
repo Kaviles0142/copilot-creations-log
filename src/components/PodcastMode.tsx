@@ -244,10 +244,42 @@ const PodcastMode = () => {
     setCurrentSpeaker(speaker);
 
     try {
+      // Build context-aware prompt based on role and conversation history
+      let prompt = '';
+      const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
+      
+      if (speaker === 'host') {
+        prompt = `You are ${currentFigure.name}, the podcast host. You are having a thoughtful discussion with your guest ${otherFigure.name} about "${podcastTopic}".
+
+Your role as host:
+- Ask insightful follow-up questions based on what ${otherFigure.name} just said
+- Guide the conversation naturally
+- Show genuine curiosity about their perspective
+- Keep responses conversational and engaging (2-3 sentences)
+
+Recent conversation:
+${recentContext}
+
+As the host, what do you say next?`;
+      } else {
+        prompt = `You are ${currentFigure.name}, a guest on this podcast hosted by ${otherFigure.name}. The topic is "${podcastTopic}".
+
+Your role as guest:
+- Respond thoughtfully to the host's questions
+- Share your unique perspective and experiences
+- Build on what the host said
+- Keep responses conversational and engaging (2-3 sentences)
+
+Recent conversation:
+${recentContext}
+
+As the guest, how do you respond?`;
+      }
+
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: `As ${currentFigure.name}, respond to this podcast discussion about "${podcastTopic}". ${messages.length > 0 ? `Previous context: ${messages[messages.length - 1].content}` : ''}`,
+          message: prompt,
           figure: {
             id: currentFigure.id,
             name: currentFigure.name
