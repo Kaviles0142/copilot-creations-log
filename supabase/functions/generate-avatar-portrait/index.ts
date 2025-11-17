@@ -24,18 +24,22 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Check cache first
-    const cacheResponse = await fetch(`${SUPABASE_URL}/rest/v1/avatar_image_cache?figure_id=eq.${figureId}&select=*`, {
-      headers: {
-        'apikey': SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
+    // Check cache first - look for valid cached image
+    const cacheResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/avatar_image_cache?figure_id=eq.${figureId}&expires_at=gt.${new Date().toISOString()}&select=*&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
 
     if (cacheResponse.ok) {
       const cached = await cacheResponse.json();
       if (cached && cached.length > 0 && cached[0].cloudinary_url) {
-        console.log('✅ Using cached portrait:', cached[0].cloudinary_url);
+        console.log('✅ Using cached portrait from:', cached[0].created_at);
+        console.log('📸 Cache URL:', cached[0].cloudinary_url);
         return new Response(JSON.stringify({
           imageUrl: cached[0].cloudinary_url,
           cached: true,
@@ -44,6 +48,8 @@ serve(async (req) => {
         });
       }
     }
+
+    console.log('🎨 No valid cache found, generating new portrait...');
 
     // Generate new portrait using OpenAI DALL-E
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
