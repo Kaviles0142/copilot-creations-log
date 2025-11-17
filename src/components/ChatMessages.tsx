@@ -76,7 +76,7 @@ const ChatMessages = ({ messages, selectedFigure, isLoading }: ChatMessagesProps
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
                       <span className="font-medium text-sm">
-                        {message.type === 'user' ? 'You' : selectedFigure.name}
+                        {message.type === 'user' ? 'You' : (message.speakerName || selectedFigure.name)}
                       </span>
                       <span className="text-xs opacity-70">
                         {message.timestamp.toLocaleTimeString()}

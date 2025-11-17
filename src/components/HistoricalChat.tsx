@@ -26,6 +26,7 @@ export interface Message {
   content: string;
   type: "user" | "assistant";
   timestamp: Date;
+  speakerName?: string;
   sourcesUsed?: {
     books: number;
     documents: number;
