@@ -268,16 +268,23 @@ const PodcastMode = () => {
 
       setMessages(prev => [...prev, responseMessage]);
 
-      // Generate and play audio
+      // Generate and play audio, then continue conversation
       if (isAutoVoiceEnabled) {
         await generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
-      }
-
-      // Continue conversation with other speaker after a delay
-      if (isRecording && messages.length < 10) {
-        setTimeout(() => {
-          continueConversation(speaker === 'host' ? 'guest' : 'host');
-        }, 2000);
+        
+        // After audio finishes, continue with other speaker if still recording and under message limit
+        if (isRecording && messages.length < 10) {
+          setTimeout(() => {
+            continueConversation(speaker === 'host' ? 'guest' : 'host');
+          }, 1000);
+        }
+      } else {
+        // If auto-voice is off, just continue immediately
+        if (isRecording && messages.length < 10) {
+          setTimeout(() => {
+            continueConversation(speaker === 'host' ? 'guest' : 'host');
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error('Error generating response:', error);
