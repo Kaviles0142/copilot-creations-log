@@ -248,6 +248,22 @@ const PodcastMode = () => {
       let prompt = '';
       const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
       
+      // Get language name for instructions
+      const getLanguageName = (code: string): string => {
+        const languages: { [key: string]: string } = {
+          'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+          'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'zh': 'Chinese',
+          'ja': 'Japanese', 'ko': 'Korean', 'ar': 'Arabic', 'hi': 'Hindi'
+        };
+        return languages[code] || 'English';
+      };
+      
+      const languageCode = selectedLanguage.split('-')[0];
+      const languageName = getLanguageName(languageCode);
+      const languageInstruction = languageCode !== 'en' 
+        ? `\n\nCRITICAL: You MUST respond ONLY in ${languageName}. Do not use English.` 
+        : '';
+      
       if (speaker === 'host') {
         prompt = `You are ${currentFigure.name}, the podcast host. You are having a thoughtful discussion with your guest ${otherFigure.name} about "${podcastTopic}".
 
@@ -260,7 +276,7 @@ Your role as host:
 Recent conversation:
 ${recentContext}
 
-As the host, what do you say next?`;
+As the host, what do you say next?${languageInstruction}`;
       } else {
         prompt = `You are ${currentFigure.name}, a guest on this podcast hosted by ${otherFigure.name}. The topic is "${podcastTopic}".
 
@@ -273,7 +289,7 @@ Your role as guest:
 Recent conversation:
 ${recentContext}
 
-As the guest, how do you respond?`;
+As the guest, how do you respond?${languageInstruction}`;
       }
 
       // Get AI response from the current speaker
