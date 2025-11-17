@@ -1,12 +1,13 @@
 import { Suspense, useState } from "react";
 import HistoricalChat from "@/components/HistoricalChat";
 import DebateMode from "@/components/DebateMode";
+import PodcastMode from "@/components/PodcastMode";
 import { Button } from "@/components/ui/button";
-import { Users } from "lucide-react";
+import { Users, Mic } from "lucide-react";
 
 const Index = () => {
   console.log("Index page loading...");
-  const [mode, setMode] = useState<"chat" | "debate">("chat");
+  const [mode, setMode] = useState<"chat" | "debate" | "podcast">("chat");
 
   return (
     <div className="min-h-screen bg-background">
@@ -29,14 +30,23 @@ const Index = () => {
               <Users className="mr-2 h-4 w-4" />
               Debate Mode
             </Button>
+            <Button
+              variant={mode === "podcast" ? "default" : "outline"}
+              onClick={() => setMode("podcast")}
+            >
+              <Mic className="mr-2 h-4 w-4" />
+              Podcast Mode
+            </Button>
           </div>
         </div>
         
         <Suspense fallback={<div className="flex items-center justify-center h-64">Loading...</div>}>
           {mode === "chat" ? (
             <HistoricalChat />
-          ) : (
+          ) : mode === "debate" ? (
             <DebateMode />
+          ) : (
+            <PodcastMode />
           )}
         </Suspense>
       </div>
