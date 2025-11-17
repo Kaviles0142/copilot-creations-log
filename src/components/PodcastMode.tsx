@@ -335,7 +335,7 @@ As the guest, how do you respond?`;
     try {
       setIsSpeaking(true);
       
-      console.log('🎤 Generating Azure TTS for:', figureName);
+      console.log('🎤 Generating Azure TTS for:', figureName, 'with language:', selectedLanguage);
       
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
