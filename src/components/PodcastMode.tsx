@@ -236,9 +236,9 @@ const PodcastMode = () => {
       setMessages([newMessage]);
       setCurrentSpeaker('host');
       
-      // Generate and play audio
+      // Generate and play audio (don't await so next response can be generated in parallel)
       if (isAutoVoiceEnabled) {
-        await generateAndPlayAudio(introMessage, host.name, host.id);
+        generateAndPlayAudio(introMessage, host.name, host.id);
       }
       
       toast({
@@ -246,10 +246,10 @@ const PodcastMode = () => {
         description: `${host.name} and ${guest.name} are ready to discuss "${podcastTopic}"`,
       });
 
-      // Now get guest's response
+      // Get guest's response immediately (will start generating while host audio plays)
       setTimeout(() => {
         continueConversation('guest');
-      }, 1000);
+      }, 500);
     } catch (error) {
       console.error('Error starting podcast:', error);
       toast({
@@ -304,16 +304,16 @@ const PodcastMode = () => {
 
       setMessages(prev => [...prev, responseMessage]);
 
-      // Generate and play audio, then continue conversation
+      // Generate and play audio (don't await so next response generates while audio plays)
       if (isAutoVoiceEnabled) {
-        await generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
+        generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
       }
       
-      // After audio finishes (or if auto-voice is off), continue with other speaker
+      // Continue with other speaker immediately (response generates while current audio plays)
       if (isRecording && messages.length < 10) {
         setTimeout(() => {
           continueConversation(speaker === 'host' ? 'guest' : 'host');
-        }, 1000);
+        }, 500);
       }
     } catch (error) {
       console.error('Error generating response:', error);
