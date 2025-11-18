@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Play, Square, Mic, MicOff, Globe, Volume2, VolumeX, Pause, RotateCcw } from "lucide-react";
+import { Users, Play, Square, Mic, MicOff, Globe, Volume2, VolumeX, Pause, RotateCcw, Send } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import RealisticAvatar from "./RealisticAvatar";
@@ -694,46 +695,6 @@ const PodcastMode = () => {
               <Play className="mr-2 h-4 w-4" />
               Start Podcast
             </Button>
-          ) : isPlayingAudio ? (
-            // Show pause and stop buttons during audio playback
-            <div className="flex gap-2 flex-1">
-              <Button 
-                onClick={handlePauseAudio}
-                size="icon"
-                variant="secondary"
-                className="h-[60px] w-[60px]"
-              >
-                <Pause className="h-4 w-4" />
-              </Button>
-              <Button 
-                onClick={stopPodcast}
-                size="icon"
-                variant="destructive"
-                className="h-[60px] w-[60px]"
-              >
-                <Square className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : isPaused ? (
-            // Show play and replay buttons when paused
-            <div className="flex gap-2 flex-1">
-              <Button 
-                onClick={handleResumeAudio}
-                size="icon"
-                variant="default"
-                className="h-[60px] w-[60px]"
-              >
-                <Play className="h-4 w-4" />
-              </Button>
-              <Button 
-                onClick={handleReplayAudio}
-                size="icon"
-                variant="outline"
-                className="h-[60px] w-[60px]"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </div>
           ) : (
             <Button onClick={stopPodcast} variant="destructive" className="flex-1">
               <Square className="mr-2 h-4 w-4" />
@@ -778,6 +739,100 @@ const PodcastMode = () => {
             selectedFigure={host || guest} 
             isLoading={false}
           />
+        </Card>
+      )}
+
+      {/* Input Ribbon - Only show when podcast is recording */}
+      {isRecording && (
+        <Card className="border-t border-border bg-card p-4">
+          <div className="flex space-x-2">
+            <div className="flex-1 relative">
+              <Textarea
+                value={recordingTranscript}
+                onChange={(e) => setRecordingTranscript(e.target.value)}
+                placeholder="Join the conversation... (or click the mic to speak)"
+                className="min-h-[60px] resize-none pr-12"
+                disabled={isPlayingAudio}
+              />
+              <Button
+                onClick={toggleListening}
+                disabled={isPlayingAudio}
+                variant="ghost"
+                size="sm"
+                className={`absolute right-2 top-2 h-8 w-8 ${
+                  isListening 
+                    ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
+              >
+                {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
+            </div>
+            {isPlayingAudio ? (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handlePauseAudio}
+                  size="icon"
+                  variant="secondary"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+                <Button 
+                  onClick={stopPodcast}
+                  size="icon"
+                  variant="destructive"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : isPaused ? (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleResumeAudio}
+                  size="icon"
+                  variant="default"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Play className="h-4 w-4" />
+                </Button>
+                <Button 
+                  onClick={handleReplayAudio}
+                  size="icon"
+                  variant="outline"
+                  className="h-[60px] w-[60px]"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button 
+                onClick={() => {
+                  // Send user message to join conversation
+                  if (recordingTranscript.trim()) {
+                    const userMessage: Message = {
+                      id: Date.now().toString(),
+                      content: recordingTranscript,
+                      type: "user",
+                      timestamp: new Date(),
+                      speakerName: "You"
+                    };
+                    setMessages(prev => [...prev, userMessage]);
+                    setRecordingTranscript("");
+                    
+                    // Continue podcast conversation
+                    continueConversation(currentSpeaker);
+                  }
+                }}
+                disabled={!recordingTranscript.trim()}
+                size="icon"
+                className="h-[60px] w-[60px]"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </Card>
       )}
     </div>
