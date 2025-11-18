@@ -52,6 +52,7 @@ const PodcastMode = () => {
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isStopped, setIsStopped] = useState(false);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
@@ -266,7 +267,7 @@ const PodcastMode = () => {
   };
 
   const stopPodcast = () => {
-    setIsRecording(false);
+    // Don't set isRecording to false - keep ribbon visible
     setCurrentSpeaker('host');
     
     // Stop any playing audio
@@ -282,6 +283,7 @@ const PodcastMode = () => {
     
     setIsPlayingAudio(false);
     setIsPaused(false);
+    setIsStopped(true);
     setCurrentAudio(null);
     
     // Clear audio queue
@@ -290,7 +292,7 @@ const PodcastMode = () => {
     
     toast({
       title: "Podcast stopped",
-      description: "Recording has been stopped",
+      description: "Click Play to restart the audio",
     });
   };
 
@@ -341,6 +343,7 @@ const PodcastMode = () => {
       currentAudio.play();
       setIsPlayingAudio(true);
       setIsPaused(false);
+      setIsStopped(false);
     }
     
     if (audioElementRef.current) {
@@ -348,6 +351,7 @@ const PodcastMode = () => {
       audioElementRef.current.play();
       setIsPlayingAudio(true);
       setIsPaused(false);
+      setIsStopped(false);
     }
     
     toast({
@@ -787,10 +791,10 @@ const PodcastMode = () => {
                   <Square className="h-4 w-4" />
                 </Button>
               </div>
-            ) : isPaused ? (
+            ) : isPaused || isStopped ? (
               <div className="flex gap-2">
                 <Button 
-                  onClick={handleResumeAudio}
+                  onClick={isStopped ? handleReplayAudio : handleResumeAudio}
                   size="icon"
                   variant="default"
                   className="h-[60px] w-[60px]"
