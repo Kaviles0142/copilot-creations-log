@@ -70,6 +70,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [recordingTranscript, setRecordingTranscript] = useState("");
+  const [isStopped, setIsStopped] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -353,6 +354,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         audioElementRef.current.onplay = () => {
           console.log('▶️ Audio playing:', figureName);
           setIsPlayingAudio(true);
+          setIsStopped(false);
           setCurrentSpeaker(figureId);
         };
 
@@ -448,6 +450,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       setCurrentAudio(null);
       setIsPlayingAudio(false);
       setIsPaused(false);
+      setIsStopped(true);
       setCurrentSpeaker(null);
       console.log('⏹️ Audio stopped');
     }
@@ -740,10 +743,10 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                 <Square className="h-4 w-4" />
               </Button>
             </div>
-          ) : isPaused ? (
+          ) : isPaused || isStopped ? (
             <div className="flex gap-2">
               <Button 
-                onClick={handleResumeAudio}
+                onClick={isStopped ? handleReplayAudio : handleResumeAudio}
                 size="icon"
                 variant="default"
                 className="h-[60px] w-[60px]"
