@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Volume2, VolumeX, Pause, Play, RotateCcw, Square } from "lucide-react";
+import { Send, Volume2, VolumeX, Pause, Play, RotateCcw, Square, Mic, MicOff } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
@@ -66,6 +67,9 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
   const [loadingAvatars, setLoadingAvatars] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [recordingTranscript, setRecordingTranscript] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -75,6 +79,61 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   useEffect(() => {
     audioEnabledRef.current = audioEnabled;
   }, [audioEnabled]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognitionInstance = new SpeechRecognition();
+      
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = true;
+      recognitionInstance.lang = language || 'en-US';
+      
+      recognitionInstance.onstart = () => {
+        setIsListening(true);
+        console.log('Voice recognition started');
+      };
+      
+      recognitionInstance.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        if (finalTranscript) {
+          setUserInput(prev => prev + finalTranscript);
+          setRecordingTranscript('');
+        } else {
+          setRecordingTranscript(interimTranscript);
+        }
+      };
+      
+      recognitionInstance.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        toast({
+          title: "Voice recognition error",
+          description: event.error,
+          variant: "destructive",
+        });
+      };
+      
+      recognitionInstance.onend = () => {
+        setIsListening(false);
+        console.log('Voice recognition ended');
+      };
+      
+      setRecognition(recognitionInstance);
+    }
+  }, [language]);
 
   useEffect(() => {
     loadMessages();
@@ -248,6 +307,24 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       setIsProcessingQueue(false);
     }
   };
+
+  const toggleVoiceRecognition = () => {
+    if (!recognition) {
+      toast({
+        title: "Not supported",
+        description: "Speech recognition is not supported in your browser",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  };
+
 
   const playAudioNow = async (text: string, figureName: string, figureId: string) => {
     try {
@@ -610,25 +687,32 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         </ScrollArea>
       </Card>
 
-      <div className="flex gap-2">
-        <Input
-          placeholder="Add your perspective to the debate..."
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && !isPlayingAudio && !isPaused && handleSendMessage()}
-          disabled={isProcessing}
-        />
-        {isPlayingAudio ? (
-          // Show pause and stop buttons during audio playback
-          <div className="flex gap-2">
-            <Button 
-              onClick={handlePauseAudio}
-              size="icon"
-              variant="secondary"
-              className="h-[60px] w-[60px]"
+      <div className="border-t border-border bg-card p-4">
+        <div className="flex space-x-2">
+          <div className="flex-1 relative">
+            <Textarea
+              value={userInput + recordingTranscript}
+              onChange={(e) => setUserInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && !isPlayingAudio && !isPaused && handleSendMessage()}
+              placeholder="Add your perspective to the debate... (or click the mic to speak)"
+              className="min-h-[60px] resize-none pr-12"
+              disabled={isProcessing}
+            />
+            <Button
+              onClick={toggleVoiceRecognition}
+              disabled={isProcessing}
+              variant="ghost"
+              size="sm"
+              className={`absolute right-2 top-2 h-8 w-8 ${
+                isListening 
+                  ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
+                  : 'text-muted-foreground hover:text-primary'
+              }`}
             >
-              <Pause className="h-4 w-4" />
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </Button>
+          </div>
+          {isProcessing ? (
             <Button 
               onClick={handleStopAudio}
               size="icon"
@@ -637,45 +721,55 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
             >
               <Square className="h-4 w-4" />
             </Button>
-          </div>
-        ) : isPaused ? (
-          // Show play and replay buttons when paused
-          <div className="flex gap-2">
+          ) : isPlayingAudio ? (
+            <div className="flex gap-2">
+              <Button 
+                onClick={handlePauseAudio}
+                size="icon"
+                variant="secondary"
+                className="h-[60px] w-[60px]"
+              >
+                <Pause className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={handleStopAudio}
+                size="icon"
+                variant="destructive"
+                className="h-[60px] w-[60px]"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : isPaused ? (
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleResumeAudio}
+                size="icon"
+                variant="default"
+                className="h-[60px] w-[60px]"
+              >
+                <Play className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={handleReplayAudio}
+                size="icon"
+                variant="outline"
+                className="h-[60px] w-[60px]"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
             <Button 
-              onClick={handleResumeAudio}
+              onClick={handleSendMessage}
+              disabled={!userInput.trim() || isProcessing}
               size="icon"
-              variant="default"
               className="h-[60px] w-[60px]"
             >
-              <Play className="h-4 w-4" />
+              <Send className="h-4 w-4" />
             </Button>
-            <Button 
-              onClick={handleReplayAudio}
-              size="icon"
-              variant="outline"
-              className="h-[60px] w-[60px]"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : selectedFigure ? (
-          // Show play button when a figure is selected
-          <div className="flex flex-col items-center gap-2">
-            <Button 
-              onClick={handleReplayAudio}
-              size="icon"
-              variant="default"
-              className="h-[60px] w-[60px]"
-            >
-              <Play className="h-4 w-4" />
-            </Button>
-            <p className="text-xs text-muted-foreground">Play Selected</p>
-          </div>
-        ) : (
-          <Button onClick={handleSendMessage} disabled={isProcessing || !userInput.trim()} size="icon" className="h-[60px] w-[60px]">
-            <Send className="h-4 w-4" />
-          </Button>
-        )}
+          )}
+        </div>
       </div>
 
       {isRoundComplete && format === "free-for-all" && (
