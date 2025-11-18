@@ -39,7 +39,7 @@ export default function DebateFigureSelector({ onStartDebate }: DebateFigureSele
   const [selectedFigures, setSelectedFigures] = useState<Figure[]>([]);
   const [figureInput, setFigureInput] = useState("");
   const [format, setFormat] = useState<DebateFormat>("round-robin");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState("en-US");
 
   const addFigure = () => {
     const name = figureInput.trim();

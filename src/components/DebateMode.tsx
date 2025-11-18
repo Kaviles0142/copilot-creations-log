@@ -16,7 +16,7 @@ export default function DebateMode() {
   const [topic, setTopic] = useState("");
   const [figures, setFigures] = useState<Figure[]>([]);
   const [format, setFormat] = useState<DebateFormat>("round-robin");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState("en-US");
   const { toast } = useToast();
 
   const handleStartDebate = async (
@@ -45,7 +45,7 @@ export default function DebateMode() {
         body: {
           sessionId: data.id,
           currentTurn: 0,
-          language: debateLanguage.split('-')[0],
+          language: debateLanguage.split('-')[0],  // Pass language code (en, es, fr) to orchestrator
         },
       });
 
@@ -60,7 +60,7 @@ export default function DebateMode() {
             body: {
               sessionId: data.id,
               currentTurn: orchestratorData.nextTurn,
-              language: debateLanguage.split('-')[0],
+              language: debateLanguage.split('-')[0],  // Pass language code (en, es, fr) to orchestrator
             },
           });
         }, 2000);
