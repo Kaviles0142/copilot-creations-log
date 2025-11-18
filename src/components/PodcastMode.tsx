@@ -436,8 +436,8 @@ const PodcastMode = () => {
       const audioTask = audioQueueRef.current.shift();
       if (audioTask) {
         await audioTask();
-        // Wait 2 seconds before playing the next audio
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait 1 second before playing the next audio
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 
