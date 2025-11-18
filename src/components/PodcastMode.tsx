@@ -756,11 +756,9 @@ const PodcastMode = () => {
                 onChange={(e) => setRecordingTranscript(e.target.value)}
                 placeholder="Join the conversation... (or click the mic to speak)"
                 className="min-h-[60px] resize-none pr-12"
-                disabled={isPlayingAudio}
               />
               <Button
                 onClick={toggleListening}
-                disabled={isPlayingAudio}
                 variant="ghost"
                 size="sm"
                 className={`absolute right-2 top-2 h-8 w-8 ${
