@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Play, Square, Mic, MicOff, Globe, Volume2, VolumeX, Pause, StopCircle } from "lucide-react";
+import { Users, Play, Square, Mic, MicOff, Globe, Volume2, VolumeX, Pause, RotateCcw } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import RealisticAvatar from "./RealisticAvatar";
@@ -329,6 +329,29 @@ const PodcastMode = () => {
     toast({
       title: "Resumed",
       description: "Audio playback resumed",
+      duration: 2000,
+    });
+  };
+
+  const handleReplayAudio = () => {
+    // Replay the current audio from the beginning
+    if (currentAudio) {
+      currentAudio.currentTime = 0;
+      currentAudio.play();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+    
+    if (audioElementRef.current) {
+      audioElementRef.current.currentTime = 0;
+      audioElementRef.current.play();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+    
+    toast({
+      title: "Replaying",
+      description: "Audio replaying from start",
       duration: 2000,
     });
   };
@@ -678,37 +701,37 @@ const PodcastMode = () => {
                 onClick={handlePauseAudio}
                 size="icon"
                 variant="secondary"
-                className="h-10 w-10"
+                className="h-[60px] w-[60px]"
               >
                 <Pause className="h-4 w-4" />
               </Button>
               <Button 
                 onClick={stopPodcast}
+                size="icon"
                 variant="destructive"
-                className="flex-1"
+                className="h-[60px] w-[60px]"
               >
-                <Square className="mr-2 h-4 w-4" />
-                Stop
+                <Square className="h-4 w-4" />
               </Button>
             </div>
           ) : isPaused ? (
-            // Show play and stop buttons when paused
+            // Show play and replay buttons when paused
             <div className="flex gap-2 flex-1">
               <Button 
                 onClick={handleResumeAudio}
                 size="icon"
                 variant="default"
-                className="h-10 w-10"
+                className="h-[60px] w-[60px]"
               >
                 <Play className="h-4 w-4" />
               </Button>
               <Button 
-                onClick={stopPodcast}
-                variant="destructive"
-                className="flex-1"
+                onClick={handleReplayAudio}
+                size="icon"
+                variant="outline"
+                className="h-[60px] w-[60px]"
               >
-                <Square className="mr-2 h-4 w-4" />
-                Stop
+                <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
           ) : (
