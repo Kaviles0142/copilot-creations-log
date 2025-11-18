@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Play, Square, Mic, MicOff, Globe, Volume2, VolumeX } from "lucide-react";
+import { Users, Play, Square, Mic, MicOff, Globe, Volume2, VolumeX, Pause, StopCircle } from "lucide-react";
 import HistoricalFigureSearch from "./HistoricalFigureSearch";
 import ChatMessages from "./ChatMessages";
 import RealisticAvatar from "./RealisticAvatar";
@@ -50,6 +50,7 @@ const PodcastMode = () => {
   
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
@@ -263,6 +264,75 @@ const PodcastMode = () => {
     }
   };
 
+  const stopPodcast = () => {
+    setIsRecording(false);
+    setCurrentSpeaker('host');
+    
+    // Stop any playing audio
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+    }
+    
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+    
+    setIsPlayingAudio(false);
+    setIsPaused(false);
+    setCurrentAudio(null);
+    
+    // Clear audio queue
+    audioQueueRef.current = [];
+    isProcessingAudioRef.current = false;
+    
+    toast({
+      title: "Podcast stopped",
+      description: "Recording has been stopped",
+    });
+  };
+
+  const handlePauseAudio = () => {
+    if (currentAudio && isPlayingAudio) {
+      currentAudio.pause();
+      setIsPlayingAudio(false);
+      setIsPaused(true);
+    }
+    
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      setIsPlayingAudio(false);
+      setIsPaused(true);
+    }
+    
+    toast({
+      title: "Paused",
+      description: "Audio playback has been paused",
+      duration: 2000,
+    });
+  };
+
+  const handleResumeAudio = () => {
+    if (currentAudio && isPaused) {
+      currentAudio.play();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+    
+    if (audioElementRef.current && isPaused) {
+      audioElementRef.current.play();
+      setIsPlayingAudio(true);
+      setIsPaused(false);
+    }
+    
+    toast({
+      title: "Resumed",
+      description: "Audio playback resumed",
+      duration: 2000,
+    });
+  };
+
   const continueConversation = async (speaker: 'host' | 'guest') => {
     const currentFigure = speaker === 'host' ? host : guest;
     const otherFigure = speaker === 'host' ? guest : host;
@@ -398,6 +468,7 @@ const PodcastMode = () => {
 
       const audio = new Audio(url);
       audioElementRef.current = audio;
+      setCurrentAudio(audio);
       
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext();
@@ -415,46 +486,43 @@ const PodcastMode = () => {
         analyserRef.current = analyser;
       }
 
+      audio.onplay = () => {
+        console.log('▶️ Audio started playing');
+        setIsPlayingAudio(true);
+        setIsPaused(false);
+      };
+
       audio.onended = () => {
+        console.log('✅ Audio finished');
         setIsPlayingAudio(false);
+        setIsPaused(false);
         setIsSpeaking(false);
         setCurrentAudioUrl(null);
+        setCurrentAudio(null);
         URL.revokeObjectURL(url);
         resolve();
       };
 
       audio.onerror = () => {
         setIsPlayingAudio(false);
+        setIsPaused(false);
         setIsSpeaking(false);
         setCurrentAudioUrl(null);
+        setCurrentAudio(null);
         resolve();
       };
 
-      setCurrentAudio(audio);
       setIsPlayingAudio(true);
       audio.play().catch(error => {
         console.error('Audio playback failed:', error);
         setIsPlayingAudio(false);
+        setIsPaused(false);
         setIsSpeaking(false);
         resolve();
       });
     });
   };
 
-  const stopPodcast = () => {
-    setIsRecording(false);
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
-    }
-    setIsPlayingAudio(false);
-    setIsSpeaking(false);
-    
-    toast({
-      title: "Podcast stopped",
-      description: "Recording has ended",
-    });
-  };
 
   const toggleAutoVoice = () => {
     setIsAutoVoiceEnabled(!isAutoVoiceEnabled);
@@ -603,6 +671,46 @@ const PodcastMode = () => {
               <Play className="mr-2 h-4 w-4" />
               Start Podcast
             </Button>
+          ) : isPlayingAudio ? (
+            // Show pause and stop buttons during audio playback
+            <div className="flex gap-2 flex-1">
+              <Button 
+                onClick={handlePauseAudio}
+                size="icon"
+                variant="secondary"
+                className="h-10 w-10"
+              >
+                <Pause className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={stopPodcast}
+                variant="destructive"
+                className="flex-1"
+              >
+                <Square className="mr-2 h-4 w-4" />
+                Stop
+              </Button>
+            </div>
+          ) : isPaused ? (
+            // Show play and stop buttons when paused
+            <div className="flex gap-2 flex-1">
+              <Button 
+                onClick={handleResumeAudio}
+                size="icon"
+                variant="default"
+                className="h-10 w-10"
+              >
+                <Play className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={stopPodcast}
+                variant="destructive"
+                className="flex-1"
+              >
+                <Square className="mr-2 h-4 w-4" />
+                Stop
+              </Button>
+            </div>
           ) : (
             <Button onClick={stopPodcast} variant="destructive" className="flex-1">
               <Square className="mr-2 h-4 w-4" />
