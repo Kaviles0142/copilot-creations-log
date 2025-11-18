@@ -311,6 +311,12 @@ serve(async (req) => {
       // For English: Map to English regional variants
       if (language === 'en-US') {
         const englishVariants: Record<string, { male: string, female: string }> = {
+          'german': { male: 'de-DE-ConradNeural', female: 'de-DE-KatjaNeural' },  // German-accented English
+          'french': { male: 'fr-FR-HenriNeural', female: 'fr-FR-DeniseNeural' },  // French-accented English
+          'italian': { male: 'it-IT-DiegoNeural', female: 'it-IT-ElsaNeural' },  // Italian-accented English
+          'spanish': { male: 'es-ES-AlvaroNeural', female: 'es-ES-ElviraNeural' },  // Spanish-accented English
+          'russian': { male: 'ru-RU-DmitryNeural', female: 'ru-RU-SvetlanaNeural' },  // Russian-accented English
+          'south-african': { male: 'en-ZA-LukeNeural', female: 'en-ZA-LeahNeural' },  // South African English
           'british': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
           'english': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
           'scottish': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
