@@ -408,7 +408,9 @@ const PodcastMode = () => {
         speakerName: currentFigure.name
       };
 
-      setMessages(prev => [...prev, responseMessage]);
+      const updatedMessages = [...messages, responseMessage];
+      setMessages(updatedMessages);
+      messagesRef.current = updatedMessages; // Immediately update ref for accurate length checks
 
       // Generate and play audio (don't await so next response generates while audio plays)
       if (isAutoVoiceEnabled) {
