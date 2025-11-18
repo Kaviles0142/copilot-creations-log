@@ -71,8 +71,14 @@ const PodcastMode = () => {
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const audioQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingAudioRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
   
   const { toast } = useToast();
+
+  // Keep messagesRef in sync with messages state
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Initialize speech recognition
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
@@ -410,7 +416,7 @@ const PodcastMode = () => {
       }
       
       // Continue with other speaker immediately (response generates while current audio plays)
-      if (isRecording && messages.length < 10) {
+      if (isRecording && messagesRef.current.length < 10) {
         setTimeout(() => {
           continueConversation(speaker === 'host' ? 'guest' : 'host');
         }, 500);
