@@ -55,9 +55,9 @@ serve(async (req) => {
       return 'male'; // Default
     };
 
-    // Helper function to detect nationality using AI
-    const detectNationality = async (figureName: string): Promise<string> => {
-      console.log(`🤖 Detecting nationality for: ${figureName}`);
+    // Helper function to detect accent/region using AI
+    const detectAccentRegion = async (figureName: string): Promise<string> => {
+      console.log(`🤖 Detecting accent region for: ${figureName}`);
       
       const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
       if (!lovableApiKey) {
@@ -77,7 +77,7 @@ serve(async (req) => {
             messages: [
               {
                 role: 'user',
-                content: `What is the nationality of "${figureName}"? Reply with ONLY the nationality (e.g., "french", "german", "greek", "american", "egyptian", "chinese", "italian", "spanish", "russian", "japanese", "indian", "english", "british", "nepalese", "tibetan", "thai", "korean", "vietnamese"). Be specific and use lowercase. Single word only.`
+                content: `What accent region should "${figureName}" have? Reply with ONLY ONE of these exact options: american, british, south-african, australian, canadian, indian, irish, scottish, french, german, italian, spanish, russian, japanese, chinese, greek. Choose the most authentic accent for this person. Single word/phrase only, lowercase.`
               }
             ],
           }),
@@ -89,59 +89,15 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        const nationality = data.choices?.[0]?.message?.content?.trim()?.toLowerCase() || 'american';
-        console.log(`✅ Detected nationality: ${nationality}`);
-        return nationality;
+        const region = data.choices?.[0]?.message?.content?.trim()?.toLowerCase() || 'american';
+        console.log(`✅ Detected accent region: ${region}`);
+        return region;
       } catch (error) {
-        console.error('❌ Error detecting nationality:', error);
+        console.error('❌ Error detecting accent region:', error);
         return 'american';
       }
     };
 
-    // Helper function to map nationality to region
-    const mapNationalityToRegion = (nationality: string): string => {
-      const mapping: Record<string, string> = {
-        'french': 'french',
-        'german': 'german',
-        'italian': 'italian',
-        'spanish': 'spanish',
-        'chinese': 'chinese',
-        'japanese': 'japanese',
-        'russian': 'russian',
-        'indian': 'indian',
-        'greek': 'greek',
-        'egyptian': 'greek',
-        'english': 'american',
-        'american': 'american',
-        'british': 'british',
-        // Asian nationalities
-        'nepalese': 'indian',     // Buddha - use Indian accent
-        'tibetan': 'chinese',
-        'thai': 'chinese',
-        'korean': 'chinese',
-        'vietnamese': 'chinese',
-        'mongolian': 'chinese',
-        'burmese': 'indian',
-        'bangladeshi': 'indian',
-        'pakistani': 'indian',
-        'sri lankan': 'indian',
-        // Middle Eastern
-        'persian': 'greek',
-        'iranian': 'greek',
-        'iraqi': 'greek',
-        'saudi': 'greek',
-        'turkish': 'greek',
-        // Additional European
-        'polish': 'russian',
-        'ukrainian': 'russian',
-        'dutch': 'german',
-        'austrian': 'german',
-        'swiss': 'german',
-        'portuguese': 'spanish',
-        'brazilian': 'spanish',
-      };
-      return mapping[nationality] || 'american';
-    };
 
     // Language-to-voice mapping with native Azure Neural Voices
     const languageVoiceMap: { [key: string]: { male: string; female: string } } = {
@@ -267,7 +223,7 @@ serve(async (req) => {
       // Check cache first
       const { data: cachedMetadata } = await supabase
         .from('figure_metadata')
-        .select('region, nationality, cache_version')
+        .select('region, cache_version')
         .eq('figure_id', figure_id)
         .maybeSingle();
 
@@ -279,18 +235,15 @@ serve(async (req) => {
           .delete()
           .eq('figure_id', figure_id);
       }
-
-      let nationality = '';
       
       if (cachedMetadata?.region && cachedMetadata.cache_version === CACHE_VERSION) {
         console.log(`📦 Using cached region for ${figure_name}: ${cachedMetadata.region}`);
         detectedRegion = cachedMetadata.region;
       } else {
-        // Detect nationality using AI
-        nationality = await detectNationality(figure_name);
-        detectedRegion = mapNationalityToRegion(nationality);
+        // Detect accent region directly using AI (no mapping needed)
+        detectedRegion = await detectAccentRegion(figure_name);
         
-        console.log(`🗺️ Detected nationality: ${nationality}, mapped to region: ${detectedRegion}`);
+        console.log(`🗺️ AI detected accent region: ${detectedRegion}`);
         
         // Cache the result with version
         await supabase
@@ -298,7 +251,6 @@ serve(async (req) => {
           .upsert({
             figure_id,
             figure_name,
-            nationality,
             region: detectedRegion,
             cache_version: CACHE_VERSION,
           }, {
