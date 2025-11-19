@@ -115,6 +115,16 @@ const HistoricalChat = () => {
   
   const { toast } = useToast();
 
+  // Auto-select Australian English voice for Elon Musk
+  useEffect(() => {
+    if (selectedFigure && 
+        (selectedFigure.id === 'elon-musk' || selectedFigure.name.toLowerCase().includes('elon musk')) &&
+        selectedVoiceId === 'auto') {
+      setSelectedVoiceId('en-AU-WilliamNeural');
+      console.log('🎙️ Auto-selected Australian English for Elon Musk');
+    }
+  }, [selectedFigure]);
+
   // DEBUG: Watch isSpeaking state changes
   useEffect(() => {
     console.log('🎤🎤🎤 isSpeaking changed to:', isSpeaking);
