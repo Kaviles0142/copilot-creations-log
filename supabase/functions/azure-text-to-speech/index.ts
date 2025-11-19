@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice, figure_name, figure_id, language } = await req.json();
+    const { text, voice: customVoice, figure_name, figure_id, language } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -199,23 +199,30 @@ serve(async (req) => {
       }
     };
 
-    // PRIORITY 1: User selected language
-    // PRIORITY 2: For English - detect nationality for authentic accent
-    // PRIORITY 3: For other languages - use standard voice
+    // PRIORITY 1: User-selected custom voice (from frontend dropdown)
+    // PRIORITY 2: User selected language
+    // PRIORITY 3: For English - detect nationality for authentic accent
+    // PRIORITY 4: For other languages - use standard voice
     let selectedVoice = '';
     let detectedRegion = 'american';
     
     const gender = detectGender(figure_name || '');
     console.log(`🎭 Detected gender: ${gender} for ${figure_name}`);
     
+    // If user manually selected a voice, use it directly
+    if (customVoice) {
+      selectedVoice = customVoice;
+      console.log(`✨ Using user-selected voice: ${selectedVoice}`);
+    }
+    
     // For non-English languages: use standard voice from language map
-    if (language && language !== 'en-US' && languageVoiceMap[language]) {
+    if (!selectedVoice && language && language !== 'en-US' && languageVoiceMap[language]) {
       selectedVoice = languageVoiceMap[language][gender];
       console.log(`🌍 Using language-specific voice: ${selectedVoice} for language: ${language}`);
     }
     
     // Detect nationality for: (1) English language selected, or (2) no language selected (auto mode)
-    if ((language === 'en-US' || !language) && figure_name && figure_id && !selectedVoice) {
+    if (!selectedVoice && (language === 'en-US' || !language) && figure_name && figure_id) {
       console.log(`🔍 Detecting nationality for ${figure_name}...`);
       // Cache version - increment this when mapping logic changes
       const CACHE_VERSION = 'v2'; // Updated to force re-detection with new nationality mappings

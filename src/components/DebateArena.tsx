@@ -9,6 +9,7 @@ import { Send, Volume2, VolumeX, Pause, Play, RotateCcw, Square, Mic, MicOff } f
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Figure {
   id: string;
@@ -71,10 +72,43 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [recordingTranscript, setRecordingTranscript] = useState("");
   const [isStopped, setIsStopped] = useState(false);
+  const [selectedVoices, setSelectedVoices] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
+
+  // Azure voice options filtered by gender
+  const azureVoices = {
+    male: [
+      { value: 'en-US-GuyNeural', label: 'American Guy' },
+      { value: 'en-GB-RyanNeural', label: 'British Ryan' },
+      { value: 'en-AU-WilliamNeural', label: 'Australian William' },
+      { value: 'en-CA-LiamNeural', label: 'Canadian Liam' },
+      { value: 'en-IN-PrabhatNeural', label: 'Indian Prabhat' },
+    ],
+    female: [
+      { value: 'en-US-JennyNeural', label: 'American Jenny' },
+      { value: 'en-GB-SoniaNeural', label: 'British Sonia' },
+      { value: 'en-AU-NatashaNeural', label: 'Australian Natasha' },
+      { value: 'en-CA-ClaraNeural', label: 'Canadian Clara' },
+      { value: 'en-IN-NeerjaNeural', label: 'Indian Neerja' },
+    ],
+  };
+
+  // Detect gender helper
+  const detectGender = (name: string): 'male' | 'female' => {
+    const nameLower = name.toLowerCase();
+    const femaleNames = [
+      'joan of arc', 'cleopatra', 'marie curie', 'rosa parks', 'mother teresa',
+      'victoria', 'elizabeth', 'catherine', 'anne frank', 'amelia earhart',
+      'harriet tubman', 'malala', 'frida kahlo', 'ada lovelace', 'florence nightingale',
+      'jane austen', 'emily dickinson', 'virginia woolf', 'simone de beauvoir',
+      'eleanor roosevelt', 'margaret thatcher', 'indira gandhi', 'benazir bhutto',
+      'mary', 'anne', 'jane', 'emily', 'rosa', 'harriet', 'ada', 'florence'
+    ];
+    return femaleNames.some(n => nameLower.includes(n)) ? 'female' : 'male';
+  };
 
   // Sync audioEnabled state with ref
   useEffect(() => {
@@ -616,7 +650,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                   </AvatarFallback>
                 )}
               </Avatar>
-              <div className="text-center">
+              <div className="text-center w-full px-2">
                 <p className="font-semibold text-sm">{capitalizeName(figure.name)}</p>
                 {currentSpeaker === figure.id && (
                   <p className="text-xs text-primary animate-pulse">Speaking...</p>
@@ -627,6 +661,23 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                 {format === "moderated" && !isProcessing && (
                   <p className="text-xs text-muted-foreground">Click to speak</p>
                 )}
+                <Select
+                  value={selectedVoices[figure.id] || ''}
+                  onValueChange={(value) => {
+                    setSelectedVoices(prev => ({ ...prev, [figure.id]: value }));
+                  }}
+                >
+                  <SelectTrigger className="w-full mt-2 h-8 text-xs" onClick={(e) => e.stopPropagation()}>
+                    <SelectValue placeholder="Auto voice" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    {azureVoices[detectGender(figure.name)].map((voice) => (
+                      <SelectItem key={voice.value} value={voice.value} className="text-xs">
+                        {voice.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </Card>
