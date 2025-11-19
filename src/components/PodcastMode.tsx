@@ -927,8 +927,8 @@ const PodcastMode = () => {
 
         {/* Avatars */}
         {(host || guest) && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {host && (
+          <div className={hostType === 'user' ? "flex justify-center mb-6" : "grid grid-cols-2 gap-4 mb-6"}>
+            {host && hostType !== 'user' && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-center">{host.name}</p>
                 <p className="text-xs text-muted-foreground text-center">Host</p>
@@ -956,7 +956,7 @@ const PodcastMode = () => {
               </div>
             )}
             {guest && (
-              <div className="space-y-2">
+              <div className={`space-y-2 ${hostType === 'user' ? 'max-w-md w-full' : ''}`}>
                 <p className="text-sm font-medium text-center">{guest.name}</p>
                 <p className="text-xs text-muted-foreground text-center">Guest</p>
                 <RealisticAvatar
