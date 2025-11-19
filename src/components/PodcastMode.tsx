@@ -77,6 +77,41 @@ const PodcastMode = () => {
   
   const { toast } = useToast();
 
+  // Azure voice options filtered by gender
+  const azureVoices = {
+    male: [
+      { value: 'en-US-GuyNeural', label: 'American English' },
+      { value: 'en-GB-RyanNeural', label: 'British English' },
+      { value: 'en-AU-WilliamNeural', label: 'Australian English' },
+      { value: 'en-CA-LiamNeural', label: 'Canadian English' },
+      { value: 'en-IN-PrabhatNeural', label: 'Indian English' },
+    ],
+    female: [
+      { value: 'en-US-JennyNeural', label: 'American English' },
+      { value: 'en-GB-SoniaNeural', label: 'British English' },
+      { value: 'en-AU-NatashaNeural', label: 'Australian English' },
+      { value: 'en-CA-ClaraNeural', label: 'Canadian English' },
+      { value: 'en-IN-NeerjaNeural', label: 'Indian English' },
+    ],
+  };
+
+  // Detect gender helper
+  const detectGender = (name: string): 'male' | 'female' => {
+    const nameLower = name.toLowerCase();
+    const femaleNames = [
+      'joan of arc', 'cleopatra', 'marie curie', 'rosa parks', 'mother teresa',
+      'victoria', 'elizabeth', 'catherine', 'anne frank', 'amelia earhart',
+      'harriet tubman', 'malala', 'frida kahlo', 'ada lovelace', 'florence nightingale',
+      'jane austen', 'emily dickinson', 'virginia woolf', 'simone de beauvoir',
+      'eleanor roosevelt', 'margaret thatcher', 'indira gandhi', 'benazir bhutto',
+      'mary', 'anne', 'jane', 'emily', 'rosa', 'harriet', 'ada', 'florence'
+    ];
+    if (femaleNames.some(n => nameLower.includes(n))) {
+      return 'female';
+    }
+    return 'male';
+  };
+
   // Auto-select Australian English for Elon Musk
   useEffect(() => {
     if (host && (host.id === 'elon-musk' || host.name.toLowerCase().includes('elon musk')) && hostVoice === 'auto') {
@@ -733,21 +768,55 @@ const PodcastMode = () => {
             {host && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-center">{host.name}</p>
+                <p className="text-xs text-muted-foreground text-center">Host</p>
                 <RealisticAvatar
                   imageUrl={hostAvatarUrl}
                   isLoading={isLoadingHostAvatar}
                   audioUrl={currentSpeaker === 'host' ? currentAudioUrl : null}
                 />
+                <Select
+                  value={hostVoice}
+                  onValueChange={(value) => setHostVoice(value)}
+                >
+                  <SelectTrigger className="w-full h-8 text-xs bg-background z-50">
+                    <SelectValue placeholder="Auto voice" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    <SelectItem value="auto" className="text-xs">Auto voice</SelectItem>
+                    {azureVoices[detectGender(host.name)].map((voice) => (
+                      <SelectItem key={voice.value} value={voice.value} className="text-xs">
+                        {voice.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {guest && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-center">{guest.name}</p>
+                <p className="text-xs text-muted-foreground text-center">Guest</p>
                 <RealisticAvatar
                   imageUrl={guestAvatarUrl}
                   isLoading={isLoadingGuestAvatar}
                   audioUrl={currentSpeaker === 'guest' ? currentAudioUrl : null}
                 />
+                <Select
+                  value={guestVoice}
+                  onValueChange={(value) => setGuestVoice(value)}
+                >
+                  <SelectTrigger className="w-full h-8 text-xs bg-background z-50">
+                    <SelectValue placeholder="Auto voice" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    <SelectItem value="auto" className="text-xs">Auto voice</SelectItem>
+                    {azureVoices[detectGender(guest.name)].map((voice) => (
+                      <SelectItem key={voice.value} value={voice.value} className="text-xs">
+                        {voice.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </div>
