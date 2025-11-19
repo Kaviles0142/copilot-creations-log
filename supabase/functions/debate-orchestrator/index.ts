@@ -191,20 +191,9 @@ serve(async (req) => {
     // Build debate-aware prompt
     const otherFigures = session.figure_names.filter((_: string, i: number) => i !== currentFigureIndex);
     
-    // Determine if this is the first speaker based on format
-    let isFirstSpeaker = false;
-    
-    if (session.format === 'round-robin') {
-      // For round-robin: First speaker in the current round
-      const messagesInCurrentRound = previousMessages?.filter(m => {
-        const roundStartTurn = (session.current_round - 1) * session.figure_names.length;
-        return m.turn_number >= roundStartTurn;
-      }).length || 0;
-      isFirstSpeaker = messagesInCurrentRound === 0;
-    } else {
-      // For free-for-all and moderated: First speaker in the entire session
-      isFirstSpeaker = !previousMessages || previousMessages.length === 0;
-    }
+    // Determine if this is the first speaker (only true for the very first message in the entire debate)
+    // All subsequent speakers, including those in Round 2+, should respond to previous arguments
+    const isFirstSpeaker = !previousMessages || previousMessages.length === 0;
     
     let systemPrompt: string;
     let userPrompt: string;
