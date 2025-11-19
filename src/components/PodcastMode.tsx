@@ -42,12 +42,17 @@ const PodcastMode = () => {
   const [host, setHost] = useState<HistoricalFigure | null>(null);
   const [guest, setGuest] = useState<HistoricalFigure | null>(null);
   const [selectingFor, setSelectingFor] = useState<'host' | 'guest' | null>(null);
+  const [hostType, setHostType] = useState<'user' | 'figure'>('figure');
+  const [guestType, setGuestType] = useState<'user' | 'figure'>('figure');
+  const [userInput, setUserInput] = useState("");
   
   // Conversation state
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<'host' | 'guest'>('host');
   const [podcastTopic, setPodcastTopic] = useState("");
+  const [isPodcastActive, setIsPodcastActive] = useState(false);
+  const [waitingForUser, setWaitingForUser] = useState(false);
   
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -254,27 +259,44 @@ const PodcastMode = () => {
   };
 
   const startPodcast = async () => {
-    if (!host || !guest || !podcastTopic.trim()) {
+    // Check if we have the necessary participants
+    const hasHost = hostType === 'user' || host;
+    const hasGuest = guestType === 'user' || guest;
+    
+    if (!hasHost || !hasGuest || !podcastTopic.trim()) {
       toast({
         title: "Missing information",
-        description: "Please select both host and guest, and provide a topic.",
+        description: "Please select participants and provide a topic.",
         variant: "destructive"
       });
       return;
     }
 
+    setIsPodcastActive(true);
+
     setIsRecording(true);
+    
+    // If user is the host, wait for their introduction
+    if (hostType === 'user') {
+      setWaitingForUser(true);
+      setCurrentSpeaker('host');
+      toast({
+        title: "Your turn!",
+        description: "Introduce yourself and the topic to start the podcast.",
+      });
+      return;
+    }
     
     // Get AI-generated introduction in the correct language
     try {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: `You are ${host.name}, the podcast host. Begin by introducing yourself briefly, then welcome your guest ${guest.name}, and introduce today's topic: "${podcastTopic}". Make it engaging and conversational.`,
+          message: `You are ${host!.name}, the podcast host. Begin by introducing yourself briefly, then welcome your guest ${guestType === 'user' ? 'our special guest' : guest!.name}, and introduce today's topic: "${podcastTopic}". Make it engaging and conversational.`,
           figure: {
-            id: host.id,
-            name: host.name,
-            period: host.period,
-            description: host.description
+            id: host!.id,
+            name: host!.name,
+            period: host!.period,
+            description: host!.description
           },
           language: selectedLanguage.split('-')[0],
           conversationType: 'casual'
@@ -290,7 +312,7 @@ const PodcastMode = () => {
         content: introMessage,
         type: "assistant",
         timestamp: new Date(),
-        speakerName: host.name
+        speakerName: host!.name
       };
       
       setMessages([newMessage]);
@@ -298,17 +320,22 @@ const PodcastMode = () => {
       
       // Generate and play audio (don't await so next response can be generated in parallel)
       if (isAutoVoiceEnabled) {
-        generateAndPlayAudio(introMessage, host.name, host.id);
+        generateAndPlayAudio(introMessage, host!.name, host!.id);
       }
       
       toast({
         title: "Podcast started!",
-        description: `${host.name} and ${guest.name} are ready to discuss "${podcastTopic}"`,
+        description: `${host!.name} and ${guestType === 'user' ? 'you' : guest!.name} are ready to discuss "${podcastTopic}"`,
       });
 
-      // Get guest's response immediately (will start generating while host audio plays)
+      // Get guest's response immediately or wait for user
       setTimeout(() => {
-        continueConversation('guest');
+        if (guestType === 'user') {
+          setWaitingForUser(true);
+          setCurrentSpeaker('guest');
+        } else {
+          continueConversation('guest');
+        }
       }, 500);
     } catch (error) {
       console.error('Error starting podcast:', error);
@@ -318,6 +345,7 @@ const PodcastMode = () => {
         variant: "destructive"
       });
       setIsRecording(false);
+      setIsPodcastActive(false);
     }
   };
 
@@ -417,10 +445,25 @@ const PodcastMode = () => {
   };
 
   const continueConversation = async (speaker: 'host' | 'guest') => {
+    // Check if it's user's turn
+    if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
+      setWaitingForUser(true);
+      setCurrentSpeaker(speaker);
+      toast({
+        title: "Your turn!",
+        description: "Record your response or type it below.",
+        duration: 3000,
+      });
+      return;
+    }
+
     const currentFigure = speaker === 'host' ? host : guest;
     const otherFigure = speaker === 'host' ? guest : host;
+    const otherName = speaker === 'host' 
+      ? (guestType === 'user' ? 'our guest' : guest?.name)
+      : (hostType === 'user' ? 'our host' : host?.name);
     
-    if (!currentFigure || !otherFigure) return;
+    if (!currentFigure) return;
 
     setCurrentSpeaker(speaker);
 
@@ -429,8 +472,8 @@ const PodcastMode = () => {
       const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
       
       const prompt = speaker === 'host'
-        ? `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherFigure.name}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`
-        : `You are ${currentFigure.name}, the podcast guest. Respond to the host ${otherFigure.name}'s introduction and comments about "${podcastTopic}". Be conversational and engaging. Recent: ${recentContext}`;
+        ? `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherName}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`
+        : `You are ${currentFigure.name}, the podcast guest. Respond to the host ${otherName}'s introduction and comments about "${podcastTopic}". Be conversational and engaging. Recent: ${recentContext}`;
 
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
@@ -617,6 +660,38 @@ const PodcastMode = () => {
     });
   };
 
+  const handleUserSubmit = async () => {
+    if (!userInput.trim()) {
+      toast({
+        title: "Empty message",
+        description: "Please type your message",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const speakerName = currentSpeaker === 'host' 
+      ? (hostType === 'user' ? 'You (Host)' : host?.name)
+      : (guestType === 'user' ? 'You (Guest)' : guest?.name);
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      content: userInput,
+      type: "user",
+      timestamp: new Date(),
+      speakerName: speakerName
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setUserInput("");
+    setWaitingForUser(false);
+
+    // Continue conversation with the other speaker
+    setTimeout(() => {
+      continueConversation(currentSpeaker === 'host' ? 'guest' : 'host');
+    }, 500);
+  };
+
   if (selectingFor) {
     return (
       <div className="space-y-4">
@@ -648,33 +723,73 @@ const PodcastMode = () => {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="space-y-2">
             <label className="text-sm font-medium">Host</label>
-            {host ? (
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <span>{host.name}</span>
-                <Button size="sm" variant="outline" onClick={() => setSelectingFor('host')}>
-                  Change
+            <Select 
+              value={hostType} 
+              onValueChange={(value: 'user' | 'figure') => {
+                setHostType(value);
+                if (value === 'user' && guestType === 'user') {
+                  setGuestType('figure');
+                }
+              }}
+              disabled={isRecording}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="user">👤 You (User)</SelectItem>
+                <SelectItem value="figure">🎭 Historical Figure</SelectItem>
+              </SelectContent>
+            </Select>
+            {hostType === 'figure' && (
+              host ? (
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <span>{host.name}</span>
+                  <Button size="sm" variant="outline" onClick={() => setSelectingFor('host')}>
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={() => setSelectingFor('host')} variant="outline" className="w-full">
+                  Select Figure
                 </Button>
-              </div>
-            ) : (
-              <Button onClick={() => setSelectingFor('host')} variant="outline" className="w-full">
-                Select Host
-              </Button>
+              )
             )}
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Guest</label>
-            {guest ? (
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <span>{guest.name}</span>
-                <Button size="sm" variant="outline" onClick={() => setSelectingFor('guest')}>
-                  Change
+            <Select 
+              value={guestType} 
+              onValueChange={(value: 'user' | 'figure') => {
+                setGuestType(value);
+                if (value === 'user' && hostType === 'user') {
+                  setHostType('figure');
+                }
+              }}
+              disabled={isRecording}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="user">👤 You (User)</SelectItem>
+                <SelectItem value="figure">🎭 Historical Figure</SelectItem>
+              </SelectContent>
+            </Select>
+            {guestType === 'figure' && (
+              guest ? (
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <span>{guest.name}</span>
+                  <Button size="sm" variant="outline" onClick={() => setSelectingFor('guest')}>
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={() => setSelectingFor('guest')} variant="outline" className="w-full">
+                  Select Figure
                 </Button>
-              </div>
-            ) : (
-              <Button onClick={() => setSelectingFor('guest')} variant="outline" className="w-full">
-                Select Guest
-              </Button>
+              )
             )}
           </div>
         </div>
@@ -838,92 +953,141 @@ const PodcastMode = () => {
       {/* Input Ribbon - Only show when podcast is recording */}
       {isRecording && (
         <Card className="border-t border-border bg-card p-4">
-          <div className="flex space-x-2">
-            <div className="flex-1 relative">
-              <Textarea
-                value={recordingTranscript}
-                onChange={(e) => setRecordingTranscript(e.target.value)}
-                placeholder="Join the conversation... (or click the mic to speak)"
-                className="min-h-[60px] resize-none pr-12"
-              />
-              <Button
-                onClick={toggleListening}
-                variant="ghost"
-                size="sm"
-                className={`absolute right-2 top-2 h-8 w-8 ${
-                  isListening 
-                    ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
-                    : 'text-muted-foreground hover:text-primary'
-                }`}
-              >
-                {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </Button>
+          {waitingForUser ? (
+            <div className="space-y-3">
+              <div className="text-center py-2 bg-primary/10 rounded-lg">
+                <p className="font-semibold text-primary">
+                  🎤 Your Turn! ({currentSpeaker === 'host' ? 'Host' : 'Guest'})
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Record or type your response</p>
+              </div>
+              <div className="flex space-x-2">
+                <div className="flex-1 relative">
+                  <Textarea
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="min-h-[60px] resize-none pr-12"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleUserSubmit();
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={toggleListening}
+                    variant="ghost"
+                    size="sm"
+                    className={`absolute right-2 top-2 h-8 w-8 ${
+                      isListening 
+                        ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
+                        : 'text-muted-foreground hover:text-primary'
+                    }`}
+                  >
+                    {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button 
+                  onClick={handleUserSubmit}
+                  size="icon"
+                  className="h-[60px] w-[60px]"
+                  disabled={!userInput.trim()}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            {isPlayingAudio ? (
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handlePauseAudio}
-                  size="icon"
-                  variant="secondary"
-                  className="h-[60px] w-[60px]"
+          ) : (
+            <div className="flex space-x-2">
+              <div className="flex-1 relative">
+                <Textarea
+                  value={recordingTranscript}
+                  onChange={(e) => setRecordingTranscript(e.target.value)}
+                  placeholder="Join the conversation... (or click the mic to speak)"
+                  className="min-h-[60px] resize-none pr-12"
+                  disabled={true}
+                />
+                <Button
+                  onClick={toggleListening}
+                  variant="ghost"
+                  size="sm"
+                  className={`absolute right-2 top-2 h-8 w-8 ${
+                    isListening 
+                      ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
+                      : 'text-muted-foreground hover:text-primary'
+                  }`}
+                  disabled={true}
                 >
-                  <Pause className="h-4 w-4" />
-                </Button>
-                <Button 
-                  onClick={stopPodcast}
-                  size="icon"
-                  variant="destructive"
-                  className="h-[60px] w-[60px]"
-                >
-                  <Square className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : isPaused || isStopped ? (
-              <div className="flex gap-2">
-                <Button 
-                  onClick={isStopped ? handleReplayAudio : handleResumeAudio}
-                  size="icon"
-                  variant="default"
-                  className="h-[60px] w-[60px]"
-                >
-                  <Play className="h-4 w-4" />
-                </Button>
-                <Button 
-                  onClick={handleReplayAudio}
-                  size="icon"
-                  variant="outline"
-                  className="h-[60px] w-[60px]"
-                >
-                  <RotateCcw className="h-4 w-4" />
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               </div>
-            ) : (
-              <Button 
-                onClick={() => {
-                  // Send user message to join conversation
-                  if (recordingTranscript.trim()) {
-                    const userMessage: Message = {
-                      id: Date.now().toString(),
-                      content: recordingTranscript,
-                      type: "user",
-                      timestamp: new Date(),
-                      speakerName: "You"
-                    };
-                    setMessages(prev => [...prev, userMessage]);
-                    setRecordingTranscript("");
-                    
-                    // Continue podcast conversation
-                    continueConversation(currentSpeaker);
-                  }
-                }}
-                disabled={!recordingTranscript.trim()}
-                size="icon"
-                className="h-[60px] w-[60px]"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+              {isPlayingAudio ? (
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handlePauseAudio}
+                    size="icon"
+                    variant="secondary"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <Pause className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={stopPodcast}
+                    size="icon"
+                    variant="destructive"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <Square className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : isPaused || isStopped ? (
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={isStopped ? handleReplayAudio : handleResumeAudio}
+                    size="icon"
+                    variant="default"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={handleReplayAudio}
+                    size="icon"
+                    variant="outline"
+                    className="h-[60px] w-[60px]"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button 
+                  onClick={() => {
+                    // Send user message to join conversation
+                    if (recordingTranscript.trim()) {
+                      const userMessage: Message = {
+                        id: Date.now().toString(),
+                        content: recordingTranscript,
+                        type: "user",
+                        timestamp: new Date(),
+                        speakerName: "You"
+                      };
+                      setMessages(prev => [...prev, userMessage]);
+                      setRecordingTranscript("");
+                      
+                      // Continue podcast conversation
+                      continueConversation(currentSpeaker);
+                    }
+                  }}
+                  disabled={!recordingTranscript.trim()}
+                  size="icon"
+                  className="h-[60px] w-[60px]"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </Card>
       )}
     </div>
