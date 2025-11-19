@@ -526,9 +526,20 @@ const PodcastMode = () => {
         return `${displayName}: ${m.content}`;
       }).join('\n');
       
-      const prompt = speaker === 'host'
-        ? `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherName}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`
-        : `You are ${currentFigure.name}, the podcast guest. Continue the conversation about "${podcastTopic}" with your host ${otherName}. Respond naturally to what they just said. Recent: ${recentContext}`;
+      // Construct prompts differently based on whether user is involved
+      let prompt: string;
+      if (speaker === 'host') {
+        prompt = `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherName}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`;
+      } else {
+        // Guest is speaking
+        if (hostType === 'user') {
+          // User is the host - guest should respond naturally without addressing host by name
+          prompt = `You are ${currentFigure.name}, the podcast guest. Continue the conversation about "${podcastTopic}". Respond naturally to what was just said. Recent: ${recentContext}`;
+        } else {
+          // Historical figure is the host
+          prompt = `You are ${currentFigure.name}, the podcast guest. Continue the conversation about "${podcastTopic}" with your host ${otherName}. Respond naturally to what they just said. Recent: ${recentContext}`;
+        }
+      }
 
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
