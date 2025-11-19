@@ -209,8 +209,8 @@ serve(async (req) => {
     const gender = detectGender(figure_name || '');
     console.log(`🎭 Detected gender: ${gender} for ${figure_name}`);
     
-    // If user manually selected a voice, use it directly
-    if (customVoice) {
+    // If user manually selected a voice, use it directly (ignore "auto" or empty)
+    if (customVoice && customVoice !== 'auto' && customVoice.trim() !== '') {
       selectedVoice = customVoice;
       console.log(`✨ Using user-selected voice: ${selectedVoice}`);
     }
