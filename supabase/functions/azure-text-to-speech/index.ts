@@ -304,12 +304,35 @@ serve(async (req) => {
 
     console.log(`🎙️ Final selected voice: ${selectedVoice}`);
 
+    // Helper to add pronunciation hints for problematic names
+    const addNamePronunciation = (text: string): string => {
+      // List of names that might be mispronounced (spelled out as acronyms)
+      const problematicNames = [
+        'Avi Loeb',
+        'Avi',
+      ];
+      
+      let processedText = text;
+      
+      // Wrap each problematic name with say-as tags
+      problematicNames.forEach(name => {
+        // Case-insensitive replacement with word boundaries
+        const regex = new RegExp(`\\b(${name})\\b`, 'gi');
+        processedText = processedText.replace(regex, `<say-as interpret-as="name">$1</say-as>`);
+      });
+      
+      return processedText;
+    };
+
+    // Preprocess text with pronunciation hints before escaping
+    const textWithPronunciation = addNamePronunciation(text);
+
     // Build SSML for better control
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
         <voice name="${selectedVoice}">
           <prosody rate="0.95" pitch="-5%">
-            ${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+            ${textWithPronunciation.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&lt;say-as interpret-as="name"&gt;/g, '<say-as interpret-as="name">').replace(/&lt;\/say-as&gt;/g, '</say-as>')}
           </prosody>
         </voice>
       </speak>
