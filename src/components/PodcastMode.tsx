@@ -56,6 +56,8 @@ const PodcastMode = () => {
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
+  const [hostVoice, setHostVoice] = useState<string>('auto');
+  const [guestVoice, setGuestVoice] = useState<string>('auto');
   
   // Avatar state
   const [hostAvatarUrl, setHostAvatarUrl] = useState<string | null>(null);
@@ -74,6 +76,18 @@ const PodcastMode = () => {
   const messagesRef = useRef<Message[]>([]);
   
   const { toast } = useToast();
+
+  // Auto-select Australian English for Elon Musk
+  useEffect(() => {
+    if (host && (host.id === 'elon-musk' || host.name.toLowerCase().includes('elon musk')) && hostVoice === 'auto') {
+      setHostVoice('en-AU-WilliamNeural');
+      console.log('🎙️ Auto-selected Australian English for Elon Musk (host)');
+    }
+    if (guest && (guest.id === 'elon-musk' || guest.name.toLowerCase().includes('elon musk')) && guestVoice === 'auto') {
+      setGuestVoice('en-AU-WilliamNeural');
+      console.log('🎙️ Auto-selected Australian English for Elon Musk (guest)');
+    }
+  }, [host, guest]);
 
   // Keep messagesRef in sync with messages state
   useEffect(() => {
@@ -462,7 +476,7 @@ const PodcastMode = () => {
             text: text,
             figure_name: figureName,
             figure_id: figureId,
-            voice: 'auto',
+            voice: figureId === host?.id ? hostVoice : guestVoice,
             language: selectedLanguage
           }
         });

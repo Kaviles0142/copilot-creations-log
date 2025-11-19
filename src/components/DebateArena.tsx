@@ -109,6 +109,26 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
     ];
     return femaleNames.some(n => nameLower.includes(n)) ? 'female' : 'male';
   };
+  
+  // Auto-select Australian English for Elon Musk
+  useEffect(() => {
+    const elonFigure = figures.find(f => 
+      f.id === 'elon-musk' || f.name.toLowerCase().includes('elon musk')
+    );
+    
+    if (elonFigure && !selectedVoices[elonFigure.id]) {
+      const elonGender = detectGender(elonFigure.name);
+      const australianVoice = azureVoices[elonGender].find(v => v.value.includes('en-AU'))?.value;
+      
+      if (australianVoice) {
+        setSelectedVoices(prev => ({
+          ...prev,
+          [elonFigure.id]: australianVoice
+        }));
+        console.log('🎙️ Auto-selected Australian English for Elon Musk');
+      }
+    }
+  }, [figures]);
 
   // Sync audioEnabled state with ref
   useEffect(() => {
