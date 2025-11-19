@@ -222,6 +222,7 @@ Instructions:
 - DO NOT reference or respond to other participants (they haven't spoken yet)
 - Present your viewpoint clearly and thoughtfully
 - Keep your response focused and under 150 words
+- CRITICAL: Do NOT start your response with your name (e.g., "Elon Musk:"). Start directly with your statement.
 ${language && language !== 'en' ? `- CRITICAL: Respond ONLY in ${getLanguageName(language)}. Do not use English.` : ''}
 
 Share your opinion on the topic above.`;
@@ -241,6 +242,7 @@ Instructions:
 - You can agree with valid points or counter arguments you disagree with
 - Keep your response focused and under 150 words
 - Engage directly with the debate, not just with the user
+- CRITICAL: Do NOT start your response with your name (e.g., "Elon Musk:"). Start directly with your statement.
 ${language && language !== 'en' ? `- CRITICAL: Respond ONLY in ${getLanguageName(language)}. Do not use English.` : ''}
 
 Previous debate conversation:
