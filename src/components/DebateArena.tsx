@@ -846,7 +846,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         </div>
       </div>
 
-      {isRoundComplete && format === "free-for-all" && (
+      {isRoundComplete && (
         <Button 
           onClick={handleContinueRound} 
           disabled={isProcessing}
@@ -856,10 +856,6 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           Continue to Round {currentRound + 1}
         </Button>
       )}
-
-      <Button variant="outline" onClick={onEnd} className="w-full">
-        End Debate
-      </Button>
     </div>
   );
 }
