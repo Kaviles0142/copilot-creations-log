@@ -267,15 +267,10 @@ serve(async (req) => {
       
       console.log(`🌍 Detected region: ${detectedRegion} for ${figure_name}`);
       
-      // For English: Map to English regional variants
+      // For English: Only use actual English regional variants (Azure doesn't have "English with German accent" etc.)
       if (language === 'en-US') {
         const englishVariants: Record<string, { male: string, female: string }> = {
-          'german': { male: 'de-DE-ConradNeural', female: 'de-DE-KatjaNeural' },  // German-accented English
-          'french': { male: 'fr-FR-HenriNeural', female: 'fr-FR-DeniseNeural' },  // French-accented English
-          'italian': { male: 'it-IT-DiegoNeural', female: 'it-IT-ElsaNeural' },  // Italian-accented English
-          'spanish': { male: 'es-ES-AlvaroNeural', female: 'es-ES-ElviraNeural' },  // Spanish-accented English
-          'russian': { male: 'ru-RU-DmitryNeural', female: 'ru-RU-SvetlanaNeural' },  // Russian-accented English
-          'south-african': { male: 'en-ZA-LukeNeural', female: 'en-ZA-LeahNeural' },  // South African English
+          'south-african': { male: 'en-ZA-LukeNeural', female: 'en-ZA-LeahNeural' },
           'british': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
           'english': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
           'scottish': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
@@ -286,8 +281,9 @@ serve(async (req) => {
           'american': { male: 'en-US-GuyNeural', female: 'en-US-JennyNeural' }
         };
         
+        // For non-English regions (german, french, etc.), fall back to American English
         selectedVoice = englishVariants[detectedRegion]?.[gender] || englishVariants['american'][gender];
-        console.log(`🗣️ English with ${detectedRegion} accent: ${selectedVoice}`);
+        console.log(`🗣️ English voice for ${detectedRegion}: ${selectedVoice}`);
       }
       // For auto/no language: Use region-specific native voices
       else {
