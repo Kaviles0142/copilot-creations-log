@@ -273,21 +273,69 @@ const PodcastMode = () => {
     }
 
     setIsPodcastActive(true);
-
     setIsRecording(true);
     
-    // If user is the host, wait for their introduction
+    // If user is the host, guest speaks first with greeting
     if (hostType === 'user') {
-      setWaitingForUser(true);
-      setCurrentSpeaker('host');
-      toast({
-        title: "Your turn!",
-        description: "Introduce yourself and the topic to start the podcast.",
-      });
+      try {
+        const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
+          body: {
+            message: `You are ${guest!.name}, and you're joining a podcast hosted by the user about "${podcastTopic}". Greet the host warmly, thank them for the invitation, acknowledge the topic, and share your initial thoughts on it. Keep it conversational and engaging.`,
+            figure: {
+              id: guest!.id,
+              name: guest!.name,
+              period: guest!.period,
+              description: guest!.description
+            },
+            language: selectedLanguage.split('-')[0],
+            conversationType: 'casual'
+          }
+        });
+
+        if (error) throw error;
+
+        const greetingMessage = data.response;
+        
+        const newMessage: Message = {
+          id: Date.now().toString(),
+          content: greetingMessage,
+          type: "assistant",
+          timestamp: new Date(),
+          speakerName: guest!.name
+        };
+        
+        setMessages([newMessage]);
+        setCurrentSpeaker('guest');
+        
+        // Generate and play audio
+        if (isAutoVoiceEnabled) {
+          generateAndPlayAudio(greetingMessage, guest!.name, guest!.id);
+        }
+        
+        toast({
+          title: "Podcast started!",
+          description: `${guest!.name} has joined to discuss "${podcastTopic}"`,
+        });
+
+        // Now wait for user's response
+        setTimeout(() => {
+          setWaitingForUser(true);
+          setCurrentSpeaker('host');
+        }, 500);
+      } catch (error) {
+        console.error('Error starting podcast:', error);
+        toast({
+          title: "Error",
+          description: "Failed to start podcast. Please try again.",
+          variant: "destructive"
+        });
+        setIsRecording(false);
+        setIsPodcastActive(false);
+      }
       return;
     }
     
-    // Get AI-generated introduction in the correct language
+    // Original flow: Historical host introduces
     try {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
