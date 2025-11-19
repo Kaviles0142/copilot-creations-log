@@ -81,18 +81,18 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   // Azure voice options filtered by gender
   const azureVoices = {
     male: [
-      { value: 'en-US-GuyNeural', label: 'American Guy' },
-      { value: 'en-GB-RyanNeural', label: 'British Ryan' },
-      { value: 'en-AU-WilliamNeural', label: 'Australian William' },
-      { value: 'en-CA-LiamNeural', label: 'Canadian Liam' },
-      { value: 'en-IN-PrabhatNeural', label: 'Indian Prabhat' },
+      { value: 'en-US-GuyNeural', label: 'American English' },
+      { value: 'en-GB-RyanNeural', label: 'British English' },
+      { value: 'en-AU-WilliamNeural', label: 'Australian English' },
+      { value: 'en-CA-LiamNeural', label: 'Canadian English' },
+      { value: 'en-IN-PrabhatNeural', label: 'Indian English' },
     ],
     female: [
-      { value: 'en-US-JennyNeural', label: 'American Jenny' },
-      { value: 'en-GB-SoniaNeural', label: 'British Sonia' },
-      { value: 'en-AU-NatashaNeural', label: 'Australian Natasha' },
-      { value: 'en-CA-ClaraNeural', label: 'Canadian Clara' },
-      { value: 'en-IN-NeerjaNeural', label: 'Indian Neerja' },
+      { value: 'en-US-JennyNeural', label: 'American English' },
+      { value: 'en-GB-SoniaNeural', label: 'British English' },
+      { value: 'en-AU-NatashaNeural', label: 'Australian English' },
+      { value: 'en-CA-ClaraNeural', label: 'Canadian English' },
+      { value: 'en-IN-NeerjaNeural', label: 'Indian English' },
     ],
   };
 
