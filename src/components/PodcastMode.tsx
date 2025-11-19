@@ -521,7 +521,7 @@ const PodcastMode = () => {
       
       const prompt = speaker === 'host'
         ? `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherName}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`
-        : `You are ${currentFigure.name}, the podcast guest. Respond to the host ${otherName}'s introduction and comments about "${podcastTopic}". Be conversational and engaging. Recent: ${recentContext}`;
+        : `You are ${currentFigure.name}, the podcast guest. Continue the conversation about "${podcastTopic}" with your host ${otherName}. Respond naturally to what they just said. Recent: ${recentContext}`;
 
       // Get AI response from the current speaker
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
