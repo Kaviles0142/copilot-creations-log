@@ -370,7 +370,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           text,
           figure_name: figureName,
           figure_id: figureId,
-          voice: 'auto',
+          voice: selectedVoices[figureId] || 'auto',  // Use selected voice from dropdown, or auto if not selected
           language: language || 'en-US'  // Pass full locale (e.g., en-US, es-ES) for proper nationality detection and voice selection
         }
       });
