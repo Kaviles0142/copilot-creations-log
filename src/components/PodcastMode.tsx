@@ -516,8 +516,15 @@ const PodcastMode = () => {
     setCurrentSpeaker(speaker);
 
     try {
-      // Simple message to let the edge function handle the conversation flow
-      const recentContext = messages.slice(-2).map(m => `${m.speakerName}: ${m.content}`).join('\n');
+      // Build recent context with proper speaker identification for user vs AI
+      const recentContext = messages.slice(-2).map(m => {
+        let displayName = m.speakerName;
+        // Replace "You (Host)" or "You (Guest)" with just "the user" for AI context
+        if (displayName?.includes('You (')) {
+          displayName = 'the user';
+        }
+        return `${displayName}: ${m.content}`;
+      }).join('\n');
       
       const prompt = speaker === 'host'
         ? `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherName}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`
