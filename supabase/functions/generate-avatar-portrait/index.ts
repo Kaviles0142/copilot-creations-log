@@ -57,57 +57,56 @@ serve(async (req) => {
 
     console.log('🎨 No valid cache found, generating new portrait...');
 
-    // Generate new portrait using Lovable AI
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    // Generate new portrait using OpenAI DALL-E 3
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
     const prompt = generateVisualPrompt(figureName, context);
     console.log('📝 Visual prompt:', prompt);
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        modalities: ['image', 'text']
+        model: 'dall-e-3',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'hd',
+        response_format: 'url'
       })
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('❌ Lovable AI error:', errorText);
+      console.error('❌ OpenAI DALL-E error:', errorText);
       throw new Error(`Image generation failed: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
-    const imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const imageUrl = aiData.data?.[0]?.url;
     
     if (!imageUrl) {
-      throw new Error('No image generated from Lovable AI');
+      throw new Error('No image URL returned from DALL-E 3');
     }
 
-    // Extract base64 data from data URL
-    const base64Image = imageUrl.split(',')[1];
+    console.log('✅ Portrait generated successfully via DALL-E 3');
 
-    if (!base64Image) {
-      throw new Error('No image generated from DALL-E');
+    // Download the image from OpenAI's URL
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error('Failed to download generated image');
     }
 
-    console.log('✅ Portrait generated successfully via DALL-E');
+    const imageBuffer = new Uint8Array(await imageResponse.arrayBuffer());
+    console.log('✅ Image downloaded successfully');
 
     // Upload image to Supabase Storage using client
-    const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
     const fileName = `${figureId}-${Date.now()}.png`;
     
     const { data: uploadData, error: uploadError } = await supabase
