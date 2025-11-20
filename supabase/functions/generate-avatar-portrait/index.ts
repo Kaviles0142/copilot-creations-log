@@ -57,39 +57,48 @@ serve(async (req) => {
 
     console.log('🎨 No valid cache found, generating new portrait...');
 
-    // Generate new portrait using OpenAI DALL-E
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+    // Generate new portrait using Lovable AI (Gemini image model)
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     const prompt = generateVisualPrompt(figureName, context);
     console.log('📝 Visual prompt:', prompt);
 
-    const aiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'high',
-        output_format: 'png'
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        modalities: ['image', 'text']
       })
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('❌ OpenAI DALL-E error:', errorText);
+      console.error('❌ Lovable AI image generation error:', errorText);
       throw new Error(`Image generation failed: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
-    const base64Image = aiData.data?.[0]?.b64_json;
+    const imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    if (!imageUrl || !imageUrl.startsWith('data:image/png;base64,')) {
+      throw new Error('No valid image generated from Lovable AI');
+    }
+
+    // Extract base64 data from data URL
+    const base64Image = imageUrl.split('data:image/png;base64,')[1];
 
     if (!base64Image) {
       throw new Error('No image generated from DALL-E');
