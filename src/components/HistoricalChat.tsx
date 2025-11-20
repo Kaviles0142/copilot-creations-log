@@ -242,7 +242,7 @@ const HistoricalChat = () => {
       
       // Generate avatar portrait and greeting audio IN PARALLEL
       const [avatarResult, audioResult] = await Promise.all([
-        supabase.functions.invoke('fal-generate-portrait', {
+        supabase.functions.invoke('generate-avatar-portrait', {
           body: {
             figureName: figure.name,
             figureId: figure.id
