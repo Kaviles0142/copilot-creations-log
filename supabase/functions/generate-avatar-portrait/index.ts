@@ -57,54 +57,52 @@ serve(async (req) => {
 
     console.log('🎨 No valid cache found, generating new portrait...');
 
-    // Generate new portrait using OpenAI DALL-E 3
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+    // Generate new portrait using Lovable AI (Gemini image generation)
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     const prompt = generateVisualPrompt(figureName, context);
     console.log('📝 Visual prompt:', prompt);
 
-    const aiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'hd',
-        response_format: 'url'
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: `Generate a photorealistic portrait: ${prompt}`
+          }
+        ],
+        modalities: ['image', 'text']
       })
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('❌ OpenAI DALL-E error:', errorText);
+      console.error('❌ Lovable AI image generation error:', errorText);
       throw new Error(`Image generation failed: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
-    const imageUrl = aiData.data?.[0]?.url;
+    const base64Image = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
-    if (!imageUrl) {
-      throw new Error('No image URL returned from DALL-E 3');
+    if (!base64Image) {
+      throw new Error('No image returned from Lovable AI');
     }
 
-    console.log('✅ Portrait generated successfully via DALL-E 3');
+    console.log('✅ Portrait generated successfully via Lovable AI');
 
-    // Download the image from OpenAI's URL
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error('Failed to download generated image');
-    }
-
-    const imageBuffer = new Uint8Array(await imageResponse.arrayBuffer());
-    console.log('✅ Image downloaded successfully');
+    // Extract base64 data (remove data:image/png;base64, prefix if present)
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    console.log('✅ Image decoded from base64');
 
     // Upload image to Supabase Storage using client
     const fileName = `${figureId}-${Date.now()}.png`;
@@ -173,8 +171,6 @@ function generateVisualPrompt(figureName: string, context?: string): string {
   const contextText = context 
     ? `${context}. The setting should complement their historical background while maintaining the ${context} environment.`
     : 'Professional studio lighting with a subtle gradient background appropriate to their era.';
-  
-  // Enhanced prompt strategy to work with DALL-E 3's content policies
-  // Using descriptive approach instead of direct naming for better results
-  return `Create a highly detailed, photorealistic portrait photograph in the style of ${figureName}'s era and appearance. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. ${contextText} Capture the distinctive characteristics, period-appropriate attire, and authentic historical features typical of ${figureName}'s time period. Head and shoulders only, straight-on angle, professional lighting, ultra high resolution 4K quality with exceptional facial detail and texture.`;
+    
+  return `Create a professional, photorealistic portrait photograph of ${figureName} in a ${context || 'studio setting'}. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. ${contextText} Head and shoulders only, straight-on angle. Historically accurate facial features and period-appropriate attire visible from shoulders up. Ultra high resolution, 4K quality.`;
 }
