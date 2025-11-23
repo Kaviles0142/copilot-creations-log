@@ -574,7 +574,15 @@ const PodcastMode = () => {
       }
       
       // Continue with other speaker immediately (response generates while current audio plays)
-      if (isRecording && messagesRef.current.length < 10) {
+      const nextMessageCount = (messagesRef.current?.length ?? 0) + 1;
+      console.log('[PodcastMode] continueConversation auto-loop', {
+        speaker,
+        isRecording,
+        currentMessages: messagesRef.current?.length ?? 0,
+        nextMessageCount,
+      });
+
+      if (isRecording && nextMessageCount < 10) {
         setTimeout(() => {
           continueConversation(speaker === 'host' ? 'guest' : 'host');
         }, 500);
