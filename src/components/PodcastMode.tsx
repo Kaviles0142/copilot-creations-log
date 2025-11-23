@@ -589,7 +589,7 @@ const PodcastMode = () => {
 You are ${hostType === 'user' ? 'the podcast host (a modern-day user)' : `${hostName}, the podcast host, speaking fully in character.`}
 Continue the conversation about "${podcastTopic}" with your guest ${otherName}. 
 Speak in first person ("I") and do NOT say phrases like "I am ${hostName}" or "As ${hostName}". 
-Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said.`;
+Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said. Make sure this response introduces at least two fresh, concrete points or examples that you have not mentioned earlier in this conversation.`;
       } else {
         // Guest is speaking
         const guestName = currentFigure.name;
@@ -600,7 +600,7 @@ Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or 
 You are ${guestName}, the podcast guest, speaking fully in character. 
 Continue the conversation about "${podcastTopic}" with a modern-day host (the user). 
 Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward.`;
+Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward. Introduce at least two new, specific insights, examples, or stories that differ from anything you've already said.`;
         } else {
           // Historical figure is the host
           prompt = `Here is the recent conversation so far:\n\n${recentContext}
@@ -608,7 +608,7 @@ Do not repeat your previous message; instead, respond naturally to what was just
 You are ${guestName}, the podcast guest, speaking fully in character with your host ${otherName}. 
 Continue the conversation about "${podcastTopic}" by responding to what they just said with new ideas or stories. 
 Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-Avoid repeating yourself or reintroducing who you are.`;
+Avoid repeating yourself or reintroducing who you are. Bring in at least two new perspectives, anecdotes, or arguments you have not previously used in this conversation.`;
         }
       }
 
