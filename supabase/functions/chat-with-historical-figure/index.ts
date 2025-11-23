@@ -808,8 +808,16 @@ ${relevantKnowledge}
 
 Remember: You're ${figure.name} having a real conversation. Share your experiences, quote your own words, express genuine emotions. Make every response feel like YOU speaking, not someone speaking ABOUT you. NO stage directions - just authentic, passionate dialogue.`;
 
-    // Generate cache key from conversation context
-    const contextForCache = figure.id + '_' + message.slice(0, 100) + '_' + relevantKnowledge.slice(0, 200) + '_' + conversationType;
+    // Generate cache key from conversation + context so multi-turn chats don't reuse stale replies
+    const serializedContext = context ? JSON.stringify(context).slice(0, 500) : "";
+    const contextForCache = [
+      figure.id,
+      conversationId || 'no-conversation',
+      serializedContext,
+      message.slice(0, 500),
+      relevantKnowledge.slice(0, 500),
+      conversationType
+    ].join('|');
     const cacheKeyHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(contextForCache))
       .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
 
