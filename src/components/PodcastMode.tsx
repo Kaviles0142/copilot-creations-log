@@ -53,7 +53,8 @@ const PodcastMode = () => {
   const [podcastTopic, setPodcastTopic] = useState("");
   const [isPodcastActive, setIsPodcastActive] = useState(false);
   const [waitingForUser, setWaitingForUser] = useState(false);
-  const [currentTurn, setCurrentTurn] = useState(0);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [speakerCount, setSpeakerCount] = useState(0);
   const [waitingForContinue, setWaitingForContinue] = useState(false);
   
   // Audio state
@@ -379,7 +380,7 @@ const PodcastMode = () => {
       });
 
       // Set up for guest response
-      setCurrentTurn(1);
+      setSpeakerCount(1);
       if (guestType === 'user') {
         setWaitingForUser(true);
         setCurrentSpeaker('guest');
@@ -570,7 +571,13 @@ const PodcastMode = () => {
       };
 
       setMessages(prev => [...prev, responseMessage]);
-      setCurrentTurn(prev => prev + 1);
+      
+      // Increment speaker count and round after both speakers have spoken
+      const newSpeakerCount = speakerCount + 1;
+      setSpeakerCount(newSpeakerCount);
+      if (newSpeakerCount % 2 === 0) {
+        setCurrentRound(prev => prev + 1);
+      }
 
       // Generate and play audio
       if (isAutoVoiceEnabled) {
@@ -758,7 +765,13 @@ const PodcastMode = () => {
     setMessages(prev => [...prev, newMessage]);
     setUserInput("");
     setWaitingForUser(false);
-    setCurrentTurn(prev => prev + 1);
+    
+    // Increment speaker count and round after both speakers have spoken
+    const newSpeakerCount = speakerCount + 1;
+    setSpeakerCount(newSpeakerCount);
+    if (newSpeakerCount % 2 === 0) {
+      setCurrentRound(prev => prev + 1);
+    }
 
     // Set up next turn - the other speaker
     const nextSpeaker = currentSpeaker === 'host' ? 'guest' : 'host';
@@ -1037,7 +1050,7 @@ const PodcastMode = () => {
           className="w-full mb-4"
           size="lg"
         >
-          Continue Conversation (Turn {currentTurn + 1})
+          Continue Conversation (Round {currentRound})
         </Button>
       )}
 
