@@ -495,7 +495,7 @@ const PodcastMode = () => {
     });
   };
 
-  const continueConversation = async (speaker: 'host' | 'guest') => {
+  const continueConversation = async (speaker: 'host' | 'guest', shouldPauseAfter: boolean = true) => {
     // Check if it's user's turn
     if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
       setWaitingForUser(true);
@@ -591,8 +591,10 @@ const PodcastMode = () => {
       if ((nextSpeaker === 'host' && hostType === 'user') || (nextSpeaker === 'guest' && guestType === 'user')) {
         setWaitingForUser(true);
         setCurrentSpeaker(nextSpeaker);
-      } else {
+      } else if (shouldPauseAfter) {
         setWaitingForContinue(true);
+        setCurrentSpeaker(nextSpeaker);
+      } else {
         setCurrentSpeaker(nextSpeaker);
       }
     } catch (error) {
@@ -606,18 +608,18 @@ const PodcastMode = () => {
    };
  
    const continueRound = async () => {
+     setWaitingForContinue(false);
+     
      // When both participants are AI figures, each round should include both speaking
      if (hostType === 'figure' && guestType === 'figure') {
        const firstSpeaker: 'host' | 'guest' = currentSpeaker;
        const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
  
-       setWaitingForContinue(false);
- 
-       await continueConversation(firstSpeaker);
-       await continueConversation(secondSpeaker);
+       await continueConversation(firstSpeaker, false); // Don't pause after first speaker
+       await continueConversation(secondSpeaker, true); // Pause after second speaker
      } else {
        // If a user is involved, keep single-turn behavior
-       await continueConversation(currentSpeaker);
+       await continueConversation(currentSpeaker, true);
      }
    };
  
