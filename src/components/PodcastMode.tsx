@@ -283,7 +283,7 @@ const PodcastMode = () => {
       try {
         const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
           body: {
-            message: `You are ${guest!.name}, and you're joining a podcast hosted by the user about "${podcastTopic}". Greet the host warmly, thank them for the invitation, acknowledge the topic, and share your initial thoughts on it. Keep it conversational and engaging.`,
+            message: `You are ${guest!.name} appearing as a podcast guest in character. The host is a modern-day user and the topic is "${podcastTopic}". Open with a warm, conversational greeting, briefly acknowledge the topic, and share an initial thought. Speak in first person ("I") and do NOT say phrases like "I am ${guest!.name}" or "As ${guest!.name}".`,
             figure: {
               id: guest!.id,
               name: guest!.name,
@@ -342,7 +342,7 @@ const PodcastMode = () => {
     try {
       const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
         body: {
-          message: `You are ${host!.name}, the podcast host. Begin by introducing yourself briefly, then welcome your guest ${guestType === 'user' ? 'our special guest' : guest!.name}, and introduce today's topic: "${podcastTopic}". Make it engaging and conversational.`,
+          message: `You are ${host!.name} acting as a podcast host in character. Open the show with a short, engaging introduction to the topic "${podcastTopic}" and warmly welcome your guest ${guestType === 'user' ? 'our special guest' : guest!.name}. Speak in first person ("I") and do NOT say phrases like "I am ${host!.name}" or "As ${host!.name}". Do not recite your full biography; focus on the conversation you're about to have.`,
           figure: {
             id: host!.id,
             name: host!.name,
@@ -387,7 +387,7 @@ const PodcastMode = () => {
         // Generate guest response to host's introduction
         const guestResponse = await supabase.functions.invoke('chat-with-historical-figure', {
           body: {
-            message: `You are ${guest.name}, the podcast guest. The host ${host!.name} just introduced you and the topic "${podcastTopic}". Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought. Here's what the host said: "${introMessage}"`,
+            message: `You are ${guest.name} appearing as a podcast guest. The host ${host!.name} just introduced you and the topic "${podcastTopic}". Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought. Speak in first person ("I") and do NOT say phrases like "I am ${guest.name}" or "As ${guest.name}". Here's what the host said: "${introMessage}"`,
             figure: {
               id: guest.id,
               name: guest.name,
@@ -564,28 +564,47 @@ const PodcastMode = () => {
       // Use provided context or current messages state
       const contextMessages = conversationContext || messages;
       
-      // Build recent context with proper speaker identification for user vs AI
-      const recentContext = contextMessages.slice(-2).map(m => {
-        let displayName = m.speakerName;
-        // Replace "You (Host)" or "You (Guest)" with just "the user" for AI context
-        if (displayName?.includes('You (')) {
-          displayName = 'the user';
+      // Build recent context without exposing real names to avoid self-recognition
+      const recentContext = contextMessages.slice(-4).map(m => {
+        let roleLabel = 'Speaker';
+        if (m.speakerName?.includes('You (Host)')) {
+          roleLabel = 'User host';
+        } else if (m.speakerName?.includes('You (Guest)')) {
+          roleLabel = 'User guest';
+        } else if (host && m.speakerName === host.name) {
+          roleLabel = 'Host';
+        } else if (guest && m.speakerName === guest.name) {
+          roleLabel = 'Guest';
         }
-        return `${displayName}: ${m.content}`;
-      }).join('\n');
+        return `${roleLabel}: ${m.content}`;
+      }).join('\n\n');
       
       // Construct prompts differently based on whether user is involved
       let prompt: string;
       if (speaker === 'host') {
-        prompt = `As the podcast host, continue the conversation about "${podcastTopic}" with your guest ${otherName}. Ask an engaging question or respond to their comments. Recent: ${recentContext}`;
+        const hostName = currentFigure.name;
+        prompt = `You are ${hostType === 'user' ? 'the podcast host (a modern-day user)' : `${hostName}, the podcast host, speaking fully in character.`}
+Continue the conversation about "${podcastTopic}" with your guest ${otherName}. 
+Speak in first person ("I") and do NOT say phrases like "I am ${hostName}" or "As ${hostName}". 
+Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said.
+Here is the recent conversation so far:\n\n${recentContext}`;
       } else {
         // Guest is speaking
+        const guestName = currentFigure.name;
         if (hostType === 'user') {
           // User is the host - guest should respond naturally without addressing host by name
-          prompt = `You are ${currentFigure.name}, the podcast guest. Continue the conversation about "${podcastTopic}". Respond naturally to what was just said. Recent: ${recentContext}`;
+          prompt = `You are ${guestName}, the podcast guest, speaking fully in character. 
+Continue the conversation about "${podcastTopic}" with a modern-day host (the user). 
+Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
+Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward.
+Here is the recent conversation so far:\n\n${recentContext}`;
         } else {
           // Historical figure is the host
-          prompt = `You are ${currentFigure.name}, the podcast guest. Continue the conversation about "${podcastTopic}" with your host ${otherName}. Respond naturally to what they just said. Recent: ${recentContext}`;
+          prompt = `You are ${guestName}, the podcast guest, speaking fully in character with your host ${otherName}. 
+Continue the conversation about "${podcastTopic}" by responding to what they just said with new ideas or stories. 
+Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
+Avoid repeating yourself or reintroducing who you are.
+Here is the recent conversation so far:\n\n${recentContext}`;
         }
       }
 
