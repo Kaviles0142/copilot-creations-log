@@ -580,19 +580,29 @@ const PodcastMode = () => {
       }).join('\n\n');
       
       // Construct prompts differently based on whether user is involved
+      // ROUND 1: Allow introductions. ROUND 2+: Require fresh, nuanced content with no repetition.
+      const isFirstRound = currentRound === 1;
       let prompt: string;
+      
       if (speaker === 'host') {
         const hostName = currentFigure.name;
-        // Put recent context FIRST so cache keys differ between rounds
+        const freshContentInstruction = isFirstRound 
+          ? "" 
+          : " Make sure this response introduces at least two fresh, concrete points, questions, or examples that you have not mentioned earlier in this conversation. Build on what was just said with new ideas.";
+        
         prompt = `Here is the recent conversation so far:\n\n${recentContext}
 
 You are ${hostType === 'user' ? 'the podcast host (a modern-day user)' : `${hostName}, the podcast host, speaking fully in character.`}
 Continue the conversation about "${podcastTopic}" with your guest ${otherName}. 
 Speak in first person ("I") and do NOT say phrases like "I am ${hostName}" or "As ${hostName}". 
-Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said. Make sure this response introduces at least two fresh, concrete points or examples that you have not mentioned earlier in this conversation.`;
+${isFirstRound ? 'You may introduce yourself briefly if appropriate, then dive into the topic.' : 'Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said.'}${freshContentInstruction}`;
       } else {
         // Guest is speaking
         const guestName = currentFigure.name;
+        const freshContentInstruction = isFirstRound 
+          ? "" 
+          : " Introduce at least two new, specific insights, examples, or stories that differ from anything you've already said. Vary your tone, angle, and examples from previous rounds.";
+        
         if (hostType === 'user') {
           // User is the host - guest should respond naturally without addressing host by name
           prompt = `Here is the recent conversation so far:\n\n${recentContext}
@@ -600,7 +610,7 @@ Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or 
 You are ${guestName}, the podcast guest, speaking fully in character. 
 Continue the conversation about "${podcastTopic}" with a modern-day host (the user). 
 Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward. Introduce at least two new, specific insights, examples, or stories that differ from anything you've already said.`;
+${isFirstRound ? 'You may introduce yourself briefly if appropriate, then respond to the topic.' : 'Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward.'}${freshContentInstruction}`;
         } else {
           // Historical figure is the host
           prompt = `Here is the recent conversation so far:\n\n${recentContext}
@@ -608,7 +618,7 @@ Do not repeat your previous message; instead, respond naturally to what was just
 You are ${guestName}, the podcast guest, speaking fully in character with your host ${otherName}. 
 Continue the conversation about "${podcastTopic}" by responding to what they just said with new ideas or stories. 
 Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-Avoid repeating yourself or reintroducing who you are. Bring in at least two new perspectives, anecdotes, or arguments you have not previously used in this conversation.`;
+${isFirstRound ? 'You may introduce yourself briefly if appropriate, then engage with the topic.' : 'Avoid repeating yourself or reintroducing who you are. Bring in at least two new perspectives, anecdotes, or arguments you have not previously used in this conversation.'}${freshContentInstruction}`;
         }
       }
 
