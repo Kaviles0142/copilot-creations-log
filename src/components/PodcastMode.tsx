@@ -358,7 +358,7 @@ const PodcastMode = () => {
 
       const introMessage = data.response;
       
-      const newMessage: Message = {
+      const hostMessage: Message = {
         id: Date.now().toString(),
         content: introMessage,
         type: "assistant",
@@ -366,10 +366,10 @@ const PodcastMode = () => {
         speakerName: host!.name
       };
       
-      setMessages([newMessage]);
+      setMessages([hostMessage]);
       setCurrentSpeaker('host');
       
-      // Generate and play audio (don't await so next response can be generated in parallel)
+      // Generate and play audio for host intro
       if (isAutoVoiceEnabled) {
         generateAndPlayAudio(introMessage, host!.name, host!.id);
       }
@@ -381,11 +381,48 @@ const PodcastMode = () => {
 
       // Set up for guest response
       setSpeakerCount(1);
-      if (guestType === 'user') {
-        setWaitingForUser(true);
-        setCurrentSpeaker('guest');
-      } else {
+      
+      // If both are AI figures, automatically generate guest response
+      if (guestType === 'figure' && guest) {
+        // Generate guest response to host's introduction
+        const guestResponse = await supabase.functions.invoke('chat-with-historical-figure', {
+          body: {
+            message: `You are ${guest.name}, the podcast guest. The host ${host!.name} just introduced you and the topic "${podcastTopic}". Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought. Here's what the host said: "${introMessage}"`,
+            figure: {
+              id: guest.id,
+              name: guest.name,
+              period: guest.period,
+              description: guest.description
+            },
+            language: selectedLanguage.split('-')[0],
+            conversationType: 'casual'
+          }
+        });
+
+        if (guestResponse.error) throw guestResponse.error;
+
+        const guestMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: guestResponse.data.response,
+          type: "assistant",
+          timestamp: new Date(),
+          speakerName: guest.name
+        };
+
+        setMessages([hostMessage, guestMessage]);
+        setSpeakerCount(2);
+        setCurrentRound(1);
+        setCurrentSpeaker('host');
+        
+        // Generate and play audio for guest response
+        if (isAutoVoiceEnabled) {
+          generateAndPlayAudio(guestResponse.data.response, guest.name, guest.id);
+        }
+        
+        // Now wait for user to click Continue
         setWaitingForContinue(true);
+      } else if (guestType === 'user') {
+        setWaitingForUser(true);
         setCurrentSpeaker('guest');
       }
     } catch (error) {
