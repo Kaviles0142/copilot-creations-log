@@ -583,28 +583,32 @@ const PodcastMode = () => {
       let prompt: string;
       if (speaker === 'host') {
         const hostName = currentFigure.name;
-        prompt = `You are ${hostType === 'user' ? 'the podcast host (a modern-day user)' : `${hostName}, the podcast host, speaking fully in character.`}
+        // Put recent context FIRST so cache keys differ between rounds
+        prompt = `Here is the recent conversation so far:\n\n${recentContext}
+
+You are ${hostType === 'user' ? 'the podcast host (a modern-day user)' : `${hostName}, the podcast host, speaking fully in character.`}
 Continue the conversation about "${podcastTopic}" with your guest ${otherName}. 
 Speak in first person ("I") and do NOT say phrases like "I am ${hostName}" or "As ${hostName}". 
-Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said.
-Here is the recent conversation so far:\n\n${recentContext}`;
+Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said.`;
       } else {
         // Guest is speaking
         const guestName = currentFigure.name;
         if (hostType === 'user') {
           // User is the host - guest should respond naturally without addressing host by name
-          prompt = `You are ${guestName}, the podcast guest, speaking fully in character. 
+          prompt = `Here is the recent conversation so far:\n\n${recentContext}
+
+You are ${guestName}, the podcast guest, speaking fully in character. 
 Continue the conversation about "${podcastTopic}" with a modern-day host (the user). 
 Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward.
-Here is the recent conversation so far:\n\n${recentContext}`;
+Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward.`;
         } else {
           // Historical figure is the host
-          prompt = `You are ${guestName}, the podcast guest, speaking fully in character with your host ${otherName}. 
+          prompt = `Here is the recent conversation so far:\n\n${recentContext}
+
+You are ${guestName}, the podcast guest, speaking fully in character with your host ${otherName}. 
 Continue the conversation about "${podcastTopic}" by responding to what they just said with new ideas or stories. 
 Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-Avoid repeating yourself or reintroducing who you are.
-Here is the recent conversation so far:\n\n${recentContext}`;
+Avoid repeating yourself or reintroducing who you are.`;
         }
       }
 
