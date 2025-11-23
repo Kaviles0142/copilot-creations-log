@@ -495,7 +495,11 @@ const PodcastMode = () => {
     });
   };
 
-  const continueConversation = async (speaker: 'host' | 'guest', shouldPauseAfter: boolean = true) => {
+  const continueConversation = async (
+    speaker: 'host' | 'guest', 
+    shouldPauseAfter: boolean = true,
+    conversationContext?: Message[]
+  ) => {
     // Check if it's user's turn
     if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
       setWaitingForUser(true);
@@ -505,7 +509,7 @@ const PodcastMode = () => {
         description: "Record your response or type it below.",
         duration: 3000,
       });
-      return;
+      return null;
     }
 
     const currentFigure = speaker === 'host' ? host : guest;
@@ -514,14 +518,17 @@ const PodcastMode = () => {
       ? (guestType === 'user' ? 'our guest' : guest?.name)
       : (hostType === 'user' ? 'our host' : host?.name);
     
-    if (!currentFigure) return;
+    if (!currentFigure) return null;
 
     setCurrentSpeaker(speaker);
     setWaitingForContinue(false);
 
     try {
+      // Use provided context or current messages state
+      const contextMessages = conversationContext || messages;
+      
       // Build recent context with proper speaker identification for user vs AI
-      const recentContext = messages.slice(-2).map(m => {
+      const recentContext = contextMessages.slice(-2).map(m => {
         let displayName = m.speakerName;
         // Replace "You (Host)" or "You (Guest)" with just "the user" for AI context
         if (displayName?.includes('You (')) {
@@ -597,6 +604,9 @@ const PodcastMode = () => {
       } else {
         setCurrentSpeaker(nextSpeaker);
       }
+      
+      // Return the new message so it can be used as context for the next speaker
+      return responseMessage;
     } catch (error) {
       console.error('Error generating response:', error);
       toast({
@@ -604,6 +614,7 @@ const PodcastMode = () => {
         description: "Failed to generate response",
         variant: "destructive"
       });
+      return null;
     }
    };
  
@@ -615,8 +626,14 @@ const PodcastMode = () => {
        const firstSpeaker: 'host' | 'guest' = currentSpeaker;
        const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
  
-       await continueConversation(firstSpeaker, false); // Don't pause after first speaker
-       await continueConversation(secondSpeaker, true); // Pause after second speaker
+       // First speaker generates response
+       const firstResponse = await continueConversation(firstSpeaker, false);
+       
+       // Second speaker uses updated context that includes first speaker's response
+       if (firstResponse) {
+         const updatedContext = [...messages, firstResponse];
+         await continueConversation(secondSpeaker, true, updatedContext);
+       }
      } else {
        // If a user is involved, keep single-turn behavior
        await continueConversation(currentSpeaker, true);
