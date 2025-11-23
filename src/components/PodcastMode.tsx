@@ -53,6 +53,8 @@ const PodcastMode = () => {
   const [podcastTopic, setPodcastTopic] = useState("");
   const [isPodcastActive, setIsPodcastActive] = useState(false);
   const [waitingForUser, setWaitingForUser] = useState(false);
+  const [currentTurn, setCurrentTurn] = useState(0);
+  const [waitingForContinue, setWaitingForContinue] = useState(false);
   
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -376,21 +378,15 @@ const PodcastMode = () => {
         description: `${host!.name} and ${guestType === 'user' ? 'you' : guest!.name} are ready to discuss "${podcastTopic}"`,
       });
 
-      // Get guest's response immediately or wait for user
-      console.log('[PodcastMode] startPodcast - scheduling guest response', {
-        guestType,
-        isRecording,
-        messagesLength: messages.length
-      });
-      setTimeout(() => {
-        console.log('[PodcastMode] startPodcast timeout - calling continueConversation for guest');
-        if (guestType === 'user') {
-          setWaitingForUser(true);
-          setCurrentSpeaker('guest');
-        } else {
-          continueConversation('guest');
-        }
-      }, 500);
+      // Set up for guest response
+      setCurrentTurn(1);
+      if (guestType === 'user') {
+        setWaitingForUser(true);
+        setCurrentSpeaker('guest');
+      } else {
+        setWaitingForContinue(true);
+        setCurrentSpeaker('guest');
+      }
     } catch (error) {
       console.error('Error starting podcast:', error);
       toast({
@@ -499,17 +495,8 @@ const PodcastMode = () => {
   };
 
   const continueConversation = async (speaker: 'host' | 'guest') => {
-    console.log('[PodcastMode] continueConversation CALLED', {
-      speaker,
-      hostType,
-      guestType,
-      isRecording,
-      messagesLength: messagesRef.current?.length ?? 0
-    });
-
     // Check if it's user's turn
     if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
-      console.log('[PodcastMode] User turn detected, waiting for user input');
       setWaitingForUser(true);
       setCurrentSpeaker(speaker);
       toast({
@@ -529,6 +516,7 @@ const PodcastMode = () => {
     if (!currentFigure) return;
 
     setCurrentSpeaker(speaker);
+    setWaitingForContinue(false);
 
     try {
       // Build recent context with proper speaker identification for user vs AI
@@ -582,25 +570,21 @@ const PodcastMode = () => {
       };
 
       setMessages(prev => [...prev, responseMessage]);
+      setCurrentTurn(prev => prev + 1);
 
-      // Generate and play audio (don't await so next response generates while audio plays)
+      // Generate and play audio
       if (isAutoVoiceEnabled) {
         generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
       }
       
-      // Continue with other speaker immediately (response generates while current audio plays)
-      const nextMessageCount = (messagesRef.current?.length ?? 0) + 1;
-      console.log('[PodcastMode] continueConversation auto-loop', {
-        speaker,
-        isRecording,
-        currentMessages: messagesRef.current?.length ?? 0,
-        nextMessageCount,
-      });
-
-      if (isRecording && nextMessageCount < 10) {
-        setTimeout(() => {
-          continueConversation(speaker === 'host' ? 'guest' : 'host');
-        }, 500);
+      // Set up next turn
+      const nextSpeaker = speaker === 'host' ? 'guest' : 'host';
+      if ((nextSpeaker === 'host' && hostType === 'user') || (nextSpeaker === 'guest' && guestType === 'user')) {
+        setWaitingForUser(true);
+        setCurrentSpeaker(nextSpeaker);
+      } else {
+        setWaitingForContinue(true);
+        setCurrentSpeaker(nextSpeaker);
       }
     } catch (error) {
       console.error('Error generating response:', error);
@@ -774,11 +758,17 @@ const PodcastMode = () => {
     setMessages(prev => [...prev, newMessage]);
     setUserInput("");
     setWaitingForUser(false);
+    setCurrentTurn(prev => prev + 1);
 
-    // Continue conversation with the other speaker
-    setTimeout(() => {
-      continueConversation(currentSpeaker === 'host' ? 'guest' : 'host');
-    }, 500);
+    // Set up next turn - the other speaker
+    const nextSpeaker = currentSpeaker === 'host' ? 'guest' : 'host';
+    if ((nextSpeaker === 'host' && hostType === 'user') || (nextSpeaker === 'guest' && guestType === 'user')) {
+      setWaitingForUser(true);
+      setCurrentSpeaker(nextSpeaker);
+    } else {
+      setWaitingForContinue(true);
+      setCurrentSpeaker(nextSpeaker);
+    }
   };
 
   if (selectingFor) {
@@ -1037,6 +1027,18 @@ const PodcastMode = () => {
             isLoading={false}
           />
         </Card>
+      )}
+
+
+      {/* Continue Button - Show when waiting for next exchange */}
+      {isRecording && waitingForContinue && (
+        <Button 
+          onClick={() => continueConversation(currentSpeaker)}
+          className="w-full mb-4"
+          size="lg"
+        >
+          Continue Conversation (Turn {currentTurn + 1})
+        </Button>
       )}
 
       {/* Input Ribbon - Only show when podcast is recording */}
