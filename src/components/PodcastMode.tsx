@@ -573,11 +573,13 @@ const PodcastMode = () => {
       setMessages(prev => [...prev, responseMessage]);
       
       // Increment speaker count and round after both speakers have spoken
-      const newSpeakerCount = speakerCount + 1;
-      setSpeakerCount(newSpeakerCount);
-      if (newSpeakerCount % 2 === 0) {
-        setCurrentRound(prev => prev + 1);
-      }
+      setSpeakerCount(prevCount => {
+        const newCount = prevCount + 1;
+        if (newCount % 2 === 0) {
+          setCurrentRound(prevRound => prevRound + 1);
+        }
+        return newCount;
+      });
 
       // Generate and play audio
       if (isAutoVoiceEnabled) {
@@ -601,9 +603,25 @@ const PodcastMode = () => {
         variant: "destructive"
       });
     }
-  };
-
-  const processAudioQueue = async () => {
+   };
+ 
+   const continueRound = async () => {
+     // When both participants are AI figures, each round should include both speaking
+     if (hostType === 'figure' && guestType === 'figure') {
+       const firstSpeaker: 'host' | 'guest' = currentSpeaker;
+       const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
+ 
+       setWaitingForContinue(false);
+ 
+       await continueConversation(firstSpeaker);
+       await continueConversation(secondSpeaker);
+     } else {
+       // If a user is involved, keep single-turn behavior
+       await continueConversation(currentSpeaker);
+     }
+   };
+ 
+   const processAudioQueue = async () => {
     if (isProcessingAudioRef.current || audioQueueRef.current.length === 0) {
       return;
     }
@@ -767,11 +785,13 @@ const PodcastMode = () => {
     setWaitingForUser(false);
     
     // Increment speaker count and round after both speakers have spoken
-    const newSpeakerCount = speakerCount + 1;
-    setSpeakerCount(newSpeakerCount);
-    if (newSpeakerCount % 2 === 0) {
-      setCurrentRound(prev => prev + 1);
-    }
+    setSpeakerCount(prevCount => {
+      const newCount = prevCount + 1;
+      if (newCount % 2 === 0) {
+        setCurrentRound(prevRound => prevRound + 1);
+      }
+      return newCount;
+    });
 
     // Set up next turn - the other speaker
     const nextSpeaker = currentSpeaker === 'host' ? 'guest' : 'host';
@@ -1046,7 +1066,7 @@ const PodcastMode = () => {
       {/* Continue Button - Show when waiting for next exchange */}
       {isRecording && waitingForContinue && (
         <Button 
-          onClick={() => continueConversation(currentSpeaker)}
+          onClick={continueRound}
           className="w-full mb-4"
           size="lg"
         >
