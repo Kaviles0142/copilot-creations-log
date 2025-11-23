@@ -377,7 +377,13 @@ const PodcastMode = () => {
       });
 
       // Get guest's response immediately or wait for user
+      console.log('[PodcastMode] startPodcast - scheduling guest response', {
+        guestType,
+        isRecording,
+        messagesLength: messages.length
+      });
       setTimeout(() => {
+        console.log('[PodcastMode] startPodcast timeout - calling continueConversation for guest');
         if (guestType === 'user') {
           setWaitingForUser(true);
           setCurrentSpeaker('guest');
@@ -493,8 +499,17 @@ const PodcastMode = () => {
   };
 
   const continueConversation = async (speaker: 'host' | 'guest') => {
+    console.log('[PodcastMode] continueConversation CALLED', {
+      speaker,
+      hostType,
+      guestType,
+      isRecording,
+      messagesLength: messagesRef.current?.length ?? 0
+    });
+
     // Check if it's user's turn
     if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
+      console.log('[PodcastMode] User turn detected, waiting for user input');
       setWaitingForUser(true);
       setCurrentSpeaker(speaker);
       toast({
