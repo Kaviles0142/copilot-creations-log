@@ -483,6 +483,104 @@ const PodcastMode = () => {
     });
   };
 
+  const handleUserQuestion = async (questionContent: string) => {
+    if (!podcastSessionId || !host || !guest) {
+      console.error('Missing session data');
+      return;
+    }
+
+    // Interrupt: Stop current audio and clear queue
+    stopPodcast();
+
+    // Save user message to database
+    const { error: userMsgError } = await supabase
+      .from('podcast_messages')
+      .insert({
+        podcast_session_id: podcastSessionId,
+        turn_number: -1, // User messages don't follow turn order
+        figure_id: 'user',
+        figure_name: 'User',
+        speaker_role: 'user',
+        content: questionContent,
+      });
+
+    if (userMsgError) {
+      console.error('Error saving user message:', userMsgError);
+      toast({
+        title: "Error",
+        description: "Failed to save your question",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('👤 User asked question, generating responses...');
+
+    try {
+      // Host responds to user's question
+      const { data: hostData, error: hostError } = await supabase.functions.invoke('podcast-orchestrator', {
+        body: {
+          sessionId: podcastSessionId,
+          language: selectedLanguage.split('-')[0],
+          userQuestion: true,
+          forceSpeaker: 'host'
+        }
+      });
+
+      if (hostError) throw hostError;
+
+      const hostMessage: Message = {
+        id: Date.now().toString(),
+        content: hostData.message,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: host.name
+      };
+
+      setMessages(prev => [...prev, hostMessage]);
+
+      if (isAutoVoiceEnabled) {
+        generateAndPlayAudio(hostData.message, host.name, host.id);
+      }
+
+      // Guest responds to user's question + host's answer
+      const { data: guestData, error: guestError } = await supabase.functions.invoke('podcast-orchestrator', {
+        body: {
+          sessionId: podcastSessionId,
+          language: selectedLanguage.split('-')[0],
+          userQuestion: true,
+          forceSpeaker: 'guest'
+        }
+      });
+
+      if (guestError) throw guestError;
+
+      const guestMessage: Message = {
+        id: Date.now().toString() + '1',
+        content: guestData.message,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: guest.name
+      };
+
+      setMessages(prev => [...prev, guestMessage]);
+
+      if (isAutoVoiceEnabled) {
+        generateAndPlayAudio(guestData.message, guest.name, guest.id);
+      }
+
+      setWaitingForContinue(true);
+
+    } catch (error) {
+      console.error('Error handling user question:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate responses to your question",
+        variant: "destructive"
+      });
+    }
+  };
+
   const continueConversation = async (
     speaker: 'host' | 'guest', 
     shouldPauseAfter: boolean = true
@@ -1114,8 +1212,9 @@ const PodcastMode = () => {
                           speakerName: "You"
                         };
                         setMessages(prev => [...prev, userMessage]);
+                        const question = recordingTranscript;
                         setRecordingTranscript("");
-                        continueConversation(currentSpeaker);
+                        handleUserQuestion(question);
                       }
                     }
                   }}
