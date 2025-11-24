@@ -56,6 +56,7 @@ const PodcastMode = () => {
   const [currentRound, setCurrentRound] = useState(1);
   const [speakerCount, setSpeakerCount] = useState(0);
   const [waitingForContinue, setWaitingForContinue] = useState(false);
+  const [podcastSessionId, setPodcastSessionId] = useState<string | null>(null);
   
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -278,152 +279,102 @@ const PodcastMode = () => {
     setIsPodcastActive(true);
     setIsRecording(true);
     
-    // If user is the host, guest speaks first with greeting
-    if (hostType === 'user') {
-      try {
-        const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
-          body: {
-            message: `You are ${guest!.name} appearing as a podcast guest in character. The host is a modern-day user and the topic is "${podcastTopic}". Open with a warm, conversational greeting, briefly acknowledge the topic, and share an initial thought. Speak in first person ("I") and do NOT say phrases like "I am ${guest!.name}" or "As ${guest!.name}".`,
-            figure: {
-              id: guest!.id,
-              name: guest!.name,
-              period: guest!.period,
-              description: guest!.description
-            },
-            language: selectedLanguage.split('-')[0],
-            conversationType: 'casual'
-          }
-        });
-
-        if (error) throw error;
-
-        const greetingMessage = data.response;
-        
-        const newMessage: Message = {
-          id: Date.now().toString(),
-          content: greetingMessage,
-          type: "assistant",
-          timestamp: new Date(),
-          speakerName: guest!.name
-        };
-        
-        setMessages([newMessage]);
-        setCurrentSpeaker('guest');
-        
-        // Generate and play audio
-        if (isAutoVoiceEnabled) {
-          generateAndPlayAudio(greetingMessage, guest!.name, guest!.id);
-        }
-        
-        toast({
-          title: "Podcast started!",
-          description: `${guest!.name} has joined to discuss "${podcastTopic}"`,
-        });
-
-        // Now wait for user's response
-        setTimeout(() => {
-          setWaitingForUser(true);
-          setCurrentSpeaker('host');
-        }, 500);
-      } catch (error) {
-        console.error('Error starting podcast:', error);
-        toast({
-          title: "Error",
-          description: "Failed to start podcast. Please try again.",
-          variant: "destructive"
-        });
-        setIsRecording(false);
-        setIsPodcastActive(false);
-      }
-      return;
-    }
-    
-    // Original flow: Historical host introduces
     try {
-      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
-        body: {
-          message: `You are ${host!.name} acting as a podcast host in character. Open the show with a short, engaging introduction to the topic "${podcastTopic}" and warmly welcome your guest ${guestType === 'user' ? 'our special guest' : guest!.name}. Speak in first person ("I") and do NOT say phrases like "I am ${host!.name}" or "As ${host!.name}". Do not recite your full biography; focus on the conversation you're about to have.`,
-          figure: {
-            id: host!.id,
-            name: host!.name,
-            period: host!.period,
-            description: host!.description
-          },
+      // Create podcast session in database
+      const hostId = hostType === 'user' ? 'user-host' : host!.id;
+      const hostName = hostType === 'user' ? 'User Host' : host!.name;
+      const guestId = guestType === 'user' ? 'user-guest' : guest!.id;
+      const guestName = guestType === 'user' ? 'User Guest' : guest!.name;
+
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('podcast_sessions')
+        .insert({
+          host_id: hostId,
+          host_name: hostName,
+          guest_id: guestId,
+          guest_name: guestName,
+          topic: podcastTopic,
           language: selectedLanguage.split('-')[0],
-          conversationType: 'casual'
+          status: 'active',
+          current_turn: 0
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+      
+      setPodcastSessionId(sessionData.id);
+      setMessages([]);
+      setCurrentRound(1);
+      setSpeakerCount(0);
+      setWaitingForContinue(false);
+
+      // Generate first round (host intro + guest response)
+      const { data: firstResponse, error: firstError } = await supabase.functions.invoke('podcast-orchestrator', {
+        body: {
+          sessionId: sessionData.id,
+          language: selectedLanguage.split('-')[0]
         }
       });
 
-      if (error) throw error;
+      if (firstError) throw firstError;
 
-      const introMessage = data.response;
-      
+      // Add first message (host intro) to UI
       const hostMessage: Message = {
         id: Date.now().toString(),
-        content: introMessage,
+        content: firstResponse.message,
         type: "assistant",
         timestamp: new Date(),
-        speakerName: host!.name
+        speakerName: firstResponse.speakerName
       };
       
       setMessages([hostMessage]);
       setCurrentSpeaker('host');
       
-      // Generate and play audio for host intro
-      if (isAutoVoiceEnabled) {
-        generateAndPlayAudio(introMessage, host!.name, host!.id);
+      // Generate and play audio for host
+      if (isAutoVoiceEnabled && hostType === 'figure') {
+        generateAndPlayAudio(firstResponse.message, hostName, hostId);
       }
-      
-      toast({
-        title: "Podcast started!",
-        description: `${host!.name} and ${guestType === 'user' ? 'you' : guest!.name} are ready to discuss "${podcastTopic}"`,
+
+      // Generate guest response
+      const { data: secondResponse, error: secondError } = await supabase.functions.invoke('podcast-orchestrator', {
+        body: {
+          sessionId: sessionData.id,
+          language: selectedLanguage.split('-')[0]
+        }
       });
 
-      // Set up for guest response
-      setSpeakerCount(1);
-      
-      // If both are AI figures, automatically generate guest response
-      if (guestType === 'figure' && guest) {
-        // Generate guest response to host's introduction
-        const guestResponse = await supabase.functions.invoke('chat-with-historical-figure', {
-          body: {
-            message: `You are ${guest.name} appearing as a podcast guest. The host ${host!.name} just introduced you and the topic "${podcastTopic}". Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought. Speak in first person ("I") and do NOT say phrases like "I am ${guest.name}" or "As ${guest.name}". Here's what the host said: "${introMessage}"`,
-            figure: {
-              id: guest.id,
-              name: guest.name,
-              period: guest.period,
-              description: guest.description
-            },
-            language: selectedLanguage.split('-')[0],
-            conversationType: 'casual'
-          }
-        });
+      if (secondError) throw secondError;
 
-        if (guestResponse.error) throw guestResponse.error;
+      const guestMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: secondResponse.message,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: secondResponse.speakerName
+      };
 
-        const guestMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: guestResponse.data.response,
-          type: "assistant",
-          timestamp: new Date(),
-          speakerName: guest.name
-        };
+      setMessages([hostMessage, guestMessage]);
+      setSpeakerCount(2);
+      setCurrentRound(1);
+      setCurrentSpeaker('host');
 
-        setMessages([hostMessage, guestMessage]);
-        setSpeakerCount(2);
-        setCurrentRound(1);
-        setCurrentSpeaker('host');
-        
-        // Generate and play audio for guest response
-        if (isAutoVoiceEnabled) {
-          generateAndPlayAudio(guestResponse.data.response, guest.name, guest.id);
-        }
-        
-        // Now wait for user to click Continue
+      // Generate and play audio for guest
+      if (isAutoVoiceEnabled && guestType === 'figure') {
+        generateAndPlayAudio(secondResponse.message, guestName, guestId);
+      }
+
+      toast({
+        title: "Podcast started!",
+        description: `${hostName} and ${guestName} are discussing "${podcastTopic}"`,
+      });
+
+      // Set up for next round
+      if (hostType === 'figure' && guestType === 'figure') {
         setWaitingForContinue(true);
-      } else if (guestType === 'user') {
+      } else {
         setWaitingForUser(true);
-        setCurrentSpeaker('guest');
+        setCurrentSpeaker(hostType === 'user' ? 'host' : 'guest');
       }
     } catch (error) {
       console.error('Error starting podcast:', error);
@@ -534,8 +485,7 @@ const PodcastMode = () => {
 
   const continueConversation = async (
     speaker: 'host' | 'guest', 
-    shouldPauseAfter: boolean = true,
-    conversationContext?: Message[]
+    shouldPauseAfter: boolean = true
   ) => {
     // Check if it's user's turn
     if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
@@ -549,91 +499,23 @@ const PodcastMode = () => {
       return null;
     }
 
+    if (!podcastSessionId) {
+      console.error('No podcast session ID');
+      return null;
+    }
+
     const currentFigure = speaker === 'host' ? host : guest;
-    const otherFigure = speaker === 'host' ? guest : host;
-    const otherName = speaker === 'host' 
-      ? (guestType === 'user' ? 'our guest' : guest?.name)
-      : (hostType === 'user' ? 'our host' : host?.name);
-    
     if (!currentFigure) return null;
 
     setCurrentSpeaker(speaker);
     setWaitingForContinue(false);
 
     try {
-      // Use provided context or current messages state
-      const contextMessages = conversationContext || messages;
-      
-      // Build recent context without exposing real names to avoid self-recognition
-      const recentContext = contextMessages.slice(-4).map(m => {
-        let roleLabel = 'Speaker';
-        if (m.speakerName?.includes('You (Host)')) {
-          roleLabel = 'User host';
-        } else if (m.speakerName?.includes('You (Guest)')) {
-          roleLabel = 'User guest';
-        } else if (host && m.speakerName === host.name) {
-          roleLabel = 'Host';
-        } else if (guest && m.speakerName === guest.name) {
-          roleLabel = 'Guest';
-        }
-        return `${roleLabel}: ${m.content}`;
-      }).join('\n\n');
-      
-      // Construct prompts differently based on whether user is involved
-      // ROUND 1: Allow introductions. ROUND 2+: Require fresh, nuanced content with no repetition.
-      const isFirstRound = currentRound === 1;
-      let prompt: string;
-      
-      if (speaker === 'host') {
-        const hostName = currentFigure.name;
-        const freshContentInstruction = isFirstRound 
-          ? "" 
-          : " Make sure this response introduces at least two fresh, concrete points, questions, or examples that you have not mentioned earlier in this conversation. Build on what was just said with new ideas.";
-        
-        prompt = `Here is the recent conversation so far:\n\n${recentContext}
-
-You are ${hostType === 'user' ? 'the podcast host (a modern-day user)' : `${hostName}, the podcast host, speaking fully in character.`}
-Continue the conversation about "${podcastTopic}" with your guest ${otherName}. 
-Speak in first person ("I") and do NOT say phrases like "I am ${hostName}" or "As ${hostName}". 
-${isFirstRound ? 'You may introduce yourself briefly if appropriate, then dive into the topic.' : 'Do not reintroduce yourself or repeat earlier lines; add new, engaging ideas or questions that build on what was just said.'}${freshContentInstruction}`;
-      } else {
-        // Guest is speaking
-        const guestName = currentFigure.name;
-        const freshContentInstruction = isFirstRound 
-          ? "" 
-          : " Introduce at least two new, specific insights, examples, or stories that differ from anything you've already said. Vary your tone, angle, and examples from previous rounds.";
-        
-        if (hostType === 'user') {
-          // User is the host - guest should respond naturally without addressing host by name
-          prompt = `Here is the recent conversation so far:\n\n${recentContext}
-
-You are ${guestName}, the podcast guest, speaking fully in character. 
-Continue the conversation about "${podcastTopic}" with a modern-day host (the user). 
-Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-${isFirstRound ? 'You may introduce yourself briefly if appropriate, then respond to the topic.' : 'Do not repeat your previous message; instead, respond naturally to what was just said and move the discussion forward.'}${freshContentInstruction}`;
-        } else {
-          // Historical figure is the host
-          prompt = `Here is the recent conversation so far:\n\n${recentContext}
-
-You are ${guestName}, the podcast guest, speaking fully in character with your host ${otherName}. 
-Continue the conversation about "${podcastTopic}" by responding to what they just said with new ideas or stories. 
-Speak in first person ("I") and do NOT say phrases like "I am ${guestName}" or "As ${guestName}". 
-${isFirstRound ? 'You may introduce yourself briefly if appropriate, then engage with the topic.' : 'Avoid repeating yourself or reintroducing who you are. Bring in at least two new perspectives, anecdotes, or arguments you have not previously used in this conversation.'}${freshContentInstruction}`;
-        }
-      }
-
-      // Get AI response from the current speaker
-      const { data, error } = await supabase.functions.invoke('chat-with-historical-figure', {
+      // Call podcast orchestrator to generate next response
+      const { data, error } = await supabase.functions.invoke('podcast-orchestrator', {
         body: {
-          message: prompt,
-          figure: {
-            id: currentFigure.id,
-            name: currentFigure.name,
-            period: currentFigure.period,
-            description: currentFigure.description
-          },
-          language: selectedLanguage.split('-')[0],
-          conversationType: 'casual'
+          sessionId: podcastSessionId,
+          language: selectedLanguage.split('-')[0]
         }
       });
 
@@ -641,10 +523,10 @@ ${isFirstRound ? 'You may introduce yourself briefly if appropriate, then engage
 
       const responseMessage: Message = {
         id: Date.now().toString(),
-        content: data.response,
+        content: data.message,
         type: "assistant",
         timestamp: new Date(),
-        speakerName: currentFigure.name
+        speakerName: data.speakerName
       };
 
       setMessages(prev => [...prev, responseMessage]);
@@ -660,7 +542,8 @@ ${isFirstRound ? 'You may introduce yourself briefly if appropriate, then engage
 
       // Generate and play audio
       if (isAutoVoiceEnabled) {
-        generateAndPlayAudio(data.response, currentFigure.name, currentFigure.id);
+        const figureId = speaker === 'host' ? (host?.id || '') : (guest?.id || '');
+        generateAndPlayAudio(data.message, data.speakerName, figureId);
       }
       
       // Set up next turn
@@ -675,7 +558,6 @@ ${isFirstRound ? 'You may introduce yourself briefly if appropriate, then engage
         setCurrentSpeaker(nextSpeaker);
       }
       
-      // Return the new message so it can be used as context for the next speaker
       return responseMessage;
     } catch (error) {
       console.error('Error generating response:', error);
@@ -699,10 +581,9 @@ ${isFirstRound ? 'You may introduce yourself briefly if appropriate, then engage
        // First speaker generates response
        const firstResponse = await continueConversation(firstSpeaker, false);
        
-       // Second speaker uses updated context that includes first speaker's response
+       // Second speaker generates response
        if (firstResponse) {
-         const updatedContext = [...messages, firstResponse];
-         await continueConversation(secondSpeaker, true, updatedContext);
+         await continueConversation(secondSpeaker, true);
        }
      } else {
        // If a user is involved, keep single-turn behavior
