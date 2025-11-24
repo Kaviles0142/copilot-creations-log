@@ -1264,45 +1264,47 @@ const PodcastMode = () => {
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               </div>
-              {isPlayingAudio ? (
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handlePauseAudio}
-                    size="icon"
-                    variant="secondary"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <Pause className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    onClick={stopPodcast}
-                    size="icon"
-                    variant="destructive"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : isPaused || isStopped ? (
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={isStopped ? handleReplayAudio : handleResumeAudio}
-                    size="icon"
-                    variant="default"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <Play className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    onClick={handleReplayAudio}
-                    size="icon"
-                    variant="outline"
-                    className="h-[60px] w-[60px]"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
+              <div className="flex gap-2">
+                {isPlayingAudio && (
+                  <>
+                    <Button 
+                      onClick={handlePauseAudio}
+                      size="icon"
+                      variant="secondary"
+                      className="h-[60px] w-[60px]"
+                    >
+                      <Pause className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      onClick={stopPodcast}
+                      size="icon"
+                      variant="destructive"
+                      className="h-[60px] w-[60px]"
+                    >
+                      <Square className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                {(isPaused || isStopped) && (
+                  <>
+                    <Button 
+                      onClick={isStopped ? handleReplayAudio : handleResumeAudio}
+                      size="icon"
+                      variant="default"
+                      className="h-[60px] w-[60px]"
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      onClick={handleReplayAudio}
+                      size="icon"
+                      variant="outline"
+                      className="h-[60px] w-[60px]"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
                 <Button 
                   onClick={() => {
                     // Send user question to interrupt conversation
@@ -1328,7 +1330,7 @@ const PodcastMode = () => {
                 >
                   <Send className="h-4 w-4" />
                 </Button>
-              )}
+              </div>
             </div>
           )}
         </Card>
