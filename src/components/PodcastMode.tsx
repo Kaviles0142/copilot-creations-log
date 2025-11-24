@@ -333,7 +333,7 @@ const PodcastMode = () => {
       
       // Generate and play audio for host
       if (isAutoVoiceEnabled && hostType === 'figure') {
-        await generateAndPlayAudio(firstResponse.message, hostName, hostId);
+        generateAndPlayAudio(firstResponse.message, hostName, hostId);
       }
 
       // Generate guest response
@@ -361,7 +361,7 @@ const PodcastMode = () => {
 
       // Generate and play audio for guest
       if (isAutoVoiceEnabled && guestType === 'figure') {
-        await generateAndPlayAudio(secondResponse.message, guestName, guestId);
+        generateAndPlayAudio(secondResponse.message, guestName, guestId);
       }
 
       toast({
