@@ -325,7 +325,7 @@ const PodcastMode = () => {
         content: firstResponse.message,
         type: "assistant",
         timestamp: new Date(),
-        speakerName: firstResponse.speakerName
+        speakerName: firstResponse.speaker.name
       };
       
       setMessages([hostMessage]);
@@ -526,7 +526,7 @@ const PodcastMode = () => {
         content: data.message,
         type: "assistant",
         timestamp: new Date(),
-        speakerName: data.speakerName
+        speakerName: data.speaker.name
       };
 
       setMessages(prev => [...prev, responseMessage]);
