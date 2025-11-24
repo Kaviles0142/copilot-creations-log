@@ -397,6 +397,11 @@ const PodcastMode = () => {
         setMessages([hostMessage]);
         setCurrentSpeaker('host');
         
+        // Generate and play audio for host intro
+        if (isAutoVoiceEnabled) {
+          generateAndPlayAudio(firstResponse.message, hostName, hostId);
+        }
+        
         // Generate guest response
         const { data: secondResponse, error: secondError } = await supabase.functions.invoke('podcast-orchestrator', {
           body: {
