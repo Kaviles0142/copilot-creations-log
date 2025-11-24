@@ -57,47 +57,100 @@ serve(async (req) => {
 
     console.log('🎨 No valid cache found, generating new portrait...');
 
-    // Generate new portrait using Lovable AI (Gemini image generation)
+    // Generate new portrait - try Lovable AI first, fallback to OpenAI DALL-E
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     const prompt = generateVisualPrompt(figureName, context);
     console.log('📝 Visual prompt:', prompt);
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: `Generate a photorealistic portrait: ${prompt}`
-          }
-        ],
-        modalities: ['image', 'text']
-      })
-    });
+    let base64Image: string | undefined;
+    let usedProvider = 'unknown';
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('❌ Lovable AI image generation error:', errorText);
-      throw new Error(`Image generation failed: ${errorText}`);
+    // Try Lovable AI first
+    if (LOVABLE_API_KEY) {
+      try {
+        console.log('🎨 Attempting generation with Lovable AI...');
+        const lovableResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash-image-preview',
+            messages: [
+              {
+                role: 'user',
+                content: `Generate a photorealistic portrait: ${prompt}`
+              }
+            ],
+            modalities: ['image', 'text']
+          })
+        });
+
+        if (!lovableResponse.ok) {
+          const errorText = await lovableResponse.text();
+          console.error('❌ Lovable AI failed:', errorText);
+          throw new Error(`Lovable AI failed: ${errorText}`);
+        }
+
+        const lovableData = await lovableResponse.json();
+        base64Image = lovableData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (base64Image) {
+          usedProvider = 'Lovable AI';
+          console.log('✅ Successfully generated with Lovable AI');
+        }
+      } catch (lovableError) {
+        console.log('⚠️ Lovable AI failed, will try fallback...');
+      }
     }
 
-    const aiData = await aiResponse.json();
-    const base64Image = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
+    // Fallback to OpenAI DALL-E if Lovable AI failed or unavailable
+    if (!base64Image && OPENAI_API_KEY) {
+      try {
+        console.log('🎨 Attempting generation with OpenAI DALL-E (fallback)...');
+        const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',
+            prompt: prompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'high',
+            output_format: 'png'
+          })
+        });
+
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error('❌ OpenAI DALL-E failed:', errorText);
+          throw new Error(`OpenAI DALL-E failed: ${errorText}`);
+        }
+
+        const openaiData = await openaiResponse.json();
+        
+        // OpenAI returns base64 directly in b64_json field when output_format is png
+        if (openaiData.data?.[0]?.b64_json) {
+          base64Image = `data:image/png;base64,${openaiData.data[0].b64_json}`;
+          usedProvider = 'OpenAI DALL-E';
+          console.log('✅ Successfully generated with OpenAI DALL-E');
+        }
+      } catch (openaiError) {
+        console.error('❌ OpenAI DALL-E also failed:', openaiError);
+      }
+    }
+
     if (!base64Image) {
-      throw new Error('No image returned from Lovable AI');
+      throw new Error('All image generation providers failed. Please check API keys and credits.');
     }
 
-    console.log('✅ Portrait generated successfully via Lovable AI');
+    console.log(`✅ Portrait generated successfully via ${usedProvider}`);
 
     // Extract base64 data (remove data:image/png;base64, prefix if present)
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
