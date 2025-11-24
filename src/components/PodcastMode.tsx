@@ -432,10 +432,14 @@ const PodcastMode = () => {
       setIsPaused(true);
     }
     
+    // Clear audio queue to allow user interruption
+    audioQueueRef.current = [];
+    isProcessingAudioRef.current = false;
+    
     toast({
-      title: "Paused",
-      description: "Audio playback has been paused",
-      duration: 2000,
+      title: "Paused - Ready for your question",
+      description: "Type your question and hit send",
+      duration: 3000,
     });
   };
 
@@ -492,11 +496,22 @@ const PodcastMode = () => {
 
     console.log('🚨 USER QUESTION MODE ACTIVATED - Interrupting normal flow');
     
+    // CRITICAL: Stop everything - audio, queue, and speaker state
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+    setIsPlayingAudio(false);
+    setIsPaused(false);
+    setCurrentAudio(null);
+    setCurrentSpeaker(null);
+    
+    // Clear audio queue completely
+    audioQueueRef.current = [];
+    isProcessingAudioRef.current = false;
+    
     // Set flag to prevent any in-flight normal turns from processing
     setIsProcessingUserQuestion(true);
-
-    // Interrupt: Stop current audio and clear queue
-    stopPodcast();
 
     // Save user message to database
     const { error: userMsgError } = await supabase
