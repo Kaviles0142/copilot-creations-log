@@ -167,10 +167,16 @@ Provide thoughtful, engaging responses to the host's questions. Share insights, 
 
     console.log('✅ Turn completed successfully');
 
+    // Clean up stage directions like [Music], [Applause], etc.
+    const cleanedContent = responseContent
+      .replace(/\[.*?\]/g, '')  // Remove anything in square brackets
+      .replace(/^\s+|\s+$/g, '') // Trim whitespace
+      .replace(/\n{3,}/g, '\n\n'); // Replace multiple newlines with max 2
+
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: responseContent,
+        message: cleanedContent,
         speaker: currentSpeaker,
         nextTurn: currentTurn + 1
       }),
