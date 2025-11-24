@@ -351,7 +351,7 @@ const PodcastMode = () => {
         content: secondResponse.message,
         type: "assistant",
         timestamp: new Date(),
-        speakerName: secondResponse.speakerName
+        speakerName: secondResponse.speaker.name
       };
 
       setMessages([hostMessage, guestMessage]);
