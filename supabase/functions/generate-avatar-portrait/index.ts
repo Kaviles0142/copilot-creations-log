@@ -7,6 +7,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Adaptive provider priority system (in-memory)
+let providerPriority: ('lovable' | 'openai')[] = ['lovable', 'openai'];
+let lastProviderCheck = Date.now();
+const PRIORITY_RESET_INTERVAL = 3600000; // Reset priority every hour (1 hour = 3600000ms)
+
+function getProviders(): ('lovable' | 'openai')[] {
+  // Reset priority periodically to give failed providers another chance
+  if (Date.now() - lastProviderCheck > PRIORITY_RESET_INTERVAL) {
+    console.log('⏰ Resetting provider priority to default (hourly retry)');
+    providerPriority = ['lovable', 'openai'];
+    lastProviderCheck = Date.now();
+  }
+  return [...providerPriority]; // Return copy to prevent external modification
+}
+
+function markProviderFailed(failedProvider: 'lovable' | 'openai') {
+  // Move failed provider to end of list
+  providerPriority = providerPriority.filter(p => p !== failedProvider);
+  providerPriority.push(failedProvider);
+  console.log(`⚠️ ${failedProvider} marked as failed, new priority order:`, providerPriority);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -82,7 +104,7 @@ serve(async (req) => {
 
     console.log('🎨 No valid cache found, generating new portrait...');
 
-    // Generate new portrait - try Lovable AI first, fallback to OpenAI DALL-E
+    // Get API keys
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
@@ -92,82 +114,95 @@ serve(async (req) => {
     let base64Image: string | undefined;
     let usedProvider = 'unknown';
 
-    // Try Lovable AI first
-    if (LOVABLE_API_KEY) {
-      try {
-        console.log('🎨 Attempting generation with Lovable AI...');
-        const lovableResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-image-preview',
-            messages: [
-              {
-                role: 'user',
-                content: `Generate a photorealistic portrait: ${prompt}`
-              }
-            ],
-            modalities: ['image', 'text']
-          })
-        });
+    // Get current provider priority order
+    const providers = getProviders();
+    console.log('🔄 Current provider priority:', providers);
 
-        if (!lovableResponse.ok) {
-          const errorText = await lovableResponse.text();
-          console.error('❌ Lovable AI failed:', errorText);
-          throw new Error(`Lovable AI failed: ${errorText}`);
+    // Try providers in priority order
+    for (const provider of providers) {
+      if (provider === 'lovable' && LOVABLE_API_KEY) {
+        try {
+          console.log('🎨 Attempting generation with Lovable AI...');
+          const lovableResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash-image-preview',
+              messages: [
+                {
+                  role: 'user',
+                  content: `Generate a photorealistic portrait: ${prompt}`
+                }
+              ],
+              modalities: ['image', 'text']
+            })
+          });
+
+          if (!lovableResponse.ok) {
+            const errorText = await lovableResponse.text();
+            console.error('❌ Lovable AI failed:', lovableResponse.status, errorText);
+            throw new Error(`Lovable AI failed: ${errorText}`);
+          }
+
+          const lovableData = await lovableResponse.json();
+          base64Image = lovableData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+          
+          if (base64Image) {
+            usedProvider = 'Lovable AI';
+            console.log('✅ Successfully generated with Lovable AI');
+            break; // Success - stop trying other providers
+          } else {
+            throw new Error('No image data in Lovable AI response');
+          }
+        } catch (lovableError) {
+          console.error('⚠️ Lovable AI error:', lovableError);
+          markProviderFailed('lovable');
+          // Continue to next provider
         }
+      } else if (provider === 'openai' && OPENAI_API_KEY) {
+        try {
+          console.log('🎨 Attempting generation with OpenAI DALL-E...');
+          const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-image-1',
+              prompt: prompt,
+              n: 1,
+              size: '1024x1024',
+              quality: 'high',
+              output_format: 'png'
+            })
+          });
 
-        const lovableData = await lovableResponse.json();
-        base64Image = lovableData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        
-        if (base64Image) {
-          usedProvider = 'Lovable AI';
-          console.log('✅ Successfully generated with Lovable AI');
+          if (!openaiResponse.ok) {
+            const errorText = await openaiResponse.text();
+            console.error('❌ OpenAI DALL-E failed:', openaiResponse.status, errorText);
+            throw new Error(`OpenAI DALL-E failed: ${errorText}`);
+          }
+
+          const openaiData = await openaiResponse.json();
+          
+          // OpenAI returns base64 directly in b64_json field when output_format is png
+          if (openaiData.data?.[0]?.b64_json) {
+            base64Image = `data:image/png;base64,${openaiData.data[0].b64_json}`;
+            usedProvider = 'OpenAI DALL-E';
+            console.log('✅ Successfully generated with OpenAI DALL-E');
+            break; // Success - stop trying other providers
+          } else {
+            throw new Error('No image data in OpenAI response');
+          }
+        } catch (openaiError) {
+          console.error('⚠️ OpenAI error:', openaiError);
+          markProviderFailed('openai');
+          // Continue to next provider
         }
-      } catch (lovableError) {
-        console.log('⚠️ Lovable AI failed, will try fallback...');
-      }
-    }
-
-    // Fallback to OpenAI DALL-E if Lovable AI failed or unavailable
-    if (!base64Image && OPENAI_API_KEY) {
-      try {
-        console.log('🎨 Attempting generation with OpenAI DALL-E (fallback)...');
-        const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-image-1',
-            prompt: prompt,
-            n: 1,
-            size: '1024x1024',
-            quality: 'high',
-            output_format: 'png'
-          })
-        });
-
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error('❌ OpenAI DALL-E failed:', errorText);
-          throw new Error(`OpenAI DALL-E failed: ${errorText}`);
-        }
-
-        const openaiData = await openaiResponse.json();
-        
-        // OpenAI returns base64 directly in b64_json field when output_format is png
-        if (openaiData.data?.[0]?.b64_json) {
-          base64Image = `data:image/png;base64,${openaiData.data[0].b64_json}`;
-          usedProvider = 'OpenAI DALL-E';
-          console.log('✅ Successfully generated with OpenAI DALL-E');
-        }
-      } catch (openaiError) {
-        console.error('❌ OpenAI DALL-E also failed:', openaiError);
       }
     }
 
