@@ -1290,7 +1290,7 @@ const PodcastMode = () => {
               ) : (
                 <Button 
                   onClick={() => {
-                    // Send user message to join conversation
+                    // Send user question to interrupt conversation
                     if (recordingTranscript.trim()) {
                       const userMessage: Message = {
                         id: Date.now().toString(),
@@ -1300,10 +1300,11 @@ const PodcastMode = () => {
                         speakerName: "You"
                       };
                       setMessages(prev => [...prev, userMessage]);
+                      const question = recordingTranscript;
                       setRecordingTranscript("");
                       
-                      // Continue podcast conversation
-                      continueConversation(currentSpeaker);
+                      // Handle as user question (interrupts normal flow)
+                      handleUserQuestion(question);
                     }
                   }}
                   disabled={!recordingTranscript.trim()}
