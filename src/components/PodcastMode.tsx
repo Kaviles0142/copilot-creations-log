@@ -57,6 +57,7 @@ const PodcastMode = () => {
   const [speakerCount, setSpeakerCount] = useState(0);
   const [waitingForContinue, setWaitingForContinue] = useState(false);
   const [podcastSessionId, setPodcastSessionId] = useState<string | null>(null);
+  const [isProcessingUserQuestion, setIsProcessingUserQuestion] = useState(false);
   
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -489,6 +490,11 @@ const PodcastMode = () => {
       return;
     }
 
+    console.log('🚨 USER QUESTION MODE ACTIVATED - Interrupting normal flow');
+    
+    // Set flag to prevent any in-flight normal turns from processing
+    setIsProcessingUserQuestion(true);
+
     // Interrupt: Stop current audio and clear queue
     stopPodcast();
 
@@ -570,6 +576,8 @@ const PodcastMode = () => {
       }
 
       setWaitingForContinue(true);
+      
+      console.log('✅ USER QUESTION MODE COMPLETE');
 
     } catch (error) {
       console.error('Error handling user question:', error);
@@ -578,6 +586,9 @@ const PodcastMode = () => {
         description: "Failed to generate responses to your question",
         variant: "destructive"
       });
+    } finally {
+      // Clear user question mode flag
+      setIsProcessingUserQuestion(false);
     }
   };
 
@@ -585,6 +596,12 @@ const PodcastMode = () => {
     speaker: 'host' | 'guest', 
     shouldPauseAfter: boolean = true
   ) => {
+    // Ignore normal turns if user question is being processed
+    if (isProcessingUserQuestion) {
+      console.log('⚠️ Ignoring normal turn - user question in progress');
+      return null;
+    }
+
     // Check if it's user's turn
     if ((speaker === 'host' && hostType === 'user') || (speaker === 'guest' && guestType === 'user')) {
       setWaitingForUser(true);
