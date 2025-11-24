@@ -31,28 +31,53 @@ serve(async (req) => {
       }
     });
 
-    // Check cache using database function (most reliable method)
+    // Check cache - query directly to inspect visual_prompt for context matching
     console.log('🔍 Checking cache for figure_id:', figureId);
     
     const { data: cachedResults, error: cacheError } = await supabase
-      .rpc('get_cached_avatar', { p_figure_id: figureId });
+      .from('avatar_image_cache')
+      .select('*')
+      .eq('figure_id', figureId)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    console.log('📊 Cache RPC result:', { 
+    console.log('📊 Cache query result:', { 
       found: cachedResults && cachedResults.length > 0, 
       error: cacheError,
       data: cachedResults 
     });
 
+    // Check if cached avatar matches the requested context
     if (!cacheError && cachedResults && cachedResults.length > 0) {
       const cachedImage = cachedResults[0];
-      console.log('✅ Using cached portrait from:', cachedImage.created_at);
-      console.log('📸 Cache URL:', cachedImage.cloudinary_url);
-      return new Response(JSON.stringify({
-        imageUrl: cachedImage.cloudinary_url,
-        cached: true,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const cachedPrompt = cachedImage.visual_prompt || '';
+      
+      // If context is provided, verify the cached prompt contains it
+      if (context) {
+        if (cachedPrompt.toLowerCase().includes(context.toLowerCase())) {
+          console.log('✅ Using cached portrait with matching context from:', cachedImage.created_at);
+          console.log('📸 Cache URL:', cachedImage.cloudinary_url);
+          return new Response(JSON.stringify({
+            imageUrl: cachedImage.cloudinary_url,
+            cached: true,
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } else {
+          console.log('⚠️ Cached portrait found but context mismatch. Expected context:', context);
+          console.log('⚠️ Cached prompt:', cachedPrompt);
+        }
+      } else {
+        // No specific context required, use cache
+        console.log('✅ Using cached portrait from:', cachedImage.created_at);
+        console.log('📸 Cache URL:', cachedImage.cloudinary_url);
+        return new Response(JSON.stringify({
+          imageUrl: cachedImage.cloudinary_url,
+          cached: true,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     console.log('🎨 No valid cache found, generating new portrait...');
