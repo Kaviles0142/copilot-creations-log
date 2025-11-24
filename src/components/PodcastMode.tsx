@@ -540,10 +540,12 @@ const PodcastMode = () => {
         return newCount;
       });
 
-      // Generate and play audio
+      // Generate and play audio - use figure from state (not orchestrator response)
       if (isAutoVoiceEnabled) {
-        const figureId = speaker === 'host' ? (host?.id || '') : (guest?.id || '');
-        generateAndPlayAudio(data.message, data.speakerName, figureId);
+        const figureName = currentFigure.name;  // Use actual figure name from state
+        const figureId = currentFigure.id;      // Use actual figure ID from state
+        console.log(`🎤 Generating TTS for ${figureName} (${figureId})`);
+        generateAndPlayAudio(data.message, figureName, figureId);
       }
       
       // Set up next turn
@@ -615,7 +617,7 @@ const PodcastMode = () => {
       try {
         setIsSpeaking(true);
         
-        console.log('🎤 Generating Azure TTS for:', figureName, 'with language:', selectedLanguage);
+        console.log('🎤 Generating Azure TTS for:', figureName, '(ID:', figureId, ') with language:', selectedLanguage);
         
         const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
           body: {
