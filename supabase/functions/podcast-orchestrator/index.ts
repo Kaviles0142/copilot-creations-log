@@ -13,9 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, language = 'en' } = await req.json();
+    const { sessionId, language = 'en', userQuestion = false, forceSpeaker } = await req.json();
     
-    console.log('🎙️ Podcast orchestrator called for session:', sessionId);
+    console.log('🎙️ Podcast orchestrator called for session:', sessionId, userQuestion ? '(User Question Mode)' : '');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -50,8 +50,17 @@ serve(async (req) => {
     console.log(`📚 Loaded ${messages?.length || 0} messages from history`);
 
     // Determine whose turn it is
-    const currentTurn = session.current_turn;
-    const isHostTurn = currentTurn % 2 === 0;
+    let currentTurn = session.current_turn;
+    let isHostTurn: boolean;
+    
+    if (userQuestion && forceSpeaker) {
+      // User question mode: force specific speaker
+      isHostTurn = forceSpeaker === 'host';
+      console.log(`👤 User Question Mode: ${forceSpeaker} responding`);
+    } else {
+      // Normal mode: turn-based
+      isHostTurn = currentTurn % 2 === 0;
+    }
     
     const currentSpeaker = isHostTurn 
       ? { id: session.host_id, name: session.host_name, role: 'host' }
@@ -71,7 +80,37 @@ serve(async (req) => {
     let systemPrompt = '';
     let userPrompt = '';
 
-    if (currentTurn === 0) {
+    if (userQuestion) {
+      // USER QUESTION MODE: Both speakers respond to user's question
+      const userMessage = messages.filter(m => m.speaker_role === 'user').pop();
+      const userQuestionText = userMessage?.content || 'the user\'s question';
+      
+      if (isHostTurn) {
+        // Host responds directly to user's question
+        systemPrompt = `You are ${session.host_name}, the podcast host. A user just asked a question during your conversation about "${session.topic}".
+
+Respond directly to the user's question. Be clear, helpful, and concise.
+
+CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
+        
+        userPrompt = `The user asked: "${userQuestionText}"\n\nRespond to the user's question as ${session.host_name}.`;
+      } else {
+        // Guest responds to user's question + comments on host's answer
+        const hostResponse = messages[messages.length - 1];
+        
+        systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and the host ${session.host_name} just responded.
+
+Now you should:
+1. Address the user's question directly
+2. Add your perspective or comment on what ${session.host_name} said
+
+Keep it natural and conversational.
+
+CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
+        
+        userPrompt = `The user asked: "${userQuestionText}"\n\n${session.host_name} responded: "${hostResponse.content}"\n\nNow respond to the user's question and add your thoughts on ${session.host_name}'s answer.`;
+      }
+    } else if (currentTurn === 0) {
       // Host's opening statement
       systemPrompt = `You are ${session.host_name}, the podcast host. You are interviewing ${session.guest_name} about the topic: "${session.topic}".
       
@@ -148,7 +187,7 @@ CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.gue
       .from('podcast_messages')
       .insert({
         podcast_session_id: sessionId,
-        turn_number: currentTurn,
+        turn_number: userQuestion ? -1 : currentTurn, // User question responses don't increment turn
         figure_id: currentSpeaker.id,
         figure_name: currentSpeaker.name,
         speaker_role: currentSpeaker.role,
@@ -160,17 +199,19 @@ CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.gue
       throw new Error('Failed to save message');
     }
 
-    // Update session turn count
-    const { error: updateError } = await supabase
-      .from('podcast_sessions')
-      .update({ 
-        current_turn: currentTurn + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', sessionId);
+    // Update session turn count (only if not user question mode)
+    if (!userQuestion) {
+      const { error: updateError } = await supabase
+        .from('podcast_sessions')
+        .update({ 
+          current_turn: currentTurn + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
 
-    if (updateError) {
-      console.error('Error updating session:', updateError);
+      if (updateError) {
+        console.error('Error updating session:', updateError);
+      }
     }
 
     console.log('✅ Turn completed successfully');
