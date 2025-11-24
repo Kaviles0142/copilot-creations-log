@@ -310,72 +310,74 @@ const PodcastMode = () => {
       setSpeakerCount(0);
       setWaitingForContinue(false);
 
-      // Generate first round (host intro + guest response)
-      const { data: firstResponse, error: firstError } = await supabase.functions.invoke('podcast-orchestrator', {
-        body: {
-          sessionId: sessionData.id,
-          language: selectedLanguage.split('-')[0]
+      // Generate first round based on who is AI
+      if (hostType === 'figure') {
+        // Host is AI - generate host intro
+        const { data: firstResponse, error: firstError } = await supabase.functions.invoke('podcast-orchestrator', {
+          body: {
+            sessionId: sessionData.id,
+            language: selectedLanguage.split('-')[0]
+          }
+        });
+
+        if (firstError) throw firstError;
+
+        // Add first message (host intro) to UI
+        const hostMessage: Message = {
+          id: Date.now().toString(),
+          content: firstResponse.message,
+          type: "assistant",
+          timestamp: new Date(),
+          speakerName: firstResponse.speaker.name
+        };
+        
+        setMessages([hostMessage]);
+        setCurrentSpeaker('host');
+        
+        // Generate and play audio for host
+        if (isAutoVoiceEnabled) {
+          generateAndPlayAudio(firstResponse.message, hostName, hostId);
         }
-      });
 
-      if (firstError) throw firstError;
+        // Generate guest response
+        const { data: secondResponse, error: secondError } = await supabase.functions.invoke('podcast-orchestrator', {
+          body: {
+            sessionId: sessionData.id,
+            language: selectedLanguage.split('-')[0]
+          }
+        });
 
-      // Add first message (host intro) to UI
-      const hostMessage: Message = {
-        id: Date.now().toString(),
-        content: firstResponse.message,
-        type: "assistant",
-        timestamp: new Date(),
-        speakerName: firstResponse.speaker.name
-      };
-      
-      setMessages([hostMessage]);
-      setCurrentSpeaker('host');
-      
-      // Generate and play audio for host
-      if (isAutoVoiceEnabled && hostType === 'figure') {
-        generateAndPlayAudio(firstResponse.message, hostName, hostId);
-      }
+        if (secondError) throw secondError;
 
-      // Generate guest response
-      const { data: secondResponse, error: secondError } = await supabase.functions.invoke('podcast-orchestrator', {
-        body: {
-          sessionId: sessionData.id,
-          language: selectedLanguage.split('-')[0]
+        const guestMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: secondResponse.message,
+          type: "assistant",
+          timestamp: new Date(),
+          speakerName: secondResponse.speaker.name
+        };
+
+        setMessages([hostMessage, guestMessage]);
+        setSpeakerCount(2);
+        setCurrentRound(1);
+        setCurrentSpeaker('host');
+
+        // Generate and play audio for guest
+        if (isAutoVoiceEnabled && guestType === 'figure') {
+          generateAndPlayAudio(secondResponse.message, guestName, guestId);
         }
-      });
 
-      if (secondError) throw secondError;
-
-      const guestMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: secondResponse.message,
-        type: "assistant",
-        timestamp: new Date(),
-        speakerName: secondResponse.speaker.name
-      };
-
-      setMessages([hostMessage, guestMessage]);
-      setSpeakerCount(2);
-      setCurrentRound(1);
-      setCurrentSpeaker('host');
-
-      // Generate and play audio for guest
-      if (isAutoVoiceEnabled && guestType === 'figure') {
-        generateAndPlayAudio(secondResponse.message, guestName, guestId);
-      }
-
-      toast({
-        title: "Podcast started!",
-        description: `${hostName} and ${guestName} are discussing "${podcastTopic}"`,
-      });
-
-      // Set up for next round
-      if (hostType === 'figure' && guestType === 'figure') {
-        setWaitingForContinue(true);
+        // Set up for next round
+        if (guestType === 'figure') {
+          setWaitingForContinue(true);
+        } else {
+          setWaitingForUser(true);
+          setCurrentSpeaker('guest');
+        }
       } else {
+        // User is host - they need to give the intro
+        setCurrentSpeaker('host');
         setWaitingForUser(true);
-        setCurrentSpeaker(hostType === 'user' ? 'host' : 'guest');
       }
     } catch (error) {
       console.error('Error starting podcast:', error);
