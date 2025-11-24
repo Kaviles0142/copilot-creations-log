@@ -567,18 +567,7 @@ const PodcastMode = () => {
     isProcessingAudioRef.current = false;
 
     try {
-      // Save user's question to database first
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        content: questionContent,
-        type: "user",
-        timestamp: new Date(),
-        speakerName: "You"
-      };
-      
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Insert user question into podcast_messages table
+      // Insert user question into podcast_messages table (real-time subscription will add to UI)
       const { error: insertError } = await supabase
         .from('podcast_messages')
         .insert({
