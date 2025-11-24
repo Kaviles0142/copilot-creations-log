@@ -425,8 +425,7 @@ const PodcastMode = () => {
           generateAndPlayAudio(secondResponse.message, guestName, guestId);
         }
 
-        // Set up for next round - wait for user
-        setWaitingForUser(true);
+        // After intro, ready for user's first question (no Continue button needed)
       }
     } catch (error) {
       console.error('Error starting podcast:', error);
@@ -540,95 +539,41 @@ const PodcastMode = () => {
   };
 
   const handleUserQuestion = async (questionContent: string) => {
-    if (!podcastSessionId || !host || !guest) {
+    if (!podcastSessionId || !guest) {
       console.error('Missing session data');
       return;
     }
 
-    console.log('🚨 USER QUESTION MODE ACTIVATED - Interrupting normal flow');
+    console.log('🎙️ User asking question to guest');
     
-    // CRITICAL: Stop everything - audio, queue, and speaker state
+    // Stop any playing audio
     if (currentAudio) {
       currentAudio.pause();
       currentAudio.currentTime = 0;
     }
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+    }
     setIsPlayingAudio(false);
     setIsPaused(false);
     setCurrentAudio(null);
-    setCurrentSpeaker(null);
-    
-    // Clear audio queue completely
     audioQueueRef.current = [];
     isProcessingAudioRef.current = false;
-    
-    // Set flag to prevent any in-flight normal turns from processing
-    setIsProcessingUserQuestion(true);
-
-    // Save user message to database
-    const { error: userMsgError } = await supabase
-      .from('podcast_messages')
-      .insert({
-        podcast_session_id: podcastSessionId,
-        turn_number: -1, // User messages don't follow turn order
-        figure_id: 'user',
-        figure_name: 'User',
-        speaker_role: 'user',
-        content: questionContent,
-      });
-
-    if (userMsgError) {
-      console.error('Error saving user message:', userMsgError);
-      toast({
-        title: "Error",
-        description: "Failed to save your question",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    console.log('👤 User asked question, generating responses...');
 
     try {
-      // Host responds to user's question
-      const { data: hostData, error: hostError } = await supabase.functions.invoke('podcast-orchestrator', {
-        body: {
-          sessionId: podcastSessionId,
-          language: selectedLanguage.split('-')[0],
-          userQuestion: true,
-          forceSpeaker: 'host'
-        }
-      });
-
-      if (hostError) throw hostError;
-
-      const hostMessage: Message = {
-        id: Date.now().toString(),
-        content: hostData.message,
-        type: "assistant",
-        timestamp: new Date(),
-        speakerName: host.name
-      };
-
-      setMessages(prev => [...prev, hostMessage]);
-
-      if (isAutoVoiceEnabled) {
-        generateAndPlayAudio(hostData.message, host.name, host.id);
-      }
-
-      // Guest responds to user's question + host's answer
+      // Guest responds to user's question
       const { data: guestData, error: guestError } = await supabase.functions.invoke('podcast-orchestrator', {
         body: {
           sessionId: podcastSessionId,
-          language: selectedLanguage.split('-')[0],
-          userQuestion: true,
-          forceSpeaker: 'guest'
+          language: selectedLanguage.split('-')[0]
         }
       });
 
       if (guestError) throw guestError;
 
       const guestMessage: Message = {
-        id: Date.now().toString() + '1',
+        id: Date.now().toString(),
         content: guestData.message,
         type: "assistant",
         timestamp: new Date(),
@@ -640,21 +585,16 @@ const PodcastMode = () => {
       if (isAutoVoiceEnabled) {
         generateAndPlayAudio(guestData.message, guest.name, guest.id);
       }
-
-      setWaitingForContinue(true);
       
-      console.log('✅ USER QUESTION MODE COMPLETE');
+      console.log('✅ Guest answered user question - ready for next question');
 
     } catch (error) {
       console.error('Error handling user question:', error);
       toast({
         title: "Error",
-        description: "Failed to generate responses to your question",
+        description: "Failed to generate guest response",
         variant: "destructive"
       });
-    } finally {
-      // Clear user question mode flag
-      setIsProcessingUserQuestion(false);
     }
   };
 
@@ -1234,8 +1174,8 @@ const PodcastMode = () => {
       )}
 
 
-      {/* Continue Button - Show when waiting for next exchange */}
-      {isRecording && waitingForContinue && (
+      {/* Continue Button - Only for AI host + AI guest mode */}
+      {isRecording && waitingForContinue && hostType === 'figure' && guestType === 'figure' && (
         <Button 
           onClick={continueRound}
           className="w-full mb-4"
