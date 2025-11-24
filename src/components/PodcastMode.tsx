@@ -567,11 +567,40 @@ const PodcastMode = () => {
     isProcessingAudioRef.current = false;
 
     try {
+      // Save user's question to database first
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        content: questionContent,
+        type: "user",
+        timestamp: new Date(),
+        speakerName: "You"
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Insert user question into podcast_messages table
+      const { error: insertError } = await supabase
+        .from('podcast_messages')
+        .insert({
+          podcast_session_id: podcastSessionId,
+          turn_number: -1, // User questions don't increment turn
+          figure_id: 'user',
+          figure_name: 'User',
+          speaker_role: 'user',
+          content: questionContent,
+        });
+      
+      if (insertError) {
+        console.error('Error saving user question:', insertError);
+      }
+      
       // Guest responds to user's question
       const { data: guestData, error: guestError } = await supabase.functions.invoke('podcast-orchestrator', {
         body: {
           sessionId: podcastSessionId,
-          language: selectedLanguage.split('-')[0]
+          language: selectedLanguage.split('-')[0],
+          userQuestion: true,
+          forceSpeaker: 'guest'
         }
       });
 
