@@ -702,26 +702,27 @@ const PodcastMode = () => {
     }
    };
  
-   const continueRound = async () => {
-     setWaitingForContinue(false);
-     
-     // When both participants are AI figures, each round should include both speaking
-     if (hostType === 'figure' && guestType === 'figure') {
-       const firstSpeaker: 'host' | 'guest' = currentSpeaker;
-       const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
- 
-       // First speaker generates response
-       const firstResponse = await continueConversation(firstSpeaker, false);
-       
-       // Second speaker generates response
-       if (firstResponse) {
-         await continueConversation(secondSpeaker, true);
-       }
-     } else {
-       // If a user is involved, keep single-turn behavior
-       await continueConversation(currentSpeaker, true);
-     }
-   };
+  const continueRound = async () => {
+    setWaitingForContinue(false);
+    
+    // When both participants are AI figures, each round should include both speaking
+    if (hostType === 'figure' && guestType === 'figure') {
+      const firstSpeaker: 'host' | 'guest' = currentSpeaker;
+      const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
+
+      // First speaker generates response
+      const firstResponse = await continueConversation(firstSpeaker, false);
+      
+      // Second speaker generates response
+      if (firstResponse) {
+        await continueConversation(secondSpeaker, true);
+      }
+    } else {
+      // If a user is involved, the AI speaker should respond
+      // currentSpeaker is already set to the next speaker (the AI)
+      await continueConversation(currentSpeaker, true);
+    }
+  };
  
    const processAudioQueue = async () => {
     if (isProcessingAudioRef.current || audioQueueRef.current.length === 0) {
@@ -883,6 +884,19 @@ const PodcastMode = () => {
     };
 
     setMessages(prev => [...prev, newMessage]);
+    
+    // Save user's message to database
+    if (podcastSessionId) {
+      await supabase.from('podcast_messages').insert({
+        podcast_session_id: podcastSessionId,
+        turn_number: speakerCount,
+        figure_id: 'user',
+        figure_name: speakerName,
+        speaker_role: currentSpeaker,
+        content: userInput,
+      });
+    }
+    
     setUserInput("");
     setWaitingForUser(false);
     
@@ -895,8 +909,12 @@ const PodcastMode = () => {
       return newCount;
     });
 
-    // Set up next turn - the other speaker
+    // Set up next turn - switch to the AI speaker
     const nextSpeaker = currentSpeaker === 'host' ? 'guest' : 'host';
+    setCurrentSpeaker(nextSpeaker);
+    
+    // Wait for Continue button since user just spoke
+    setWaitingForContinue(true);
     if ((nextSpeaker === 'host' && hostType === 'user') || (nextSpeaker === 'guest' && guestType === 'user')) {
       setWaitingForUser(true);
       setCurrentSpeaker(nextSpeaker);
