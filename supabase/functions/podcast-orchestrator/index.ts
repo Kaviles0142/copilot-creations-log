@@ -75,14 +75,18 @@ serve(async (req) => {
       // Host's opening statement
       systemPrompt = `You are ${session.host_name}, the podcast host. You are interviewing ${session.guest_name} about the topic: "${session.topic}".
       
-Your task is to provide a warm, engaging introduction to the podcast. Introduce yourself, the topic, and your guest. Keep it conversational and enthusiastic.`;
+Your task is to provide a warm, engaging introduction to the podcast. Introduce yourself, the topic, and your guest. Keep it conversational and enthusiastic.
+
+CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.host_name}:" at the start. Speak directly.`;
       
       userPrompt = `Start the podcast by introducing the topic "${session.topic}" and welcoming ${session.guest_name}.`;
     } else if (currentTurn === 1) {
       // Guest's opening response
       systemPrompt = `You are ${session.guest_name}, the podcast guest. The host ${session.host_name} just introduced you and the topic "${session.topic}".
       
-Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought.`;
+Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought.
+
+CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.guest_name}:" at the start. Speak directly.`;
       
       userPrompt = `The host said: "${messages[0].content}"\n\nRespond to the host's introduction.`;
     } else {
@@ -94,11 +98,15 @@ Respond warmly, express your enthusiasm about the topic, and add an insightful o
       if (isHostTurn) {
         systemPrompt = `You are ${session.host_name}, the podcast host. You are having a conversation with ${session.guest_name} about "${session.topic}".
         
-Your role is to ask thoughtful follow-up questions, explore interesting angles, and keep the conversation flowing naturally. Build on what your guest just said.`;
+Your role is to ask thoughtful follow-up questions, explore interesting angles, and keep the conversation flowing naturally. Build on what your guest just said.
+
+CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.host_name}:" at the start. Speak directly. Do NOT re-introduce yourself - you already did that in the opening.`;
       } else {
         systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" with the host ${session.host_name}.
         
-Provide thoughtful, engaging responses to the host's questions. Share insights, examples, and build on the conversation naturally.`;
+Provide thoughtful, engaging responses to the host's questions. Share insights, examples, and build on the conversation naturally.
+
+CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.guest_name}:" at the start. Speak directly. Do NOT re-introduce yourself - you already did that in your opening response.`;
       }
       
       userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\n${lastSpeaker} just said: "${lastMessage.content}"\n\nRespond to ${lastSpeaker} as ${currentSpeaker.name}.`;
