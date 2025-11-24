@@ -267,14 +267,9 @@ serve(async (req) => {
       
       console.log(`🌍 Detected region: ${detectedRegion} for ${figure_name}`);
       
-      // For English: Map to English regional variants
+      // For English: Map to English regional variants only (Azure doesn't support English with foreign accents)
       if (language === 'en-US') {
         const englishVariants: Record<string, { male: string, female: string }> = {
-          'german': { male: 'de-DE-ConradNeural', female: 'de-DE-KatjaNeural' },
-          'french': { male: 'fr-FR-HenriNeural', female: 'fr-FR-DeniseNeural' },
-          'italian': { male: 'it-IT-DiegoNeural', female: 'it-IT-ElsaNeural' },
-          'spanish': { male: 'es-ES-AlvaroNeural', female: 'es-ES-ElviraNeural' },
-          'russian': { male: 'ru-RU-DmitryNeural', female: 'ru-RU-SvetlanaNeural' },
           'south-african': { male: 'en-ZA-LukeNeural', female: 'en-ZA-LeahNeural' },
           'british': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
           'english': { male: 'en-GB-RyanNeural', female: 'en-GB-SoniaNeural' },
