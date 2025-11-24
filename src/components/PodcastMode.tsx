@@ -1100,9 +1100,25 @@ const PodcastMode = () => {
                 <Textarea
                   value={recordingTranscript}
                   onChange={(e) => setRecordingTranscript(e.target.value)}
-                  placeholder="Join the conversation... (or click the mic to speak)"
+                  placeholder="Ask a question or join the conversation..."
                   className="min-h-[60px] resize-none pr-12"
-                  disabled={true}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (recordingTranscript.trim()) {
+                        const userMessage: Message = {
+                          id: Date.now().toString(),
+                          content: recordingTranscript,
+                          type: "user",
+                          timestamp: new Date(),
+                          speakerName: "You"
+                        };
+                        setMessages(prev => [...prev, userMessage]);
+                        setRecordingTranscript("");
+                        continueConversation(currentSpeaker);
+                      }
+                    }
+                  }}
                 />
                 <Button
                   onClick={toggleListening}
@@ -1113,7 +1129,6 @@ const PodcastMode = () => {
                       ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-950' 
                       : 'text-muted-foreground hover:text-primary'
                   }`}
-                  disabled={true}
                 >
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
