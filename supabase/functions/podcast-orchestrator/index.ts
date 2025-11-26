@@ -121,6 +121,11 @@ CRITICAL CONTEXT AWARENESS:
 - DO NOT attribute your own previous statements to the user
 - Check carefully who said what before responding
 
+HARD CONTEXT CONSTRAINTS (MUST OBEY):
+- You MUST NOT mention specific battles, events, places, books, or names unless they appear either in the USER'S latest question or in the conversation history shown below
+- Never write phrases like "your mention of X" or "the host's recounting of Y" for things that were never actually said by the USER
+- If you feel a concrete example would help but it wasn't mentioned before, describe it GENERICALLY (e.g. "another battle I fought") instead of naming it
+
 ABSOLUTE LANGUAGE RULES (MUST OBEY):
 - Do NOT use the words "host", "the host", "user", "User", "listener", "audience", or "interviewer" anywhere in your response
 - Always speak directly to the USER as "you"
@@ -199,6 +204,11 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-i
         if (isUserHost) {
           // Enhanced prompt for User-AI scenario
           systemPrompt = `You are ${session.guest_name}, a renowned historical figure being interviewed in depth about "${session.topic}".
+
+HARD CONTEXT CONSTRAINTS (MUST OBEY):
+- You MUST NOT mention specific battles, events, places, books, or names unless they appear in the conversation history below or in the USER'S latest question
+- Never write phrases like "your mention of X" or "the host's detailed recounting of Y" for things that were never actually said by the USER
+- If you want to bring in a new example, describe it GENERICALLY (e.g. "another battle I fought") instead of naming it, unless that name already appears in the history
 
 ANSWER PROTOCOL:
 1. First, identify EXACTLY what is being asked. Is it about timing? Process? Reasons? Outcomes?
