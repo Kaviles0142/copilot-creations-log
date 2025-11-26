@@ -283,9 +283,9 @@ const PodcastMode = () => {
     try {
       // Create podcast session in database
       const hostId = hostType === 'user' ? 'user-host' : host!.id;
-      const hostName = hostType === 'user' ? 'User Host' : host!.name;
+      const hostName = hostType === 'user' ? 'Host' : host!.name;
       const guestId = guestType === 'user' ? 'user-guest' : guest!.id;
-      const guestName = guestType === 'user' ? 'User Guest' : guest!.name;
+      const guestName = guestType === 'user' ? 'Guest' : guest!.name;
 
       const { data: sessionData, error: sessionError } = await supabase
         .from('podcast_sessions')

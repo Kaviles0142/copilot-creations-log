@@ -71,9 +71,12 @@ serve(async (req) => {
     // Build conversation context
     let conversationHistory = '';
     if (messages && messages.length > 0) {
-      conversationHistory = messages.map(m => 
-        `${m.speaker_role === 'host' ? session.host_name : session.guest_name}: ${m.content}`
-      ).join('\n\n');
+      conversationHistory = messages.map(m => {
+        const speakerLabel = m.speaker_role === 'host' 
+          ? (session.host_name === 'Host' ? 'the host' : session.host_name)
+          : (session.guest_name === 'Guest' ? 'the guest' : session.guest_name);
+        return `${speakerLabel}: ${m.content}`;
+      }).join('\n\n');
     }
 
     // Construct prompt based on turn number and role
@@ -87,68 +90,73 @@ serve(async (req) => {
       
       if (isHostTurn) {
         // Host responds directly to user's question
-        systemPrompt = `You are ${session.host_name}, the podcast host. A user just asked a question during your conversation about "${session.topic}".
+        const hostLabel = session.host_name === 'Host' ? 'the podcast host' : session.host_name;
+        systemPrompt = `You are ${hostLabel}. A user just asked a question during your conversation about "${session.topic}".
 
 Respond directly to the user's question. Be clear, helpful, and concise.
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         
-        userPrompt = `The user asked: "${userQuestionText}"\n\nRespond to the user's question as ${session.host_name}.`;
+        userPrompt = `The user asked: "${userQuestionText}"\n\nRespond to the user's question.`;
       } else {
         // Guest responds to user's question + comments on host's answer
         const hostResponse = messages[messages.length - 1];
+        const hostLabel = session.host_name === 'Host' ? 'the host' : session.host_name;
         
-        systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and the host ${session.host_name} just responded.
+        systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and ${hostLabel} just responded.
 
 Now you should:
 1. Address the user's question directly
-2. Add your perspective or comment on what ${session.host_name} said
+2. Add your perspective or comment on what ${hostLabel} said
 
 Keep it natural and conversational.
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         
-        userPrompt = `The user asked: "${userQuestionText}"\n\n${session.host_name} responded: "${hostResponse.content}"\n\nNow respond to the user's question and add your thoughts on ${session.host_name}'s answer.`;
+        userPrompt = `The user asked: "${userQuestionText}"\n\n${hostLabel} responded: "${hostResponse.content}"\n\nNow respond to the user's question and add your thoughts on ${hostLabel}'s answer.`;
       }
     } else if (currentTurn === 0) {
       // Host's opening statement
-      systemPrompt = `You are ${session.host_name}, the podcast host. You are interviewing ${session.guest_name} about the topic: "${session.topic}".
+      const hostLabel = session.host_name === 'Host' ? 'the podcast host' : session.host_name;
+      systemPrompt = `You are ${hostLabel}. You are interviewing ${session.guest_name} about the topic: "${session.topic}".
       
 Your task is to provide a warm, engaging introduction to the podcast. Introduce yourself, the topic, and your guest. Keep it conversational and enthusiastic.
 
-CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.host_name}:" at the start. Speak directly.`;
+CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
       
       userPrompt = `Start the podcast by introducing the topic "${session.topic}" and welcoming ${session.guest_name}.`;
     } else if (currentTurn === 1) {
       // Guest's opening response
-      systemPrompt = `You are ${session.guest_name}, the podcast guest. The host ${session.host_name} just introduced you and the topic "${session.topic}".
+      const hostLabel = session.host_name === 'Host' ? 'the host' : session.host_name;
+      systemPrompt = `You are ${session.guest_name}, the podcast guest. ${hostLabel} just introduced you and the topic "${session.topic}".
       
-Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought.
+Respond warmly to the host, express your enthusiasm about the topic, and add an insightful opening thought.
 
-CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.guest_name}:" at the start. Speak directly.`;
+CRITICAL: Do NOT prepend your name to your response. Speak directly. Address the host naturally without using their name repeatedly.`;
       
       userPrompt = `The host said: "${messages[0].content}"\n\nRespond to the host's introduction.`;
     } else {
       // Subsequent turns - respond to the last message
       const lastMessage = messages[messages.length - 1];
-      const lastSpeaker = lastMessage.speaker_role === 'host' ? session.host_name : session.guest_name;
-      const otherSpeaker = lastMessage.speaker_role === 'host' ? session.guest_name : session.host_name;
+      const hostLabel = session.host_name === 'Host' ? 'the host' : session.host_name;
+      const guestLabel = session.guest_name === 'Guest' ? 'the guest' : session.guest_name;
+      const lastSpeaker = lastMessage.speaker_role === 'host' ? hostLabel : guestLabel;
       
       if (isHostTurn) {
-        systemPrompt = `You are ${session.host_name}, the podcast host. You are having a conversation with ${session.guest_name} about "${session.topic}".
+        systemPrompt = `You are ${hostLabel}. You are having a conversation with ${session.guest_name} about "${session.topic}".
         
 Your role is to ask thoughtful follow-up questions, explore interesting angles, and keep the conversation flowing naturally. Build on what your guest just said.
 
-CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.host_name}:" at the start. Speak directly. Do NOT re-introduce yourself - you already did that in the opening.`;
+CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself - you already did that in the opening.`;
       } else {
-        systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" with the host ${session.host_name}.
+        systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" with ${hostLabel}.
         
-Provide thoughtful, engaging responses to the host's questions. Share insights, examples, and build on the conversation naturally.
+Provide thoughtful, engaging responses to the host's questions. Share insights, examples, and build on the conversation naturally. Address the host naturally without repeatedly using labels like "Host" or "the host".
 
-CRITICAL: Do NOT prepend your name to your response. Do NOT write "${session.guest_name}:" at the start. Speak directly. Do NOT re-introduce yourself - you already did that in your opening response.`;
+CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself - you already did that in your opening response.`;
       }
       
-      userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\n${lastSpeaker} just said: "${lastMessage.content}"\n\nRespond to ${lastSpeaker} as ${currentSpeaker.name}.`;
+      userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\n${lastSpeaker} just said: "${lastMessage.content}"\n\nRespond naturally to continue the conversation.`;
     }
 
     console.log('🤖 Generating AI response...');
