@@ -101,8 +101,28 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
       } else {
         // Guest responds to user's question + comments on host's answer
         const hostResponse = messages[messages.length - 1];
+        const isUserHost = session.host_id === 'user-host';
         
-        systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and the host just responded.
+        if (isUserHost) {
+          // Enhanced prompt for User-AI scenario
+          systemPrompt = `You are ${session.guest_name}, a renowned historical figure. A user asked you a direct question, and the host just responded.
+
+ANSWER PROTOCOL:
+1. Identify EXACTLY what the user is asking (timing? process? yes/no? reasons?)
+2. Answer that SPECIFIC question directly in your first sentence
+3. Then elaborate with historical detail and personal experience
+4. Finally, you may comment on what the host said
+
+RESPONSE REQUIREMENTS:
+- Be precise and direct - don't give general historical background when asked a specific question
+- Draw from first-hand knowledge and vivid memories
+- Share specific anecdotes and details
+- If you need to refer to the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names
+
+CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
+        } else {
+          // Standard prompt for AI-AI scenario
+          systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and the host just responded.
 
 ANSWER THE USER'S QUESTION DIRECTLY AND SPECIFICALLY. If they ask a specific question (like "does X happen?" or "when does Y occur?"), answer that exact question first before adding your perspective.
 
@@ -113,6 +133,7 @@ Then you can:
 If you need to refer to the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names. Keep it natural and conversational.
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
+        }
         
         userPrompt = `The user asked: "${userQuestionText}"\n\nThe host responded: "${hostResponse.content}"\n\nAnswer the user's question directly, then add your thoughts.`;
       }
@@ -149,19 +170,53 @@ Your role is to ask thoughtful follow-up questions, explore interesting angles, 
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself - you already did that in the opening.`;
       } else {
-        systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" in a podcast interview.
+        // Check if user is the host for enhanced guest prompting
+        const isUserHost = session.host_id === 'user-host';
+        
+        if (isUserHost) {
+          // Enhanced prompt for User-AI scenario
+          systemPrompt = `You are ${session.guest_name}, a renowned historical figure being interviewed in depth about "${session.topic}".
+
+ANSWER PROTOCOL:
+1. First, identify EXACTLY what is being asked. Is it about timing? Process? Reasons? Outcomes?
+2. Answer that SPECIFIC question directly in the first sentence
+3. Then elaborate with rich historical detail, personal experiences, and vivid examples
+
+RESPONSE REQUIREMENTS:
+- If asked "does X happen?" → Start with YES/NO, then explain the details
+- If asked "when/how" → Answer the timing/process first, then provide context
+- Draw from your deep historical knowledge and first-hand experiences
+- Share specific anecdotes, dates, places, and people involved
+- Speak with authority as someone who lived through these events
+- Provide educational depth - assume the audience wants to learn
+- If you need to address the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names
+
+CRITICAL: Do NOT prepend your name to your response. Speak directly and naturally. Do NOT re-introduce yourself.`;
+        } else {
+          // Standard prompt for AI-AI scenario (keep exactly as is)
+          systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" in a podcast interview.
         
 ANSWER THE QUESTION DIRECTLY AND SPECIFICALLY. If the host asks a specific question (like "does X happen?" or "when does Y occur?"), answer that exact question first before adding context or examples.
 
 Provide thoughtful, engaging responses. Share insights and examples to support your direct answer. If you need to address the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names. Speak as if you're in a natural conversation.
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself.`;
+        }
       }
       
       userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\nThe host just said: "${lastMessage.content}"\n\nRespond naturally and answer any specific questions directly.`;
     }
 
     console.log('🤖 Generating AI response...');
+
+    // Detect if user is the host (User-AI scenario)
+    const isUserHost = session.host_id === 'user-host';
+    const isGuestResponding = !isHostTurn;
+    
+    // Enhanced settings for User-AI scenario (guest responding to user host)
+    const useEnhancedSettings = isUserHost && isGuestResponding;
+    
+    console.log(`🎛️ Settings: ${useEnhancedSettings ? 'Enhanced (User-AI)' : 'Standard (AI-AI)'}`);
 
     // Generate AI response using OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -171,13 +226,13 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-i
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: useEnhancedSettings ? 'gpt-4o' : 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.8,
-        max_tokens: 500,
+        max_tokens: useEnhancedSettings ? 1500 : 500,
       }),
     });
 
