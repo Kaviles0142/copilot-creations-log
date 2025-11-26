@@ -72,6 +72,10 @@ serve(async (req) => {
     let conversationHistory = '';
     if (messages && messages.length > 0) {
       conversationHistory = messages.map(m => {
+        // Clearly distinguish user questions from regular conversation
+        if (m.speaker_role === 'user') {
+          return `[USER QUESTION]: ${m.content}`;
+        }
         const speakerLabel = m.speaker_role === 'host' 
           ? (session.host_name === 'Host' ? 'the host' : session.host_name)
           : (session.guest_name === 'Guest' ? 'the guest' : session.guest_name);
@@ -107,6 +111,12 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
           // Enhanced prompt for User-AI scenario
           systemPrompt = `You are ${session.guest_name}, a renowned historical figure. A user asked you a direct question, and the host just responded.
 
+CRITICAL CONTEXT AWARENESS:
+- In the conversation history below, [USER QUESTION] markers show when the USER asked something
+- Regular messages show the natural podcast dialogue between you and the host
+- DO NOT attribute your own previous statements to the user
+- Check carefully who said what before responding
+
 ANSWER PROTOCOL:
 1. Identify EXACTLY what the user is asking (timing? process? yes/no? reasons?)
 2. Answer that SPECIFIC question directly in your first sentence
@@ -124,6 +134,11 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
           // Standard prompt for AI-AI scenario
           systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and the host just responded.
 
+CRITICAL CONTEXT AWARENESS:
+- In the conversation history below, [USER QUESTION] markers show when the USER asked something
+- Regular messages show the natural podcast dialogue
+- DO NOT confuse who said what - check the labels carefully before responding
+
 ANSWER THE USER'S QUESTION DIRECTLY AND SPECIFICALLY. If they ask a specific question (like "does X happen?" or "when does Y occur?"), answer that exact question first before adding your perspective.
 
 Then you can:
@@ -135,7 +150,7 @@ If you need to refer to the host, just say "you" - NEVER use labels like "Host",
 CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         }
         
-        userPrompt = `The user asked: "${userQuestionText}"\n\nThe host responded: "${hostResponse.content}"\n\nAnswer the user's question directly, then add your thoughts.`;
+        userPrompt = `Here's the full conversation history (check labels carefully):\n\n${conversationHistory}\n\n---\n\nNow the USER asked a NEW question: "${userQuestionText}"\n\nThe host responded: "${hostResponse.content}"\n\nAnswer the USER'S NEW question directly. Remember: check who said what in the history above before responding.`;
       }
     } else if (currentTurn === 0) {
       // Host's opening statement
