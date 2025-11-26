@@ -770,7 +770,8 @@ const PodcastMode = () => {
             figure_name: figureName,
             figure_id: figureId,
             voice: figureId === host?.id ? hostVoice : guestVoice,
-            language: selectedLanguage
+            language: selectedLanguage,
+            is_user_host: hostType === 'user' && figureId === host?.id
           }
         });
 
