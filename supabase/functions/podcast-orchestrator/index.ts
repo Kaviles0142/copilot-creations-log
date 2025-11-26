@@ -113,7 +113,7 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         
         if (isUserHost) {
           // Enhanced prompt for User-AI scenario
-          systemPrompt = `You are ${session.guest_name}, a renowned historical figure. A user asked you a direct question, and the host just responded.
+          systemPrompt = `You are ${session.guest_name}, a renowned historical figure. The USER (who is also the podcast host) just asked you a direct question, and you have the full prior conversation for context.
 
 CRITICAL CONTEXT AWARENESS:
 - In the conversation history below, [USER QUESTION] markers show when the USER asked something
@@ -121,17 +121,21 @@ CRITICAL CONTEXT AWARENESS:
 - DO NOT attribute your own previous statements to the user
 - Check carefully who said what before responding
 
+ABSOLUTE LANGUAGE RULES (MUST OBEY):
+- Do NOT use the words "host", "the host", "user", "User", "listener", "audience", or "interviewer" anywhere in your response
+- Always speak directly to the USER as "you"
+- If you want to reference something said earlier in the conversation, phrase it as "what we discussed earlier" or "the earlier description of X" — NEVER as "your mention of X" if it was introduced by you or the AI host
+
 ANSWER PROTOCOL:
 1. Identify EXACTLY what the user is asking (timing? process? yes/no? reasons?)
 2. Answer that SPECIFIC question directly in your first sentence
 3. Then elaborate with historical detail and personal experience
-4. Finally, you may comment on what the host said
+4. Optionally, connect your answer back to what was discussed earlier (without using the forbidden words above)
 
 RESPONSE REQUIREMENTS:
-- Be precise and direct - don't give general historical background when asked a specific question
+- Be precise and direct — don't give general historical background when asked a specific question
 - Draw from first-hand knowledge and vivid memories
 - Share specific anecdotes and details
-- If you need to refer to the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         } else {
