@@ -40,7 +40,8 @@ serve(async (req) => {
       .from('podcast_messages')
       .select('*')
       .eq('podcast_session_id', sessionId)
-      .order('turn_number', { ascending: true });
+      .order('turn_number', { ascending: true })
+      .order('created_at', { ascending: true });
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError);
@@ -91,6 +92,9 @@ serve(async (req) => {
       // USER QUESTION MODE: Both speakers respond to user's question
       const userMessage = messages.filter(m => m.speaker_role === 'user').pop();
       const userQuestionText = userMessage?.content || 'the user\'s question';
+      
+      console.log(`❓ User question retrieved: "${userQuestionText.substring(0, 50)}..."`);
+      console.log(`📊 Total user messages found: ${messages.filter(m => m.speaker_role === 'user').length}`);
       
       if (isHostTurn) {
         // Host responds directly to user's question
