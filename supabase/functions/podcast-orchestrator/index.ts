@@ -104,15 +104,17 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         
         systemPrompt = `You are ${session.guest_name}, the podcast guest. A user asked a question, and the host just responded.
 
-Now you should:
-1. Address the user's question directly
-2. Add your perspective or comment on what the host said
+ANSWER THE USER'S QUESTION DIRECTLY AND SPECIFICALLY. If they ask a specific question (like "does X happen?" or "when does Y occur?"), answer that exact question first before adding your perspective.
 
-If you need to refer to the host, just say "you" - do NOT use labels like "Host", "the host", "User Host" or any names. Keep it natural and conversational.
+Then you can:
+1. Add your own insights to the user's question
+2. Comment on what the host said
+
+If you need to refer to the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names. Keep it natural and conversational.
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
         
-        userPrompt = `The user asked: "${userQuestionText}"\n\nThe host responded: "${hostResponse.content}"\n\nNow respond to the user's question and add your thoughts on the host's answer.`;
+        userPrompt = `The user asked: "${userQuestionText}"\n\nThe host responded: "${hostResponse.content}"\n\nAnswer the user's question directly, then add your thoughts.`;
       }
     } else if (currentTurn === 0) {
       // Host's opening statement
@@ -128,7 +130,7 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly.`;
       // Guest's opening response
       systemPrompt = `You are ${session.guest_name}, the podcast guest. The host just introduced you and the topic "${session.topic}".
       
-Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought. If you need to address the host, just say "you" - do NOT use labels like "Host", "the host", or any names.
+Respond warmly, express your enthusiasm about the topic, and add an insightful opening thought. If you need to address the host, just say "you" - do NOT use labels like "Host", "the host", "User Host" or any names.
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly and naturally.`;
       
@@ -149,12 +151,14 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-i
       } else {
         systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" in a podcast interview.
         
-Provide thoughtful, engaging responses to the questions and comments. Share insights, examples, and build on the conversation naturally. If you need to address the host, just say "you" - do NOT use any labels like "Host", "the host", "User Host" or any names. Speak as if you're in a natural conversation.
+ANSWER THE QUESTION DIRECTLY AND SPECIFICALLY. If the host asks a specific question (like "does X happen?" or "when does Y occur?"), answer that exact question first before adding context or examples.
 
-CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself - you already did that in your opening response.`;
+Provide thoughtful, engaging responses. Share insights and examples to support your direct answer. If you need to address the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names. Speak as if you're in a natural conversation.
+
+CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself.`;
       }
       
-      userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\nThe host just said: "${lastMessage.content}"\n\nRespond naturally to continue the conversation.`;
+      userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\nThe host just said: "${lastMessage.content}"\n\nRespond naturally and answer any specific questions directly.`;
     }
 
     console.log('🤖 Generating AI response...');
