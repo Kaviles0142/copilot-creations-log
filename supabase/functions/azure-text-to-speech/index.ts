@@ -34,6 +34,34 @@ serve(async (req) => {
     console.log(`Generating Azure TTS for ${figure_name || 'figure'}`);
     console.log(`Text length: ${text.length} characters`);
 
+    // Generate cache key from text content (first attempt without voice for broader reuse)
+    const cacheKey = text.substring(0, 500); // Use first 500 chars as key
+    
+    // Check cache first
+    const { data: cachedAudio } = await supabase
+      .from('audio_cache')
+      .select('cached_audio, voice_id')
+      .eq('text', text.substring(0, 1000)) // Match on text
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (cachedAudio) {
+      console.log(`✅ Using cached audio (voice: ${cachedAudio.voice_id})`);
+      return new Response(
+        JSON.stringify({
+          audioContent: cachedAudio.cached_audio,
+          voice: cachedAudio.voice_id,
+          provider: 'azure',
+          cached: true
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log(`🔊 No cache found, generating new audio...`);
+
     // Detect gender from figure name
     const detectGender = (name: string): 'male' | 'female' => {
       const nameLower = name.toLowerCase();
@@ -379,6 +407,23 @@ serve(async (req) => {
     const base64Audio = btoa(binary);
 
     console.log(`✅ Generated Azure TTS audio: ${audioBuffer.byteLength} bytes`);
+
+    // Cache the audio for 30 days
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    await supabase
+      .from('audio_cache')
+      .upsert({
+        text: text.substring(0, 1000), // Match key length
+        voice_id: selectedVoice,
+        cached_audio: base64Audio,
+        expires_at: expiresAt.toISOString(),
+      }, {
+        onConflict: 'text,voice_id'
+      });
+
+    console.log(`💾 Cached audio for future use (expires: ${expiresAt.toISOString()})`);
 
     return new Response(
       JSON.stringify({ 
