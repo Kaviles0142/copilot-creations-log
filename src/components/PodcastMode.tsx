@@ -763,13 +763,14 @@ const PodcastMode = () => {
         setIsSpeaking(true);
         
         console.log('🎤 Generating Azure TTS for:', figureName, '(ID:', figureId, ') with language:', selectedLanguage);
+        console.log('🎛️ hostType:', hostType, 'figureId:', figureId, 'is_user_host check:', hostType === 'user' && figureId === 'user-host');
         
         const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
           body: {
             text: text,
             figure_name: figureName,
             figure_id: figureId,
-            voice: figureId === host?.id ? hostVoice : guestVoice,
+            voice: figureId === 'user-host' || figureId === host?.id ? hostVoice : guestVoice,
             language: selectedLanguage,
             is_user_host: hostType === 'user' && figureId === 'user-host'
           }
