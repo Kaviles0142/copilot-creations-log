@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice: customVoice, figure_name, figure_id, language } = await req.json();
+    const { text, voice: customVoice, figure_name, figure_id, language, is_user_host } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -213,6 +213,12 @@ serve(async (req) => {
     if (customVoice && customVoice !== 'auto' && customVoice.trim() !== '') {
       selectedVoice = customVoice;
       console.log(`✨ Using user-selected voice: ${selectedVoice}`);
+    }
+    
+    // For user as host: Always force American English, skip nationality detection
+    if (!selectedVoice && is_user_host) {
+      selectedVoice = gender === 'male' ? 'en-US-GuyNeural' : 'en-US-JennyNeural';
+      console.log(`👤 User is host - forcing American English: ${selectedVoice}`);
     }
     
     // For non-English languages: use standard voice from language map
