@@ -361,52 +361,94 @@ serve(async (req) => {
     // Preprocess text with pronunciation hints before escaping
     const textWithPronunciation = addNamePronunciation(text);
 
-    // Build SSML for better control
-    const ssml = `
+    // Helper to build SSML with a specific voice
+    const buildSsml = (voiceName: string): string => `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
-        <voice name="${selectedVoice}">
+        <voice name="${voiceName}">
           <prosody rate="0.95" pitch="-5%">
-            ${textWithPronunciation.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&lt;say-as interpret-as="name"&gt;/g, '<say-as interpret-as="name">').replace(/&lt;\/say-as&gt;/g, '</say-as>')}
+            ${textWithPronunciation
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/&lt;say-as interpret-as="name"&gt;/g, '<say-as interpret-as="name">')
+              .replace(/&lt;\/say-as&gt;/g, '</say-as>')}
           </prosody>
         </voice>
       </speak>
     `;
 
-    // Call Azure Speech API
-    const response = await fetch(
-      `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
-      {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-        },
-        body: ssml,
+    // Low-level Azure call so we can retry with a fallback voice on specific errors
+    const callAzureTTS = async (voiceName: string) => {
+      const ssml = buildSsml(voiceName);
+
+      const response = await fetch(
+        `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
+        {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+          },
+          body: ssml,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Azure TTS API error:', response.status, errorText);
+        throw new Error(`Azure TTS API error: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Azure TTS API error:', response.status, errorText);
-      throw new Error(`Azure TTS API error: ${response.status}`);
+      const audioBuffer = await response.arrayBuffer();
+      const uint8Array = new Uint8Array(audioBuffer);
+      
+      // Convert to base64 in chunks to prevent memory issues
+      let binary = '';
+      const chunkSize = 0x8000;
+      
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      
+      const base64Audio = btoa(binary);
+      return { base64Audio, byteLength: audioBuffer.byteLength, voiceName };
+    };
+
+    // First attempt: use the selected voice based on language/region logic above
+    let finalVoice = selectedVoice;
+    let base64Audio = '';
+    let audioByteLength = 0;
+
+    try {
+      const result = await callAzureTTS(selectedVoice);
+      base64Audio = result.base64Audio;
+      audioByteLength = result.byteLength;
+      finalVoice = result.voiceName;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      // Specifically handle Azure 429 quota/voice limit errors by retrying with a safe fallback voice
+      if (message.includes('Azure TTS API error: 429')) {
+        const fallbackVoice = gender === 'male' ? 'en-US-GuyNeural' : 'en-US-JennyNeural';
+        console.warn(`⚠️ Azure 429 for voice ${selectedVoice}, retrying with fallback voice: ${fallbackVoice}`);
+
+        // Only retry if the fallback is actually different
+        if (fallbackVoice !== selectedVoice) {
+          const result = await callAzureTTS(fallbackVoice);
+          base64Audio = result.base64Audio;
+          audioByteLength = result.byteLength;
+          finalVoice = result.voiceName;
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
     }
 
-    const audioBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(audioBuffer);
-    
-    // Convert to base64 in chunks to prevent memory issues
-    let binary = '';
-    const chunkSize = 0x8000;
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    
-    const base64Audio = btoa(binary);
-
-    console.log(`✅ Generated Azure TTS audio: ${audioBuffer.byteLength} bytes`);
+    console.log(`✅ Generated Azure TTS audio: ${audioByteLength} bytes`);
 
     // Cache the audio for 30 days
     const expiresAt = new Date();
@@ -416,7 +458,7 @@ serve(async (req) => {
       .from('audio_cache')
       .upsert({
         text: text.substring(0, 1000), // Match key length
-        voice_id: selectedVoice,
+        voice_id: finalVoice,
         cached_audio: base64Audio,
         expires_at: expiresAt.toISOString(),
       }, {
@@ -428,7 +470,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         audioContent: base64Audio,
-        voice: selectedVoice,
+        voice: finalVoice,
         provider: 'azure'
       }),
       {
