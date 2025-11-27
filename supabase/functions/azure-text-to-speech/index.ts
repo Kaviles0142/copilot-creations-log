@@ -31,22 +31,33 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    console.log(`Generating Azure TTS for ${figure_name || 'figure'}`);
-    console.log(`Text length: ${text.length} characters`);
+    console.log(`\n========== NEW TTS REQUEST ==========`);
+    console.log(`📝 Figure: ${figure_name || 'unknown'} (${figure_id || 'unknown'})`);
+    console.log(`📏 Text length: ${text.length} chars`);
+    console.log(`🎙️ Custom voice: ${customVoice || 'auto'}`);
+    console.log(`🌍 Language: ${language || 'auto'}`);
+    console.log(`👤 Is user host: ${is_user_host || false}`);
+    console.log(`📄 Text preview: ${text.substring(0, 100)}...`);
 
     // Generate cache key from text content (first attempt without voice for broader reuse)
     const cacheKey = text.substring(0, 500); // Use first 500 chars as key
     
     // Check cache first
-    const { data: cachedAudio } = await supabase
+    console.log(`🔍 Checking cache for text: "${text.substring(0, 50)}..."`);
+    const { data: cachedAudio, error: cacheError } = await supabase
       .from('audio_cache')
       .select('cached_audio, voice_id')
       .eq('text', text.substring(0, 1000)) // Match on text
       .gt('expires_at', new Date().toISOString())
       .maybeSingle();
 
+    if (cacheError) {
+      console.log(`⚠️ Cache check error:`, cacheError);
+    }
+
     if (cachedAudio) {
-      console.log(`✅ Using cached audio (voice: ${cachedAudio.voice_id})`);
+      console.log(`✅ CACHE HIT - Using cached audio (voice: ${cachedAudio.voice_id})`);
+      console.log(`========== RETURNING CACHED AUDIO ==========\n`);
       return new Response(
         JSON.stringify({
           audioContent: cachedAudio.cached_audio,
@@ -60,7 +71,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🔊 No cache found, generating new audio...`);
+    console.log(`❌ CACHE MISS - No cached audio found, will generate new...`);
 
     // Detect gender from figure name
     const detectGender = (name: string): 'male' | 'female' => {
@@ -336,7 +347,8 @@ serve(async (req) => {
       console.log(`⚠️ Using fallback voice: ${selectedVoice}`);
     }
 
-    console.log(`🎙️ Final selected voice: ${selectedVoice}`);
+    console.log(`\n🎙️ FINAL VOICE SELECTION: ${selectedVoice}`);
+    console.log(`🎭 Gender detected: ${gender}`);
 
     // Helper to add pronunciation hints for problematic names
     const addNamePronunciation = (text: string): string => {
@@ -381,6 +393,12 @@ serve(async (req) => {
     const callAzureTTS = async (voiceName: string) => {
       const ssml = buildSsml(voiceName);
 
+      console.log(`\n🌐 Calling Azure TTS API...`);
+      console.log(`   Region: ${AZURE_SPEECH_REGION}`);
+      console.log(`   Voice: ${voiceName}`);
+      console.log(`   SSML length: ${ssml.length} chars`);
+      
+      const azureStartTime = Date.now();
       const response = await fetch(
         `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
         {
@@ -393,12 +411,20 @@ serve(async (req) => {
           body: ssml,
         }
       );
+      
+      const azureDuration = Date.now() - azureStartTime;
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Azure TTS API error:', response.status, errorText);
+        console.error(`\n❌ AZURE API ERROR:`);
+        console.error(`   Status: ${response.status}`);
+        console.error(`   Duration: ${azureDuration}ms`);
+        console.error(`   Error: ${errorText}`);
+        console.error(`   Voice attempted: ${voiceName}`);
         throw new Error(`Azure TTS API error: ${response.status}`);
       }
+      
+      console.log(`✅ Azure API success in ${azureDuration}ms`);
 
       const audioBuffer = await response.arrayBuffer();
       const uint8Array = new Uint8Array(audioBuffer);
@@ -449,12 +475,14 @@ serve(async (req) => {
     }
 
     console.log(`✅ Generated Azure TTS audio: ${audioByteLength} bytes`);
+    console.log(`   Base64 length: ${base64Audio.length} chars`);
 
     // Cache the audio for 30 days
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
-    await supabase
+    console.log(`💾 Caching audio...`);
+    const { error: cacheInsertError } = await supabase
       .from('audio_cache')
       .upsert({
         text: text.substring(0, 1000), // Match key length
@@ -465,7 +493,13 @@ serve(async (req) => {
         onConflict: 'text,voice_id'
       });
 
-    console.log(`💾 Cached audio for future use (expires: ${expiresAt.toISOString()})`);
+    if (cacheInsertError) {
+      console.log(`⚠️ Cache insert warning:`, cacheInsertError);
+    } else {
+      console.log(`✅ Audio cached successfully (expires: ${expiresAt.toISOString().substring(0, 10)})`);
+    }
+
+    console.log(`========== REQUEST COMPLETE ==========\n`);
 
     return new Response(
       JSON.stringify({ 
