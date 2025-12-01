@@ -515,10 +515,35 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in azure-text-to-speech:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+    const isAzure429 =
+      typeof errorMessage === 'string' &&
+      (errorMessage.includes('Azure TTS API error: 429') ||
+        errorMessage.toLowerCase().includes('quota exceeded'));
+
+    // For Azure 429 quota/rate-limit errors, return a graceful 200 response
+    // so the frontend can continue working (it will simply skip audio).
+    if (isAzure429) {
+      console.warn('Azure TTS quota/rate limit hit (429). Returning fallback response without audio.');
+      return new Response(
+        JSON.stringify({
+          audioContent: null,
+          voice: null,
+          provider: 'azure',
+          error: 'azure_quota_exceeded',
+          message: 'Azure Text-to-Speech quota or rate limit has been exceeded. Audio is temporarily unavailable.',
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage,
-        message: 'Azure TTS failed'
+        message: 'Azure TTS failed',
       }),
       {
         status: 500,
