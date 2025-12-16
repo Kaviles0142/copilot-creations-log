@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Use a compliant User-Agent as per Wikipedia's API etiquette
+// https://meta.wikimedia.org/wiki/User-Agent_policy
+const WIKIPEDIA_HEADERS = {
+  'User-Agent': 'HistoricalChatBot/1.0 (https://lovable.dev; contact@lovable.dev) Deno/1.0',
+  'Accept': 'application/json',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -21,17 +29,42 @@ serve(async (req) => {
 
     console.log(`Searching Wikipedia for: "${query}"`);
 
-    // First, try using Wikipedia's opensearch API which has better fuzzy matching and suggestions
+    // Try REST API first (different rate limiting than MediaWiki API)
+    const restApiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/ /g, '_'))}`;
+    console.log(`[DEBUG] Trying REST API first: ${restApiUrl}`);
+    
+    const restResponse = await fetch(restApiUrl, { headers: WIKIPEDIA_HEADERS });
+    console.log(`[DEBUG] REST API status: ${restResponse.status}`);
+    
+    if (restResponse.ok) {
+      const data = await restResponse.json();
+      console.log(`Found Wikipedia article via REST API: ${data.title}`);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            title: data.title,
+            extract: data.extract,
+            url: data.content_urls?.desktop?.page,
+            thumbnail: data.thumbnail?.source,
+            description: data.description
+          },
+          searchResults: [{
+            title: data.title,
+            snippet: data.description || '',
+            url: data.content_urls?.desktop?.page
+          }]
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // If REST API fails, try OpenSearch API as fallback
     const opensearchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=${encodeURIComponent(query)}&limit=${limit}&origin=*`;
+    console.log(`[DEBUG] REST API failed (${restResponse.status}), trying OpenSearch: ${opensearchUrl}`);
     
-    console.log(`[DEBUG] OpenSearch URL: ${opensearchUrl}`);
-    
-    const opensearchResponse = await fetch(opensearchUrl, {
-      headers: {
-        'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
-        'Accept': 'application/json'
-      }
-    });
+    const opensearchResponse = await fetch(opensearchUrl, { headers: WIKIPEDIA_HEADERS });
 
     console.log(`[DEBUG] OpenSearch response status: ${opensearchResponse.status}`);
     
@@ -55,12 +88,7 @@ serve(async (req) => {
         const detailUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle)}`;
         console.log(`[DEBUG] Detail URL: ${detailUrl}`);
         
-        const detailResponse = await fetch(detailUrl, {
-          headers: {
-            'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
-            'Accept': 'application/json'
-          }
-        });
+        const detailResponse = await fetch(detailUrl, { headers: WIKIPEDIA_HEADERS });
 
         console.log(`[DEBUG] Detail response status: ${detailResponse.status}`);
 
@@ -106,12 +134,7 @@ serve(async (req) => {
     // Fallback to direct page lookup if opensearch doesn't work
     const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
     
-    const searchResponse = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
-        'Accept': 'application/json'
-      }
-    });
+    const searchResponse = await fetch(searchUrl, { headers: WIKIPEDIA_HEADERS });
 
     if (!searchResponse.ok) {
 
