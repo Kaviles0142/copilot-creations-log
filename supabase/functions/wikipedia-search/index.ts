@@ -24,6 +24,8 @@ serve(async (req) => {
     // First, try using Wikipedia's opensearch API which has better fuzzy matching and suggestions
     const opensearchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=${encodeURIComponent(query)}&limit=${limit}&origin=*`;
     
+    console.log(`[DEBUG] OpenSearch URL: ${opensearchUrl}`);
+    
     const opensearchResponse = await fetch(opensearchUrl, {
       headers: {
         'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
@@ -31,16 +33,27 @@ serve(async (req) => {
       }
     });
 
+    console.log(`[DEBUG] OpenSearch response status: ${opensearchResponse.status}`);
+    
     if (opensearchResponse.ok) {
-      const opensearchData = await opensearchResponse.json();
-      // opensearch returns: [query, [titles], [descriptions], [urls]]
+      const opensearchText = await opensearchResponse.text();
+      console.log(`[DEBUG] OpenSearch raw response (first 500 chars): ${opensearchText.substring(0, 500)}`);
       
-      if (opensearchData[1]?.length > 0) {
+      let opensearchData;
+      try {
+        opensearchData = JSON.parse(opensearchText);
+      } catch (parseError) {
+        console.error(`[DEBUG] OpenSearch JSON parse error: ${parseError}`);
+        // Continue to fallback
+      }
+      
+      if (opensearchData && opensearchData[1]?.length > 0) {
         const firstTitle = opensearchData[1][0];
         console.log(`OpenSearch suggested: ${firstTitle}`);
         
         // Get detailed info for the best match
         const detailUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle)}`;
+        console.log(`[DEBUG] Detail URL: ${detailUrl}`);
         
         const detailResponse = await fetch(detailUrl, {
           headers: {
@@ -48,6 +61,8 @@ serve(async (req) => {
             'Accept': 'application/json'
           }
         });
+
+        console.log(`[DEBUG] Detail response status: ${detailResponse.status}`);
 
         if (detailResponse.ok) {
           const detailData = await detailResponse.json();
@@ -76,8 +91,16 @@ serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             }
           );
+        } else {
+          const detailErrorText = await detailResponse.text();
+          console.error(`[DEBUG] Detail API failed: ${detailResponse.status} - ${detailErrorText.substring(0, 300)}`);
         }
+      } else {
+        console.log(`[DEBUG] OpenSearch returned no results. Data structure: ${JSON.stringify(opensearchData)}`);
       }
+    } else {
+      const errorText = await opensearchResponse.text();
+      console.error(`[DEBUG] OpenSearch API failed: ${opensearchResponse.status} - ${errorText.substring(0, 300)}`);
     }
 
     // Fallback to direct page lookup if opensearch doesn't work
