@@ -21,57 +21,54 @@ serve(async (req) => {
 
     console.log(`Searching Wikipedia for: "${query}"`);
 
-    // Use Wikipedia's MediaWiki API for search - more reliable than REST API
-    const searchApiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=${limit}`;
+    // First, try using Wikipedia's opensearch API which has better fuzzy matching and suggestions
+    const opensearchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=${encodeURIComponent(query)}&limit=${limit}&origin=*`;
     
-    console.log(`Making request to: ${searchApiUrl}`);
-    
-    const searchResponse = await fetch(searchApiUrl, {
+    const opensearchResponse = await fetch(opensearchUrl, {
       headers: {
+        'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
         'Accept': 'application/json'
       }
     });
 
-    console.log(`Search response status: ${searchResponse.status}`);
-
-    if (searchResponse.ok) {
-      const searchData = await searchResponse.json();
-      console.log(`Search results count: ${searchData?.query?.search?.length || 0}`);
+    if (opensearchResponse.ok) {
+      const opensearchData = await opensearchResponse.json();
+      // opensearch returns: [query, [titles], [descriptions], [urls]]
       
-      if (searchData?.query?.search?.length > 0) {
-        const firstResult = searchData.query.search[0];
-        const pageTitle = firstResult.title;
-        console.log(`Best match: ${pageTitle}`);
+      if (opensearchData[1]?.length > 0) {
+        const firstTitle = opensearchData[1][0];
+        console.log(`OpenSearch suggested: ${firstTitle}`);
         
-        // Get detailed summary for the best match
-        const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`;
+        // Get detailed info for the best match
+        const detailUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle)}`;
         
-        const summaryResponse = await fetch(summaryUrl, {
+        const detailResponse = await fetch(detailUrl, {
           headers: {
+            'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
             'Accept': 'application/json'
           }
         });
 
-        if (summaryResponse.ok) {
-          const summaryData = await summaryResponse.json();
-          console.log(`Found Wikipedia article: ${summaryData.title}`);
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          console.log(`Found Wikipedia article: ${detailData.title}`);
           
-          // Build search results
-          const searchResults = searchData.query.search.map((result: any) => ({
-            title: result.title,
-            snippet: result.snippet?.replace(/<[^>]*>/g, '') || '',
-            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, '_'))}`
+          // Build search results from opensearch data
+          const searchResults = opensearchData[1].map((title: string, index: number) => ({
+            title: title,
+            snippet: opensearchData[2][index] || '',
+            url: opensearchData[3][index] || `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
           }));
           
           return new Response(
             JSON.stringify({
               success: true,
               data: {
-                title: summaryData.title,
-                extract: summaryData.extract,
-                url: summaryData.content_urls?.desktop?.page,
-                thumbnail: summaryData.thumbnail?.source,
-                description: summaryData.description
+                title: detailData.title,
+                extract: detailData.extract,
+                url: detailData.content_urls?.desktop?.page,
+                thumbnail: detailData.thumbnail?.source,
+                description: detailData.description
               },
               searchResults: searchResults
             }),
@@ -79,26 +76,22 @@ serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             }
           );
-        } else {
-          console.log(`Summary fetch failed: ${summaryResponse.status}`);
         }
       }
-    } else {
-      const errorText = await searchResponse.text();
-      console.log(`Search API error: ${errorText}`);
     }
 
-    // Fallback to direct page lookup if MediaWiki search doesn't work
-    console.log(`Trying direct page lookup as fallback...`);
-    const fallbackUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
+    // Fallback to direct page lookup if opensearch doesn't work
+    const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
     
-    const fallbackResponse = await fetch(fallbackUrl, {
+    const searchResponse = await fetch(searchUrl, {
       headers: {
+        'User-Agent': 'HistoricalChat/1.0 (contact@example.com)',
         'Accept': 'application/json'
       }
     });
 
-    if (!fallbackResponse.ok) {
+    if (!searchResponse.ok) {
+
       // No results found - return success with empty data instead of error
       console.log(`No Wikipedia articles found for: "${query}"`);
       return new Response(
@@ -114,8 +107,8 @@ serve(async (req) => {
       );
     }
 
-    const data = await fallbackResponse.json();
-    console.log(`Found Wikipedia article via fallback: ${data.title}`);
+    const data = await searchResponse.json();
+    console.log(`Found Wikipedia article: ${data.title}`);
 
     return new Response(
       JSON.stringify({
