@@ -60,7 +60,74 @@ serve(async (req) => {
       );
     }
     
-    // If REST API fails, try OpenSearch API as fallback
+    // If Wikipedia is blocked (403), try Wikidata API as fallback
+    if (restResponse.status === 403) {
+      console.log(`[DEBUG] Wikipedia blocked (403), trying Wikidata API...`);
+      
+      // Search Wikidata for the entity
+      const wikidataSearchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(query)}&language=en&limit=1&format=json&origin=*`;
+      const wikidataSearchResponse = await fetch(wikidataSearchUrl, { headers: WIKIPEDIA_HEADERS });
+      console.log(`[DEBUG] Wikidata search status: ${wikidataSearchResponse.status}`);
+      
+      if (wikidataSearchResponse.ok) {
+        const wikidataSearch = await wikidataSearchResponse.json();
+        
+        if (wikidataSearch.search && wikidataSearch.search.length > 0) {
+          const entityId = wikidataSearch.search[0].id;
+          const entityLabel = wikidataSearch.search[0].label;
+          const entityDescription = wikidataSearch.search[0].description;
+          
+          console.log(`[DEBUG] Found Wikidata entity: ${entityId} - ${entityLabel}`);
+          
+          // Get more details from Wikidata
+          const wikidataEntityUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${entityId}&props=sitelinks|descriptions|claims&languages=en&format=json&origin=*`;
+          const wikidataEntityResponse = await fetch(wikidataEntityUrl, { headers: WIKIPEDIA_HEADERS });
+          
+          if (wikidataEntityResponse.ok) {
+            const entityData = await wikidataEntityResponse.json();
+            const entity = entityData.entities?.[entityId];
+            
+            // Get Wikipedia URL from sitelinks
+            const wikipediaTitle = entity?.sitelinks?.enwiki?.title;
+            const wikipediaUrl = wikipediaTitle 
+              ? `https://en.wikipedia.org/wiki/${encodeURIComponent(wikipediaTitle.replace(/ /g, '_'))}`
+              : null;
+            
+            // Get image from claims (P18 is the image property)
+            let thumbnail = null;
+            const imageClaimP18 = entity?.claims?.P18;
+            if (imageClaimP18 && imageClaimP18[0]?.mainsnak?.datavalue?.value) {
+              const imageName = imageClaimP18[0].mainsnak.datavalue.value;
+              thumbnail = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(imageName)}?width=300`;
+            }
+            
+            console.log(`Found via Wikidata: ${entityLabel}`);
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                data: {
+                  title: entityLabel,
+                  extract: entityDescription || `Historical figure: ${entityLabel}`,
+                  url: wikipediaUrl,
+                  thumbnail: thumbnail,
+                  description: entityDescription
+                },
+                searchResults: [{
+                  title: entityLabel,
+                  snippet: entityDescription || '',
+                  url: wikipediaUrl
+                }],
+                source: 'wikidata'
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+    }
+    
+    // If REST API fails for other reasons, try OpenSearch API as fallback
     const opensearchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=${encodeURIComponent(query)}&limit=${limit}&origin=*`;
     console.log(`[DEBUG] REST API failed (${restResponse.status}), trying OpenSearch: ${opensearchUrl}`);
     
