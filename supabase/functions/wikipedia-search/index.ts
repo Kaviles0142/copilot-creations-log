@@ -60,49 +60,47 @@ serve(async (req) => {
       );
     }
     
-    // If Wikipedia is blocked (403), try Wikidata API as fallback
+    // If Wikipedia is blocked (403), try Wikidata, then DuckDuckGo (non-Wikimedia) as final fallback.
     if (restResponse.status === 403) {
       console.log(`[DEBUG] Wikipedia blocked (403), trying Wikidata API...`);
-      
-      // Search Wikidata for the entity
+
+      // --- Wikidata fallback (may also be blocked by Wikimedia) ---
       const wikidataSearchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(query)}&language=en&limit=1&format=json&origin=*`;
       const wikidataSearchResponse = await fetch(wikidataSearchUrl, { headers: WIKIPEDIA_HEADERS });
       console.log(`[DEBUG] Wikidata search status: ${wikidataSearchResponse.status}`);
-      
+
       if (wikidataSearchResponse.ok) {
         const wikidataSearch = await wikidataSearchResponse.json();
-        
+
         if (wikidataSearch.search && wikidataSearch.search.length > 0) {
           const entityId = wikidataSearch.search[0].id;
           const entityLabel = wikidataSearch.search[0].label;
           const entityDescription = wikidataSearch.search[0].description;
-          
+
           console.log(`[DEBUG] Found Wikidata entity: ${entityId} - ${entityLabel}`);
-          
-          // Get more details from Wikidata
+
           const wikidataEntityUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${entityId}&props=sitelinks|descriptions|claims&languages=en&format=json&origin=*`;
           const wikidataEntityResponse = await fetch(wikidataEntityUrl, { headers: WIKIPEDIA_HEADERS });
-          
+          console.log(`[DEBUG] Wikidata entity status: ${wikidataEntityResponse.status}`);
+
           if (wikidataEntityResponse.ok) {
             const entityData = await wikidataEntityResponse.json();
             const entity = entityData.entities?.[entityId];
-            
-            // Get Wikipedia URL from sitelinks
+
             const wikipediaTitle = entity?.sitelinks?.enwiki?.title;
-            const wikipediaUrl = wikipediaTitle 
+            const wikipediaUrl = wikipediaTitle
               ? `https://en.wikipedia.org/wiki/${encodeURIComponent(wikipediaTitle.replace(/ /g, '_'))}`
               : null;
-            
-            // Get image from claims (P18 is the image property)
+
             let thumbnail = null;
             const imageClaimP18 = entity?.claims?.P18;
             if (imageClaimP18 && imageClaimP18[0]?.mainsnak?.datavalue?.value) {
               const imageName = imageClaimP18[0].mainsnak.datavalue.value;
               thumbnail = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(imageName)}?width=300`;
             }
-            
+
             console.log(`Found via Wikidata: ${entityLabel}`);
-            
+
             return new Response(
               JSON.stringify({
                 success: true,
@@ -110,20 +108,76 @@ serve(async (req) => {
                   title: entityLabel,
                   extract: entityDescription || `Historical figure: ${entityLabel}`,
                   url: wikipediaUrl,
-                  thumbnail: thumbnail,
-                  description: entityDescription
+                  thumbnail,
+                  description: entityDescription,
                 },
                 searchResults: [{
                   title: entityLabel,
                   snippet: entityDescription || '',
-                  url: wikipediaUrl
+                  url: wikipediaUrl,
                 }],
-                source: 'wikidata'
+                source: 'wikidata',
               }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
             );
           }
         }
+      }
+
+      // --- DuckDuckGo Instant Answer fallback (non-Wikimedia; no API key) ---
+      console.log(`[DEBUG] Wikidata unavailable/blocked; trying DuckDuckGo Instant Answer API...`);
+      const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1&skip_disambig=1`;
+      const ddgResp = await fetch(ddgUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': WIKIPEDIA_HEADERS['User-Agent'],
+        },
+      });
+      console.log(`[DEBUG] DuckDuckGo Instant Answer status: ${ddgResp.status}`);
+
+      if (ddgResp.ok) {
+        const ddg = await ddgResp.json();
+
+        const title = ddg.Heading || query;
+        const baseExtract = ddg.AbstractText || ddg.Abstract || '';
+        const baseUrl = ddg.AbstractURL || ddg.Redirect || null;
+        const thumbnail = ddg.Image ? `https://duckduckgo.com${ddg.Image}` : null;
+
+        let finalExtract = baseExtract;
+        let finalUrl = baseUrl;
+
+        if ((!finalExtract || finalExtract.trim().length === 0) && Array.isArray(ddg.RelatedTopics)) {
+          const firstTopic = ddg.RelatedTopics.find((t: any) => t && typeof t.Text === 'string');
+          if (firstTopic) {
+            finalExtract = firstTopic.Text;
+            finalUrl = firstTopic.FirstURL || finalUrl;
+          }
+        }
+
+        if (finalExtract && finalExtract.trim().length > 0) {
+          console.log(`[DEBUG] Found via DuckDuckGo Instant Answer: ${title}`);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                title,
+                extract: finalExtract,
+                url: finalUrl,
+                thumbnail,
+                description: ddg.AbstractSource || 'DuckDuckGo',
+              },
+              searchResults: [{
+                title,
+                snippet: finalExtract,
+                url: finalUrl,
+              }],
+              source: 'duckduckgo_instant_answer',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        console.log(`[DEBUG] DuckDuckGo Instant Answer returned no usable abstract for: ${query}`);
       }
     }
     
