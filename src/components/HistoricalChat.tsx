@@ -1594,29 +1594,6 @@ const HistoricalChat = () => {
                     ? `Auto mode will select the best ${gender} voice based on ${selectedFigure.name}'s nationality` 
                     : 'Manual voice selection overrides auto-detection'}
                 </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3 w-full"
-                  onClick={async () => {
-                    const success = await clearFigureMetadata(selectedFigure.id);
-                    if (success) {
-                      toast({
-                        title: "Cache cleared",
-                        description: `Voice metadata for ${selectedFigure.name} will be re-detected on next use`,
-                      });
-                    } else {
-                      toast({
-                        title: "Error",
-                        description: "Failed to clear cache",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset Voice Auto-Detection
-                </Button>
               </Card>
             );
           })()}
