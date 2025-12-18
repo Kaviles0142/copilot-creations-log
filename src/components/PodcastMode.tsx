@@ -689,7 +689,7 @@ const PodcastMode = () => {
         const figureName = currentFigure.name;  // Use actual figure name from state
         const figureId = currentFigure.id;      // Use actual figure ID from state
         console.log(`🎤 Generating TTS for ${figureName} (${figureId})`);
-        generateAndPlayAudio(data.message, figureName, figureId);
+        await generateAndPlayAudio(data.message, figureName, figureId);
       }
       
       // Set up next turn
