@@ -74,70 +74,11 @@ serve(async (req) => {
       });
     }
 
-    console.log('🔍 No cache found, searching for real photo...');
+    console.log('🔍 No cache found, generating podcast studio portrait...');
 
-    // PRIORITY 1: Try to get REAL photo from Wikipedia/Wikidata
-    let realPhotoUrl: string | null = null;
-    
-    // Use the wikipedia-search function which has DuckDuckGo fallback
-    try {
-      console.log('📡 Calling wikipedia-search function for real photo...');
-      
-      const wikiSearchResponse = await fetch(`${SUPABASE_URL}/functions/v1/wikipedia-search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-        body: JSON.stringify({ query: figureName, limit: 1 })
-      });
-
-      if (wikiSearchResponse.ok) {
-        const wikiData = await wikiSearchResponse.json();
-        console.log('📊 Wikipedia-search response:', JSON.stringify(wikiData, null, 2));
-        
-        if (wikiData.success && wikiData.data?.thumbnail) {
-          realPhotoUrl = wikiData.data.thumbnail;
-          console.log('📸 Found real photo via wikipedia-search:', realPhotoUrl);
-        }
-      } else {
-        console.log('⚠️ Wikipedia-search function failed:', wikiSearchResponse.status);
-      }
-    } catch (wikiError) {
-      console.log('⚠️ Wikipedia-search error:', wikiError);
-    }
-
-    // If we found a real photo, use it
-    if (realPhotoUrl) {
-      console.log('✅ Using REAL photo for', figureName);
-      
-      // Cache the real photo URL
-      const { error: cacheInsertError } = await supabase
-        .from('avatar_image_cache')
-        .insert({
-          figure_id: figureId,
-          figure_name: figureName,
-          cloudinary_url: realPhotoUrl,
-          visual_prompt: 'real_photo_wikipedia',
-        });
-
-      if (cacheInsertError) {
-        console.error('⚠️ Cache insert failed:', cacheInsertError);
-      } else {
-        console.log('✅ Real photo cached successfully');
-      }
-
-      return new Response(JSON.stringify({
-        imageUrl: realPhotoUrl,
-        cached: false,
-        source: 'wikipedia'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // PRIORITY 2: Fall back to AI generation only if no real photo found
-    console.log('⚠️ No real photo found, falling back to AI generation...');
+    // ALWAYS generate AI portrait with podcast studio context
+    // Real Wikipedia photos don't show the figure in a studio setting
+    console.log('🎨 Generating AI studio portrait for:', figureName);
 
     // Get API keys
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -316,9 +257,6 @@ serve(async (req) => {
 });
 
 function generateVisualPrompt(figureName: string, context?: string): string {
-  const contextText = context 
-    ? `${context}. The setting should complement their historical background while maintaining the ${context} environment.`
-    : 'Professional studio lighting with a subtle gradient background appropriate to their era.';
-    
-  return `Create a professional, photorealistic portrait photograph of ${figureName} in a ${context || 'studio setting'}. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. ${contextText} Head and shoulders only, straight-on angle. Historically accurate facial features and period-appropriate attire visible from shoulders up. Ultra high resolution, 4K quality.`;
+  // Always generate podcast studio portraits
+  return `Create a professional, photorealistic portrait photograph of ${figureName} sitting in a modern podcast recording studio. CRITICAL REQUIREMENTS: The subject is seated at a podcast desk with professional microphones visible. The background shows acoustic panels, studio monitors, and warm ambient lighting typical of a high-end podcast studio. The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression ready for conversation. Historically accurate facial features and period-appropriate attire visible from shoulders up. The lighting should be professional studio lighting with soft shadows. Ultra high resolution, 4K quality, photorealistic.`;
 }
