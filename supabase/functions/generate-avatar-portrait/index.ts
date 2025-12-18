@@ -41,7 +41,7 @@ serve(async (req) => {
       throw new Error('figureName is required');
     }
 
-    console.log('🎨 Generating portrait for:', figureName);
+    console.log('🎨 Getting portrait for:', figureName);
 
     // Initialize Supabase client with service role (bypasses RLS)
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -53,7 +53,7 @@ serve(async (req) => {
       }
     });
 
-    // Check cache - query directly to inspect visual_prompt for context matching
+    // Check cache first
     console.log('🔍 Checking cache for figure_id:', figureId);
     
     const { data: cachedResults, error: cacheError } = await supabase
@@ -63,46 +63,113 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1);
 
-    console.log('📊 Cache query result:', { 
-      found: cachedResults && cachedResults.length > 0, 
-      error: cacheError,
-      data: cachedResults 
-    });
-
-    // Check if cached avatar matches the requested context
     if (!cacheError && cachedResults && cachedResults.length > 0) {
       const cachedImage = cachedResults[0];
-      const cachedPrompt = cachedImage.visual_prompt || '';
+      console.log('✅ Using cached portrait from:', cachedImage.created_at);
+      return new Response(JSON.stringify({
+        imageUrl: cachedImage.cloudinary_url,
+        cached: true,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('🔍 No cache found, searching for real photo...');
+
+    // PRIORITY 1: Try to get REAL photo from Wikipedia/Wikidata
+    let realPhotoUrl: string | null = null;
+    
+    try {
+      // Try Wikidata first for high-quality images
+      const wikidataResponse = await fetch(
+        `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(figureName)}&language=en&format=json&origin=*`
+      );
       
-      // If context is provided, verify the cached prompt contains it
-      if (context) {
-        if (cachedPrompt.toLowerCase().includes(context.toLowerCase())) {
-          console.log('✅ Using cached portrait with matching context from:', cachedImage.created_at);
-          console.log('📸 Cache URL:', cachedImage.cloudinary_url);
-          return new Response(JSON.stringify({
-            imageUrl: cachedImage.cloudinary_url,
-            cached: true,
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } else {
-          console.log('⚠️ Cached portrait found but context mismatch. Expected context:', context);
-          console.log('⚠️ Cached prompt:', cachedPrompt);
+      if (wikidataResponse.ok) {
+        const wikidataSearch = await wikidataResponse.json();
+        const entityId = wikidataSearch.search?.[0]?.id;
+        
+        if (entityId) {
+          console.log('📍 Found Wikidata entity:', entityId);
+          
+          // Get entity details including image
+          const entityResponse = await fetch(
+            `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${entityId}&props=claims&format=json&origin=*`
+          );
+          
+          if (entityResponse.ok) {
+            const entityData = await entityResponse.json();
+            const claims = entityData.entities?.[entityId]?.claims;
+            
+            // P18 is the property for "image"
+            const imageProperty = claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+            
+            if (imageProperty) {
+              // Convert filename to Wikimedia Commons URL
+              const filename = imageProperty.replace(/ /g, '_');
+              realPhotoUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=512`;
+              console.log('📸 Found Wikidata image:', realPhotoUrl);
+            }
+          }
         }
-      } else {
-        // No specific context required, use cache
-        console.log('✅ Using cached portrait from:', cachedImage.created_at);
-        console.log('📸 Cache URL:', cachedImage.cloudinary_url);
-        return new Response(JSON.stringify({
-          imageUrl: cachedImage.cloudinary_url,
-          cached: true,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      }
+    } catch (wikidataError) {
+      console.log('⚠️ Wikidata lookup failed:', wikidataError);
+    }
+
+    // If no Wikidata image, try Wikipedia API directly
+    if (!realPhotoUrl) {
+      try {
+        const wikiResponse = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(figureName)}&prop=pageimages&format=json&pithumbsize=512&origin=*`
+        );
+        
+        if (wikiResponse.ok) {
+          const wikiData = await wikiResponse.json();
+          const pages = wikiData.query?.pages;
+          const pageId = Object.keys(pages || {})[0];
+          
+          if (pageId && pageId !== '-1' && pages[pageId]?.thumbnail?.source) {
+            realPhotoUrl = pages[pageId].thumbnail.source;
+            console.log('📸 Found Wikipedia image:', realPhotoUrl);
+          }
+        }
+      } catch (wikiError) {
+        console.log('⚠️ Wikipedia lookup failed:', wikiError);
       }
     }
 
-    console.log('🎨 No valid cache found, generating new portrait...');
+    // If we found a real photo, use it
+    if (realPhotoUrl) {
+      console.log('✅ Using REAL photo for', figureName);
+      
+      // Cache the real photo URL
+      const { error: cacheInsertError } = await supabase
+        .from('avatar_image_cache')
+        .insert({
+          figure_id: figureId,
+          figure_name: figureName,
+          cloudinary_url: realPhotoUrl,
+          visual_prompt: 'real_photo_wikipedia',
+        });
+
+      if (cacheInsertError) {
+        console.error('⚠️ Cache insert failed:', cacheInsertError);
+      } else {
+        console.log('✅ Real photo cached successfully');
+      }
+
+      return new Response(JSON.stringify({
+        imageUrl: realPhotoUrl,
+        cached: false,
+        source: 'wikipedia'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // PRIORITY 2: Fall back to AI generation only if no real photo found
+    console.log('⚠️ No real photo found, falling back to AI generation...');
 
     // Get API keys
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
