@@ -79,64 +79,32 @@ serve(async (req) => {
     // PRIORITY 1: Try to get REAL photo from Wikipedia/Wikidata
     let realPhotoUrl: string | null = null;
     
+    // Use the wikipedia-search function which has DuckDuckGo fallback
     try {
-      // Try Wikidata first for high-quality images
-      const wikidataResponse = await fetch(
-        `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(figureName)}&language=en&format=json&origin=*`
-      );
+      console.log('📡 Calling wikipedia-search function for real photo...');
       
-      if (wikidataResponse.ok) {
-        const wikidataSearch = await wikidataResponse.json();
-        const entityId = wikidataSearch.search?.[0]?.id;
-        
-        if (entityId) {
-          console.log('📍 Found Wikidata entity:', entityId);
-          
-          // Get entity details including image
-          const entityResponse = await fetch(
-            `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${entityId}&props=claims&format=json&origin=*`
-          );
-          
-          if (entityResponse.ok) {
-            const entityData = await entityResponse.json();
-            const claims = entityData.entities?.[entityId]?.claims;
-            
-            // P18 is the property for "image"
-            const imageProperty = claims?.P18?.[0]?.mainsnak?.datavalue?.value;
-            
-            if (imageProperty) {
-              // Convert filename to Wikimedia Commons URL
-              const filename = imageProperty.replace(/ /g, '_');
-              realPhotoUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=512`;
-              console.log('📸 Found Wikidata image:', realPhotoUrl);
-            }
-          }
-        }
-      }
-    } catch (wikidataError) {
-      console.log('⚠️ Wikidata lookup failed:', wikidataError);
-    }
+      const wikiSearchResponse = await fetch(`${SUPABASE_URL}/functions/v1/wikipedia-search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({ query: figureName, limit: 1 })
+      });
 
-    // If no Wikidata image, try Wikipedia API directly
-    if (!realPhotoUrl) {
-      try {
-        const wikiResponse = await fetch(
-          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(figureName)}&prop=pageimages&format=json&pithumbsize=512&origin=*`
-        );
+      if (wikiSearchResponse.ok) {
+        const wikiData = await wikiSearchResponse.json();
+        console.log('📊 Wikipedia-search response:', JSON.stringify(wikiData, null, 2));
         
-        if (wikiResponse.ok) {
-          const wikiData = await wikiResponse.json();
-          const pages = wikiData.query?.pages;
-          const pageId = Object.keys(pages || {})[0];
-          
-          if (pageId && pageId !== '-1' && pages[pageId]?.thumbnail?.source) {
-            realPhotoUrl = pages[pageId].thumbnail.source;
-            console.log('📸 Found Wikipedia image:', realPhotoUrl);
-          }
+        if (wikiData.success && wikiData.data?.thumbnail) {
+          realPhotoUrl = wikiData.data.thumbnail;
+          console.log('📸 Found real photo via wikipedia-search:', realPhotoUrl);
         }
-      } catch (wikiError) {
-        console.log('⚠️ Wikipedia lookup failed:', wikiError);
+      } else {
+        console.log('⚠️ Wikipedia-search function failed:', wikiSearchResponse.status);
       }
+    } catch (wikiError) {
+      console.log('⚠️ Wikipedia-search error:', wikiError);
     }
 
     // If we found a real photo, use it
