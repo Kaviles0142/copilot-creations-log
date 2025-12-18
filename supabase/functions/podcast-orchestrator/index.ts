@@ -172,14 +172,26 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly and naturall
       const lastMessage = messages[messages.length - 1];
       const hostLabel = session.host_name === 'Host' ? 'the host' : session.host_name;
       const guestLabel = session.guest_name === 'Guest' ? 'the guest' : session.guest_name;
-      const lastSpeaker = lastMessage.speaker_role === 'host' ? hostLabel : guestLabel;
+      const lastSpeakerLabel = lastMessage.speaker_role === 'host' ? hostLabel : guestLabel;
+      
+      // Get recent messages to avoid repetition
+      const recentMessages = messages.slice(-6);
+      const recentTopics = recentMessages.map(m => m.content.substring(0, 100)).join(' | ');
       
       if (isHostTurn) {
         systemPrompt = `You are ${hostLabel}. You are having a conversation with ${session.guest_name} about "${session.topic}".
         
-Your role is to ask thoughtful follow-up questions, explore interesting angles, and keep the conversation flowing naturally. Build on what your guest just said.
+This is turn ${currentTurn} of the conversation. Your role is to:
+1. Ask NEW follow-up questions that haven't been asked before
+2. Explore DIFFERENT angles of the topic
+3. Build on what your guest just said with fresh perspectives
+4. Keep the conversation progressing forward
 
-CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself - you already did that in the opening.`;
+VARIETY IS CRITICAL: Do NOT repeat questions or themes already covered. Move the conversation forward.
+
+CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself.`;
+        
+        userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\n---\nTurn ${currentTurn}: ${guestLabel} just said: "${lastMessage.content}"\n\nAsk a NEW question or explore a DIFFERENT angle. Do NOT repeat previous topics.`;
       } else {
         // Check if user is the host for enhanced guest prompting
         const isUserHost = session.host_id === 'user-host';
@@ -188,28 +200,33 @@ CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-i
           // Enhanced prompt for User-AI scenario
           systemPrompt = `You are ${session.guest_name}, a renowned historical figure being interviewed about "${session.topic}".
 
-Respond naturally to the host's questions. Answer specific questions directly before adding context.
+This is turn ${currentTurn}. Respond naturally to the host's latest question with FRESH perspectives.
 
 Important:
-- Only discuss historical events, people, or places explicitly mentioned in this conversation
-- Address the host as "you" - never use labels like "host" or "interviewer"
-- Draw from your deep historical knowledge and first-hand experiences
-- Share detailed anecdotes and provide educational depth
+- Give NEW information you haven't shared before in this conversation
+- Address specific questions directly before adding context
+- Draw from different aspects of your experience each time
+- Avoid repeating stories or points you've already made
 
 CRITICAL: Do NOT prepend your name to your response. Speak directly and naturally. Do NOT re-introduce yourself.`;
         } else {
-          // Standard prompt for AI-AI scenario (keep exactly as is)
-          systemPrompt = `You are ${session.guest_name}, the podcast guest. You are discussing "${session.topic}" in a podcast interview.
-        
-ANSWER THE QUESTION DIRECTLY AND SPECIFICALLY. If the host asks a specific question (like "does X happen?" or "when does Y occur?"), answer that exact question first before adding context or examples.
+          // Standard prompt for AI-AI scenario
+          systemPrompt = `You are ${session.guest_name}, the podcast guest discussing "${session.topic}".
 
-Provide thoughtful, engaging responses. Share insights and examples to support your direct answer. If you need to address the host, just say "you" - NEVER use labels like "Host", "the host", "User Host", "User", or any names. Speak as if you're in a natural conversation.
+This is turn ${currentTurn}. ANSWER THE NEW QUESTION with FRESH perspectives you haven't shared yet.
 
-CRITICAL: Do NOT prepend your name to your response. Speak directly. Do NOT re-introduce yourself.`;
+VARIETY IS CRITICAL:
+- Do NOT repeat points or stories you've already made
+- Provide NEW insights, examples, or angles each response
+- Progress the conversation forward with new information
+
+If the host asks a specific question, answer that exact question first. Address the host as "you" - never use labels.
+
+CRITICAL: Do NOT prepend your name. Do NOT re-introduce yourself. Do NOT repeat previous answers.`;
         }
+        
+        userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\n---\nTurn ${currentTurn}: ${hostLabel} just said: "${lastMessage.content}"\n\nRespond with NEW information you haven't shared yet. Avoid repeating previous points.`;
       }
-      
-      userPrompt = `Here's the conversation so far:\n\n${conversationHistory}\n\nThe host just said: "${lastMessage.content}"\n\nRespond naturally and answer any specific questions directly.`;
     }
 
     console.log('🤖 Generating AI response...');
