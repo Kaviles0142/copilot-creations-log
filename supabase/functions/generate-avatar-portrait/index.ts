@@ -41,7 +41,7 @@ serve(async (req) => {
       throw new Error('figureName is required');
     }
 
-    console.log('🎨 Getting portrait for:', figureName);
+    console.log('🎨 Generating portrait for:', figureName);
 
     // Initialize Supabase client with service role (bypasses RLS)
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -53,7 +53,7 @@ serve(async (req) => {
       }
     });
 
-    // Check cache first
+    // Check cache - query directly to inspect visual_prompt for context matching
     console.log('🔍 Checking cache for figure_id:', figureId);
     
     const { data: cachedResults, error: cacheError } = await supabase
@@ -63,44 +63,67 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1);
 
+    console.log('📊 Cache query result:', { 
+      found: cachedResults && cachedResults.length > 0, 
+      error: cacheError,
+      data: cachedResults 
+    });
+
+    // Check if cached avatar matches the requested context
     if (!cacheError && cachedResults && cachedResults.length > 0) {
       const cachedImage = cachedResults[0];
-      console.log('✅ Using cached portrait from:', cachedImage.created_at);
-      return new Response(JSON.stringify({
-        imageUrl: cachedImage.cloudinary_url,
-        cached: true,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const cachedPrompt = cachedImage.visual_prompt || '';
+      
+      // If context is provided, verify the cached prompt contains it
+      if (context) {
+        if (cachedPrompt.toLowerCase().includes(context.toLowerCase())) {
+          console.log('✅ Using cached portrait with matching context from:', cachedImage.created_at);
+          console.log('📸 Cache URL:', cachedImage.cloudinary_url);
+          return new Response(JSON.stringify({
+            imageUrl: cachedImage.cloudinary_url,
+            cached: true,
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } else {
+          console.log('⚠️ Cached portrait found but context mismatch. Expected context:', context);
+          console.log('⚠️ Cached prompt:', cachedPrompt);
+        }
+      } else {
+        // No specific context required, use cache
+        console.log('✅ Using cached portrait from:', cachedImage.created_at);
+        console.log('📸 Cache URL:', cachedImage.cloudinary_url);
+        return new Response(JSON.stringify({
+          imageUrl: cachedImage.cloudinary_url,
+          cached: true,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    console.log('🔍 No cache found, generating podcast studio portrait...');
+    console.log('🎨 No valid cache found, generating new portrait...');
 
     // Get API keys
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
-    // Default to text-only generation prompt; if we can find a real reference photo,
-    // we do an image-edit first to preserve the person's likeness.
-    let prompt = generateVisualPrompt(figureName, context);
-    const editPrompt = generateEditPrompt(figureName, context);
+    const prompt = generateVisualPrompt(figureName, context);
+    console.log('📝 Visual prompt:', prompt);
 
     let base64Image: string | undefined;
     let usedProvider = 'unknown';
 
-    if (LOVABLE_API_KEY) {
-      const referencePhotoUrl = await findReferencePhotoUrl(
-        SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY,
-        figureName,
-      );
+    // Get current provider priority order
+    const providers = getProviders();
+    console.log('🔄 Current provider priority:', providers);
 
-      if (referencePhotoUrl) {
+    // Try providers in priority order
+    for (const provider of providers) {
+      if (provider === 'lovable' && LOVABLE_API_KEY) {
         try {
-          console.log('🧩 Found reference photo, creating studio version via image edit...');
-          const referenceDataUrl = await fetchImageAsDataUrl(referencePhotoUrl);
-
-          const lovableEditResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          console.log('🎨 Attempting generation with Lovable AI...');
+          const lovableResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -111,131 +134,74 @@ serve(async (req) => {
               messages: [
                 {
                   role: 'user',
-                  content: [
-                    { type: 'text', text: editPrompt },
-                    { type: 'image_url', image_url: { url: referenceDataUrl } },
-                  ],
-                },
+                  content: `Generate a photorealistic portrait: ${prompt}`
+                }
               ],
-              modalities: ['image', 'text'],
-            }),
+              modalities: ['image', 'text']
+            })
           });
 
-          if (!lovableEditResponse.ok) {
-            const errorText = await lovableEditResponse.text();
-            console.error('❌ Lovable AI edit failed:', lovableEditResponse.status, errorText);
-            throw new Error(`Lovable AI edit failed: ${errorText}`);
+          if (!lovableResponse.ok) {
+            const errorText = await lovableResponse.text();
+            console.error('❌ Lovable AI failed:', lovableResponse.status, errorText);
+            throw new Error(`Lovable AI failed: ${errorText}`);
           }
 
-          const lovableEditData = await lovableEditResponse.json();
-          const edited = lovableEditData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-          if (edited) {
-            base64Image = edited;
-            usedProvider = 'Lovable AI (reference edit)';
-            prompt = editPrompt;
-            console.log('✅ Successfully generated studio portrait from reference photo');
+          const lovableData = await lovableResponse.json();
+          base64Image = lovableData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+          
+          if (base64Image) {
+            usedProvider = 'Lovable AI';
+            console.log('✅ Successfully generated with Lovable AI');
+            break; // Success - stop trying other providers
+          } else {
+            throw new Error('No image data in Lovable AI response');
           }
-        } catch (editError) {
-          console.error('⚠️ Reference-photo edit failed, falling back to text-only generation:', editError);
+        } catch (lovableError) {
+          console.error('⚠️ Lovable AI error:', lovableError);
+          markProviderFailed('lovable');
+          // Continue to next provider
         }
-      } else {
-        console.log('ℹ️ No reference photo found; using text-only generation');
-      }
-    }
+      } else if (provider === 'openai' && OPENAI_API_KEY) {
+        try {
+          console.log('🎨 Attempting generation with OpenAI DALL-E...');
+          const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-image-1',
+              prompt: prompt,
+              n: 1,
+              size: '1024x1024',
+              quality: 'high',
+              output_format: 'png'
+            })
+          });
 
-    console.log('📝 Visual prompt:', prompt);
-
-    if (!base64Image) {
-      // Get current provider priority order
-      const providers = getProviders();
-      console.log('🔄 Current provider priority:', providers);
-
-      // Try providers in priority order
-      for (const provider of providers) {
-        if (provider === 'lovable' && LOVABLE_API_KEY) {
-          try {
-            console.log('🎨 Attempting generation with Lovable AI...');
-            const lovableResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'google/gemini-2.5-flash-image-preview',
-                messages: [
-                  {
-                    role: 'user',
-                    content: `Generate a photorealistic portrait: ${prompt}`
-                  }
-                ],
-                modalities: ['image', 'text']
-              })
-            });
-
-            if (!lovableResponse.ok) {
-              const errorText = await lovableResponse.text();
-              console.error('❌ Lovable AI failed:', lovableResponse.status, errorText);
-              throw new Error(`Lovable AI failed: ${errorText}`);
-            }
-
-            const lovableData = await lovableResponse.json();
-            base64Image = lovableData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-            if (base64Image) {
-              usedProvider = 'Lovable AI';
-              console.log('✅ Successfully generated with Lovable AI');
-              break; // Success - stop trying other providers
-            } else {
-              throw new Error('No image data in Lovable AI response');
-            }
-          } catch (lovableError) {
-            console.error('⚠️ Lovable AI error:', lovableError);
-            markProviderFailed('lovable');
-            // Continue to next provider
+          if (!openaiResponse.ok) {
+            const errorText = await openaiResponse.text();
+            console.error('❌ OpenAI DALL-E failed:', openaiResponse.status, errorText);
+            throw new Error(`OpenAI DALL-E failed: ${errorText}`);
           }
-        } else if (provider === 'openai' && OPENAI_API_KEY) {
-          try {
-            console.log('🎨 Attempting generation with OpenAI DALL-E...');
-            const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'gpt-image-1',
-                prompt: prompt,
-                n: 1,
-                size: '1024x1024',
-                quality: 'high',
-                output_format: 'png'
-              })
-            });
 
-            if (!openaiResponse.ok) {
-              const errorText = await openaiResponse.text();
-              console.error('❌ OpenAI DALL-E failed:', openaiResponse.status, errorText);
-              throw new Error(`OpenAI DALL-E failed: ${errorText}`);
-            }
-
-            const openaiData = await openaiResponse.json();
-
-            // OpenAI returns base64 directly in b64_json field when output_format is png
-            if (openaiData.data?.[0]?.b64_json) {
-              base64Image = `data:image/png;base64,${openaiData.data[0].b64_json}`;
-              usedProvider = 'OpenAI DALL-E';
-              console.log('✅ Successfully generated with OpenAI DALL-E');
-              break; // Success - stop trying other providers
-            } else {
-              throw new Error('No image data in OpenAI response');
-            }
-          } catch (openaiError) {
-            console.error('⚠️ OpenAI error:', openaiError);
-            markProviderFailed('openai');
-            // Continue to next provider
+          const openaiData = await openaiResponse.json();
+          
+          // OpenAI returns base64 directly in b64_json field when output_format is png
+          if (openaiData.data?.[0]?.b64_json) {
+            base64Image = `data:image/png;base64,${openaiData.data[0].b64_json}`;
+            usedProvider = 'OpenAI DALL-E';
+            console.log('✅ Successfully generated with OpenAI DALL-E');
+            break; // Success - stop trying other providers
+          } else {
+            throw new Error('No image data in OpenAI response');
           }
+        } catch (openaiError) {
+          console.error('⚠️ OpenAI error:', openaiError);
+          markProviderFailed('openai');
+          // Continue to next provider
         }
       }
     }
@@ -315,66 +281,9 @@ serve(async (req) => {
 });
 
 function generateVisualPrompt(figureName: string, context?: string): string {
-  // Text-only fallback prompt (best effort).
-  return `Create a professional, photorealistic portrait photograph of ${figureName} sitting in a modern podcast recording studio. The subject must resemble ${figureName} (do not generate a generic person). The subject is seated at a podcast desk with professional microphones visible. The background shows acoustic panels, studio monitors, and warm ambient lighting typical of a high-end podcast studio. The subject should face directly forward with a neutral, welcoming expression ready for conversation. The lighting should be professional studio lighting with soft shadows. Ultra high resolution, 4K quality, photorealistic.`;
-}
-
-function generateEditPrompt(figureName: string, context?: string): string {
-  const extraContext = context ? ` Keep the vibe consistent with: ${context}.` : '';
-  return `Edit the provided photo WITHOUT changing the person's identity (same face, same features). Place the same person in a modern podcast recording studio: seated at a podcast desk with two professional microphones visible, acoustic panels and studio monitors in the background, warm ambient studio lighting. Keep the person looking into the camera with a calm, welcoming expression. Photorealistic, high-resolution. Do not change skin tone, age, hairstyle, facial structure, or distinguishing features.${extraContext}`;
-}
-
-async function findReferencePhotoUrl(
-  supabaseUrl: string,
-  serviceRoleKey: string,
-  figureName: string,
-): Promise<string | null> {
-  try {
-    console.log('📡 Calling wikipedia-search function for reference photo...');
-
-    const wikiSearchResponse = await fetch(`${supabaseUrl}/functions/v1/wikipedia-search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`,
-      },
-      body: JSON.stringify({ query: figureName, limit: 1 }),
-    });
-
-    if (!wikiSearchResponse.ok) {
-      console.log('⚠️ wikipedia-search failed:', wikiSearchResponse.status);
-      return null;
-    }
-
-    const wikiData = await wikiSearchResponse.json();
-    const thumb = wikiData?.data?.thumbnail as string | undefined;
-
-    if (wikiData?.success && typeof thumb === 'string' && thumb.length > 0) {
-      console.log('📸 Reference photo found:', thumb);
-      return thumb;
-    }
-
-    return null;
-  } catch (err) {
-    console.log('⚠️ Reference photo lookup error:', err);
-    return null;
-  }
-}
-
-async function fetchImageAsDataUrl(imageUrl: string): Promise<string> {
-  const res = await fetch(imageUrl);
-  if (!res.ok) throw new Error(`Failed to fetch reference image: ${res.status}`);
-
-  const contentType = res.headers.get('content-type') || 'image/jpeg';
-  const bytes = new Uint8Array(await res.arrayBuffer());
-
-  // Convert bytes -> base64 (chunked to avoid call stack issues)
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  const base64 = btoa(binary);
-
-  return `data:${contentType};base64,${base64}`;
+  const contextText = context 
+    ? `${context}. The setting should complement their historical background while maintaining the ${context} environment.`
+    : 'Professional studio lighting with a subtle gradient background appropriate to their era.';
+    
+  return `Create a professional, photorealistic portrait photograph of ${figureName} in a ${context || 'studio setting'}. CRITICAL REQUIREMENTS: The face must be perfectly centered and fill 60% of the frame. Eyes must be positioned at exactly 40% from the top of the image. The subject should face directly forward with a neutral, welcoming expression. ${contextText} Head and shoulders only, straight-on angle. Historically accurate facial features and period-appropriate attire visible from shoulders up. Ultra high resolution, 4K quality.`;
 }
