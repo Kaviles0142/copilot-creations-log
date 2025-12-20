@@ -3,48 +3,52 @@ import { Card } from './ui/card';
 import { Loader2 } from 'lucide-react';
 import { useTalkingVideo } from '@/hooks/useTalkingVideo';
 
-interface RealisticAvatarProps {
+interface TalkingVideoPlayerProps {
   imageUrl: string | null;
+  audioUrl: string | null;
   isLoading?: boolean;
-  audioUrl?: string | null;
   figureName?: string;
   figureId?: string;
   onVideoEnd?: () => void;
   onVideoReady?: (videoUrl: string) => void;
+  onAudioReady?: (audioUrl: string) => void;
 }
 
-const RealisticAvatar = ({ 
+const TalkingVideoPlayer = ({ 
   imageUrl, 
-  isLoading, 
   audioUrl, 
+  isLoading, 
   figureName,
   figureId,
   onVideoEnd, 
-  onVideoReady 
-}: RealisticAvatarProps) => {
+  onVideoReady,
+  onAudioReady 
+}: TalkingVideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const processedAudioRef = useRef<string | null>(null);
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
 
   const { 
     generateVideo, 
-    videoUrl: generatedVideoUrl, 
+    videoUrl, 
     isGenerating, 
-    status,
+    status, 
     reset 
   } = useTalkingVideo({
     onVideoReady: (url) => {
-      console.log('🎥 Ditto video ready:', url);
+      console.log('🎥 Video ready from hook:', url);
       setCurrentVideoUrl(url);
       onVideoReady?.(url);
     },
     onError: (error) => {
-      console.error('❌ Ditto video generation failed:', error);
-      // Fallback: just notify that audio is ready (no video)
-      if (audioUrl) {
-        console.log('🔊 Falling back to audio-only mode');
-        onVideoReady?.(audioUrl);
+      console.error('❌ Video generation failed:', error);
+      // Fallback: play audio only with static image
+      if (audioUrl && audioRef.current) {
+        console.log('🔊 Falling back to audio-only playback');
+        audioRef.current.src = audioUrl;
+        audioRef.current.play().catch(console.error);
       }
     }
   });
@@ -52,7 +56,7 @@ const RealisticAvatar = ({
   // Generate video when we have both image and audio
   useEffect(() => {
     if (!imageUrl || !audioUrl) {
-      console.log('⏸️ No image or audio URL provided');
+      console.log('⏸️ Missing image or audio URL');
       return;
     }
 
@@ -65,13 +69,16 @@ const RealisticAvatar = ({
     // Mark this audio as processed
     processedAudioRef.current = audioUrl;
     
-    console.log('🎬 Starting Ditto video generation');
-    console.log('📸 Image:', imageUrl.substring(0, 60) + '...');
-    console.log('🎵 Audio type:', audioUrl.startsWith('data:') ? 'base64' : 'url');
+    console.log('🎬 Starting video generation for:', figureName);
+    console.log('📸 Image:', imageUrl.substring(0, 50) + '...');
+    console.log('🎵 Audio:', audioUrl.substring(0, 50) + '...');
 
-    // Generate talking video using Ditto API
+    // Notify that audio is ready (for immediate playback if video fails)
+    onAudioReady?.(audioUrl);
+
+    // Generate talking video
     generateVideo(imageUrl, audioUrl, figureId, figureName);
-  }, [imageUrl, audioUrl, figureName, figureId, generateVideo]);
+  }, [imageUrl, audioUrl, figureName, figureId, generateVideo, onAudioReady]);
 
   // Play video when URL is available
   useEffect(() => {
@@ -96,19 +103,17 @@ const RealisticAvatar = ({
       videoRef.current.onerror = (err) => {
         console.error('❌ Video playback error:', err);
         setIsPlayingVideo(false);
-        setCurrentVideoUrl(null);
       };
     }
   }, [currentVideoUrl, onVideoEnd]);
 
-  // Reset video state when figure changes
+  // Reset on new figure
   useEffect(() => {
     if (figureId) {
       setCurrentVideoUrl(null);
       processedAudioRef.current = null;
-      reset();
     }
-  }, [figureId, reset]);
+  }, [figureId]);
 
   if (isLoading) {
     return (
@@ -125,7 +130,7 @@ const RealisticAvatar = ({
   if (isGenerating && imageUrl) {
     const statusMessage = status === 'generating' 
       ? 'Starting video generation...' 
-      : 'Creating lip-sync animation...';
+      : 'Generating talking video...';
     
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
@@ -138,9 +143,11 @@ const RealisticAvatar = ({
           <div className="text-center space-y-4">
             <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
             <p className="text-sm text-white font-medium">{statusMessage}</p>
-            <p className="text-xs text-white/70">This can take 30-60 seconds...</p>
+            <p className="text-xs text-white/70">Creating lip-sync animation...</p>
           </div>
         </div>
+        {/* Hidden audio for fallback */}
+        <audio ref={audioRef} hidden />
       </Card>
     );
   }
@@ -155,7 +162,7 @@ const RealisticAvatar = ({
 
   // Show video if available
   if (currentVideoUrl) {
-    console.log('🎥 Rendering VIDEO element with URL:', currentVideoUrl.substring(0, 60) + '...');
+    console.log('🎥 Rendering VIDEO element with URL:', currentVideoUrl);
     
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
@@ -199,8 +206,10 @@ const RealisticAvatar = ({
         alt="Avatar" 
         className="w-full h-full object-cover"
       />
+      {/* Hidden audio for playback */}
+      <audio ref={audioRef} hidden />
     </Card>
   );
 };
 
-export default RealisticAvatar;
+export default TalkingVideoPlayer;

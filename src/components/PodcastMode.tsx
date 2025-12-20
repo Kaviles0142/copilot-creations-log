@@ -779,13 +779,18 @@ const PodcastMode = () => {
         if (error) throw error;
 
         if (data?.audioContent) {
+          // Create data URL for video generation (RealisticAvatar needs this format)
+          const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+          setCurrentAudioUrl(audioDataUrl);
+          console.log('🎬 Audio ready for video generation');
+          
+          // Create blob URL for audio playback
           const audioBlob = new Blob(
             [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
             { type: 'audio/mpeg' }
           );
-          const audioUrl = URL.createObjectURL(audioBlob);
-          setCurrentAudioUrl(audioUrl);
-          await playAudio(audioUrl);
+          const playbackUrl = URL.createObjectURL(audioBlob);
+          await playAudio(playbackUrl);
           resolve();
         } else {
           resolve();
@@ -1136,6 +1141,8 @@ const PodcastMode = () => {
                   imageUrl={hostAvatarUrl}
                   isLoading={isLoadingHostAvatar}
                   audioUrl={currentSpeaker === 'host' ? currentAudioUrl : null}
+                  figureName={host.name}
+                  figureId={host.id}
                 />
                 <Select
                   value={hostVoice}
@@ -1163,6 +1170,8 @@ const PodcastMode = () => {
                   imageUrl={guestAvatarUrl}
                   isLoading={isLoadingGuestAvatar}
                   audioUrl={currentSpeaker === 'guest' ? currentAudioUrl : null}
+                  figureName={guest.name}
+                  figureId={guest.id}
                 />
                 <Select
                   value={guestVoice}

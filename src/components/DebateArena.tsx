@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import StreamingAvatar from "./StreamingAvatar";
+import RealisticAvatar from "./RealisticAvatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTalkingVideo } from "@/hooks/useTalkingVideo";
 
 interface Figure {
   id: string;
@@ -73,6 +75,9 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [recordingTranscript, setRecordingTranscript] = useState("");
   const [isStopped, setIsStopped] = useState(false);
   const [selectedVoices, setSelectedVoices] = useState<Record<string, string>>({});
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
+  const [speakingFigureId, setSpeakingFigureId] = useState<string | null>(null);
+  const [speakingFigureName, setSpeakingFigureName] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -385,19 +390,28 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
     try {
       console.log('🎤 Generating Azure TTS for:', figureName);
       
+      // Set speaking figure info for video generation
+      setSpeakingFigureId(figureId);
+      setSpeakingFigureName(figureName);
+      
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
           text,
           figure_name: figureName,
           figure_id: figureId,
-          voice: selectedVoices[figureId] || 'auto',  // Use selected voice from dropdown, or auto if not selected
-          language: language || 'en-US'  // Pass full locale (e.g., en-US, es-ES) for proper nationality detection and voice selection
+          voice: selectedVoices[figureId] || 'auto',
+          language: language || 'en-US'
         }
       });
 
       if (error) throw error;
 
       if (data?.audioContent) {
+        // Create data URL for video generation
+        const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+        setCurrentAudioUrl(audioDataUrl);
+        console.log('🎬 Audio ready for video generation');
+        
         // Initialize audio element if needed
         if (!audioElementRef.current) {
           audioElementRef.current = new Audio();
@@ -418,16 +432,21 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           setIsPlayingAudio(false);
           setIsPaused(false);
           setCurrentSpeaker(null);
-          // Queue will automatically process next item via useEffect
+          setCurrentAudioUrl(null);
+          setSpeakingFigureId(null);
+          setSpeakingFigureName(null);
         };
 
         audioElementRef.current.onerror = (err) => {
           console.error('❌ Audio error:', err);
           setCurrentAudio(null);
           setIsPlayingAudio(false);
+          setCurrentAudioUrl(null);
+          setSpeakingFigureId(null);
+          setSpeakingFigureName(null);
         };
 
-        // Convert base64 to blob
+        // Convert base64 to blob for playback
         const byteCharacters = atob(data.audioContent);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -448,6 +467,9 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       console.error('Error playing audio:', error);
       setCurrentAudio(null);
       setIsPlayingAudio(false);
+      setCurrentAudioUrl(null);
+      setSpeakingFigureId(null);
+      setSpeakingFigureName(null);
       throw error;
     }
   };
@@ -703,6 +725,27 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
           </Card>
         ))}
       </div>
+
+      {/* Talking Video Player for Current Speaker */}
+      {speakingFigureId && avatarUrls[speakingFigureId] && currentAudioUrl && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <p className="text-sm font-medium">{speakingFigureName} is speaking...</p>
+          </div>
+          <div className="flex justify-center">
+            <RealisticAvatar
+              imageUrl={avatarUrls[speakingFigureId]}
+              audioUrl={currentAudioUrl}
+              figureName={speakingFigureName || undefined}
+              figureId={speakingFigureId}
+              onVideoEnd={() => {
+                console.log('🎬 Debate video ended');
+              }}
+            />
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
