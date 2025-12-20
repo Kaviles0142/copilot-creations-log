@@ -443,64 +443,113 @@ serve(async (req) => {
 
             if (isLotteryQuery) {
               try {
-                let allLotteryResults: string[] = [];
+                let lotteryText = '\n\n🎟️ LOTTERY WINNING NUMBERS (Previous Draws):\n';
+                let foundActualNumbers = false;
 
-                // Search with Google Custom Search (no figure prefix) for lottery
-                const GOOGLE_API_KEY = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
-                const GOOGLE_CX = Deno.env.get('GOOGLE_SEARCH_ENGINE_ID');
-                
-                if (GOOGLE_API_KEY && GOOGLE_CX) {
-                  const googleLotteryQuery = 'powerball mega millions winning numbers latest results jackpot';
-                  const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(googleLotteryQuery)}&num=5`;
-                  
-                  console.log(`🎟️ Google lottery search: ${googleLotteryQuery}`);
-                  const googleResp = await fetch(searchUrl);
-                  
-                  if (googleResp.ok) {
-                    const googleData = await googleResp.json();
-                    if (googleData.items?.length > 0) {
-                      googleData.items.forEach((item: any) => {
-                        allLotteryResults.push(`📄 ${item.title}: ${item.snippet} (Source: ${item.link})`);
-                      });
-                      console.log(`🎟️ Google found ${googleData.items.length} lottery results`);
+                // STEP 1: Fetch ACTUAL winning numbers from lottery results page
+                const lotteryUrls = [
+                  { name: 'Powerball', url: 'https://www.usamega.com/powerball/results' },
+                  { name: 'Mega Millions', url: 'https://www.usamega.com/mega-millions/results' }
+                ];
+
+                // Determine which lottery to fetch based on query
+                const urlsToFetch = wantsPowerball 
+                  ? [lotteryUrls[0]] 
+                  : wantsMegaMillions 
+                    ? [lotteryUrls[1]] 
+                    : lotteryUrls; // Fetch both if unclear
+
+                for (const lottery of urlsToFetch) {
+                  try {
+                    console.log(`🎟️ Fetching actual numbers from ${lottery.url}`);
+                    const response = await fetch(lottery.url, {
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                      }
+                    });
+                    
+                    if (response.ok) {
+                      const html = await response.text();
+                      const draws = parseUsaMegaDraws(html, 10);
+                      
+                      if (draws.length > 0) {
+                        foundActualNumbers = true;
+                        lotteryText += `\n📊 ${lottery.name} - PREVIOUS WINNING NUMBERS:\n`;
+                        draws.forEach((draw, idx) => {
+                          const mainNums = draw.nums.slice(0, 5).join(' - ');
+                          const powerball = draw.nums[5] || draw.nums[draw.nums.length - 1];
+                          lotteryText += `  ${idx + 1}. ${draw.date}: ${mainNums} | PB: ${powerball}\n`;
+                        });
+                        console.log(`🎟️ Parsed ${draws.length} ${lottery.name} draws`);
+                      }
                     }
+                  } catch (fetchErr) {
+                    console.log(`🎟️ Error fetching ${lottery.name}:`, fetchErr);
                   }
                 }
 
-                // Also use DuckDuckGo for lottery results
-                const lotterySearchQuery = 'powerball mega millions winning numbers today latest results';
-                console.log(`🎟️ DDG lottery search: ${lotterySearchQuery}`);
-
-                const lotterySearch = await supabase.functions.invoke('duckduckgo-search', {
-                  body: {
-                    query: lotterySearchQuery,
-                    limit: 8,
-                  },
-                });
-
-                let lotteryResults: any[] = [];
-                if (lotterySearch.data?.data && Array.isArray(lotterySearch.data.data)) {
-                  lotteryResults = lotterySearch.data.data;
-                } else if (Array.isArray(lotterySearch.data)) {
-                  lotteryResults = lotterySearch.data;
+                // STEP 2: Also try lottery.com as backup
+                if (!foundActualNumbers) {
+                  try {
+                    console.log('🎟️ Trying backup source: lottery.com');
+                    const backupUrl = wantsPowerball 
+                      ? 'https://www.lottery.com/games/powerball' 
+                      : 'https://www.lottery.com/games/mega-millions';
+                    
+                    const backupResp = await fetch(backupUrl, {
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                      }
+                    });
+                    
+                    if (backupResp.ok) {
+                      const html = await backupResp.text();
+                      // Try to extract numbers with a more flexible pattern
+                      const numPattern = /(\d{1,2})\s*-?\s*(\d{1,2})\s*-?\s*(\d{1,2})\s*-?\s*(\d{1,2})\s*-?\s*(\d{1,2})\s*(?:PB|Powerball|Mega Ball)?\s*:?\s*(\d{1,2})/gi;
+                      const matches = html.match(numPattern);
+                      if (matches && matches.length > 0) {
+                        foundActualNumbers = true;
+                        lotteryText += `\n📊 Recent Winning Numbers:\n`;
+                        matches.slice(0, 5).forEach((match, idx) => {
+                          lotteryText += `  ${idx + 1}. ${match}\n`;
+                        });
+                      }
+                    }
+                  } catch (backupErr) {
+                    console.log('🎟️ Backup source error:', backupErr);
+                  }
                 }
 
-                console.log(`🎟️ DDG found ${lotteryResults.length} lottery results`);
-
-                lotteryResults.forEach((result: any) => {
-                  allLotteryResults.push(`📄 ${result.title}: ${result.snippet} (Source: ${result.url})`);
-                });
-
-                if (allLotteryResults.length > 0) {
-                  let lotteryText = '\n\n🎟️ CURRENT LOTTERY INFORMATION (from multiple sources):\n';
-                  lotteryText += 'Official sites: www.powerball.com and www.megamillions.com\n\n';
-                  allLotteryResults.slice(0, 10).forEach((r) => {
-                    lotteryText += `${r}\n`;
+                // STEP 3: If we still don't have numbers, use search but be explicit about limitation
+                if (!foundActualNumbers) {
+                  console.log('🎟️ Could not fetch actual numbers, falling back to search snippets');
+                  
+                  const lotterySearchQuery = wantsPowerball 
+                    ? 'powerball winning numbers previous results site:powerball.com OR site:usamega.com'
+                    : 'mega millions winning numbers previous results site:megamillions.com OR site:usamega.com';
+                  
+                  const lotterySearch = await supabase.functions.invoke('duckduckgo-search', {
+                    body: { query: lotterySearchQuery, limit: 5 }
                   });
 
-                  console.log(`🎟️ Returning ${allLotteryResults.length} combined lottery results`);
-                  return lotteryText;
+                  let lotteryResults: any[] = [];
+                  if (lotterySearch.data?.data && Array.isArray(lotterySearch.data.data)) {
+                    lotteryResults = lotterySearch.data.data;
+                  } else if (Array.isArray(lotterySearch.data)) {
+                    lotteryResults = lotterySearch.data;
+                  }
+
+                  if (lotteryResults.length > 0) {
+                    lotteryText += '\n📋 Search Results (snippets - may contain winning numbers):\n';
+                    lotteryResults.forEach((result: any) => {
+                      lotteryText += `• ${result.title}: ${result.snippet}\n`;
+                    });
+                  }
                 }
+
+                lotteryText += '\nOfficial sources: www.powerball.com and www.megamillions.com\n';
+                console.log(`🎟️ Lottery data collected, foundActualNumbers: ${foundActualNumbers}`);
+                return lotteryText;
               } catch (e) {
                 console.log('🎟️ Lottery search error:', e);
               }
