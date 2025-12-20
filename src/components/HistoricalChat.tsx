@@ -1761,7 +1761,9 @@ const HistoricalChat = () => {
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              audioUrl={currentAudioUrl || greetingAudioUrl} // Use current response audio or greeting
+              audioUrl={currentAudioUrl || greetingAudioUrl}
+              figureName={selectedFigure.name}
+              figureId={selectedFigure.id}
               onVideoEnd={() => {
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
