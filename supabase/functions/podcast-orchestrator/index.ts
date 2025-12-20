@@ -231,6 +231,48 @@ CRITICAL: Do NOT prepend your name. Do NOT re-introduce yourself. Do NOT repeat 
 
     console.log('🤖 Generating AI response...');
 
+    // Search for factual data if the topic or conversation seems like a data request
+    let factualContext = '';
+    const topicAndPrompt = `${session.topic} ${userPrompt}`.toLowerCase();
+    const factualKeywords = ['lottery', 'numbers', 'winning', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population', 'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the', 'who won', 'latest', 'current', 'today', 'yesterday', 'recent'];
+    const isFactualQuery = factualKeywords.some(keyword => topicAndPrompt.includes(keyword));
+    
+    if (isFactualQuery) {
+      console.log('🌍 Podcast: Searching for factual data...');
+      try {
+        const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
+          body: { 
+            query: session.topic.substring(0, 150),
+            limit: 5
+          }
+        });
+        
+        let ddgResults: any[] = [];
+        if (ddgResponse.data) {
+          if (Array.isArray(ddgResponse.data.data)) {
+            ddgResults = ddgResponse.data.data;
+          } else if (Array.isArray(ddgResponse.data)) {
+            ddgResults = ddgResponse.data;
+          }
+        }
+        
+        if (ddgResults.length > 0) {
+          factualContext = '\n\nFACTUAL DATA FROM WEB SEARCH:\n';
+          ddgResults.forEach((result: any) => {
+            factualContext += `- ${result.title}: ${result.snippet}\n`;
+          });
+          console.log(`🌍 Found ${ddgResults.length} factual results for podcast`);
+        }
+      } catch (error) {
+        console.log('Factual search error in podcast:', error);
+      }
+    }
+    
+    // Add factual context to system prompt if available
+    const enhancedSystemPrompt = factualContext 
+      ? `${systemPrompt}\n\nUse this factual data in your response if relevant:${factualContext}`
+      : systemPrompt;
+
     // Detect if user is the host (User-AI scenario)
     const isUserHost = session.host_id === 'user-host';
     const isGuestResponding = !isHostTurn;
@@ -250,7 +292,7 @@ CRITICAL: Do NOT prepend your name. Do NOT re-introduce yourself. Do NOT repeat 
       body: JSON.stringify({
         model: useEnhancedSettings ? 'gpt-4o' : 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: enhancedSystemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.8,
