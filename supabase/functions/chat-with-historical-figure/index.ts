@@ -435,40 +435,71 @@ serve(async (req) => {
               return draws;
             };
 
-            if (usaMegaPath) {
-              try {
-                const url = `https://www.usamega.com/${usaMegaPath}/results`;
-                console.log(`🎟️ Fetching structured lottery results from: ${url}`);
+            // Try multiple sources for lottery data
+            const isLotteryQuery = lowerMessage.includes('lottery') || lowerMessage.includes('powerball') || 
+                                   lowerMessage.includes('mega millions') || lowerMessage.includes('lotto') ||
+                                   lowerMessage.includes('winning') || lowerMessage.includes('jackpot') ||
+                                   contextText.includes('powerball') || contextText.includes('lottery');
 
-                const resp = await fetch(url, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (compatible; LovableBot/1.0)',
-                    'Accept': 'text/html,application/xhtml+xml',
+            if (isLotteryQuery) {
+              try {
+                // Use DuckDuckGo to search for current lottery results
+                const lotterySearchQuery = 'powerball mega millions winning numbers today latest results site:powerball.com OR site:megamillions.com';
+                console.log(`🎟️ Searching for lottery results: ${lotterySearchQuery}`);
+
+                const lotterySearch = await supabase.functions.invoke('duckduckgo-search', {
+                  body: {
+                    query: lotterySearchQuery,
+                    limit: 8,
                   },
                 });
 
-                if (resp.ok) {
-                  const html = await resp.text();
-                  const draws = parseUsaMegaDraws(html, 6);
+                let lotteryResults: any[] = [];
+                if (lotterySearch.data?.data && Array.isArray(lotterySearch.data.data)) {
+                  lotteryResults = lotterySearch.data.data;
+                } else if (Array.isArray(lotterySearch.data)) {
+                  lotteryResults = lotterySearch.data;
+                }
 
-                  if (draws.length > 0) {
-                    const label = usaMegaPath === 'powerball' ? 'Powerball' : 'Mega Millions';
-                    let structured = `\n\n🎟️ ${label.toUpperCase()} RECENT WINNING NUMBERS (Structured):\n`;
-                    draws.slice(0, 5).forEach((d) => {
-                      const main = d.nums.slice(0, 5).join('-');
-                      const bonus = d.nums[5];
-                      structured += `- ${d.date}: ${main} | Bonus ${bonus}\n`;
-                    });
-                    structured += `Source: https://www.usamega.com/${usaMegaPath}/results\n`;
+                console.log(`🎟️ Found ${lotteryResults.length} lottery search results`);
 
-                    console.log(`🎟️ Parsed ${draws.length} draws for ${label}`);
-                    return structured;
+                if (lotteryResults.length > 0) {
+                  let lotteryText = '\n\n🎟️ CURRENT LOTTERY INFORMATION:\n';
+                  lotteryText += 'NOTE: Check official sites for exact numbers - www.powerball.com and www.megamillions.com\n';
+                  lotteryResults.forEach((result: any) => {
+                    lotteryText += `- ${result.title}: ${result.snippet}\n`;
+                    if (result.url) lotteryText += `  Source: ${result.url}\n`;
+                  });
+
+                  // Also try to get current jackpot info
+                  const jackpotSearch = await supabase.functions.invoke('duckduckgo-search', {
+                    body: {
+                      query: 'current powerball jackpot amount mega millions jackpot 2024',
+                      limit: 5,
+                    },
+                  });
+
+                  let jackpotResults: any[] = [];
+                  if (jackpotSearch.data?.data && Array.isArray(jackpotSearch.data.data)) {
+                    jackpotResults = jackpotSearch.data.data;
+                  } else if (Array.isArray(jackpotSearch.data)) {
+                    jackpotResults = jackpotSearch.data;
                   }
-                } else {
-                  console.log(`🎟️ Lottery results fetch failed: ${resp.status}`);
+
+                  if (jackpotResults.length > 0) {
+                    lotteryText += '\n📊 CURRENT JACKPOT INFO:\n';
+                    jackpotResults.forEach((result: any) => {
+                      if (result.snippet && (result.snippet.includes('$') || result.snippet.includes('million') || result.snippet.includes('billion'))) {
+                        lotteryText += `- ${result.snippet}\n`;
+                      }
+                    });
+                  }
+
+                  console.log('🎟️ Returning lottery search results');
+                  return lotteryText;
                 }
               } catch (e) {
-                console.log('🎟️ Lottery results parse error:', e);
+                console.log('🎟️ Lottery search error:', e);
               }
             }
 
@@ -919,10 +950,13 @@ The following research contains books you wrote, accounts of your life, and hist
 3. Reference these naturally: "I remember writing..." "When I lived through..." "As I discovered..."
 4. Let these sources give you specific examples and quotes to make your conversation vivid and personal
 
-CRITICAL (FACTUAL QUERIES):
-- If the user asks for factual data (e.g., winning numbers, dates, stats) and it appears in the sources below, answer directly using that data.
-- Do NOT say you "can't access" the internet or "can't look it up" when the data is provided below; instead, cite the source lines.
-- If the data is NOT in the sources below, say you don't have it in the provided research.
+⚠️ CRITICAL - CURRENT EVENTS & FACTUAL DATA:
+- You HAVE ACCESS to current information through web searches that appear in this context
+- When lottery numbers, jackpots, scores, prices, or any factual data appear in YOUR KNOWLEDGE BASE below, USE THAT DATA DIRECTLY
+- NEVER say "I don't have access to current information" or "I can't look that up" - the data is PROVIDED TO YOU below
+- If asked about lottery/Powerball/Mega Millions and you see 🎟️ LOTTERY INFORMATION below, share those details!
+- If data is NOT in the sources below, say "I don't see that in my current briefing" - not "I can't access it"
+- You are NOT limited to your historical era for facts - you receive modern data feeds
 
 RESEARCH SOURCES AVAILABLE:
 ${relevantKnowledge}
