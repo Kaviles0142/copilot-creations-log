@@ -269,6 +269,48 @@ Now respond to the latest point raised.`;
     } else {
       console.log(`🔄 Cache miss - calling OpenAI for ${currentFigureName}`);
       
+      // Search for factual data if the topic or user message seems like a data request
+      let factualContext = '';
+      const topicAndMessage = `${session.topic} ${userMessage || ''}`.toLowerCase();
+      const factualKeywords = ['lottery', 'numbers', 'winning', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population', 'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the', 'who won', 'latest', 'current', 'today', 'yesterday', 'recent'];
+      const isFactualQuery = factualKeywords.some(keyword => topicAndMessage.includes(keyword));
+      
+      if (isFactualQuery) {
+        console.log('🌍 Debate: Searching for factual data...');
+        try {
+          const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
+            body: { 
+              query: session.topic.substring(0, 150),
+              limit: 5
+            }
+          });
+          
+          let ddgResults: any[] = [];
+          if (ddgResponse.data) {
+            if (Array.isArray(ddgResponse.data.data)) {
+              ddgResults = ddgResponse.data.data;
+            } else if (Array.isArray(ddgResponse.data)) {
+              ddgResults = ddgResponse.data;
+            }
+          }
+          
+          if (ddgResults.length > 0) {
+            factualContext = '\n\nFACTUAL DATA FROM WEB SEARCH:\n';
+            ddgResults.forEach((result: any) => {
+              factualContext += `- ${result.title}: ${result.snippet}\n`;
+            });
+            console.log(`🌍 Found ${ddgResults.length} factual results for debate`);
+          }
+        } catch (error) {
+          console.log('Factual search error in debate:', error);
+        }
+      }
+      
+      // Add factual context to system prompt if available
+      const enhancedSystemPrompt = factualContext 
+        ? `${systemPrompt}\n\nUse this factual data in your response if relevant:${factualContext}`
+        : systemPrompt;
+      
       // Call AI to generate response
       const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
       if (!OPENAI_API_KEY) {
@@ -284,7 +326,7 @@ Now respond to the latest point raised.`;
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: enhancedSystemPrompt },
           { role: 'user', content: userMessage || 'Continue the debate based on the previous points.' }
         ],
         temperature: 0.8,

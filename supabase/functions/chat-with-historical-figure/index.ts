@@ -348,10 +348,10 @@ serve(async (req) => {
           return '';
         })(),
 
-        // 5. DuckDuckGo Search for additional web context
+        // 5. DuckDuckGo Search for figure-related context
         (async () => {
           try {
-            console.log('🦆 Starting DuckDuckGo search...');
+            console.log('🦆 Starting DuckDuckGo search (figure-related)...');
             
             const searchQuery = `${figure.name} ${message.substring(0, 100)}`;
             
@@ -389,6 +389,58 @@ serve(async (req) => {
             }
           } catch (error) {
             console.log('DuckDuckGo search error:', error);
+          }
+          return '';
+        })(),
+
+        // 5b. GENERAL KNOWLEDGE SEARCH - Search WITHOUT figure name for factual queries
+        (async () => {
+          try {
+            // Only run general search if query seems like a factual/data request
+            const factualKeywords = ['lottery', 'numbers', 'winning', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population', 'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the', 'who won', 'latest', 'current', 'today', 'yesterday', 'recent'];
+            const lowerMessage = message.toLowerCase();
+            const isFactualQuery = factualKeywords.some(keyword => lowerMessage.includes(keyword));
+            
+            if (!isFactualQuery) {
+              console.log('🔍 Skipping general search - not a factual query');
+              return '';
+            }
+            
+            console.log('🌍 Starting GENERAL KNOWLEDGE search (no figure prefix)...');
+            
+            // Search WITHOUT the figure name to get actual factual results
+            const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
+              body: { 
+                query: message.substring(0, 150), // Just the user's question
+                limit: 5
+              }
+            });
+
+            console.log('🌍 General Search Raw Response:', JSON.stringify(ddgResponse, null, 2));
+            
+            let ddgResults: any[] = [];
+            if (ddgResponse.data) {
+              if (Array.isArray(ddgResponse.data.data)) {
+                ddgResults = ddgResponse.data.data;
+              } else if (Array.isArray(ddgResponse.data)) {
+                ddgResults = ddgResponse.data;
+              }
+            }
+            
+            console.log(`🌍 Parsed ${ddgResults.length} general knowledge results`);
+            
+            if (ddgResults.length > 0) {
+              let generalText = '\n\n🌍 GENERAL KNOWLEDGE (Factual Data):\n';
+              ddgResults.forEach((result: any) => {
+                generalText += `\n📊 ${result.title}\n`;
+                generalText += `${result.snippet}\n`;
+                if (result.url) generalText += `Source: ${result.url}\n`;
+              });
+              console.log(`Found ${ddgResults.length} general knowledge results`);
+              return generalText;
+            }
+          } catch (error) {
+            console.log('General knowledge search error:', error);
           }
           return '';
         })(),
