@@ -706,6 +706,48 @@ export type Database = {
         }
         Relationships: []
       }
+      video_jobs: {
+        Row: {
+          audio_url: string | null
+          created_at: string | null
+          ditto_request_id: string | null
+          error: string | null
+          figure_id: string | null
+          figure_name: string | null
+          id: string
+          image_url: string | null
+          status: string
+          updated_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string | null
+          ditto_request_id?: string | null
+          error?: string | null
+          figure_id?: string | null
+          figure_name?: string | null
+          id?: string
+          image_url?: string | null
+          status?: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string | null
+          ditto_request_id?: string | null
+          error?: string | null
+          figure_id?: string | null
+          figure_name?: string | null
+          id?: string
+          image_url?: string | null
+          status?: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       voice_training_pipeline: {
         Row: {
           api_endpoint: string | null
