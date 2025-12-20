@@ -443,9 +443,33 @@ serve(async (req) => {
 
             if (isLotteryQuery) {
               try {
-                // Use DuckDuckGo to search for current lottery results
-                const lotterySearchQuery = 'powerball mega millions winning numbers today latest results site:powerball.com OR site:megamillions.com';
-                console.log(`🎟️ Searching for lottery results: ${lotterySearchQuery}`);
+                let allLotteryResults: string[] = [];
+
+                // Search with Google Custom Search (no figure prefix) for lottery
+                const GOOGLE_API_KEY = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
+                const GOOGLE_CX = Deno.env.get('GOOGLE_SEARCH_ENGINE_ID');
+                
+                if (GOOGLE_API_KEY && GOOGLE_CX) {
+                  const googleLotteryQuery = 'powerball mega millions winning numbers latest results jackpot';
+                  const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(googleLotteryQuery)}&num=5`;
+                  
+                  console.log(`🎟️ Google lottery search: ${googleLotteryQuery}`);
+                  const googleResp = await fetch(searchUrl);
+                  
+                  if (googleResp.ok) {
+                    const googleData = await googleResp.json();
+                    if (googleData.items?.length > 0) {
+                      googleData.items.forEach((item: any) => {
+                        allLotteryResults.push(`📄 ${item.title}: ${item.snippet} (Source: ${item.link})`);
+                      });
+                      console.log(`🎟️ Google found ${googleData.items.length} lottery results`);
+                    }
+                  }
+                }
+
+                // Also use DuckDuckGo for lottery results
+                const lotterySearchQuery = 'powerball mega millions winning numbers today latest results';
+                console.log(`🎟️ DDG lottery search: ${lotterySearchQuery}`);
 
                 const lotterySearch = await supabase.functions.invoke('duckduckgo-search', {
                   body: {
@@ -461,41 +485,20 @@ serve(async (req) => {
                   lotteryResults = lotterySearch.data;
                 }
 
-                console.log(`🎟️ Found ${lotteryResults.length} lottery search results`);
+                console.log(`🎟️ DDG found ${lotteryResults.length} lottery results`);
 
-                if (lotteryResults.length > 0) {
-                  let lotteryText = '\n\n🎟️ CURRENT LOTTERY INFORMATION:\n';
-                  lotteryText += 'NOTE: Check official sites for exact numbers - www.powerball.com and www.megamillions.com\n';
-                  lotteryResults.forEach((result: any) => {
-                    lotteryText += `- ${result.title}: ${result.snippet}\n`;
-                    if (result.url) lotteryText += `  Source: ${result.url}\n`;
+                lotteryResults.forEach((result: any) => {
+                  allLotteryResults.push(`📄 ${result.title}: ${result.snippet} (Source: ${result.url})`);
+                });
+
+                if (allLotteryResults.length > 0) {
+                  let lotteryText = '\n\n🎟️ CURRENT LOTTERY INFORMATION (from multiple sources):\n';
+                  lotteryText += 'Official sites: www.powerball.com and www.megamillions.com\n\n';
+                  allLotteryResults.slice(0, 10).forEach((r) => {
+                    lotteryText += `${r}\n`;
                   });
 
-                  // Also try to get current jackpot info
-                  const jackpotSearch = await supabase.functions.invoke('duckduckgo-search', {
-                    body: {
-                      query: 'current powerball jackpot amount mega millions jackpot 2024',
-                      limit: 5,
-                    },
-                  });
-
-                  let jackpotResults: any[] = [];
-                  if (jackpotSearch.data?.data && Array.isArray(jackpotSearch.data.data)) {
-                    jackpotResults = jackpotSearch.data.data;
-                  } else if (Array.isArray(jackpotSearch.data)) {
-                    jackpotResults = jackpotSearch.data;
-                  }
-
-                  if (jackpotResults.length > 0) {
-                    lotteryText += '\n📊 CURRENT JACKPOT INFO:\n';
-                    jackpotResults.forEach((result: any) => {
-                      if (result.snippet && (result.snippet.includes('$') || result.snippet.includes('million') || result.snippet.includes('billion'))) {
-                        lotteryText += `- ${result.snippet}\n`;
-                      }
-                    });
-                  }
-
-                  console.log('🎟️ Returning lottery search results');
+                  console.log(`🎟️ Returning ${allLotteryResults.length} combined lottery results`);
                   return lotteryText;
                 }
               } catch (e) {
@@ -505,7 +508,33 @@ serve(async (req) => {
 
             console.log('🌍 Starting GENERAL KNOWLEDGE search (no figure prefix)...');
 
-            // Generic factual search WITHOUT the figure name
+            let allGeneralResults: string[] = [];
+
+            // Use Google Custom Search WITHOUT figure name for factual queries
+            const GOOGLE_API_KEY = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
+            const GOOGLE_CX = Deno.env.get('GOOGLE_SEARCH_ENGINE_ID');
+            
+            if (GOOGLE_API_KEY && GOOGLE_CX) {
+              try {
+                const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(message.substring(0, 150))}&num=5`;
+                console.log(`🌍 Google general search: ${message.substring(0, 50)}...`);
+                
+                const googleResp = await fetch(searchUrl);
+                if (googleResp.ok) {
+                  const googleData = await googleResp.json();
+                  if (googleData.items?.length > 0) {
+                    googleData.items.forEach((item: any) => {
+                      allGeneralResults.push(`📄 ${item.title}: ${item.snippet} (Source: ${item.link})`);
+                    });
+                    console.log(`🌍 Google found ${googleData.items.length} general results`);
+                  }
+                }
+              } catch (e) {
+                console.log('🌍 Google general search error:', e);
+              }
+            }
+
+            // Also use DuckDuckGo WITHOUT the figure name
             const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
               body: {
                 query: message.substring(0, 150),
@@ -524,16 +553,17 @@ serve(async (req) => {
               }
             }
 
-            console.log(`🌍 Parsed ${ddgResults.length} general knowledge results`);
+            ddgResults.forEach((result: any) => {
+              allGeneralResults.push(`📄 ${result.title}: ${result.snippet} (Source: ${result.url})`);
+            });
 
-            if (ddgResults.length > 0) {
-              let generalText = '\n\n🌍 GENERAL KNOWLEDGE (Factual Data):\n';
-              ddgResults.forEach((result: any) => {
-                generalText += `\n📊 ${result.title}\n`;
-                generalText += `${result.snippet}\n`;
-                if (result.url) generalText += `Source: ${result.url}\n`;
+            console.log(`🌍 Total general knowledge results: ${allGeneralResults.length}`);
+
+            if (allGeneralResults.length > 0) {
+              let generalText = '\n\n🌍 GENERAL KNOWLEDGE (from Google + DuckDuckGo):\n';
+              allGeneralResults.slice(0, 10).forEach((r) => {
+                generalText += `${r}\n`;
               });
-              console.log(`Found ${ddgResults.length} general knowledge results`);
               return generalText;
             }
           } catch (error) {
