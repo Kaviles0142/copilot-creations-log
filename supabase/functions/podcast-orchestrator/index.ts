@@ -234,37 +234,80 @@ CRITICAL: Do NOT prepend your name. Do NOT re-introduce yourself. Do NOT repeat 
     // Search for factual data if the topic or conversation seems like a data request
     let factualContext = '';
     const topicAndPrompt = `${session.topic} ${userPrompt}`.toLowerCase();
-    const factualKeywords = ['lottery', 'numbers', 'winning', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population', 'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the', 'who won', 'latest', 'current', 'today', 'yesterday', 'recent'];
+    const factualKeywords = ['lottery', 'lotto', 'powerball', 'mega millions', 'megamillions', 'jackpot', 'draw', 'numbers', 'winning', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population', 'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the', 'who won', 'latest', 'current', 'today', 'yesterday', 'recent'];
     const isFactualQuery = factualKeywords.some(keyword => topicAndPrompt.includes(keyword));
-    
+
     if (isFactualQuery) {
       console.log('🌍 Podcast: Searching for factual data...');
-      try {
-        const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
-          body: { 
-            query: session.topic.substring(0, 150),
-            limit: 5
-          }
-        });
-        
-        let ddgResults: any[] = [];
-        if (ddgResponse.data) {
-          if (Array.isArray(ddgResponse.data.data)) {
-            ddgResults = ddgResponse.data.data;
-          } else if (Array.isArray(ddgResponse.data)) {
-            ddgResults = ddgResponse.data;
-          }
+
+      const parseUsaMegaDraws = (html: string, maxDraws = 5) => {
+        const draws: Array<{ date: string; nums: string[] }> = [];
+        const rowRe = /<a href="https:\/\/www\.usamega\.com\/(?:powerball|mega-millions)\/drawing\/[^"]+">([^<]+)<\/a><ul>([\s\S]*?)<\/ul>/g;
+        let m: RegExpExecArray | null;
+        while ((m = rowRe.exec(html)) && draws.length < maxDraws) {
+          const date = m[1].replace(/\s+/g, ' ').trim();
+          const nums = Array.from(m[2].matchAll(/<li[^>]*>(\d+)<\/li>/g)).map((x) => x[1]);
+          if (nums.length >= 6) draws.push({ date, nums });
         }
-        
-        if (ddgResults.length > 0) {
-          factualContext = '\n\nFACTUAL DATA FROM WEB SEARCH:\n';
-          ddgResults.forEach((result: any) => {
-            factualContext += `- ${result.title}: ${result.snippet}\n`;
+        return draws;
+      };
+
+      const wantsPowerball = topicAndPrompt.includes('powerball');
+      const wantsMegaMillions = topicAndPrompt.includes('mega millions') || topicAndPrompt.includes('megamillions');
+      const usaMegaPath = wantsPowerball ? 'powerball' : wantsMegaMillions ? 'mega-millions' : null;
+
+      if (usaMegaPath) {
+        try {
+          const url = `https://www.usamega.com/${usaMegaPath}/results`;
+          console.log(`🎟️ Podcast: Fetching structured lottery results from ${url}`);
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const html = await resp.text();
+            const draws = parseUsaMegaDraws(html, 5);
+            if (draws.length > 0) {
+              const label = usaMegaPath === 'powerball' ? 'Powerball' : 'Mega Millions';
+              factualContext = `\n\nLOTTERY RESULTS (${label}) - RECENT DRAWS:\n`;
+              draws.forEach((d) => {
+                factualContext += `- ${d.date}: ${d.nums.slice(0, 5).join('-')} | Bonus ${d.nums[5]}\n`;
+              });
+              factualContext += `Source: https://www.usamega.com/${usaMegaPath}/results\n`;
+              console.log(`🎟️ Podcast: Parsed ${draws.length} draws for ${label}`);
+            }
+          }
+        } catch (error) {
+          console.log('🎟️ Podcast: Lottery fetch/parse error:', error);
+        }
+      }
+
+      // Fallback to DuckDuckGo snippets if no structured results
+      if (!factualContext) {
+        try {
+          const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
+            body: { 
+              query: session.topic.substring(0, 150),
+              limit: 5
+            }
           });
-          console.log(`🌍 Found ${ddgResults.length} factual results for podcast`);
+
+          let ddgResults: any[] = [];
+          if (ddgResponse.data) {
+            if (Array.isArray(ddgResponse.data.data)) {
+              ddgResults = ddgResponse.data.data;
+            } else if (Array.isArray(ddgResponse.data)) {
+              ddgResults = ddgResponse.data;
+            }
+          }
+
+          if (ddgResults.length > 0) {
+            factualContext = '\n\nFACTUAL DATA FROM WEB SEARCH:\n';
+            ddgResults.forEach((result: any) => {
+              factualContext += `- ${result.title}: ${result.snippet}\n`;
+            });
+            console.log(`🌍 Found ${ddgResults.length} factual results for podcast`);
+          }
+        } catch (error) {
+          console.log('Factual search error in podcast:', error);
         }
-      } catch (error) {
-        console.log('Factual search error in podcast:', error);
       }
     }
     
