@@ -397,27 +397,93 @@ serve(async (req) => {
         (async () => {
           try {
             // Only run general search if query seems like a factual/data request
-            const factualKeywords = ['lottery', 'numbers', 'winning', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population', 'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the', 'who won', 'latest', 'current', 'today', 'yesterday', 'recent'];
+            const factualKeywords = [
+              'lottery', 'lotto', 'powerball', 'mega millions', 'megamillions', 'jackpot', 'draw', 'winning', 'winner',
+              'numbers', 'results', 'score', 'statistics', 'data', 'price', 'stock', 'weather', 'population',
+              'capital', 'president', 'election', 'record', 'history of', 'when did', 'how many', 'what is the',
+              'who won', 'latest', 'current', 'today', 'yesterday', 'recent'
+            ];
+
             const lowerMessage = message.toLowerCase();
-            const isFactualQuery = factualKeywords.some(keyword => lowerMessage.includes(keyword));
-            
+            const contextText = JSON.stringify(context || []).toLowerCase();
+            const isFactualQuery = factualKeywords.some((keyword) => lowerMessage.includes(keyword));
+
             if (!isFactualQuery) {
               console.log('🔍 Skipping general search - not a factual query');
               return '';
             }
-            
-            console.log('🌍 Starting GENERAL KNOWLEDGE search (no figure prefix)...');
-            
-            // Search WITHOUT the figure name to get actual factual results
-            const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
-              body: { 
-                query: message.substring(0, 150), // Just the user's question
-                limit: 5
+
+            // Special-case: lottery results. Provide structured winning numbers so the model can answer directly.
+            const wantsPowerball = lowerMessage.includes('powerball') || contextText.includes('powerball');
+            const wantsMegaMillions =
+              lowerMessage.includes('mega millions') ||
+              lowerMessage.includes('megamillions') ||
+              contextText.includes('mega millions') ||
+              contextText.includes('megamillions');
+
+            const usaMegaPath = wantsPowerball ? 'powerball' : wantsMegaMillions ? 'mega-millions' : null;
+
+            const parseUsaMegaDraws = (html: string, maxDraws = 6) => {
+              const draws: Array<{ date: string; nums: string[] }> = [];
+              const rowRe = /<a href="https:\/\/www\.usamega\.com\/(?:powerball|mega-millions)\/drawing\/[^"]+">([^<]+)<\/a><ul>([\s\S]*?)<\/ul>/g;
+              let m: RegExpExecArray | null;
+              while ((m = rowRe.exec(html)) && draws.length < maxDraws) {
+                const date = m[1].replace(/\s+/g, ' ').trim();
+                const nums = Array.from(m[2].matchAll(/<li[^>]*>(\d+)<\/li>/g)).map((x) => x[1]);
+                if (nums.length >= 6) draws.push({ date, nums });
               }
+              return draws;
+            };
+
+            if (usaMegaPath) {
+              try {
+                const url = `https://www.usamega.com/${usaMegaPath}/results`;
+                console.log(`🎟️ Fetching structured lottery results from: ${url}`);
+
+                const resp = await fetch(url, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; LovableBot/1.0)',
+                    'Accept': 'text/html,application/xhtml+xml',
+                  },
+                });
+
+                if (resp.ok) {
+                  const html = await resp.text();
+                  const draws = parseUsaMegaDraws(html, 6);
+
+                  if (draws.length > 0) {
+                    const label = usaMegaPath === 'powerball' ? 'Powerball' : 'Mega Millions';
+                    let structured = `\n\n🎟️ ${label.toUpperCase()} RECENT WINNING NUMBERS (Structured):\n`;
+                    draws.slice(0, 5).forEach((d) => {
+                      const main = d.nums.slice(0, 5).join('-');
+                      const bonus = d.nums[5];
+                      structured += `- ${d.date}: ${main} | Bonus ${bonus}\n`;
+                    });
+                    structured += `Source: https://www.usamega.com/${usaMegaPath}/results\n`;
+
+                    console.log(`🎟️ Parsed ${draws.length} draws for ${label}`);
+                    return structured;
+                  }
+                } else {
+                  console.log(`🎟️ Lottery results fetch failed: ${resp.status}`);
+                }
+              } catch (e) {
+                console.log('🎟️ Lottery results parse error:', e);
+              }
+            }
+
+            console.log('🌍 Starting GENERAL KNOWLEDGE search (no figure prefix)...');
+
+            // Generic factual search WITHOUT the figure name
+            const ddgResponse = await supabase.functions.invoke('duckduckgo-search', {
+              body: {
+                query: message.substring(0, 150),
+                limit: 5,
+              },
             });
 
             console.log('🌍 General Search Raw Response:', JSON.stringify(ddgResponse, null, 2));
-            
+
             let ddgResults: any[] = [];
             if (ddgResponse.data) {
               if (Array.isArray(ddgResponse.data.data)) {
@@ -426,9 +492,9 @@ serve(async (req) => {
                 ddgResults = ddgResponse.data;
               }
             }
-            
+
             console.log(`🌍 Parsed ${ddgResults.length} general knowledge results`);
-            
+
             if (ddgResults.length > 0) {
               let generalText = '\n\n🌍 GENERAL KNOWLEDGE (Factual Data):\n';
               ddgResults.forEach((result: any) => {
@@ -852,6 +918,11 @@ The following research contains books you wrote, accounts of your life, and hist
 2. Share specific experiences and details mentioned in these materials
 3. Reference these naturally: "I remember writing..." "When I lived through..." "As I discovered..."
 4. Let these sources give you specific examples and quotes to make your conversation vivid and personal
+
+CRITICAL (FACTUAL QUERIES):
+- If the user asks for factual data (e.g., winning numbers, dates, stats) and it appears in the sources below, answer directly using that data.
+- Do NOT say you "can't access" the internet or "can't look it up" when the data is provided below; instead, cite the source lines.
+- If the data is NOT in the sources below, say you don't have it in the provided research.
 
 RESEARCH SOURCES AVAILABLE:
 ${relevantKnowledge}
