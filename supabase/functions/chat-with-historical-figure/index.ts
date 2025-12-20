@@ -446,27 +446,56 @@ serve(async (req) => {
                 let lotteryText = '\n\n🎟️ LOTTERY WINNING NUMBERS (Previous Draws):\n';
                 let foundActualNumbers = false;
 
-                // STEP 1: Fetch ACTUAL winning numbers from lottery results page
-                const lotteryUrls = [
-                  { name: 'Powerball', url: 'https://www.usamega.com/powerball/results' },
-                  { name: 'Mega Millions', url: 'https://www.usamega.com/mega-millions/results' }
-                ];
+                // STEP 1: Try NY State Open Data API (most reliable - no auth required)
+                try {
+                  const officialUrl = wantsPowerball 
+                    ? 'https://data.ny.gov/resource/d6yy-54nr.json?$order=draw_date%20DESC&$limit=15'
+                    : 'https://data.ny.gov/resource/5xaw-6ayf.json?$order=draw_date%20DESC&$limit=15';
+                  
+                  console.log(`🎟️ Fetching from NY Open Data: ${officialUrl}`);
+                  const officialResp = await fetch(officialUrl, {
+                    headers: { 'Accept': 'application/json' }
+                  });
+                  
+                  console.log(`🎟️ NY API response status: ${officialResp.status}`);
+                  
+                  if (officialResp.ok) {
+                    const data = await officialResp.json();
+                    console.log(`🎟️ Got ${data.length} draws from NY API`);
+                    
+                    if (Array.isArray(data) && data.length > 0) {
+                      foundActualNumbers = true;
+                      const lotteryName = wantsPowerball ? 'Powerball' : 'Mega Millions';
+                      lotteryText += `\n📊 ${lotteryName} - OFFICIAL WINNING NUMBERS (NY State Open Data):\n`;
+                      
+                      data.slice(0, 12).forEach((draw: any, idx: number) => {
+                        const date = draw.draw_date?.split('T')[0] || 'Unknown';
+                        const numbers = draw.winning_numbers || '';
+                        const multiplier = draw.multiplier || '';
+                        lotteryText += `  ${idx + 1}. ${date}: ${numbers}${multiplier ? ` (${multiplier}x)` : ''}\n`;
+                      });
+                      console.log('🎟️ SUCCESS: Got numbers from NY Open Data API');
+                    }
+                  }
+                } catch (nyErr) {
+                  console.log('🎟️ NY API error:', nyErr);
+                }
 
-                // Determine which lottery to fetch based on query
-                const urlsToFetch = wantsPowerball 
-                  ? [lotteryUrls[0]] 
-                  : wantsMegaMillions 
-                    ? [lotteryUrls[1]] 
-                    : lotteryUrls; // Fetch both if unclear
-
-                for (const lottery of urlsToFetch) {
+                // STEP 2: Try USA Mega as backup
+                if (!foundActualNumbers) {
                   try {
-                    console.log(`🎟️ Fetching actual numbers from ${lottery.url}`);
-                    const response = await fetch(lottery.url, {
+                    const lotteryType = wantsPowerball ? 'powerball' : wantsMegaMillions ? 'mega-millions' : 'powerball';
+                    const usamegaUrl = `https://www.usamega.com/${lotteryType}/results`;
+                    console.log(`🎟️ Trying USA Mega: ${usamegaUrl}`);
+                    
+                    const response = await fetch(usamegaUrl, {
                       headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                       }
                     });
+                    
+                    console.log(`🎟️ USA Mega status: ${response.status}`);
                     
                     if (response.ok) {
                       const html = await response.text();
@@ -474,80 +503,49 @@ serve(async (req) => {
                       
                       if (draws.length > 0) {
                         foundActualNumbers = true;
-                        lotteryText += `\n📊 ${lottery.name} - PREVIOUS WINNING NUMBERS:\n`;
+                        const lotteryName = lotteryType === 'powerball' ? 'Powerball' : 'Mega Millions';
+                        lotteryText += `\n📊 ${lotteryName} - WINNING NUMBERS FROM USAMEGA.COM:\n`;
                         draws.forEach((draw, idx) => {
                           const mainNums = draw.nums.slice(0, 5).join(' - ');
-                          const powerball = draw.nums[5] || draw.nums[draw.nums.length - 1];
-                          lotteryText += `  ${idx + 1}. ${draw.date}: ${mainNums} | PB: ${powerball}\n`;
+                          const specialBall = draw.nums[5];
+                          lotteryText += `  ${idx + 1}. ${draw.date}: ${mainNums} | ${lotteryType === 'powerball' ? 'PB' : 'MB'}: ${specialBall}\n`;
                         });
-                        console.log(`🎟️ Parsed ${draws.length} ${lottery.name} draws`);
+                        console.log(`🎟️ SUCCESS: Parsed ${draws.length} draws from USA Mega`);
                       }
                     }
-                  } catch (fetchErr) {
-                    console.log(`🎟️ Error fetching ${lottery.name}:`, fetchErr);
+                  } catch (usamegaErr) {
+                    console.log('🎟️ USA Mega error:', usamegaErr);
                   }
                 }
 
-                // STEP 2: Also try lottery.com as backup
+                // STEP 3: Search fallback
                 if (!foundActualNumbers) {
-                  try {
-                    console.log('🎟️ Trying backup source: lottery.com');
-                    const backupUrl = wantsPowerball 
-                      ? 'https://www.lottery.com/games/powerball' 
-                      : 'https://www.lottery.com/games/mega-millions';
-                    
-                    const backupResp = await fetch(backupUrl, {
-                      headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                      }
-                    });
-                    
-                    if (backupResp.ok) {
-                      const html = await backupResp.text();
-                      // Try to extract numbers with a more flexible pattern
-                      const numPattern = /(\d{1,2})\s*-?\s*(\d{1,2})\s*-?\s*(\d{1,2})\s*-?\s*(\d{1,2})\s*-?\s*(\d{1,2})\s*(?:PB|Powerball|Mega Ball)?\s*:?\s*(\d{1,2})/gi;
-                      const matches = html.match(numPattern);
-                      if (matches && matches.length > 0) {
-                        foundActualNumbers = true;
-                        lotteryText += `\n📊 Recent Winning Numbers:\n`;
-                        matches.slice(0, 5).forEach((match, idx) => {
-                          lotteryText += `  ${idx + 1}. ${match}\n`;
-                        });
-                      }
-                    }
-                  } catch (backupErr) {
-                    console.log('🎟️ Backup source error:', backupErr);
-                  }
-                }
-
-                // STEP 3: If we still don't have numbers, use search but be explicit about limitation
-                if (!foundActualNumbers) {
-                  console.log('🎟️ Could not fetch actual numbers, falling back to search snippets');
+                  console.log('🎟️ APIs failed, using search');
                   
-                  const lotterySearchQuery = wantsPowerball 
-                    ? 'powerball winning numbers previous results site:powerball.com OR site:usamega.com'
-                    : 'mega millions winning numbers previous results site:megamillions.com OR site:usamega.com';
+                  const searchQuery = wantsPowerball 
+                    ? 'powerball winning numbers december 2025 latest drawing results'
+                    : 'mega millions winning numbers december 2025 latest drawing results';
                   
-                  const lotterySearch = await supabase.functions.invoke('duckduckgo-search', {
-                    body: { query: lotterySearchQuery, limit: 5 }
+                  const searchResult = await supabase.functions.invoke('duckduckgo-search', {
+                    body: { query: searchQuery, limit: 8 }
                   });
 
-                  let lotteryResults: any[] = [];
-                  if (lotterySearch.data?.data && Array.isArray(lotterySearch.data.data)) {
-                    lotteryResults = lotterySearch.data.data;
-                  } else if (Array.isArray(lotterySearch.data)) {
-                    lotteryResults = lotterySearch.data;
+                  let results: any[] = [];
+                  if (searchResult.data?.data && Array.isArray(searchResult.data.data)) {
+                    results = searchResult.data.data;
+                  } else if (Array.isArray(searchResult.data)) {
+                    results = searchResult.data;
                   }
 
-                  if (lotteryResults.length > 0) {
-                    lotteryText += '\n📋 Search Results (snippets - may contain winning numbers):\n';
-                    lotteryResults.forEach((result: any) => {
+                  if (results.length > 0) {
+                    lotteryText += '\n📋 SEARCH RESULTS (extract numbers from these):\n';
+                    results.forEach((result: any) => {
                       lotteryText += `• ${result.title}: ${result.snippet}\n`;
                     });
                   }
                 }
 
-                lotteryText += '\nOfficial sources: www.powerball.com and www.megamillions.com\n';
+                lotteryText += '\n⚠️ CRITICAL: Use the actual numbers above. Do NOT tell users to look them up themselves.\n';
                 console.log(`🎟️ Lottery data collected, foundActualNumbers: ${foundActualNumbers}`);
                 return lotteryText;
               } catch (e) {
