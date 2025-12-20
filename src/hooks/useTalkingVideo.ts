@@ -2,6 +2,13 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+// Dispatch event when video is generated for history widget
+const dispatchVideoEvent = (url: string, figureName?: string) => {
+  window.dispatchEvent(
+    new CustomEvent("video-generated", { detail: { url, figureName } })
+  );
+};
+
 interface VideoGenerationResult {
   status: 'idle' | 'generating' | 'processing' | 'completed' | 'failed';
   videoUrl: string | null;
@@ -14,6 +21,7 @@ interface UseTalkingVideoOptions {
   onError?: (error: string) => void;
   pollInterval?: number;
   maxPollAttempts?: number;
+  figureName?: string;
 }
 
 export function useTalkingVideo(options: UseTalkingVideoOptions = {}) {
@@ -22,7 +30,10 @@ export function useTalkingVideo(options: UseTalkingVideoOptions = {}) {
     onError,
     pollInterval = 3000,
     maxPollAttempts = 60, // 3 minutes max polling
+    figureName: optionsFigureName,
   } = options;
+  
+  const currentFigureNameRef = useRef<string | undefined>(optionsFigureName);
 
   const [result, setResult] = useState<VideoGenerationResult>({
     status: 'idle',
@@ -77,6 +88,7 @@ export function useTalkingVideo(options: UseTalkingVideoOptions = {}) {
           jobId,
           error: null,
         });
+        dispatchVideoEvent(data.video, currentFigureNameRef.current);
         onVideoReady?.(data.video);
         return;
       }
@@ -116,6 +128,9 @@ export function useTalkingVideo(options: UseTalkingVideoOptions = {}) {
     console.log('📸 Image:', imageUrl.substring(0, 50) + '...');
     console.log('🎵 Audio type:', audioUrl.startsWith('data:') ? 'base64' : 'url');
 
+    // Store figureName for event dispatch
+    currentFigureNameRef.current = figureName || optionsFigureName;
+
     stopPolling();
     setResult({
       status: 'generating',
@@ -148,6 +163,7 @@ export function useTalkingVideo(options: UseTalkingVideoOptions = {}) {
           jobId: data.jobId,
           error: null,
         });
+        dispatchVideoEvent(data.video, currentFigureNameRef.current);
         onVideoReady?.(data.video);
         return data.video;
       }

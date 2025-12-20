@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import AvatarTest from "./pages/AvatarTest";
 import NotFound from "./pages/NotFound";
+import { VideoHistoryWidget } from "./components/VideoHistoryWidget";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      <VideoHistoryWidget />
     </TooltipProvider>
   </QueryClientProvider>
 );
