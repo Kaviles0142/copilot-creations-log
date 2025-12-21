@@ -107,7 +107,7 @@ const HistoricalChat = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // Only for first greeting
-  const [pendingResponse, setPendingResponse] = useState<{text: string, audioUrl: string} | null>(null); // Hold response until video ready
+  // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -897,7 +897,11 @@ const HistoricalChat = () => {
         fallbackUsed: result.fallbackUsed
       };
 
-      // Generate TTS and prepare for avatar video
+      // Show message IMMEDIATELY, then generate video in parallel
+      setMessages(prev => [...prev, assistantMessage]);
+      await saveMessage(assistantMessage, conversationId);
+      
+      // Generate TTS and video in background (message already shown)
       if (aiResponse.length > 20 && isAutoVoiceEnabled) {
         console.log('🎤 IMMEDIATE TTS START for:', selectedFigure!.name);
         
@@ -916,43 +920,24 @@ const HistoricalChat = () => {
           if (ttsError) throw ttsError;
           if (!ttsData?.audioContent) throw new Error('No audio content received');
 
-          console.log('✅ TTS audio ready, storing for avatar generation');
+          console.log('✅ TTS audio ready, triggering video generation');
           
           // Create data URL for edge function (can be uploaded to storage)
           const audioDataUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
           
-          // Create blob URL for local audio playback
-          const audioBlob = base64ToBlob(ttsData.audioContent, 'audio/mpeg');
-          const audioBlobUrl = URL.createObjectURL(audioBlob);
-          
-          // Store the pending response - will be shown when avatar video is ready
-          console.log('📝 Storing pending response with blob URL for playback');
-          setPendingResponse({
-            text: aiResponse,
-            audioUrl: audioBlobUrl // Use blob URL for playback
-          });
-          
-          // Store data URL to trigger avatar generation (edge function needs data URL)
-          console.log('🎬 Setting currentAudioUrl (data URL) to trigger new avatar video');
+          // Store data URL to trigger avatar video generation
+          // Video will play with embedded audio when ready
+          console.log('🎬 Setting currentAudioUrl to trigger avatar video');
           setCurrentAudioUrl(audioDataUrl);
-          
-          // Message and audio playback will happen in onVideoReady callback
           
         } catch (error) {
           console.error('❌ TTS generation error:', error);
-          // If TTS fails, show message without avatar
-          setMessages(prev => [...prev, assistantMessage]);
-          await saveMessage(assistantMessage, conversationId);
           toast({
             title: "Voice generation failed",
-            description: "Showing text response only",
+            description: "Response shown without voice",
             variant: "destructive",
           });
         }
-      } else {
-        // No TTS needed, show message immediately
-        setMessages(prev => [...prev, assistantMessage]);
-        await saveMessage(assistantMessage, conversationId);
       }
       
       // Reset loading state
@@ -1775,38 +1760,13 @@ const HistoricalChat = () => {
                 // Clear currentAudioUrl to prevent re-triggering video generation
                 setCurrentAudioUrl(null);
                 
-                // Check if videoUrl is actually a video (not audio fallback)
-                // Ditto videos are typically MP4 URLs from their CDN
-                const isVideo = videoUrl && (
-                  videoUrl.includes('.mp4') || 
-                  videoUrl.includes('.webm') || 
-                  videoUrl.includes('video') ||
-                  videoUrl.includes('ditto') ||
-                  videoUrl.includes('cdn') ||
-                  // Also check if it's NOT an audio data URL
-                  !videoUrl.startsWith('data:audio')
-                );
-                
-                console.log('🎬 Is video:', isVideo, 'Has pending response:', !!pendingResponse);
-                
-                // If we have a pending response, now show it
-                if (pendingResponse) {
-                  const assistantMessage: Message = {
-                    id: (Date.now() + 1).toString(),
-                    content: pendingResponse.text,
-                    type: "assistant",
-                    timestamp: new Date(),
-                  };
+                // For greeting, check if we need to play audio fallback
+                if (greetingAudioUrl) {
+                  const isVideo = videoUrl && !videoUrl.startsWith('data:audio');
                   
-                  // Add message to UI
-                  setMessages(prev => [...prev, assistantMessage]);
-                  if (currentConversationId) {
-                    await saveMessage(assistantMessage, currentConversationId);
-                  }
-                  
-                  // Only play audio separately if the video generation failed (fallback to audio only)
                   if (!isVideo) {
-                    console.log('🎤 Playing audio only (no video)');
+                    // Only play greeting audio separately if no video
+                    console.log('🎤 Playing greeting audio (no video)');
                     initializeAudioPipeline();
                     if (audioContextRef.current!.state === 'suspended') {
                       await audioContextRef.current!.resume();
@@ -1817,84 +1777,30 @@ const HistoricalChat = () => {
                       currentAudio.currentTime = 0;
                     }
                     
-                    // Set up audio event handlers
                     audioElementRef.current!.onplay = () => {
-                      console.log('▶️ Audio PLAY event fired');
                       setIsSpeaking(true);
                       setIsPlayingAudio(true);
                     };
                     
                     audioElementRef.current!.onended = () => {
-                      console.log('⏹️ Audio ENDED');
                       setIsSpeaking(false);
                       setIsPlayingAudio(false);
+                      setIsGreetingPlaying(false);
                       setCurrentAudio(null);
                     };
                     
-                    audioElementRef.current!.onerror = (err) => {
-                      console.error('❌ Audio ERROR:', err);
+                    audioElementRef.current!.onerror = () => {
                       setIsSpeaking(false);
                       setIsPlayingAudio(false);
+                      setIsGreetingPlaying(false);
                     };
                     
-                    audioElementRef.current!.onpause = () => {
-                      console.log('⏸️ Audio PAUSED');
-                      setIsSpeaking(false);
-                    };
-                    
-                    // pendingResponse.audioUrl is already a blob URL, use it directly
-                    audioElementRef.current!.src = pendingResponse.audioUrl;
+                    audioElementRef.current!.src = greetingAudioUrl;
                     setCurrentAudio(audioElementRef.current!);
                     audioElementRef.current!.load();
                     await audioElementRef.current!.play();
-                  } else {
-                    console.log('🎬 Video has embedded audio, not playing separately');
                   }
                   
-                  // Clear pending response
-                  setPendingResponse(null);
-                } else if (greetingAudioUrl && !isVideo) {
-                  // Only play greeting audio separately if no video
-                  console.log('🎤 Playing greeting audio');
-                  initializeAudioPipeline();
-                  if (audioContextRef.current!.state === 'suspended') {
-                    await audioContextRef.current!.resume();
-                  }
-                  
-                  if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
-                  }
-                  
-                  // Set up audio event handlers
-                  audioElementRef.current!.onplay = () => {
-                    console.log('▶️ Greeting audio PLAY event fired');
-                    setIsSpeaking(true);
-                    setIsPlayingAudio(true);
-                  };
-                  
-                  audioElementRef.current!.onended = () => {
-                    console.log('⏹️ Greeting audio ENDED');
-                    setIsSpeaking(false);
-                    setIsPlayingAudio(false);
-                    setIsGreetingPlaying(false);
-                    setCurrentAudio(null);
-                  };
-                  
-                  audioElementRef.current!.onerror = (err) => {
-                    console.error('❌ Greeting audio ERROR:', err);
-                    setIsSpeaking(false);
-                    setIsPlayingAudio(false);
-                    setIsGreetingPlaying(false);
-                  };
-                  
-                  // Play greeting audio (it's already a data URL)
-                  audioElementRef.current!.src = greetingAudioUrl;
-                  setCurrentAudio(audioElementRef.current!);
-                  audioElementRef.current!.load();
-                  await audioElementRef.current!.play();
-                  
-                  // Clear greeting audio after playing
                   setGreetingAudioUrl(null);
                 }
               }}
