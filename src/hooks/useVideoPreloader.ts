@@ -1,74 +1,52 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface PreloadedVideo {
-  audioUrl: string;
-  videoUrl: string | null;
-  status: 'generating' | 'ready' | 'failed';
-  error?: string;
-}
-
 interface VideoPreloaderOptions {
-  onVideoReady?: (audioUrl: string, videoUrl: string) => void;
-  onError?: (audioUrl: string, error: string) => void;
   pollInterval?: number;
   maxPollAttempts?: number;
 }
 
+interface PreloadResult {
+  videoUrl: string | null;
+  error?: string;
+}
+
 export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
-  const {
-    onVideoReady,
-    onError,
-    pollInterval = 3000,
-    maxPollAttempts = 60,
-  } = options;
+  const { pollInterval = 3000, maxPollAttempts = 30 } = options;
 
-  const [preloadedVideos, setPreloadedVideos] = useState<Map<string, PreloadedVideo>>(new Map());
-  const [currentlyGenerating, setCurrentlyGenerating] = useState<Set<string>>(new Set());
+  // Use refs instead of state to avoid stale closure issues
+  const videosRef = useRef<Map<string, PreloadResult>>(new Map());
+  const generatingRef = useRef<Set<string>>(new Set());
   const pollTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const pollCountsRef = useRef<Map<string, number>>(new Map());
 
-  // Stop polling for a specific audio URL
-  const stopPolling = useCallback((audioUrl: string) => {
-    const timeout = pollTimeoutsRef.current.get(audioUrl);
+  // Stop polling for a specific key
+  const stopPolling = useCallback((key: string) => {
+    const timeout = pollTimeoutsRef.current.get(key);
     if (timeout) {
       clearTimeout(timeout);
-      pollTimeoutsRef.current.delete(audioUrl);
+      pollTimeoutsRef.current.delete(key);
     }
-    pollCountsRef.current.delete(audioUrl);
-  }, []);
-
-  // Stop all polling
-  const stopAllPolling = useCallback(() => {
-    pollTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
-    pollTimeoutsRef.current.clear();
-    pollCountsRef.current.clear();
   }, []);
 
   // Poll for video status
-  const pollForVideo = useCallback(async (audioUrl: string, jobId: string) => {
-    const count = (pollCountsRef.current.get(audioUrl) || 0) + 1;
-    pollCountsRef.current.set(audioUrl, count);
-
-    if (count > maxPollAttempts) {
-      console.log('⏰ Max poll attempts reached for preload');
-      stopPolling(audioUrl);
-      setPreloadedVideos(prev => {
-        const newMap = new Map(prev);
-        newMap.set(audioUrl, { audioUrl, videoUrl: null, status: 'failed', error: 'Timeout' });
-        return newMap;
-      });
-      setCurrentlyGenerating(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(audioUrl);
-        return newSet;
-      });
-      onError?.(audioUrl, 'Video generation timed out');
+  const pollForVideo = useCallback(async (
+    key: string,
+    jobId: string,
+    attempt: number,
+    resolve: (result: PreloadResult) => void
+  ) => {
+    if (attempt > maxPollAttempts) {
+      console.log('⏰ Max poll attempts reached');
+      const result = { videoUrl: null, error: 'Timeout' };
+      videosRef.current.set(key, result);
+      generatingRef.current.delete(key);
+      stopPolling(key);
+      resolve(result);
       return;
     }
 
     try {
-      console.log(`🔄 Preload polling (attempt ${count}/${maxPollAttempts})...`);
+      console.log(`🔄 Polling video status (${attempt}/${maxPollAttempts})...`);
       
       const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
         body: { action: 'status', jobId },
@@ -77,81 +55,78 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
       if (error) throw error;
 
       if (data.status === 'completed' && data.video) {
-        console.log('✅ Preloaded video ready:', data.video);
-        stopPolling(audioUrl);
-        setPreloadedVideos(prev => {
-          const newMap = new Map(prev);
-          newMap.set(audioUrl, { audioUrl, videoUrl: data.video, status: 'ready' });
-          return newMap;
-        });
-        setCurrentlyGenerating(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(audioUrl);
-          return newSet;
-        });
-        onVideoReady?.(audioUrl, data.video);
+        console.log('✅ Video ready:', data.video.substring(0, 60) + '...');
+        const result = { videoUrl: data.video };
+        videosRef.current.set(key, result);
+        generatingRef.current.delete(key);
+        stopPolling(key);
+        resolve(result);
         return;
       }
 
       if (data.status === 'failed') {
-        console.log('❌ Preload video generation failed:', data.error);
-        stopPolling(audioUrl);
-        setPreloadedVideos(prev => {
-          const newMap = new Map(prev);
-          newMap.set(audioUrl, { audioUrl, videoUrl: null, status: 'failed', error: data.error });
-          return newMap;
-        });
-        setCurrentlyGenerating(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(audioUrl);
-          return newSet;
-        });
-        onError?.(audioUrl, data.error || 'Video generation failed');
+        console.log('❌ Video generation failed:', data.error);
+        const result = { videoUrl: null, error: data.error || 'Generation failed' };
+        videosRef.current.set(key, result);
+        generatingRef.current.delete(key);
+        stopPolling(key);
+        resolve(result);
         return;
       }
 
       // Still processing - continue polling
-      const timeout = setTimeout(() => pollForVideo(audioUrl, jobId), pollInterval);
-      pollTimeoutsRef.current.set(audioUrl, timeout);
+      const timeout = setTimeout(() => {
+        pollForVideo(key, jobId, attempt + 1, resolve);
+      }, pollInterval);
+      pollTimeoutsRef.current.set(key, timeout);
+      
     } catch (err) {
-      console.error('❌ Preload poll error:', err);
-      stopPolling(audioUrl);
+      console.error('❌ Poll error:', err);
       const errorMsg = err instanceof Error ? err.message : 'Polling failed';
-      setPreloadedVideos(prev => {
-        const newMap = new Map(prev);
-        newMap.set(audioUrl, { audioUrl, videoUrl: null, status: 'failed', error: errorMsg });
-        return newMap;
-      });
-      setCurrentlyGenerating(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(audioUrl);
-        return newSet;
-      });
-      onError?.(audioUrl, errorMsg);
+      const result = { videoUrl: null, error: errorMsg };
+      videosRef.current.set(key, result);
+      generatingRef.current.delete(key);
+      stopPolling(key);
+      resolve(result);
     }
-  }, [maxPollAttempts, pollInterval, stopPolling, onVideoReady, onError]);
+  }, [maxPollAttempts, pollInterval, stopPolling]);
 
-  // Start preloading a video
-  const preloadVideo = useCallback(async (
+  // Generate and wait for video - returns a promise
+  const generateVideo = useCallback(async (
     imageUrl: string,
     audioUrl: string,
     figureId?: string,
     figureName?: string
-  ): Promise<void> => {
-    // Skip if already preloading or preloaded
-    if (currentlyGenerating.has(audioUrl) || preloadedVideos.has(audioUrl)) {
-      console.log('⏭️ Already preloading/preloaded this video');
-      return;
+  ): Promise<PreloadResult> => {
+    const key = `${figureId || 'unknown'}-${audioUrl.substring(0, 50)}`;
+    
+    // Return cached result if available
+    const cached = videosRef.current.get(key);
+    if (cached?.videoUrl) {
+      console.log('⏭️ Returning cached video');
+      return cached;
     }
 
-    console.log('🎬 Starting video preload for:', figureName || figureId);
-    
-    setCurrentlyGenerating(prev => new Set(prev).add(audioUrl));
-    setPreloadedVideos(prev => {
-      const newMap = new Map(prev);
-      newMap.set(audioUrl, { audioUrl, videoUrl: null, status: 'generating' });
-      return newMap;
-    });
+    // Skip if already generating - wait for it
+    if (generatingRef.current.has(key)) {
+      console.log('⏳ Already generating, waiting...');
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          const result = videosRef.current.get(key);
+          if (result) {
+            clearInterval(checkInterval);
+            resolve(result);
+          }
+          if (!generatingRef.current.has(key) && !result) {
+            clearInterval(checkInterval);
+            resolve({ videoUrl: null, error: 'Generation stopped' });
+          }
+        }, 500);
+      });
+    }
+
+    console.log('🎬 Starting video generation for:', figureName || figureId);
+    generatingRef.current.add(key);
 
     try {
       const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
@@ -168,125 +143,61 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
 
       // Immediate completion
       if (data.status === 'completed' && data.video) {
-        console.log('✅ Preloaded video ready immediately:', data.video);
-        setPreloadedVideos(prev => {
-          const newMap = new Map(prev);
-          newMap.set(audioUrl, { audioUrl, videoUrl: data.video, status: 'ready' });
-          return newMap;
-        });
-        setCurrentlyGenerating(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(audioUrl);
-          return newSet;
-        });
-        onVideoReady?.(audioUrl, data.video);
-        return;
+        console.log('✅ Video ready immediately:', data.video.substring(0, 60) + '...');
+        const result = { videoUrl: data.video };
+        videosRef.current.set(key, result);
+        generatingRef.current.delete(key);
+        return result;
       }
 
-      // Async processing - start polling
+      // Async processing - poll for completion
       if (data.status === 'processing' && data.jobId) {
-        console.log('⏳ Preload video processing, starting poll for job:', data.jobId);
-        const timeout = setTimeout(() => pollForVideo(audioUrl, data.jobId), pollInterval);
-        pollTimeoutsRef.current.set(audioUrl, timeout);
-        return;
+        console.log('⏳ Video processing, starting poll...');
+        return new Promise((resolve) => {
+          pollForVideo(key, data.jobId, 1, resolve);
+        });
       }
 
-      throw new Error(data.error || 'Failed to start video preload');
+      throw new Error(data.error || 'Failed to start video generation');
+      
     } catch (err) {
-      console.error('❌ Video preload error:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Video preload failed';
-      setPreloadedVideos(prev => {
-        const newMap = new Map(prev);
-        newMap.set(audioUrl, { audioUrl, videoUrl: null, status: 'failed', error: errorMsg });
-        return newMap;
-      });
-      setCurrentlyGenerating(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(audioUrl);
-        return newSet;
-      });
-      onError?.(audioUrl, errorMsg);
+      console.error('❌ Video generation error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Generation failed';
+      const result = { videoUrl: null, error: errorMsg };
+      videosRef.current.set(key, result);
+      generatingRef.current.delete(key);
+      return result;
     }
-  }, [currentlyGenerating, preloadedVideos, pollForVideo, pollInterval, onVideoReady, onError]);
+  }, [pollForVideo]);
 
-  // Get preloaded video URL for an audio URL
-  const getPreloadedVideo = useCallback((audioUrl: string): PreloadedVideo | undefined => {
-    return preloadedVideos.get(audioUrl);
-  }, [preloadedVideos]);
-
-  // Check if video is ready
-  const isVideoReady = useCallback((audioUrl: string): boolean => {
-    const video = preloadedVideos.get(audioUrl);
-    return video?.status === 'ready' && !!video.videoUrl;
-  }, [preloadedVideos]);
-
-  // Check if video is currently generating
-  const isVideoGenerating = useCallback((audioUrl: string): boolean => {
-    return currentlyGenerating.has(audioUrl) || preloadedVideos.get(audioUrl)?.status === 'generating';
-  }, [currentlyGenerating, preloadedVideos]);
-
-  // Wait for video to be ready (returns promise)
-  const waitForVideo = useCallback((audioUrl: string, timeout = 90000): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-      
-      const check = () => {
-        const video = preloadedVideos.get(audioUrl);
-        
-        if (video?.status === 'ready' && video.videoUrl) {
-          resolve(video.videoUrl);
-          return;
-        }
-        
-        if (video?.status === 'failed') {
-          resolve(null);
-          return;
-        }
-        
-        if (Date.now() - startTime > timeout) {
-          console.log('⏰ Wait for video timeout');
-          resolve(null);
-          return;
-        }
-        
-        setTimeout(check, 500);
-      };
-      
-      check();
+  // Clear cache for a figure
+  const clearCache = useCallback((figureId: string) => {
+    const keysToDelete: string[] = [];
+    videosRef.current.forEach((_, key) => {
+      if (key.startsWith(figureId)) {
+        keysToDelete.push(key);
+        stopPolling(key);
+      }
     });
-  }, [preloadedVideos]);
-
-  // Clear a specific preloaded video
-  const clearPreloadedVideo = useCallback((audioUrl: string) => {
-    stopPolling(audioUrl);
-    setPreloadedVideos(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(audioUrl);
-      return newMap;
-    });
-    setCurrentlyGenerating(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(audioUrl);
-      return newSet;
+    keysToDelete.forEach(key => videosRef.current.delete(key));
+    generatingRef.current.forEach(key => {
+      if (key.startsWith(figureId)) {
+        generatingRef.current.delete(key);
+      }
     });
   }, [stopPolling]);
 
-  // Clear all preloaded videos
+  // Clear all
   const clearAll = useCallback(() => {
-    stopAllPolling();
-    setPreloadedVideos(new Map());
-    setCurrentlyGenerating(new Set());
-  }, [stopAllPolling]);
+    pollTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+    pollTimeoutsRef.current.clear();
+    videosRef.current.clear();
+    generatingRef.current.clear();
+  }, []);
 
   return {
-    preloadVideo,
-    getPreloadedVideo,
-    isVideoReady,
-    isVideoGenerating,
-    waitForVideo,
-    clearPreloadedVideo,
+    generateVideo,
+    clearCache,
     clearAll,
-    preloadedVideos,
-    currentlyGenerating: currentlyGenerating.size > 0,
   };
 }
