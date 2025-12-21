@@ -694,22 +694,29 @@ const PodcastMode = () => {
   const continueRound = async () => {
     setWaitingForContinue(false);
     
-    // When both participants are AI figures, preload second speaker's video while first plays
+    // When both participants are AI figures, generate and play videos sequentially
     if (hostType === 'figure' && guestType === 'figure') {
-      const firstSpeaker: 'host' | 'guest' = currentSpeaker;
-      const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
+      // Always start with host, then guest for each round
+      const firstSpeaker: 'host' | 'guest' = 'host';
+      const secondSpeaker: 'host' | 'guest' = 'guest';
       
-      const firstFigure = firstSpeaker === 'host' ? host : guest;
-      const secondFigure = secondSpeaker === 'host' ? host : guest;
+      const firstFigure = host;
+      const secondFigure = guest;
       
       if (!firstFigure || !secondFigure || !podcastSessionId) return;
 
-      // Generate first speaker's content
+      console.log(`🎙️ Starting round ${currentRound + 1}`);
+
+      // Generate first speaker's content (host)
       const { data: firstData, error: firstError } = await supabase.functions.invoke('podcast-orchestrator', {
         body: { sessionId: podcastSessionId, language: selectedLanguage.split('-')[0] }
       });
       
-      if (firstError || !firstData) return;
+      if (firstError || !firstData) {
+        console.error('Failed to get first response:', firstError);
+        setWaitingForContinue(true);
+        return;
+      }
       
       const firstMessage: Message = {
         id: Date.now().toString(),
@@ -721,77 +728,63 @@ const PodcastMode = () => {
       setMessages(prev => [...prev, firstMessage]);
       setSpeakerCount(prev => prev + 1);
       
-      // Start generating second speaker's content in parallel
-      const secondDataPromise = supabase.functions.invoke('podcast-orchestrator', {
+      // Generate and play first video (host)
+      if (isAutoVoiceEnabled) {
+        console.log(`🎬 Generating video for ${firstFigure.name}`);
+        setCurrentVideoSpeaker(firstSpeaker);
+        const firstVideoUrl = await generateVideoOnly(firstData.message, firstFigure.name, firstFigure.id, firstSpeaker);
+        
+        if (firstVideoUrl) {
+          // Set and play first video
+          setHostVideoUrl(firstVideoUrl);
+          setGuestVideoUrl(null);
+          await playVideo(firstVideoUrl);
+          setHostVideoUrl(null);
+        }
+      }
+
+      // Generate second speaker's content (guest)
+      const { data: secondData, error: secondError } = await supabase.functions.invoke('podcast-orchestrator', {
         body: { sessionId: podcastSessionId, language: selectedLanguage.split('-')[0] }
       });
       
-      // Generate and play first video
+      if (secondError || !secondData) {
+        console.error('Failed to get second response:', secondError);
+        setWaitingForContinue(true);
+        return;
+      }
+      
+      const secondMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: secondData.message,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: secondFigure.name
+      };
+      setMessages(prev => [...prev, secondMessage]);
+      setSpeakerCount(prev => prev + 1);
+      
+      // Generate and play second video (guest)
       if (isAutoVoiceEnabled) {
-        // Start preloading second video while first plays
-        const firstVideoPromise = generateVideoOnly(firstData.message, firstFigure.name, firstFigure.id, firstSpeaker);
-        const firstVideoUrl = await firstVideoPromise;
+        console.log(`🎬 Generating video for ${secondFigure.name}`);
+        setCurrentVideoSpeaker(secondSpeaker);
+        const secondVideoUrl = await generateVideoOnly(secondData.message, secondFigure.name, secondFigure.id, secondSpeaker);
         
-        if (firstVideoUrl) {
-          // Play first video and preload second in parallel
-          const { data: secondData } = await secondDataPromise;
-          
-          if (secondData) {
-            const secondMessage: Message = {
-              id: (Date.now() + 1).toString(),
-              content: secondData.message,
-              type: "assistant",
-              timestamp: new Date(),
-              speakerName: secondFigure.name
-            };
-            setMessages(prev => [...prev, secondMessage]);
-            setSpeakerCount(prev => prev + 1);
-            
-            // Start preloading second video
-            setIsPreloading(true);
-            const secondVideoPromise = generateVideoOnly(secondData.message, secondFigure.name, secondFigure.id, secondSpeaker);
-            
-            // Play first video
-            if (firstSpeaker === 'host') {
-              setHostVideoUrl(firstVideoUrl);
-              setGuestVideoUrl(null);
-            } else {
-              setGuestVideoUrl(firstVideoUrl);
-              setHostVideoUrl(null);
-            }
-            await playVideo(firstVideoUrl);
-            
-            // First video done, clear it
-            if (firstSpeaker === 'host') setHostVideoUrl(null);
-            else setGuestVideoUrl(null);
-            
-            // Wait for second video to be ready
-            const secondVideoUrl = await secondVideoPromise;
-            setIsPreloading(false);
-            
-            if (secondVideoUrl) {
-              // Play second video
-              if (secondSpeaker === 'host') {
-                setHostVideoUrl(secondVideoUrl);
-                setGuestVideoUrl(null);
-              } else {
-                setGuestVideoUrl(secondVideoUrl);
-                setHostVideoUrl(null);
-              }
-              await playVideo(secondVideoUrl);
-              
-              // Clear after playback
-              if (secondSpeaker === 'host') setHostVideoUrl(null);
-              else setGuestVideoUrl(null);
-            }
-          }
+        if (secondVideoUrl) {
+          // Set and play second video
+          setGuestVideoUrl(secondVideoUrl);
+          setHostVideoUrl(null);
+          await playVideo(secondVideoUrl);
+          setGuestVideoUrl(null);
         }
       }
       
-      // Update round
+      // Update round and prepare for next
       setCurrentRound(prev => prev + 1);
-      setCurrentSpeaker(firstSpeaker);
+      setCurrentVideoSpeaker(null);
+      setCurrentSpeaker('host'); // Reset to host for next round
       setWaitingForContinue(true);
+      console.log(`✅ Round complete, ready for next round`);
     } else {
       // If a user is involved, just continue normally
       await continueConversation(currentSpeaker, true);

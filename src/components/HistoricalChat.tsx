@@ -1770,10 +1770,24 @@ const HistoricalChat = () => {
                 setIsGreetingPlaying(false);
               }}
               onVideoReady={async (videoUrl) => {
-                console.log('✅ Video ready:', videoUrl);
+                console.log('✅ Video ready:', videoUrl?.substring(0, 80));
                 
-                // Check if videoUrl is actually a video (not audio)
-                const isVideo = videoUrl.includes('.mp4') || videoUrl.includes('.webm') || videoUrl.includes('video');
+                // Clear currentAudioUrl to prevent re-triggering video generation
+                setCurrentAudioUrl(null);
+                
+                // Check if videoUrl is actually a video (not audio fallback)
+                // Ditto videos are typically MP4 URLs from their CDN
+                const isVideo = videoUrl && (
+                  videoUrl.includes('.mp4') || 
+                  videoUrl.includes('.webm') || 
+                  videoUrl.includes('video') ||
+                  videoUrl.includes('ditto') ||
+                  videoUrl.includes('cdn') ||
+                  // Also check if it's NOT an audio data URL
+                  !videoUrl.startsWith('data:audio')
+                );
+                
+                console.log('🎬 Is video:', isVideo, 'Has pending response:', !!pendingResponse);
                 
                 // If we have a pending response, now show it
                 if (pendingResponse) {
