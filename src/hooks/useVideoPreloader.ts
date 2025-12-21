@@ -92,20 +92,19 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
   }, [maxPollAttempts, pollInterval, stopPolling]);
 
   // Generate and wait for video - returns a promise
+  // NOTE: Each call generates a NEW video - no caching by audio content
+  // Caching caused issues where greeting videos were replayed for responses
   const generateVideo = useCallback(async (
     imageUrl: string,
     audioUrl: string,
     figureId?: string,
     figureName?: string
   ): Promise<PreloadResult> => {
-    const key = `${figureId || 'unknown'}-${audioUrl.substring(0, 50)}`;
+    // Use timestamp to ensure unique key for each generation request
+    const uniqueId = Date.now().toString();
+    const key = `${figureId || 'unknown'}-${uniqueId}`;
     
-    // Return cached result if available
-    const cached = videosRef.current.get(key);
-    if (cached?.videoUrl) {
-      console.log('⏭️ Returning cached video');
-      return cached;
-    }
+    console.log('🎬 Starting new video generation (no cache):', figureName || figureId);
 
     // Skip if already generating - wait for it
     if (generatingRef.current.has(key)) {
