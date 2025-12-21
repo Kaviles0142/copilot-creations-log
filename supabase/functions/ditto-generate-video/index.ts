@@ -15,6 +15,59 @@ const getDittoApiUrl = () => {
   return url.replace(/\/$/, ''); // Remove trailing slash if present
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableDittoStatus = (status: number) => {
+  // Cloudflare / transient gateway errors (including RunPod cold start)
+  return [408, 425, 429, 500, 502, 503, 504, 524].includes(status);
+};
+
+const fetchWithRetry = async (
+  makeRequest: () => Promise<Response>,
+  opts: { attempts: number; baseDelayMs?: number; maxDelayMs?: number; label?: string }
+) => {
+  const attempts = Math.max(1, opts.attempts);
+  const baseDelayMs = opts.baseDelayMs ?? 1500;
+  const maxDelayMs = opts.maxDelayMs ?? 12000;
+  const label = opts.label ?? 'request';
+
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const res = await makeRequest();
+
+      if (res.ok) return res;
+
+      const retryable = isRetryableDittoStatus(res.status);
+      if (!retryable || attempt === attempts) return res;
+
+      let preview = '';
+      try {
+        preview = (await res.clone().text()).slice(0, 400);
+      } catch {
+        preview = '<unable to read body>';
+      }
+
+      console.error(`❌ Ditto ${label} retryable status ${res.status} (attempt ${attempt}/${attempts}):`, preview);
+
+      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+      console.log(`⏳ Retrying Ditto ${label} in ${delay}ms...`);
+      await sleep(delay);
+    } catch (err) {
+      lastError = err;
+      if (attempt === attempts) throw err;
+
+      console.error(`❌ Ditto ${label} threw (attempt ${attempt}/${attempts}):`, err);
+      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+      console.log(`⏳ Retrying Ditto ${label} in ${delay}ms...`);
+      await sleep(delay);
+    }
+  }
+
+  throw lastError ?? new Error('Ditto request failed');
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -173,12 +226,27 @@ serve(async (req) => {
     }
 
     // Build multipart form - CRITICAL: audio first, then image (as per Ditto API)
-    const formData = new FormData();
-    formData.append("audio_file", new Blob([await audioBlob.arrayBuffer()], { type: "audio/wav" }), "audio.wav");
-    formData.append("image_file", new Blob([await imageBlob.arrayBuffer()], { type: "image/jpeg" }), "portrait.jpg");
-    formData.append("model_type", "trt"); // TensorRT for faster processing
-    formData.append("fade_in", "-1");
-    formData.append("fade_out", "-1");
+    // NOTE: We precompute bytes so we can safely retry the Ditto request.
+    const audioBytes = new Uint8Array(await audioBlob.arrayBuffer());
+    const imageBytes = new Uint8Array(await imageBlob.arrayBuffer());
+
+    const buildFormData = () => {
+      const formData = new FormData();
+      formData.append(
+        "audio_file",
+        new Blob([audioBytes], { type: "audio/wav" }),
+        "audio.wav"
+      );
+      formData.append(
+        "image_file",
+        new Blob([imageBytes], { type: "image/jpeg" }),
+        "portrait.jpg"
+      );
+      formData.append("model_type", "trt"); // TensorRT for faster processing
+      formData.append("fade_in", "-1");
+      formData.append("fade_out", "-1");
+      return formData;
+    };
 
     console.log('📤 Sending to Ditto API...');
     await supabase
@@ -186,11 +254,14 @@ serve(async (req) => {
       .update({ status: "generating" })
       .eq("id", jobId);
 
-    // Call Ditto generate endpoint
-    const response = await fetch(`${getDittoApiUrl()}/generate`, {
-      method: "POST",
-      body: formData,
-    });
+    // Call Ditto generate endpoint (with retry/backoff for transient 524 timeouts)
+    const response = await fetchWithRetry(
+      () => fetch(`${getDittoApiUrl()}/generate`, {
+        method: "POST",
+        body: buildFormData(),
+      }),
+      { attempts: 3, label: 'generate' }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -1755,53 +1755,66 @@ const HistoricalChat = () => {
                 setIsGreetingPlaying(false);
               }}
               onVideoReady={async (videoUrl) => {
-                console.log('✅ Video ready:', videoUrl?.substring(0, 80));
-                
-                // Clear currentAudioUrl to prevent re-triggering video generation
-                setCurrentAudioUrl(null);
-                
-                // For greeting, check if we need to play audio fallback
-                if (greetingAudioUrl) {
-                  const isVideo = videoUrl && !videoUrl.startsWith('data:audio');
-                  
-                  if (!isVideo) {
-                    // Only play greeting audio separately if no video
-                    console.log('🎤 Playing greeting audio (no video)');
-                    initializeAudioPipeline();
-                    if (audioContextRef.current!.state === 'suspended') {
-                      await audioContextRef.current!.resume();
-                    }
-                    
-                    if (currentAudio) {
-                      currentAudio.pause();
-                      currentAudio.currentTime = 0;
-                    }
-                    
-                    audioElementRef.current!.onplay = () => {
-                      setIsSpeaking(true);
-                      setIsPlayingAudio(true);
-                    };
-                    
-                    audioElementRef.current!.onended = () => {
-                      setIsSpeaking(false);
-                      setIsPlayingAudio(false);
-                      setIsGreetingPlaying(false);
-                      setCurrentAudio(null);
-                    };
-                    
-                    audioElementRef.current!.onerror = () => {
-                      setIsSpeaking(false);
-                      setIsPlayingAudio(false);
-                      setIsGreetingPlaying(false);
-                    };
-                    
-                    audioElementRef.current!.src = greetingAudioUrl;
-                    setCurrentAudio(audioElementRef.current!);
-                    audioElementRef.current!.load();
-                    await audioElementRef.current!.play();
+                console.log('✅ Video ready (or fallback):', videoUrl?.substring(0, 80));
+
+                const isAudioFallback = !!videoUrl && videoUrl.startsWith('data:audio');
+                const isVideo = !!videoUrl && !isAudioFallback;
+
+                const playAudioFallback = async (audioDataUrl: string) => {
+                  console.log('🎤 Playing audio fallback (no video)');
+
+                  initializeAudioPipeline();
+                  if (audioContextRef.current!.state === 'suspended') {
+                    await audioContextRef.current!.resume();
                   }
-                  
+
+                  if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                  }
+
+                  audioElementRef.current!.onplay = () => {
+                    setIsSpeaking(true);
+                    setIsPlayingAudio(true);
+                  };
+
+                  audioElementRef.current!.onended = () => {
+                    setIsSpeaking(false);
+                    setIsPlayingAudio(false);
+                    setCurrentAudio(null);
+                    setIsGreetingPlaying(false);
+                  };
+
+                  audioElementRef.current!.onerror = () => {
+                    setIsSpeaking(false);
+                    setIsPlayingAudio(false);
+                    setIsGreetingPlaying(false);
+                  };
+
+                  audioElementRef.current!.src = audioDataUrl;
+                  setCurrentAudio(audioElementRef.current!);
+                  audioElementRef.current!.load();
+                  await audioElementRef.current!.play();
+                };
+
+                // If we got an actual video, we can clear the pending audio trigger.
+                if (isVideo) {
+                  setCurrentAudioUrl(null);
+                }
+
+                // Greeting: if Ditto fails, play greeting audio once.
+                if (greetingAudioUrl) {
+                  if (!isVideo) {
+                    await playAudioFallback(greetingAudioUrl);
+                  }
                   setGreetingAudioUrl(null);
+                  return;
+                }
+
+                // Non-greeting: if Ditto fails, play the response audio so the user still hears the reply.
+                if (isAudioFallback) {
+                  await playAudioFallback(videoUrl);
+                  setCurrentAudioUrl(null);
                 }
               }}
             />
