@@ -20,6 +20,7 @@ import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { clearFigureMetadata } from "@/utils/clearCache";
+import { useVideoPreloader } from "@/hooks/useVideoPreloader";
 
 export interface Message {
   id: string;
@@ -105,15 +106,23 @@ const HistoricalChat = () => {
   const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
-  const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // Only for first greeting
+  const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // For audio fallback
+  
+  // Video state - external video generation like PodcastMode
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  
   // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const currentVideoRef = useRef<HTMLVideoElement | null>(null);
   
   const { toast } = useToast();
+  
+  // Video generator hook - external generation like PodcastMode
+  const { generateVideo, clearCache: clearVideoCache } = useVideoPreloader();
 
   // Auto-select Australian English voice for Elon Musk
   useEffect(() => {
@@ -231,11 +240,12 @@ const HistoricalChat = () => {
     }
   }, [selectedFigure]);
   
-  // Generate avatar portrait and play greeting (optimized with parallel requests)
+  // Generate avatar portrait and play greeting (external video generation like PodcastMode)
   const generateAvatarPortraitAndGreeting = async (figure: HistoricalFigure) => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
+    setCurrentVideoUrl(null);
     
     try {
       const greetingText = getGreetingForFigure(figure);
@@ -265,18 +275,35 @@ const HistoricalChat = () => {
       console.log('✅ Avatar portrait ready:', avatarResult.data.cached ? '(cached)' : '(new)');
       console.log('🎤 Greeting audio ready');
       
-      setAvatarImageUrl(avatarResult.data.imageUrl);
+      const imageUrl = avatarResult.data.imageUrl;
+      setAvatarImageUrl(imageUrl);
       setIsLoadingAvatarImage(false);
       
       if (!audioResult.data?.audioContent) {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store data URL for video animation (audio will be synced in video)
+      // Store data URL for audio fallback
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
       
-      console.log('✅ Greeting audio ready - triggering video generation with synced audio');
+      // Generate video EXTERNALLY like PodcastMode
+      console.log('🎬 Generating greeting video externally...');
+      setIsGeneratingVideo(true);
+      
+      const videoResult = await generateVideo(imageUrl, greetingDataUrl, figure.id, figure.name);
+      
+      setIsGeneratingVideo(false);
+      
+      if (videoResult.videoUrl) {
+        console.log('✅ Greeting video ready:', videoResult.videoUrl.substring(0, 60) + '...');
+        setCurrentVideoUrl(videoResult.videoUrl);
+        setGreetingAudioUrl(null); // Clear audio fallback since video is ready
+      } else {
+        console.log('⚠️ Video generation failed, will use audio fallback');
+        // greetingAudioUrl is already set, RealisticAvatar will show static image + we play audio
+        playAudioFallback(greetingDataUrl);
+      }
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -286,7 +313,46 @@ const HistoricalChat = () => {
         variant: "default",
       });
       setIsGreetingPlaying(false);
+      setIsGeneratingVideo(false);
     }
+  };
+  
+  // Helper to play audio when video fails
+  const playAudioFallback = async (audioDataUrl: string) => {
+    console.log('🎤 Playing audio fallback (no video)');
+
+    initializeAudioPipeline();
+    if (audioContextRef.current!.state === 'suspended') {
+      await audioContextRef.current!.resume();
+    }
+
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+
+    audioElementRef.current!.onplay = () => {
+      setIsSpeaking(true);
+      setIsPlayingAudio(true);
+    };
+
+    audioElementRef.current!.onended = () => {
+      setIsSpeaking(false);
+      setIsPlayingAudio(false);
+      setCurrentAudio(null);
+      setIsGreetingPlaying(false);
+    };
+
+    audioElementRef.current!.onerror = () => {
+      setIsSpeaking(false);
+      setIsPlayingAudio(false);
+      setIsGreetingPlaying(false);
+    };
+
+    audioElementRef.current!.src = audioDataUrl;
+    setCurrentAudio(audioElementRef.current!);
+    audioElementRef.current!.load();
+    await audioElementRef.current!.play();
   };
   
   // Get appropriate greeting for historical figure in selected language
@@ -489,15 +555,10 @@ const HistoricalChat = () => {
         setIsSpeaking(false);
       };
       
-      // Convert base64 to data URL for edge function
+      // Convert base64 to data URL for audio playback
       const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
       
-      // Store data URL (not blob) for avatar animation
-      // Edge function will upload it to storage
-      setCurrentAudioUrl(audioDataUrl);
-      
-      // CRITICAL: Trigger new avatar video generation with each response
-      console.log('🎬 Triggering new avatar animation for this response');
+      console.log('🎬 Playing audio directly (video generated externally now)');
       
       // Create blob for audio playback
       const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
@@ -901,9 +962,10 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
-      // Generate TTS and video in background (message already shown)
-      if (aiResponse.length > 20 && isAutoVoiceEnabled) {
+      // Generate TTS and video EXTERNALLY like PodcastMode (message already shown)
+      if (aiResponse.length > 20 && isAutoVoiceEnabled && avatarImageUrl) {
         console.log('🎤 IMMEDIATE TTS START for:', selectedFigure!.name);
+        setIsGeneratingVideo(true);
         
         try {
           // Generate TTS audio
@@ -920,18 +982,28 @@ const HistoricalChat = () => {
           if (ttsError) throw ttsError;
           if (!ttsData?.audioContent) throw new Error('No audio content received');
 
-          console.log('✅ TTS audio ready, triggering video generation');
+          console.log('✅ TTS audio ready, generating video EXTERNALLY');
           
-          // Create data URL for edge function (can be uploaded to storage)
+          // Create data URL for video generation
           const audioDataUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
           
-          // Store data URL to trigger avatar video generation
-          // Video will play with embedded audio when ready
-          console.log('🎬 Setting currentAudioUrl to trigger avatar video');
-          setCurrentAudioUrl(audioDataUrl);
+          // Generate video externally like PodcastMode - wait for completion
+          console.log('🎬 Generating response video externally...');
+          const videoResult = await generateVideo(avatarImageUrl, audioDataUrl, selectedFigure!.id, selectedFigure!.name);
+          
+          setIsGeneratingVideo(false);
+          
+          if (videoResult.videoUrl) {
+            console.log('✅ Response video ready:', videoResult.videoUrl.substring(0, 60) + '...');
+            setCurrentVideoUrl(videoResult.videoUrl);
+          } else {
+            console.log('⚠️ Video generation failed, playing audio fallback');
+            await playAudioFallback(audioDataUrl);
+          }
           
         } catch (error) {
-          console.error('❌ TTS generation error:', error);
+          console.error('❌ TTS/Video generation error:', error);
+          setIsGeneratingVideo(false);
           toast({
             title: "Voice generation failed",
             description: "Response shown without voice",
@@ -1740,81 +1812,29 @@ const HistoricalChat = () => {
           )}
         </div>
 
-        {/* Realistic Avatar - Sora-Level */}
+        {/* Realistic Avatar - External video generation like PodcastMode */}
         {selectedFigure && (
           <div className="border-b border-border bg-card px-6 py-4">
             <RealisticAvatar 
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
-              audioUrl={currentAudioUrl || greetingAudioUrl}
+              videoUrl={currentVideoUrl}
+              isGeneratingVideo={isGeneratingVideo}
               figureName={selectedFigure.name}
               figureId={selectedFigure.id}
               onVideoEnd={() => {
+                console.log('⏹️ Video ended - clearing state');
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
+                setCurrentVideoUrl(null); // Clear video after playback
               }}
-              onVideoReady={async (videoUrl) => {
-                console.log('✅ Video ready (or fallback):', videoUrl?.substring(0, 80));
-
-                const isAudioFallback = !!videoUrl && videoUrl.startsWith('data:audio');
-                const isVideo = !!videoUrl && !isAudioFallback;
-
-                const playAudioFallback = async (audioDataUrl: string) => {
-                  console.log('🎤 Playing audio fallback (no video)');
-
-                  initializeAudioPipeline();
-                  if (audioContextRef.current!.state === 'suspended') {
-                    await audioContextRef.current!.resume();
-                  }
-
-                  if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
-                  }
-
-                  audioElementRef.current!.onplay = () => {
-                    setIsSpeaking(true);
-                    setIsPlayingAudio(true);
-                  };
-
-                  audioElementRef.current!.onended = () => {
-                    setIsSpeaking(false);
-                    setIsPlayingAudio(false);
-                    setCurrentAudio(null);
-                    setIsGreetingPlaying(false);
-                  };
-
-                  audioElementRef.current!.onerror = () => {
-                    setIsSpeaking(false);
-                    setIsPlayingAudio(false);
-                    setIsGreetingPlaying(false);
-                  };
-
-                  audioElementRef.current!.src = audioDataUrl;
-                  setCurrentAudio(audioElementRef.current!);
-                  audioElementRef.current!.load();
-                  await audioElementRef.current!.play();
-                };
-
-                // If we got an actual video, we can clear the pending audio trigger.
-                if (isVideo) {
-                  setCurrentAudioUrl(null);
-                }
-
-                // Greeting: if Ditto fails, play greeting audio once.
-                if (greetingAudioUrl) {
-                  if (!isVideo) {
-                    await playAudioFallback(greetingAudioUrl);
-                  }
-                  setGreetingAudioUrl(null);
-                  return;
-                }
-
-                // Non-greeting: if Ditto fails, play the response audio so the user still hears the reply.
-                if (isAudioFallback) {
-                  await playAudioFallback(videoUrl);
-                  setCurrentAudioUrl(null);
+              onVideoReady={(videoUrl) => {
+                console.log('✅ Video ready callback:', videoUrl?.substring(0, 80));
+                // Video is now managed externally - this callback is for backwards compatibility
+                if (videoUrl && !videoUrl.startsWith('data:audio')) {
+                  setIsSpeaking(true);
+                  setIsPlayingAudio(true);
                 }
               }}
             />
