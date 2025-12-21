@@ -6,8 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Ditto API endpoint
-const DITTO_API_URL = "https://u4eqxx0gi5t7j8-8000.proxy.runpod.net";
+// Ditto API endpoint - read from environment variable
+const getDittoApiUrl = () => {
+  const url = Deno.env.get('DITTO_API_URL');
+  if (!url) {
+    throw new Error('DITTO_API_URL environment variable is not set');
+  }
+  return url.replace(/\/$/, ''); // Remove trailing slash if present
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -62,7 +68,7 @@ serve(async (req) => {
         console.log('🔄 Polling Ditto for request:', jobData.ditto_request_id);
         
         try {
-          const response = await fetch(`${DITTO_API_URL}/download/${jobData.ditto_request_id}`);
+          const response = await fetch(`${getDittoApiUrl()}/download/${jobData.ditto_request_id}`);
           const contentType = response.headers.get("content-type") || "";
 
           if (contentType.includes("video")) {
@@ -181,7 +187,7 @@ serve(async (req) => {
       .eq("id", jobId);
 
     // Call Ditto generate endpoint
-    const response = await fetch(`${DITTO_API_URL}/generate`, {
+    const response = await fetch(`${getDittoApiUrl()}/generate`, {
       method: "POST",
       body: formData,
     });
