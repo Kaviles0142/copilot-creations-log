@@ -41,9 +41,13 @@ const RealisticAvatar = ({
     },
     onError: (error) => {
       console.error('❌ Ditto video generation failed:', error);
-      // Fallback: just notify that audio is ready (no video)
+      // CRITICAL: Reset the processed ref so audio can be played as fallback
+      // Without this, the audio won't trigger because it's "already processed"
+      processedAudioRef.current = null;
+      
+      // Signal to parent that video failed - pass audioUrl so parent can play it
       if (audioUrl) {
-        console.log('🔊 Falling back to audio-only mode');
+        console.log('🔊 Triggering audio-only fallback with audioUrl');
         onVideoReady?.(audioUrl);
       }
     }
