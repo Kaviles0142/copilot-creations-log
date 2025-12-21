@@ -968,6 +968,11 @@ const HistoricalChat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage(assistantMessage, conversationId);
       
+      // CRITICAL: Set loading to false IMMEDIATELY after message is shown
+      // This prevents "thinking..." from appearing while video generates
+      setIsLoading(false);
+      setAbortController(null);
+      
       // Generate TTS and video EXTERNALLY like PodcastMode (message already shown)
       if (aiResponse.length > 20 && isAutoVoiceEnabled && avatarImageUrl) {
         console.log('🎤 IMMEDIATE TTS START for:', selectedFigure!.name);
@@ -1018,9 +1023,7 @@ const HistoricalChat = () => {
         }
       }
       
-      // Reset loading state
-      setIsLoading(false);
-      setAbortController(null);
+      // Loading state already reset above after message was shown
 
       /* Azure TTS infrastructure preserved for future activation
       if (isAutoVoiceEnabled) {
