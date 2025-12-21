@@ -6,134 +6,100 @@ import { useTalkingVideo } from '@/hooks/useTalkingVideo';
 interface RealisticAvatarProps {
   imageUrl: string | null;
   isLoading?: boolean;
+  // Either pass audioUrl for internal video generation
   audioUrl?: string | null;
+  // Or pass videoUrl directly (pre-generated)
+  videoUrl?: string | null;
+  isGeneratingVideo?: boolean;
   figureName?: string;
   figureId?: string;
   onVideoEnd?: () => void;
   onVideoReady?: (videoUrl: string) => void;
-  // New props for preloaded videos
-  preloadedVideoUrl?: string | null;
-  isPreloading?: boolean;
-  skipGeneration?: boolean;
 }
 
 const RealisticAvatar = ({ 
   imageUrl, 
   isLoading, 
-  audioUrl, 
+  audioUrl,
+  videoUrl: externalVideoUrl,
+  isGeneratingVideo: externalIsGenerating,
   figureName,
   figureId,
-  onVideoEnd, 
+  onVideoEnd,
   onVideoReady,
-  preloadedVideoUrl,
-  isPreloading,
-  skipGeneration = false,
 }: RealisticAvatarProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const processedAudioRef = useRef<string | null>(null);
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+  const [internalVideoUrl, setInternalVideoUrl] = useState<string | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
+  // Use the video URL from either source
+  const videoUrl = externalVideoUrl || internalVideoUrl;
+
+  // Internal video generation hook (only used when audioUrl is passed without videoUrl)
   const { 
     generateVideo, 
-    videoUrl: generatedVideoUrl, 
-    isGenerating, 
+    isGenerating: internalIsGenerating, 
     status,
     reset 
   } = useTalkingVideo({
     onVideoReady: (url) => {
-      console.log('🎥 Ditto video ready:', url);
-      setCurrentVideoUrl(url);
+      console.log('🎥 Internal video ready:', url.substring(0, 60) + '...');
+      setInternalVideoUrl(url);
       onVideoReady?.(url);
     },
     onError: (error) => {
-      console.error('❌ Ditto video generation failed:', error);
-      // Fallback: just notify that audio is ready (no video)
+      console.error('❌ Video generation failed:', error);
       if (audioUrl) {
-        console.log('🔊 Falling back to audio-only mode');
         onVideoReady?.(audioUrl);
       }
     }
   });
 
-  // Use preloaded video URL when available
-  useEffect(() => {
-    if (preloadedVideoUrl && preloadedVideoUrl !== currentVideoUrl) {
-      console.log('🎬 Using preloaded video URL:', preloadedVideoUrl.substring(0, 60) + '...');
-      setCurrentVideoUrl(preloadedVideoUrl);
-      onVideoReady?.(preloadedVideoUrl);
-    }
-  }, [preloadedVideoUrl, currentVideoUrl, onVideoReady]);
+  const isGeneratingVideo = externalIsGenerating || internalIsGenerating;
 
-  // Generate video when we have both image and audio (only if not skipping/preloaded)
+  // Generate video internally when we have image + audio but no external video
   useEffect(() => {
-    if (!imageUrl || !audioUrl) {
-      console.log('⏸️ No image or audio URL provided');
+    if (!imageUrl || !audioUrl || externalVideoUrl) {
       return;
     }
 
-    // Skip generation if we're using preloaded videos or explicitly skipping
-    if (skipGeneration || preloadedVideoUrl) {
-      console.log('⏭️ Skipping video generation - using preloaded video');
-      return;
-    }
-
-    // Prevent processing the same audio URL multiple times
+    // Prevent re-processing same audio
     if (processedAudioRef.current === audioUrl) {
-      console.log('⏭️ Already processed this audio URL, skipping');
       return;
     }
 
-    // Mark this audio as processed
     processedAudioRef.current = audioUrl;
-    
-    console.log('🎬 Starting Ditto video generation');
-    console.log('📸 Image:', imageUrl.substring(0, 60) + '...');
-    console.log('🎵 Audio type:', audioUrl.startsWith('data:') ? 'base64' : 'url');
-
-    // Generate talking video using Ditto API
+    console.log('🎬 Starting internal video generation');
     generateVideo(imageUrl, audioUrl, figureId, figureName);
-  }, [imageUrl, audioUrl, figureName, figureId, generateVideo, skipGeneration, preloadedVideoUrl]);
+  }, [imageUrl, audioUrl, externalVideoUrl, figureId, figureName, generateVideo]);
 
   // Play video when URL is available
   useEffect(() => {
-    if (videoRef.current && currentVideoUrl) {
-      console.log('🎬 Setting up video playback');
-      
-      videoRef.current.onloadeddata = () => {
-        console.log('✅ Video loaded, attempting autoplay');
-        setIsPlayingVideo(true);
-        videoRef.current?.play().catch(err => {
-          console.error('❌ Video autoplay failed:', err);
-          setIsPlayingVideo(false);
-        });
-      };
-      
-      videoRef.current.onended = () => {
-        console.log('📹 Video playback ended');
-        setIsPlayingVideo(false);
-        onVideoEnd?.();
-      };
-      
-      videoRef.current.onerror = (err) => {
-        console.error('❌ Video playback error:', err);
-        setIsPlayingVideo(false);
-        setCurrentVideoUrl(null);
-      };
+    if (videoRef.current && videoUrl && !videoError) {
+      console.log('🎬 Loading video:', videoUrl.substring(0, 60) + '...');
+      videoRef.current.load();
+      videoRef.current.play().catch(err => {
+        console.error('❌ Video autoplay failed:', err);
+        setVideoError(true);
+      });
     }
-  }, [currentVideoUrl, onVideoEnd]);
+  }, [videoUrl, videoError]);
 
-  // Reset video state when figure changes
+  // Reset state when figure or video URL changes
+  useEffect(() => {
+    setVideoError(false);
+  }, [videoUrl, figureId]);
+
+  // Reset when figure changes
   useEffect(() => {
     if (figureId) {
-      setCurrentVideoUrl(null);
+      setInternalVideoUrl(null);
       processedAudioRef.current = null;
       reset();
     }
   }, [figureId, reset]);
-
-  // Determine if we're in a generating/preloading state
-  const showGeneratingOverlay = (isGenerating || isPreloading) && imageUrl && !currentVideoUrl;
 
   if (isLoading) {
     return (
@@ -141,32 +107,6 @@ const RealisticAvatar = ({
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
           <p className="text-sm text-muted-foreground">Loading portrait...</p>
-        </div>
-      </Card>
-    );
-  }
-
-  // Show portrait with generating overlay
-  if (showGeneratingOverlay) {
-    const statusMessage = isPreloading 
-      ? 'Preloading video...' 
-      : status === 'generating' 
-        ? 'Starting video generation...' 
-        : 'Creating lip-sync animation...';
-    
-    return (
-      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
-        <img 
-          src={imageUrl} 
-          alt="Avatar" 
-          className="w-full h-full object-cover opacity-50"
-        />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
-            <p className="text-sm text-white font-medium">{statusMessage}</p>
-            <p className="text-xs text-white/70">This can take 30-60 seconds...</p>
-          </div>
         </div>
       </Card>
     );
@@ -180,35 +120,58 @@ const RealisticAvatar = ({
     );
   }
 
-  // Show video if available
-  if (currentVideoUrl) {
-    console.log('🎥 Rendering VIDEO element with URL:', currentVideoUrl.substring(0, 60) + '...');
+  // Show generating overlay
+  if (isGeneratingVideo && !videoUrl) {
+    const statusMessage = status === 'generating' 
+      ? 'Starting video generation...' 
+      : 'Creating lip-sync animation...';
     
+    return (
+      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+        <img 
+          src={imageUrl} 
+          alt={figureName || 'Avatar'} 
+          className="w-full h-full object-cover opacity-50"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
+            <p className="text-sm text-white font-medium">{statusMessage}</p>
+            <p className="text-xs text-white/70">This can take 30-60 seconds...</p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // Show video if available and no error
+  if (videoUrl && !videoError) {
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
         <video
           ref={videoRef}
-          src={currentVideoUrl}
+          src={videoUrl}
           autoPlay
           playsInline
           muted={false}
           controls={false}
           className="w-full h-full object-cover"
           onPlay={() => {
-            console.log('▶️ Video started playing');
+            console.log('▶️ Video playing');
             setIsPlayingVideo(true);
           }}
           onEnded={() => {
             console.log('⏹️ Video ended');
             setIsPlayingVideo(false);
+            onVideoEnd?.();
           }}
           onError={(e) => {
             console.error('❌ Video playback error:', e);
-            setCurrentVideoUrl(null);
+            setVideoError(true);
           }}
         />
         {isPlayingVideo && (
-          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/50 px-2 py-1 rounded">
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-xs text-white">Speaking</span>
           </div>
@@ -217,13 +180,12 @@ const RealisticAvatar = ({
     );
   }
 
-  // Fallback to static image
-  console.log('🖼️ Rendering STATIC IMAGE fallback');
+  // Static image fallback
   return (
     <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden">
       <img 
         src={imageUrl} 
-        alt="Avatar" 
+        alt={figureName || 'Avatar'} 
         className="w-full h-full object-cover"
       />
     </Card>

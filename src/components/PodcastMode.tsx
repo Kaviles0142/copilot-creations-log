@@ -78,16 +78,10 @@ const PodcastMode = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
-  // Video preloading state
+  // Video state - simplified
   const [hostVideoUrl, setHostVideoUrl] = useState<string | null>(null);
   const [guestVideoUrl, setGuestVideoUrl] = useState<string | null>(null);
-  const [isWaitingForVideo, setIsWaitingForVideo] = useState(false);
-  const [nextTurnAudioData, setNextTurnAudioData] = useState<{
-    audioUrl: string;
-    figureName: string;
-    figureId: string;
-    role: 'host' | 'guest';
-  } | null>(null);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -99,32 +93,8 @@ const PodcastMode = () => {
   
   const { toast } = useToast();
 
-  // Video preloader hook
-  const {
-    preloadVideo,
-    getPreloadedVideo,
-    isVideoReady,
-    isVideoGenerating,
-    waitForVideo,
-    clearAll: clearAllPreloadedVideos,
-  } = useVideoPreloader({
-    onVideoReady: (audioUrl, videoUrl) => {
-      console.log('🎬 Preloaded video ready:', videoUrl.substring(0, 60) + '...');
-      // Update the appropriate avatar's video URL
-      const preloadData = nextTurnAudioData;
-      if (preloadData && preloadData.audioUrl === audioUrl) {
-        if (preloadData.role === 'host') {
-          setHostVideoUrl(videoUrl);
-        } else {
-          setGuestVideoUrl(videoUrl);
-        }
-      }
-    },
-    onError: (audioUrl, error) => {
-      console.error('❌ Video preload failed:', error);
-      setIsWaitingForVideo(false);
-    }
-  });
+  // Video generator hook - simplified
+  const { generateVideo, clearAll: clearAllVideos } = useVideoPreloader();
 
   // Azure voice options filtered by gender
   const azureVoices = {
@@ -799,9 +769,7 @@ const PodcastMode = () => {
   const generateAndPlayAudio = async (
     text: string, 
     figureName: string, 
-    figureId: string,
-    shouldPreloadNext: boolean = false,
-    nextSpeakerRole?: 'host' | 'guest'
+    figureId: string
   ): Promise<void> => {
     const audioTask = () => new Promise<void>(async (resolve) => {
       try {
@@ -809,8 +777,7 @@ const PodcastMode = () => {
         const isHostSpeaker = figureId === host?.id || figureId === 'user-host';
         const speakerRole: 'host' | 'guest' = isHostSpeaker ? 'host' : 'guest';
         
-        console.log('🎤 Generating Azure TTS for:', figureName, '(ID:', figureId, ') with language:', selectedLanguage);
-        console.log('🎛️ hostType:', hostType, 'figureId:', figureId, 'is_user_host check:', hostType === 'user' && figureId === 'user-host');
+        console.log('🎤 Generating TTS for:', figureName);
         
         const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
           body: {
@@ -826,48 +793,36 @@ const PodcastMode = () => {
         if (error) throw error;
 
         if (data?.audioContent) {
-          // Create data URL for video generation (RealisticAvatar needs this format)
           const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
-          
-          // Get the correct avatar URL for video generation
           const avatarUrl = speakerRole === 'host' ? hostAvatarUrl : guestAvatarUrl;
           
-          // Start video preloading immediately
-          setIsWaitingForVideo(true);
-          console.log('🎬 Starting video preload for:', figureName);
+          // Generate video first, wait for it
+          setIsGeneratingVideo(true);
+          console.log('🎬 Generating video for:', figureName);
           
+          let videoUrl: string | null = null;
           if (avatarUrl) {
-            await preloadVideo(avatarUrl, audioDataUrl, figureId, figureName);
+            const result = await generateVideo(avatarUrl, audioDataUrl, figureId, figureName);
+            videoUrl = result.videoUrl;
           }
           
-          // Store data for later reference
-          setNextTurnAudioData({
-            audioUrl: audioDataUrl,
-            figureName,
-            figureId,
-            role: speakerRole
-          });
+          setIsGeneratingVideo(false);
           
-          // Wait for video to be ready before playing audio
-          console.log('⏳ Waiting for video to load before playing audio...');
-          const videoUrl = await waitForVideo(audioDataUrl, 90000);
-          
+          // Set the video URL for display
           if (videoUrl) {
-            console.log('✅ Video ready, setting URL and playing audio');
-            // Set the video URL for the correct avatar
+            console.log('✅ Video ready:', videoUrl.substring(0, 60) + '...');
             if (speakerRole === 'host') {
               setHostVideoUrl(videoUrl);
             } else {
               setGuestVideoUrl(videoUrl);
             }
           } else {
-            console.log('⚠️ Video not ready, playing audio without video');
+            console.log('⚠️ No video, audio only');
           }
           
-          setIsWaitingForVideo(false);
           setCurrentAudioUrl(audioDataUrl);
           
-          // Create blob URL for audio playback
+          // Play audio
           const audioBlob = new Blob(
             [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
             { type: 'audio/mpeg' }
@@ -875,7 +830,7 @@ const PodcastMode = () => {
           const playbackUrl = URL.createObjectURL(audioBlob);
           await playAudio(playbackUrl);
           
-          // Clear video URL after playback to reset for next turn
+          // Clear video after playback
           if (speakerRole === 'host') {
             setHostVideoUrl(null);
           } else {
@@ -889,12 +844,11 @@ const PodcastMode = () => {
       } catch (error) {
         console.error('Error generating audio:', error);
         setIsSpeaking(false);
-        setIsWaitingForVideo(false);
+        setIsGeneratingVideo(false);
         resolve();
       }
     });
 
-    // Add to queue and process
     audioQueueRef.current.push(audioTask);
     processAudioQueue();
   };
@@ -1223,11 +1177,11 @@ const PodcastMode = () => {
         </div>
 
         {/* Video Loading Indicator */}
-        {isWaitingForVideo && (
+        {isGeneratingVideo && (
           <div className="flex items-center justify-center gap-2 mb-4 p-3 bg-primary/10 rounded-lg">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             <span className="text-sm text-primary font-medium">
-              Preparing video... Please wait
+              Creating video... This may take 30-60 seconds
             </span>
           </div>
         )}
@@ -1242,12 +1196,10 @@ const PodcastMode = () => {
                 <RealisticAvatar
                   imageUrl={hostAvatarUrl}
                   isLoading={isLoadingHostAvatar}
-                  audioUrl={currentSpeaker === 'host' ? currentAudioUrl : null}
+                  videoUrl={hostVideoUrl}
+                  isGeneratingVideo={isGeneratingVideo && currentSpeaker === 'host'}
                   figureName={host.name}
                   figureId={host.id}
-                  preloadedVideoUrl={hostVideoUrl}
-                  isPreloading={isWaitingForVideo && currentSpeaker === 'host'}
-                  skipGeneration={true}
                 />
                 <Select
                   value={hostVoice}
@@ -1274,12 +1226,10 @@ const PodcastMode = () => {
                 <RealisticAvatar
                   imageUrl={guestAvatarUrl}
                   isLoading={isLoadingGuestAvatar}
-                  audioUrl={currentSpeaker === 'guest' ? currentAudioUrl : null}
+                  videoUrl={guestVideoUrl}
+                  isGeneratingVideo={isGeneratingVideo && currentSpeaker === 'guest'}
                   figureName={guest.name}
                   figureId={guest.id}
-                  preloadedVideoUrl={guestVideoUrl}
-                  isPreloading={isWaitingForVideo && currentSpeaker === 'guest'}
-                  skipGeneration={true}
                 />
                 <Select
                   value={guestVoice}
