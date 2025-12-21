@@ -1772,19 +1772,6 @@ const HistoricalChat = () => {
               onVideoReady={async (videoUrl) => {
                 console.log('✅ Video ready:', videoUrl);
                 
-                // CRITICAL: Stop any currently playing audio before new playback
-                if (audioElementRef.current) {
-                  console.log('⏹️ Stopping previous audio before new playback');
-                  audioElementRef.current.pause();
-                  audioElementRef.current.currentTime = 0;
-                }
-                if (currentAudio && currentAudio !== audioElementRef.current) {
-                  currentAudio.pause();
-                  currentAudio.currentTime = 0;
-                }
-                setIsSpeaking(false);
-                setIsPlayingAudio(false);
-                
                 // Check if videoUrl is actually a video (not audio)
                 const isVideo = videoUrl.includes('.mp4') || videoUrl.includes('.webm') || videoUrl.includes('video');
                 

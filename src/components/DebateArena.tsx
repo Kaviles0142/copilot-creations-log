@@ -390,18 +390,6 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
     try {
       console.log('🎤 Generating Azure TTS for:', figureName);
       
-      // CRITICAL: Stop any currently playing audio before new playback
-      if (audioElementRef.current) {
-        console.log('⏹️ Stopping previous audio before new playback');
-        audioElementRef.current.pause();
-        audioElementRef.current.currentTime = 0;
-      }
-      if (currentAudio && currentAudio !== audioElementRef.current) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-      setCurrentAudioUrl(null); // Clear old audio URL to reset video
-      
       // Set speaking figure info for video generation
       setSpeakingFigureId(figureId);
       setSpeakingFigureName(figureName);

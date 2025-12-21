@@ -9,39 +9,6 @@ const corsHeaders = {
 // Ditto API endpoint
 const DITTO_API_URL = "https://u4eqxx0gi5t7j8-8000.proxy.runpod.net";
 
-// Use Cloudinary for image optimization (already configured in secrets)
-async function optimizeImage(imageUrl: string): Promise<{ data: Uint8Array; optimized: boolean }> {
-  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  
-  if (cloudName) {
-    try {
-      // Use Cloudinary's fetch URL transformation for on-the-fly optimization
-      // This resizes to 512px width, auto quality, and converts to JPEG
-      const optimizedUrl = `https://res.cloudinary.com/${cloudName}/image/fetch/w_512,q_auto,f_jpg/${encodeURIComponent(imageUrl)}`;
-      
-      console.log('🗜️ Fetching optimized image via Cloudinary...');
-      const response = await fetch(optimizedUrl);
-      
-      if (response.ok) {
-        const data = new Uint8Array(await response.arrayBuffer());
-        console.log('✅ Cloudinary optimized image size:', data.length);
-        return { data, optimized: true };
-      }
-    } catch (error) {
-      console.warn('⚠️ Cloudinary optimization failed:', error);
-    }
-  }
-  
-  // Fallback: fetch original image
-  console.log('⬇️ Fetching original image (no optimization)...');
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image: ${response.status}`);
-  }
-  const data = new Uint8Array(await response.arrayBuffer());
-  return { data, optimized: false };
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -165,11 +132,14 @@ serve(async (req) => {
 
     console.log('📝 Job created:', jobId);
 
-    // Fetch and optimize image using Cloudinary
-    const { data: imageData, optimized } = await optimizeImage(imageUrl);
-    console.log(`✅ Image ready, size: ${imageData.length} bytes, optimized: ${optimized}`);
-    
-    const imageBlob = new Blob([new Uint8Array(imageData)], { type: 'image/jpeg' });
+    // Fetch image
+    console.log('⬇️ Fetching image...');
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    }
+    const imageBlob = await imageResponse.blob();
+    console.log('✅ Image fetched, size:', imageBlob.size);
 
     // Handle audio - convert base64 to blob if needed
     let audioBlob: Blob;

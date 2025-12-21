@@ -41,13 +41,9 @@ const RealisticAvatar = ({
     },
     onError: (error) => {
       console.error('❌ Ditto video generation failed:', error);
-      // CRITICAL: Reset the processed ref so audio can be played as fallback
-      // Without this, the audio won't trigger because it's "already processed"
-      processedAudioRef.current = null;
-      
-      // Signal to parent that video failed - pass audioUrl so parent can play it
+      // Fallback: just notify that audio is ready (no video)
       if (audioUrl) {
-        console.log('🔊 Triggering audio-only fallback with audioUrl');
+        console.log('🔊 Falling back to audio-only mode');
         onVideoReady?.(audioUrl);
       }
     }
@@ -65,18 +61,6 @@ const RealisticAvatar = ({
       console.log('⏭️ Already processed this audio URL, skipping');
       return;
     }
-
-    // CRITICAL: Stop any currently playing video before processing new audio
-    if (videoRef.current) {
-      console.log('⏹️ Stopping previous video before new generation');
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
-    
-    // Clear old video URL to show static image during generation
-    console.log('🧹 Clearing old video URL for new generation');
-    setCurrentVideoUrl(null);
-    setIsPlayingVideo(false);
 
     // Mark this audio as processed
     processedAudioRef.current = audioUrl;

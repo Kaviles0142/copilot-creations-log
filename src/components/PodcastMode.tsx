@@ -809,18 +809,10 @@ const PodcastMode = () => {
 
   const playAudio = (url: string): Promise<void> => {
     return new Promise((resolve) => {
-      // CRITICAL: Stop any currently playing audio before new playback
       if (currentAudio) {
-        console.log('⏹️ Stopping previous audio before new playback');
         currentAudio.pause();
-        currentAudio.currentTime = 0;
         currentAudio.remove();
       }
-      if (audioElementRef.current && audioElementRef.current !== currentAudio) {
-        audioElementRef.current.pause();
-        audioElementRef.current.currentTime = 0;
-      }
-      setCurrentAudioUrl(null); // Clear old audio URL to reset video
 
       const audio = new Audio(url);
       audioElementRef.current = audio;
