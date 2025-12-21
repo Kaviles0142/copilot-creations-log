@@ -11,6 +11,10 @@ interface RealisticAvatarProps {
   figureId?: string;
   onVideoEnd?: () => void;
   onVideoReady?: (videoUrl: string) => void;
+  // New props for preloaded videos
+  preloadedVideoUrl?: string | null;
+  isPreloading?: boolean;
+  skipGeneration?: boolean;
 }
 
 const RealisticAvatar = ({ 
@@ -20,7 +24,10 @@ const RealisticAvatar = ({
   figureName,
   figureId,
   onVideoEnd, 
-  onVideoReady 
+  onVideoReady,
+  preloadedVideoUrl,
+  isPreloading,
+  skipGeneration = false,
 }: RealisticAvatarProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const processedAudioRef = useRef<string | null>(null);
@@ -49,10 +56,25 @@ const RealisticAvatar = ({
     }
   });
 
-  // Generate video when we have both image and audio
+  // Use preloaded video URL when available
+  useEffect(() => {
+    if (preloadedVideoUrl && preloadedVideoUrl !== currentVideoUrl) {
+      console.log('🎬 Using preloaded video URL:', preloadedVideoUrl.substring(0, 60) + '...');
+      setCurrentVideoUrl(preloadedVideoUrl);
+      onVideoReady?.(preloadedVideoUrl);
+    }
+  }, [preloadedVideoUrl, currentVideoUrl, onVideoReady]);
+
+  // Generate video when we have both image and audio (only if not skipping/preloaded)
   useEffect(() => {
     if (!imageUrl || !audioUrl) {
       console.log('⏸️ No image or audio URL provided');
+      return;
+    }
+
+    // Skip generation if we're using preloaded videos or explicitly skipping
+    if (skipGeneration || preloadedVideoUrl) {
+      console.log('⏭️ Skipping video generation - using preloaded video');
       return;
     }
 
@@ -71,7 +93,7 @@ const RealisticAvatar = ({
 
     // Generate talking video using Ditto API
     generateVideo(imageUrl, audioUrl, figureId, figureName);
-  }, [imageUrl, audioUrl, figureName, figureId, generateVideo]);
+  }, [imageUrl, audioUrl, figureName, figureId, generateVideo, skipGeneration, preloadedVideoUrl]);
 
   // Play video when URL is available
   useEffect(() => {
@@ -110,6 +132,9 @@ const RealisticAvatar = ({
     }
   }, [figureId, reset]);
 
+  // Determine if we're in a generating/preloading state
+  const showGeneratingOverlay = (isGenerating || isPreloading) && imageUrl && !currentVideoUrl;
+
   if (isLoading) {
     return (
       <Card className="w-full max-w-md mx-auto aspect-square flex items-center justify-center bg-muted">
@@ -122,10 +147,12 @@ const RealisticAvatar = ({
   }
 
   // Show portrait with generating overlay
-  if (isGenerating && imageUrl) {
-    const statusMessage = status === 'generating' 
-      ? 'Starting video generation...' 
-      : 'Creating lip-sync animation...';
+  if (showGeneratingOverlay) {
+    const statusMessage = isPreloading 
+      ? 'Preloading video...' 
+      : status === 'generating' 
+        ? 'Starting video generation...' 
+        : 'Creating lip-sync animation...';
     
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
