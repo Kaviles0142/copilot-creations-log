@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { clearFigureMetadata } from "@/utils/clearCache";
 import { useVideoPreloader } from "@/hooks/useVideoPreloader";
+import { getFigureContext } from "@/utils/figureContextMapper";
 
 export interface Message {
   id: string;
@@ -250,12 +251,17 @@ const HistoricalChat = () => {
     try {
       const greetingText = getGreetingForFigure(figure);
       
+      // Get contextual setting for this figure (e.g., Einstein in a lab, Lincoln in Oval Office)
+      const figureContext = getFigureContext(figure.name);
+      console.log(`🎨 Using context for ${figure.name}: ${figureContext}`);
+      
       // Generate avatar portrait and greeting audio IN PARALLEL
       const [avatarResult, audioResult] = await Promise.all([
         supabase.functions.invoke('generate-avatar-portrait', {
           body: {
             figureName: figure.name,
-            figureId: figure.id
+            figureId: figure.id,
+            context: figureContext
           }
         }),
         supabase.functions.invoke('azure-text-to-speech', {
