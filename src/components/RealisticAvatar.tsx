@@ -56,6 +56,12 @@ const RealisticAvatar = ({
       return;
     }
 
+    // Prevent processing the same audio URL multiple times
+    if (processedAudioRef.current === audioUrl) {
+      console.log('⏭️ Already processed this audio URL, skipping');
+      return;
+    }
+
     // CRITICAL: Stop any currently playing video before processing new audio
     if (videoRef.current) {
       console.log('⏹️ Stopping previous video before new generation');
@@ -64,17 +70,9 @@ const RealisticAvatar = ({
     }
     
     // Clear old video URL to show static image during generation
-    if (currentVideoUrl && processedAudioRef.current !== audioUrl) {
-      console.log('🧹 Clearing old video URL');
-      setCurrentVideoUrl(null);
-      setIsPlayingVideo(false);
-    }
-
-    // Prevent processing the same audio URL multiple times
-    if (processedAudioRef.current === audioUrl) {
-      console.log('⏭️ Already processed this audio URL, skipping');
-      return;
-    }
+    console.log('🧹 Clearing old video URL for new generation');
+    setCurrentVideoUrl(null);
+    setIsPlayingVideo(false);
 
     // Mark this audio as processed
     processedAudioRef.current = audioUrl;
@@ -85,7 +83,7 @@ const RealisticAvatar = ({
 
     // Generate talking video using Ditto API
     generateVideo(imageUrl, audioUrl, figureId, figureName);
-  }, [imageUrl, audioUrl, figureName, figureId, generateVideo, currentVideoUrl]);
+  }, [imageUrl, audioUrl, figureName, figureId, generateVideo]);
 
   // Play video when URL is available
   useEffect(() => {
