@@ -61,10 +61,9 @@ const PodcastMode = () => {
   const [isProcessingUserQuestion, setIsProcessingUserQuestion] = useState(false);
   
   // Audio state
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isStopped, setIsStopped] = useState(false);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
   const [hostVoice, setHostVoice] = useState<string>('auto');
@@ -75,25 +74,26 @@ const PodcastMode = () => {
   const [guestAvatarUrl, setGuestAvatarUrl] = useState<string | null>(null);
   const [isLoadingHostAvatar, setIsLoadingHostAvatar] = useState(false);
   const [isLoadingGuestAvatar, setIsLoadingGuestAvatar] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
-  // Video state - simplified
+  // Video state - video-first approach
   const [hostVideoUrl, setHostVideoUrl] = useState<string | null>(null);
   const [guestVideoUrl, setGuestVideoUrl] = useState<string | null>(null);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [currentVideoSpeaker, setCurrentVideoSpeaker] = useState<'host' | 'guest' | null>(null);
   
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const audioQueueRef = useRef<Array<() => Promise<void>>>([]);
-  const isProcessingAudioRef = useRef(false);
+  // Preloading state
+  const [preloadedVideoUrl, setPreloadedVideoUrl] = useState<string | null>(null);
+  const [preloadedSpeaker, setPreloadedSpeaker] = useState<'host' | 'guest' | null>(null);
+  const [isPreloading, setIsPreloading] = useState(false);
+  
+  const videoQueueRef = useRef<Array<{speaker: 'host' | 'guest', text: string, figureName: string, figureId: string}>>([]);
+  const isProcessingVideoRef = useRef(false);
+  const currentVideoRef = useRef<HTMLVideoElement | null>(null);
   const messagesRef = useRef<Message[]>([]);
   
   const { toast } = useToast();
 
-  // Video generator hook - simplified
+  // Video generator hook
   const { generateVideo, clearAll: clearAllVideos } = useVideoPreloader();
 
   // Azure voice options filtered by gender
@@ -343,9 +343,9 @@ const PodcastMode = () => {
         setMessages([hostMessage]);
         setCurrentSpeaker('host');
         
-        // Generate and play audio for host
+        // Generate and play video for host
         if (isAutoVoiceEnabled) {
-          generateAndPlayAudio(firstResponse.message, hostName, hostId);
+          await generateAndPlayVideo(firstResponse.message, hostName, hostId, 'host');
         }
 
         // Generate guest response
@@ -371,9 +371,9 @@ const PodcastMode = () => {
         setCurrentRound(1);
         setCurrentSpeaker('host');
 
-        // Generate and play audio for guest
+        // Generate and play video for guest
         if (isAutoVoiceEnabled && guestType === 'figure') {
-          generateAndPlayAudio(secondResponse.message, guestName, guestId);
+          await generateAndPlayVideo(secondResponse.message, guestName, guestId, 'guest');
         }
 
         // Set up for next round
@@ -406,9 +406,9 @@ const PodcastMode = () => {
         setMessages([hostMessage]);
         setCurrentSpeaker('host');
         
-        // Generate and play audio for host intro
+        // Generate and play video for host intro
         if (isAutoVoiceEnabled) {
-          generateAndPlayAudio(firstResponse.message, hostName, hostId);
+          await generateAndPlayVideo(firstResponse.message, hostName, hostId, 'host');
         }
         
         // Generate guest response
@@ -434,9 +434,9 @@ const PodcastMode = () => {
         setCurrentRound(1);
         setCurrentSpeaker('guest');
 
-        // Generate and play audio for guest
+        // Generate and play video for guest
         if (isAutoVoiceEnabled) {
-          generateAndPlayAudio(secondResponse.message, guestName, guestId);
+          await generateAndPlayVideo(secondResponse.message, guestName, guestId, 'guest');
         }
 
         // After intro, ready for user's first question (no Continue button needed)
@@ -454,100 +454,70 @@ const PodcastMode = () => {
   };
 
   const stopPodcast = () => {
-    // Don't set isRecording to false - keep ribbon visible
     setCurrentSpeaker('host');
     
-    // Stop any playing audio
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      audioElementRef.current.currentTime = 0;
+    // Stop any playing video
+    if (currentVideoRef.current) {
+      currentVideoRef.current.pause();
+      currentVideoRef.current.currentTime = 0;
     }
     
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-    }
-    
-    setIsPlayingAudio(false);
+    setIsPlayingVideo(false);
     setIsPaused(false);
     setIsStopped(true);
-    setCurrentAudio(null);
+    setHostVideoUrl(null);
+    setGuestVideoUrl(null);
     
-    // Clear audio queue
-    audioQueueRef.current = [];
-    isProcessingAudioRef.current = false;
+    // Clear video queue
+    videoQueueRef.current = [];
+    isProcessingVideoRef.current = false;
     
     toast({
       title: "Podcast stopped",
-      description: "Click Play to restart the audio",
+      description: "Click Continue to resume",
     });
   };
 
-  const handlePauseAudio = () => {
-    if (currentAudio && isPlayingAudio) {
-      currentAudio.pause();
-      setIsPlayingAudio(false);
+  const handlePauseVideo = () => {
+    if (currentVideoRef.current && isPlayingVideo) {
+      currentVideoRef.current.pause();
+      setIsPlayingVideo(false);
       setIsPaused(true);
     }
-    
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      setIsPlayingAudio(false);
-      setIsPaused(true);
-    }
-    
-    // Clear audio queue to allow user interruption
-    audioQueueRef.current = [];
-    isProcessingAudioRef.current = false;
     
     toast({
-      title: "Paused - Ready for your question",
-      description: "Type your question and hit send",
-      duration: 3000,
+      title: "Paused",
+      description: "Video paused",
+      duration: 2000,
     });
   };
 
-  const handleResumeAudio = () => {
-    if (currentAudio && isPaused) {
-      currentAudio.play();
-      setIsPlayingAudio(true);
-      setIsPaused(false);
-    }
-    
-    if (audioElementRef.current && isPaused) {
-      audioElementRef.current.play();
-      setIsPlayingAudio(true);
+  const handleResumeVideo = () => {
+    if (currentVideoRef.current && isPaused) {
+      currentVideoRef.current.play();
+      setIsPlayingVideo(true);
       setIsPaused(false);
     }
     
     toast({
       title: "Resumed",
-      description: "Audio playback resumed",
+      description: "Video resumed",
       duration: 2000,
     });
   };
 
-  const handleReplayAudio = () => {
-    // Replay the current audio from the beginning
-    if (currentAudio) {
-      currentAudio.currentTime = 0;
-      currentAudio.play();
-      setIsPlayingAudio(true);
-      setIsPaused(false);
-      setIsStopped(false);
-    }
-    
-    if (audioElementRef.current) {
-      audioElementRef.current.currentTime = 0;
-      audioElementRef.current.play();
-      setIsPlayingAudio(true);
+  const handleReplayVideo = () => {
+    if (currentVideoRef.current) {
+      currentVideoRef.current.currentTime = 0;
+      currentVideoRef.current.play();
+      setIsPlayingVideo(true);
       setIsPaused(false);
       setIsStopped(false);
     }
     
     toast({
       title: "Replaying",
-      description: "Audio replaying from start",
+      description: "Video replaying from start",
       duration: 2000,
     });
   };
@@ -560,28 +530,23 @@ const PodcastMode = () => {
 
     console.log('🎙️ User asking question to guest');
     
-    // Stop any playing audio
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
+    // Stop any playing video
+    if (currentVideoRef.current) {
+      currentVideoRef.current.pause();
+      currentVideoRef.current.currentTime = 0;
     }
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      audioElementRef.current.currentTime = 0;
-    }
-    setIsPlayingAudio(false);
+    setIsPlayingVideo(false);
     setIsPaused(false);
-    setCurrentAudio(null);
-    audioQueueRef.current = [];
-    isProcessingAudioRef.current = false;
+    videoQueueRef.current = [];
+    isProcessingVideoRef.current = false;
 
     try {
-      // Insert user question into podcast_messages table (real-time subscription will add to UI)
+      // Insert user question into podcast_messages table
       const { error: insertError } = await supabase
         .from('podcast_messages')
         .insert({
           podcast_session_id: podcastSessionId,
-          turn_number: -1, // User questions don't increment turn
+          turn_number: -1,
           figure_id: 'user',
           figure_name: 'User',
           speaker_role: 'user',
@@ -615,10 +580,10 @@ const PodcastMode = () => {
       setMessages(prev => [...prev, guestMessage]);
 
       if (isAutoVoiceEnabled) {
-        generateAndPlayAudio(guestData.message, guest.name, guest.id);
+        await generateAndPlayVideo(guestData.message, guest.name, guest.id, 'guest');
       }
       
-      console.log('✅ Guest answered user question - ready for next question');
+      console.log('✅ Guest answered user question');
 
     } catch (error) {
       console.error('Error handling user question:', error);
@@ -693,12 +658,13 @@ const PodcastMode = () => {
         return newCount;
       });
 
-      // Generate and play audio - use figure from state (not orchestrator response)
+      // Generate and play video
       if (isAutoVoiceEnabled) {
-        const figureName = currentFigure.name;  // Use actual figure name from state
-        const figureId = currentFigure.id;      // Use actual figure ID from state
-        console.log(`🎤 Generating TTS for ${figureName} (${figureId})`);
-        await generateAndPlayAudio(data.message, figureName, figureId);
+        const figureName = currentFigure.name;
+        const figureId = currentFigure.id;
+        const speakerRole: 'host' | 'guest' = speaker;
+        console.log(`🎤 Generating video for ${figureName} (${figureId})`);
+        await generateAndPlayVideo(data.message, figureName, figureId, speakerRole);
       }
       
       // Set up next turn
@@ -728,192 +694,269 @@ const PodcastMode = () => {
   const continueRound = async () => {
     setWaitingForContinue(false);
     
-    // When both participants are AI figures, each round should include both speaking
+    // When both participants are AI figures, preload second speaker's video while first plays
     if (hostType === 'figure' && guestType === 'figure') {
       const firstSpeaker: 'host' | 'guest' = currentSpeaker;
       const secondSpeaker: 'host' | 'guest' = currentSpeaker === 'host' ? 'guest' : 'host';
-
-      // First speaker generates response
-      const firstResponse = await continueConversation(firstSpeaker, false);
       
-      // Second speaker generates response
-      if (firstResponse) {
-        await continueConversation(secondSpeaker, true);
+      const firstFigure = firstSpeaker === 'host' ? host : guest;
+      const secondFigure = secondSpeaker === 'host' ? host : guest;
+      
+      if (!firstFigure || !secondFigure || !podcastSessionId) return;
+
+      // Generate first speaker's content
+      const { data: firstData, error: firstError } = await supabase.functions.invoke('podcast-orchestrator', {
+        body: { sessionId: podcastSessionId, language: selectedLanguage.split('-')[0] }
+      });
+      
+      if (firstError || !firstData) return;
+      
+      const firstMessage: Message = {
+        id: Date.now().toString(),
+        content: firstData.message,
+        type: "assistant",
+        timestamp: new Date(),
+        speakerName: firstFigure.name
+      };
+      setMessages(prev => [...prev, firstMessage]);
+      setSpeakerCount(prev => prev + 1);
+      
+      // Start generating second speaker's content in parallel
+      const secondDataPromise = supabase.functions.invoke('podcast-orchestrator', {
+        body: { sessionId: podcastSessionId, language: selectedLanguage.split('-')[0] }
+      });
+      
+      // Generate and play first video
+      if (isAutoVoiceEnabled) {
+        // Start preloading second video while first plays
+        const firstVideoPromise = generateVideoOnly(firstData.message, firstFigure.name, firstFigure.id, firstSpeaker);
+        const firstVideoUrl = await firstVideoPromise;
+        
+        if (firstVideoUrl) {
+          // Play first video and preload second in parallel
+          const { data: secondData } = await secondDataPromise;
+          
+          if (secondData) {
+            const secondMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              content: secondData.message,
+              type: "assistant",
+              timestamp: new Date(),
+              speakerName: secondFigure.name
+            };
+            setMessages(prev => [...prev, secondMessage]);
+            setSpeakerCount(prev => prev + 1);
+            
+            // Start preloading second video
+            setIsPreloading(true);
+            const secondVideoPromise = generateVideoOnly(secondData.message, secondFigure.name, secondFigure.id, secondSpeaker);
+            
+            // Play first video
+            if (firstSpeaker === 'host') {
+              setHostVideoUrl(firstVideoUrl);
+              setGuestVideoUrl(null);
+            } else {
+              setGuestVideoUrl(firstVideoUrl);
+              setHostVideoUrl(null);
+            }
+            await playVideo(firstVideoUrl);
+            
+            // First video done, clear it
+            if (firstSpeaker === 'host') setHostVideoUrl(null);
+            else setGuestVideoUrl(null);
+            
+            // Wait for second video to be ready
+            const secondVideoUrl = await secondVideoPromise;
+            setIsPreloading(false);
+            
+            if (secondVideoUrl) {
+              // Play second video
+              if (secondSpeaker === 'host') {
+                setHostVideoUrl(secondVideoUrl);
+                setGuestVideoUrl(null);
+              } else {
+                setGuestVideoUrl(secondVideoUrl);
+                setHostVideoUrl(null);
+              }
+              await playVideo(secondVideoUrl);
+              
+              // Clear after playback
+              if (secondSpeaker === 'host') setHostVideoUrl(null);
+              else setGuestVideoUrl(null);
+            }
+          }
+        }
       }
+      
+      // Update round
+      setCurrentRound(prev => prev + 1);
+      setCurrentSpeaker(firstSpeaker);
+      setWaitingForContinue(true);
     } else {
-      // If a user is involved, the AI speaker should respond
-      // currentSpeaker is already set to the next speaker (the AI)
+      // If a user is involved, just continue normally
       await continueConversation(currentSpeaker, true);
     }
   };
- 
-   const processAudioQueue = async () => {
-    if (isProcessingAudioRef.current || audioQueueRef.current.length === 0) {
-      return;
+  
+  // Generate video only (no playback) - for preloading
+  const generateVideoOnly = async (
+    text: string,
+    figureName: string,
+    figureId: string,
+    speaker: 'host' | 'guest'
+  ): Promise<string | null> => {
+    try {
+      console.log('🎤 Preloading video for:', figureName);
+      
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: {
+          text: text,
+          figure_name: figureName,
+          figure_id: figureId,
+          voice: speaker === 'host' ? hostVoice : guestVoice,
+          language: selectedLanguage,
+          is_user_host: false
+        }
+      });
+
+      if (error || !data?.audioContent) return null;
+
+      const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      const avatarUrl = speaker === 'host' ? hostAvatarUrl : guestAvatarUrl;
+      
+      if (!avatarUrl) return null;
+      
+      const result = await generateVideo(avatarUrl, audioDataUrl, figureId, figureName);
+      return result.videoUrl;
+    } catch (error) {
+      console.error('Error preloading video:', error);
+      return null;
     }
-
-    isProcessingAudioRef.current = true;
-
-    while (audioQueueRef.current.length > 0) {
-      const audioTask = audioQueueRef.current.shift();
-      if (audioTask) {
-        await audioTask();
-        // Wait 1 second before playing the next audio
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    isProcessingAudioRef.current = false;
   };
-
-  const generateAndPlayAudio = async (
+ 
+  // Generate TTS, create video, and play it
+  const generateAndPlayVideo = async (
     text: string, 
     figureName: string, 
-    figureId: string
+    figureId: string,
+    speaker: 'host' | 'guest'
   ): Promise<void> => {
-    const audioTask = () => new Promise<void>(async (resolve) => {
-      try {
-        setIsSpeaking(true);
-        const isHostSpeaker = figureId === host?.id || figureId === 'user-host';
-        const speakerRole: 'host' | 'guest' = isHostSpeaker ? 'host' : 'guest';
-        
-        console.log('🎤 Generating TTS for:', figureName);
-        
-        const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
-          body: {
-            text: text,
-            figure_name: figureName,
-            figure_id: figureId,
-            voice: figureId === 'user-host' || figureId === host?.id ? hostVoice : guestVoice,
-            language: selectedLanguage,
-            is_user_host: hostType === 'user' && figureId === 'user-host'
-          }
-        });
-
-        if (error) throw error;
-
-        if (data?.audioContent) {
-          const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
-          const avatarUrl = speakerRole === 'host' ? hostAvatarUrl : guestAvatarUrl;
-          
-          // Generate video first, wait for it
-          setIsGeneratingVideo(true);
-          console.log('🎬 Generating video for:', figureName);
-          
-          let videoUrl: string | null = null;
-          if (avatarUrl) {
-            const result = await generateVideo(avatarUrl, audioDataUrl, figureId, figureName);
-            videoUrl = result.videoUrl;
-          }
-          
-          setIsGeneratingVideo(false);
-          
-          // Set the video URL for display
-          if (videoUrl) {
-            console.log('✅ Video ready:', videoUrl.substring(0, 60) + '...');
-            if (speakerRole === 'host') {
-              setHostVideoUrl(videoUrl);
-            } else {
-              setGuestVideoUrl(videoUrl);
-            }
-          } else {
-            console.log('⚠️ No video, audio only');
-          }
-          
-          setCurrentAudioUrl(audioDataUrl);
-          
-          // Play audio
-          const audioBlob = new Blob(
-            [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
-            { type: 'audio/mpeg' }
-          );
-          const playbackUrl = URL.createObjectURL(audioBlob);
-          await playAudio(playbackUrl);
-          
-          // Clear video after playback
-          if (speakerRole === 'host') {
-            setHostVideoUrl(null);
-          } else {
-            setGuestVideoUrl(null);
-          }
-          
-          resolve();
-        } else {
-          resolve();
+    try {
+      setIsGeneratingVideo(true);
+      setCurrentVideoSpeaker(speaker);
+      console.log('🎤 Generating TTS + Video for:', figureName);
+      
+      // Step 1: Generate TTS audio
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: {
+          text: text,
+          figure_name: figureName,
+          figure_id: figureId,
+          voice: speaker === 'host' ? hostVoice : guestVoice,
+          language: selectedLanguage,
+          is_user_host: hostType === 'user' && figureId === 'user-host'
         }
-      } catch (error) {
-        console.error('Error generating audio:', error);
-        setIsSpeaking(false);
-        setIsGeneratingVideo(false);
-        resolve();
-      }
-    });
+      });
 
-    audioQueueRef.current.push(audioTask);
-    processAudioQueue();
+      if (error) throw error;
+      if (!data?.audioContent) {
+        throw new Error('No audio content received');
+      }
+
+      const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      const avatarUrl = speaker === 'host' ? hostAvatarUrl : guestAvatarUrl;
+      
+      // Step 2: Generate video with audio embedded
+      let videoUrl: string | null = null;
+      if (avatarUrl) {
+        console.log('🎬 Creating video for:', figureName);
+        const result = await generateVideo(avatarUrl, audioDataUrl, figureId, figureName);
+        videoUrl = result.videoUrl;
+      }
+      
+      setIsGeneratingVideo(false);
+      
+      if (!videoUrl) {
+        console.log('⚠️ Video generation failed');
+        return;
+      }
+
+      console.log('✅ Video ready, playing...');
+      
+      // Step 3: Set video URL and play
+      if (speaker === 'host') {
+        setHostVideoUrl(videoUrl);
+        setGuestVideoUrl(null);
+      } else {
+        setGuestVideoUrl(videoUrl);
+        setHostVideoUrl(null);
+      }
+      
+      // Step 4: Wait for video to finish playing
+      await playVideo(videoUrl);
+      
+      // Clear after playback
+      if (speaker === 'host') {
+        setHostVideoUrl(null);
+      } else {
+        setGuestVideoUrl(null);
+      }
+      
+    } catch (error) {
+      console.error('Error generating video:', error);
+      setIsGeneratingVideo(false);
+      setCurrentVideoSpeaker(null);
+    }
   };
 
-  const playAudio = (url: string): Promise<void> => {
+  // Play video and wait for it to complete
+  const playVideo = (videoUrl: string): Promise<void> => {
     return new Promise((resolve) => {
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.remove();
-      }
-
-      const audio = new Audio(url);
-      audioElementRef.current = audio;
-      setCurrentAudio(audio);
+      setIsPlayingVideo(true);
+      setIsPaused(false);
+      setIsStopped(false);
       
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-      }
-
-      if (!sourceNodeRef.current && audioContextRef.current) {
-        const source = audioContextRef.current.createMediaElementSource(audio);
-        const analyser = audioContextRef.current.createAnalyser();
-        analyser.fftSize = 256;
-        
-        source.connect(analyser);
-        analyser.connect(audioContextRef.current.destination);
-        
-        sourceNodeRef.current = source;
-        analyserRef.current = analyser;
-      }
-
-      audio.onplay = () => {
-        console.log('▶️ Audio started playing');
-        setIsPlayingAudio(true);
-        setIsPaused(false);
+      // Create a temporary video element to track completion
+      const checkVideoEnd = () => {
+        const videoEl = document.querySelector('video[src="' + videoUrl + '"]') as HTMLVideoElement;
+        if (videoEl) {
+          currentVideoRef.current = videoEl;
+          
+          const handleEnded = () => {
+            console.log('✅ Video finished playing');
+            setIsPlayingVideo(false);
+            currentVideoRef.current = null;
+            videoEl.removeEventListener('ended', handleEnded);
+            resolve();
+          };
+          
+          videoEl.addEventListener('ended', handleEnded);
+          
+          // Also check if video already ended or errors
+          if (videoEl.ended) {
+            handleEnded();
+          }
+          
+          videoEl.onerror = () => {
+            console.log('⚠️ Video error');
+            setIsPlayingVideo(false);
+            currentVideoRef.current = null;
+            resolve();
+          };
+        } else {
+          // Video element not found yet, wait a bit and try again
+          setTimeout(checkVideoEnd, 100);
+        }
       };
-
-      audio.onended = () => {
-        console.log('✅ Audio finished');
-        setIsPlayingAudio(false);
-        setIsPaused(false);
-        setIsSpeaking(false);
-        setCurrentAudioUrl(null);
-        setCurrentAudio(null);
-        URL.revokeObjectURL(url);
+      
+      // Start checking after a short delay
+      setTimeout(checkVideoEnd, 200);
+      
+      // Safety timeout - max 2 minutes
+      setTimeout(() => {
+        setIsPlayingVideo(false);
         resolve();
-      };
-
-      audio.onerror = () => {
-        setIsPlayingAudio(false);
-        setIsPaused(false);
-        setIsSpeaking(false);
-        setCurrentAudioUrl(null);
-        setCurrentAudio(null);
-        resolve();
-      };
-
-      setIsPlayingAudio(true);
-      audio.play().catch(error => {
-        console.error('Audio playback failed:', error);
-        setIsPlayingAudio(false);
-        setIsPaused(false);
-        setIsSpeaking(false);
-        resolve();
-      });
+      }, 120000);
     });
   };
 
@@ -1177,11 +1220,11 @@ const PodcastMode = () => {
         </div>
 
         {/* Video Loading Indicator */}
-        {isGeneratingVideo && (
+        {(isGeneratingVideo || isPreloading) && (
           <div className="flex items-center justify-center gap-2 mb-4 p-3 bg-primary/10 rounded-lg">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             <span className="text-sm text-primary font-medium">
-              Creating video... This may take 30-60 seconds
+              {isPreloading ? 'Preparing next speaker...' : 'Creating video... This may take 30-60 seconds'}
             </span>
           </div>
         )}
@@ -1197,7 +1240,7 @@ const PodcastMode = () => {
                   imageUrl={hostAvatarUrl}
                   isLoading={isLoadingHostAvatar}
                   videoUrl={hostVideoUrl}
-                  isGeneratingVideo={isGeneratingVideo && currentSpeaker === 'host'}
+                  isGeneratingVideo={isGeneratingVideo && currentVideoSpeaker === 'host'}
                   figureName={host.name}
                   figureId={host.id}
                 />
@@ -1227,7 +1270,7 @@ const PodcastMode = () => {
                   imageUrl={guestAvatarUrl}
                   isLoading={isLoadingGuestAvatar}
                   videoUrl={guestVideoUrl}
-                  isGeneratingVideo={isGeneratingVideo && currentSpeaker === 'guest'}
+                  isGeneratingVideo={isGeneratingVideo && currentVideoSpeaker === 'guest'}
                   figureName={guest.name}
                   figureId={guest.id}
                 />
@@ -1366,10 +1409,10 @@ const PodcastMode = () => {
                 </Button>
               </div>
               <div className="flex gap-2">
-                {isPlayingAudio && (
+                {isPlayingVideo && (
                   <>
                     <Button 
-                      onClick={handlePauseAudio}
+                      onClick={handlePauseVideo}
                       size="icon"
                       variant="secondary"
                       className="h-[60px] w-[60px]"
@@ -1389,7 +1432,7 @@ const PodcastMode = () => {
                 {(isPaused || isStopped) && (
                   <>
                     <Button 
-                      onClick={isStopped ? handleReplayAudio : handleResumeAudio}
+                      onClick={isStopped ? handleReplayVideo : handleResumeVideo}
                       size="icon"
                       variant="default"
                       className="h-[60px] w-[60px]"
@@ -1397,7 +1440,7 @@ const PodcastMode = () => {
                       <Play className="h-4 w-4" />
                     </Button>
                     <Button 
-                      onClick={handleReplayAudio}
+                      onClick={handleReplayVideo}
                       size="icon"
                       variant="outline"
                       className="h-[60px] w-[60px]"
