@@ -108,6 +108,7 @@ const HistoricalChat = () => {
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // For audio fallback
+  const [greetingText, setGreetingText] = useState<string | null>(null); // Text for K2 animation
   
   // Video state - external video generation like PodcastMode
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
@@ -251,9 +252,11 @@ const HistoricalChat = () => {
     setIsGreetingPlaying(true);
     setCurrentVideoUrl(null);
     setAnimationFrames(null);
+    setGreetingText(null);
     
     try {
-      const greetingText = getGreetingForFigure(figure);
+      const greeting = getGreetingForFigure(figure);
+      setGreetingText(greeting);
       
       // Get contextual setting for this figure (e.g., Einstein in a lab, Lincoln in Oval Office)
       const figureContext = getFigureContext(figure.name);
@@ -270,7 +273,7 @@ const HistoricalChat = () => {
         }),
         supabase.functions.invoke('azure-text-to-speech', {
           body: {
-            text: greetingText,
+            text: greeting,
             figure_name: figure.name,
             figure_id: figure.id,
             voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
@@ -301,7 +304,7 @@ const HistoricalChat = () => {
       console.log('🎬 Generating K2 animation frames...');
       setIsGeneratingVideo(true);
       
-      const animationResult = await generateK2Animation(imageUrl, greetingText, figure.id, figure.name);
+      const animationResult = await generateK2Animation(imageUrl, greeting, figure.id, figure.name);
       
       setIsGeneratingVideo(false);
       
@@ -1848,6 +1851,7 @@ const HistoricalChat = () => {
               videoUrl={currentVideoUrl}
               animationFrames={animationFrames || undefined}
               audioUrl={greetingAudioUrl}
+              greetingText={greetingText || undefined}
               isGeneratingVideo={isGeneratingVideo}
               figureName={selectedFigure.name}
               figureId={selectedFigure.id}
