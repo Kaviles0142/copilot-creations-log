@@ -100,87 +100,62 @@ const RealisticAvatar = ({
     };
   }, [audioUrl, animationFrames, onAudioEnd]);
 
-  // Play K2 animation frames synced with audio
+  // Play K2 animation frames synced with audio - single unified effect
   useEffect(() => {
     if (!animationFrames || animationFrames.length === 0 || !audioUrl) {
       return;
     }
+
+    // Skip if this is the same audio we already processed
+    if (lastAudioUrlRef.current === audioUrl) return;
+    lastAudioUrlRef.current = audioUrl;
 
     console.log(`🎬 Playing ${animationFrames.length} K2 animation frames`);
     stopAnimation();
     setCurrentFrameIndex(0);
     setIsPlayingAnimation(true);
 
-    // Play audio
-    if (audioRef.current) {
-      audioRef.current.src = audioUrl;
-      audioRef.current.play().catch(err => {
-        console.error('Audio playback failed:', err);
-      });
-    }
-
-    // Estimate duration, will be updated when audio metadata loads
-    const estimatedDuration = 5000;
-    const msPerFrame = estimatedDuration / animationFrames.length;
-
-    let frameIndex = 0;
-    animationIntervalRef.current = setInterval(() => {
-      frameIndex++;
-      if (frameIndex >= animationFrames.length) {
-        stopAnimation();
-        setCurrentFrameIndex(0);
-        onAnimationEnd?.();
-        return;
-      }
-      setCurrentFrameIndex(frameIndex);
-    }, msPerFrame);
-
-    return () => stopAnimation();
-  }, [animationFrames, audioUrl, onAnimationEnd]);
-
-  // Sync animation timing with actual audio duration
-  useEffect(() => {
-    if (!audioRef.current || !animationFrames || animationFrames.length === 0) return;
-
     const audio = audioRef.current;
-    
-    const handleLoadedMetadata = () => {
-      if (animationIntervalRef.current && audio.duration) {
-        stopAnimation();
-        setCurrentFrameIndex(0);
-        setIsPlayingAnimation(true);
-        
-        const durationMs = audio.duration * 1000;
-        const msPerFrame = durationMs / animationFrames.length;
-        console.log(`🎬 Synced: ${durationMs}ms, ${msPerFrame}ms/frame`);
+    if (!audio) return;
 
-        let frameIndex = 0;
-        animationIntervalRef.current = setInterval(() => {
-          frameIndex++;
-          if (frameIndex >= animationFrames.length) {
-            stopAnimation();
-            setCurrentFrameIndex(0);
-            return;
-          }
-          setCurrentFrameIndex(frameIndex);
-        }, msPerFrame);
-      }
+    audio.src = audioUrl;
+
+    // Simple frame cycling - use fixed timing, don't try to sync perfectly
+    const frameCount = animationFrames.length;
+    let frameIndex = 0;
+    
+    // Use a reasonable default timing - will feel natural enough
+    const msPerFrame = 2000; // 2 seconds per frame for 3 frames = 6 seconds
+
+    const startAnimation = () => {
+      animationIntervalRef.current = setInterval(() => {
+        frameIndex = (frameIndex + 1) % frameCount;
+        setCurrentFrameIndex(frameIndex);
+      }, msPerFrame);
     };
 
     const handleEnded = () => {
+      console.log('⏹️ Animation ended - clearing state');
       stopAnimation();
       setCurrentFrameIndex(0);
+      setIsPlayingAnimation(false);
       onAnimationEnd?.();
     };
 
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('ended', handleEnded);
+    
+    // Start animation and audio together
+    startAnimation();
+    audio.play().catch(err => {
+      console.error('Audio playback failed:', err);
+      stopAnimation();
+    });
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      stopAnimation();
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [animationFrames, onAnimationEnd]);
+  }, [animationFrames, audioUrl, onAnimationEnd]);
 
   // Play video when URL is available
   useEffect(() => {
