@@ -94,7 +94,7 @@ const HistoricalChat = () => {
   const [books, setBooks] = useState<BookInfo[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [showMusicInterface, setShowMusicInterface] = useState(false);
-  const [selectedAIProvider, setSelectedAIProvider] = useState<'openai' | 'grok' | 'claude' | 'lovable-ai'>('openai'); // OpenAI as default (matches backend priority)
+  const [selectedAIProvider, setSelectedAIProvider] = useState<'kimi-k2' | 'openai' | 'grok' | 'claude' | 'lovable-ai'>('kimi-k2'); // Kimi K2 as default (matches backend priority)
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [isAutoVoiceEnabled, setIsAutoVoiceEnabled] = useState(true); // Auto-enable voice responses
   // Removed: responseLanguage now uses selectedLanguage for both text and speech
@@ -1525,6 +1525,7 @@ const HistoricalChat = () => {
                 <p className="text-xs font-medium mb-1">Currently Using:</p>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold capitalize">
+                    {messages[messages.length - 1].aiProvider === 'kimi-k2' && '🌙 Kimi K2'}
                     {messages[messages.length - 1].aiProvider === 'openai' && '🤖 OpenAI'}
                     {messages[messages.length - 1].aiProvider === 'grok' && '🚀 Grok'}
                     {messages[messages.length - 1].aiProvider === 'anthropic' && '🧠 Claude'}
@@ -1540,11 +1541,17 @@ const HistoricalChat = () => {
               </div>
             )}
             
-            <Select value={selectedAIProvider} onValueChange={(value: 'openai' | 'grok' | 'claude' | 'lovable-ai') => setSelectedAIProvider(value)}>
+            <Select value={selectedAIProvider} onValueChange={(value: 'kimi-k2' | 'openai' | 'grok' | 'claude' | 'lovable-ai') => setSelectedAIProvider(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-card z-50">
+                <SelectItem value="kimi-k2">
+                  <div className="flex items-center">
+                    <span className="mr-2">🌙</span>
+                    Kimi K2 (Primary)
+                  </div>
+                </SelectItem>
                 <SelectItem value="openai">
                   <div className="flex items-center">
                     <span className="mr-2">🤖</span>
@@ -1572,7 +1579,9 @@ const HistoricalChat = () => {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-2">
-              {selectedAIProvider === 'claude'
+              {selectedAIProvider === 'kimi-k2'
+                ? 'Kimi K2 with context caching for cost-effective responses'
+                : selectedAIProvider === 'claude'
                 ? 'Claude offers intelligent, nuanced responses with superior reasoning'
                 : selectedAIProvider === 'openai' 
                 ? 'OpenAI provides reliable, well-structured responses'
