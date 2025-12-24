@@ -93,8 +93,8 @@ const PodcastMode = () => {
   
   const { toast } = useToast();
 
-  // Video generator hook
-  const { generateVideo, clearAll: clearAllVideos } = useVideoPreloader();
+  // K2 Animation generator hook
+  const { generateK2Animation, clearAll: clearAllVideos } = useVideoPreloader();
 
   // Azure voice options filtered by gender
   const azureVoices = {
@@ -345,7 +345,7 @@ const PodcastMode = () => {
         
         // Generate and play video for host
         if (isAutoVoiceEnabled) {
-          await generateAndPlayVideo(firstResponse.message, hostName, hostId, 'host');
+          await generateAndPlayAudio(firstResponse.message, hostName, hostId, 'host');
         }
 
         // Generate guest response
@@ -373,7 +373,7 @@ const PodcastMode = () => {
 
         // Generate and play video for guest
         if (isAutoVoiceEnabled && guestType === 'figure') {
-          await generateAndPlayVideo(secondResponse.message, guestName, guestId, 'guest');
+          await generateAndPlayAudio(secondResponse.message, guestName, guestId, 'guest');
         }
 
         // Set up for next round
@@ -408,7 +408,7 @@ const PodcastMode = () => {
         
         // Generate and play video for host intro
         if (isAutoVoiceEnabled) {
-          await generateAndPlayVideo(firstResponse.message, hostName, hostId, 'host');
+          await generateAndPlayAudio(firstResponse.message, hostName, hostId, 'host');
         }
         
         // Generate guest response
@@ -436,7 +436,7 @@ const PodcastMode = () => {
 
         // Generate and play video for guest
         if (isAutoVoiceEnabled) {
-          await generateAndPlayVideo(secondResponse.message, guestName, guestId, 'guest');
+          await generateAndPlayAudio(secondResponse.message, guestName, guestId, 'guest');
         }
 
         // After intro, ready for user's first question (no Continue button needed)
@@ -580,7 +580,7 @@ const PodcastMode = () => {
       setMessages(prev => [...prev, guestMessage]);
 
       if (isAutoVoiceEnabled) {
-        await generateAndPlayVideo(guestData.message, guest.name, guest.id, 'guest');
+        await generateAndPlayAudio(guestData.message, guest.name, guest.id, 'guest');
       }
       
       console.log('✅ Guest answered user question');
@@ -664,7 +664,7 @@ const PodcastMode = () => {
         const figureId = currentFigure.id;
         const speakerRole: 'host' | 'guest' = speaker;
         console.log(`🎤 Generating video for ${figureName} (${figureId})`);
-        await generateAndPlayVideo(data.message, figureName, figureId, speakerRole);
+        await generateAndPlayAudio(data.message, figureName, figureId, speakerRole);
       }
       
       // Set up next turn
@@ -728,19 +728,11 @@ const PodcastMode = () => {
       setMessages(prev => [...prev, firstMessage]);
       setSpeakerCount(prev => prev + 1);
       
-      // Generate and play first video (host)
+      // Generate and play first audio (host)
       if (isAutoVoiceEnabled) {
-        console.log(`🎬 Generating video for ${firstFigure.name}`);
+        console.log(`🎤 Generating audio for ${firstFigure.name}`);
         setCurrentVideoSpeaker(firstSpeaker);
-        const firstVideoUrl = await generateVideoOnly(firstData.message, firstFigure.name, firstFigure.id, firstSpeaker);
-        
-        if (firstVideoUrl) {
-          // Set and play first video
-          setHostVideoUrl(firstVideoUrl);
-          setGuestVideoUrl(null);
-          await playVideo(firstVideoUrl);
-          setHostVideoUrl(null);
-        }
+        await generateAndPlayAudio(firstData.message, firstFigure.name, firstFigure.id, firstSpeaker);
       }
 
       // Generate second speaker's content (guest)
@@ -764,19 +756,11 @@ const PodcastMode = () => {
       setMessages(prev => [...prev, secondMessage]);
       setSpeakerCount(prev => prev + 1);
       
-      // Generate and play second video (guest)
+      // Generate and play second audio (guest)
       if (isAutoVoiceEnabled) {
-        console.log(`🎬 Generating video for ${secondFigure.name}`);
+        console.log(`🎤 Generating audio for ${secondFigure.name}`);
         setCurrentVideoSpeaker(secondSpeaker);
-        const secondVideoUrl = await generateVideoOnly(secondData.message, secondFigure.name, secondFigure.id, secondSpeaker);
-        
-        if (secondVideoUrl) {
-          // Set and play second video
-          setGuestVideoUrl(secondVideoUrl);
-          setHostVideoUrl(null);
-          await playVideo(secondVideoUrl);
-          setGuestVideoUrl(null);
-        }
+        await generateAndPlayAudio(secondData.message, secondFigure.name, secondFigure.id, secondSpeaker);
       }
       
       // Update round and prepare for next
@@ -791,15 +775,15 @@ const PodcastMode = () => {
     }
   };
   
-  // Generate video only (no playback) - for preloading
-  const generateVideoOnly = async (
+  // Generate audio only - video generation disabled (Ditto removed)
+  const generateAudioOnly = async (
     text: string,
     figureName: string,
     figureId: string,
     speaker: 'host' | 'guest'
   ): Promise<string | null> => {
     try {
-      console.log('🎤 Preloading video for:', figureName);
+      console.log('🎤 Generating audio for:', figureName);
       
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
@@ -814,21 +798,15 @@ const PodcastMode = () => {
 
       if (error || !data?.audioContent) return null;
 
-      const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
-      const avatarUrl = speaker === 'host' ? hostAvatarUrl : guestAvatarUrl;
-      
-      if (!avatarUrl) return null;
-      
-      const result = await generateVideo(avatarUrl, audioDataUrl, figureId, figureName);
-      return result.videoUrl;
+      return `data:audio/mpeg;base64,${data.audioContent}`;
     } catch (error) {
-      console.error('Error preloading video:', error);
+      console.error('Error generating audio:', error);
       return null;
     }
   };
  
-  // Generate TTS, create video, and play it
-  const generateAndPlayVideo = async (
+  // Generate TTS and play audio with static avatar (video generation disabled)
+  const generateAndPlayAudio = async (
     text: string, 
     figureName: string, 
     figureId: string,
@@ -837,9 +815,9 @@ const PodcastMode = () => {
     try {
       setIsGeneratingVideo(true);
       setCurrentVideoSpeaker(speaker);
-      console.log('🎤 Generating TTS + Video for:', figureName);
+      console.log('🎤 Generating TTS for:', figureName);
       
-      // Step 1: Generate TTS audio
+      // Generate TTS audio
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
           text: text,
@@ -857,49 +835,28 @@ const PodcastMode = () => {
       }
 
       const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
-      const avatarUrl = speaker === 'host' ? hostAvatarUrl : guestAvatarUrl;
-      
-      // Step 2: Generate video with audio embedded
-      let videoUrl: string | null = null;
-      if (avatarUrl) {
-        console.log('🎬 Creating video for:', figureName);
-        const result = await generateVideo(avatarUrl, audioDataUrl, figureId, figureName);
-        videoUrl = result.videoUrl;
-      }
       
       setIsGeneratingVideo(false);
-      
-      if (!videoUrl) {
-        console.log('⚠️ Video generation failed');
-        return;
-      }
 
-      console.log('✅ Video ready, playing...');
+      console.log('✅ Audio ready, playing...');
       
-      // Step 3: Set video URL and play
-      if (speaker === 'host') {
-        setHostVideoUrl(videoUrl);
-        setGuestVideoUrl(null);
-      } else {
-        setGuestVideoUrl(videoUrl);
-        setHostVideoUrl(null);
-      }
-      
-      // Step 4: Wait for video to finish playing
-      await playVideo(videoUrl);
-      
-      // Clear after playback
-      if (speaker === 'host') {
-        setHostVideoUrl(null);
-      } else {
-        setGuestVideoUrl(null);
-      }
+      // Play audio (video generation disabled - using static avatars)
+      await playAudio(audioDataUrl);
       
     } catch (error) {
-      console.error('Error generating video:', error);
+      console.error('Error generating audio:', error);
       setIsGeneratingVideo(false);
-      setCurrentVideoSpeaker(null);
     }
+  };
+
+  // Play audio with promise
+  const playAudio = (audioUrl: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const audio = new Audio(audioUrl);
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      audio.play().catch(() => resolve());
+    });
   };
 
   // Play video and wait for it to complete
