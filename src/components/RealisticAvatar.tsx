@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
 import { Loader2 } from 'lucide-react';
-import { useTalkingVideo } from '@/hooks/useTalkingVideo';
+import { useK2Animation } from '@/hooks/useK2Animation';
 
 interface AnimationFrame {
   frameNumber: number;
@@ -12,11 +12,9 @@ interface AnimationFrame {
 interface RealisticAvatarProps {
   imageUrl: string | null;
   isLoading?: boolean;
-  // Either pass audioUrl for internal video generation
   audioUrl?: string | null;
-  // Or pass videoUrl directly (pre-generated)
+  greetingText?: string; // Text for K2 animation
   videoUrl?: string | null;
-  // Or pass animation frames (K2 generated)
   animationFrames?: AnimationFrame[];
   isGeneratingVideo?: boolean;
   figureName?: string;
@@ -30,8 +28,9 @@ const RealisticAvatar = ({
   imageUrl, 
   isLoading, 
   audioUrl,
+  greetingText,
   videoUrl: externalVideoUrl,
-  animationFrames,
+  animationFrames: externalFrames,
   isGeneratingVideo: externalIsGenerating,
   figureName,
   figureId,
@@ -43,36 +42,32 @@ const RealisticAvatar = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   const processedAudioRef = useRef<string | null>(null);
   const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [internalVideoUrl, setInternalVideoUrl] = useState<string | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [isPlayingAnimation, setIsPlayingAnimation] = useState(false);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [videoError, setVideoError] = useState(false);
 
-  // Use the video URL from either source
-  const videoUrl = externalVideoUrl || internalVideoUrl;
+  const videoUrl = externalVideoUrl;
 
-  // Internal video generation hook (only used when audioUrl is passed without videoUrl)
+  // K2 Animation hook for generating lip-sync frames
   const { 
-    generateVideo, 
-    isGenerating: internalIsGenerating, 
-    status,
-    reset 
-  } = useTalkingVideo({
-    onVideoReady: (url) => {
-      console.log('🎥 Internal video ready:', url.substring(0, 60) + '...');
-      setInternalVideoUrl(url);
-      onVideoReady?.(url);
+    generateAnimation, 
+    isGenerating: k2IsGenerating, 
+    frames: k2Frames,
+    reset: resetK2
+  } = useK2Animation({
+    onAnimationReady: (frames) => {
+      console.log(`🎬 K2 animation ready with ${frames.length} frames`);
     },
     onError: (error) => {
-      console.error('❌ Video generation failed:', error);
-      if (audioUrl) {
-        onVideoReady?.(audioUrl);
-      }
-    }
+      console.error('❌ K2 animation failed:', error);
+    },
+    frameCount: 5,
   });
 
-  const isGeneratingVideo = externalIsGenerating || internalIsGenerating;
+  // Use external frames or K2-generated frames
+  const animationFrames = externalFrames || k2Frames;
+  const isGeneratingVideo = externalIsGenerating || k2IsGenerating;
 
   // Stop animation playback
   const stopAnimation = () => {
@@ -167,9 +162,9 @@ const RealisticAvatar = ({
     };
   }, [animationFrames, onAnimationEnd]);
 
-  // Generate video internally when we have image + audio but no external video
+  // Generate K2 animation when we have image + audio + text but no external video/frames
   useEffect(() => {
-    if (!imageUrl || !audioUrl || externalVideoUrl || animationFrames) {
+    if (!imageUrl || !audioUrl || !greetingText || externalVideoUrl || externalFrames) {
       return;
     }
 
@@ -179,9 +174,9 @@ const RealisticAvatar = ({
     }
 
     processedAudioRef.current = audioUrl;
-    console.log('🎬 Starting internal video generation');
-    generateVideo(imageUrl, audioUrl, figureId, figureName);
-  }, [imageUrl, audioUrl, externalVideoUrl, animationFrames, figureId, figureName, generateVideo]);
+    console.log('🎬 Starting K2 animation generation');
+    generateAnimation(imageUrl, greetingText, figureId, figureName, audioUrl);
+  }, [imageUrl, audioUrl, greetingText, externalVideoUrl, externalFrames, figureId, figureName, generateAnimation]);
 
   // Play video when URL is available
   useEffect(() => {
@@ -203,13 +198,12 @@ const RealisticAvatar = ({
   // Reset when figure changes
   useEffect(() => {
     if (figureId) {
-      setInternalVideoUrl(null);
       processedAudioRef.current = null;
       stopAnimation();
       setCurrentFrameIndex(0);
-      reset();
+      resetK2();
     }
-  }, [figureId, reset]);
+  }, [figureId, resetK2]);
 
   // Cleanup on unmount
   useEffect(() => {
