@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
 import { Loader2 } from 'lucide-react';
-import { useK2Animation } from '@/hooks/useK2Animation';
 
 interface AnimationFrame {
   frameNumber: number;
@@ -13,14 +12,14 @@ interface RealisticAvatarProps {
   imageUrl: string | null;
   isLoading?: boolean;
   audioUrl?: string | null;
-  greetingText?: string; // Text for K2 animation
   videoUrl?: string | null;
   animationFrames?: AnimationFrame[];
   isGeneratingVideo?: boolean;
+  isSpeaking?: boolean;
   figureName?: string;
   figureId?: string;
   onVideoEnd?: () => void;
-  onVideoReady?: (videoUrl: string) => void;
+  onAudioEnd?: () => void;
   onAnimationEnd?: () => void;
 }
 
@@ -28,46 +27,27 @@ const RealisticAvatar = ({
   imageUrl, 
   isLoading, 
   audioUrl,
-  greetingText,
-  videoUrl: externalVideoUrl,
-  animationFrames: externalFrames,
-  isGeneratingVideo: externalIsGenerating,
+  videoUrl,
+  animationFrames,
+  isGeneratingVideo,
+  isSpeaking: externalIsSpeaking,
   figureName,
   figureId,
   onVideoEnd,
-  onVideoReady,
+  onAudioEnd,
   onAnimationEnd,
 }: RealisticAvatarProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const processedAudioRef = useRef<string | null>(null);
   const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAudioUrlRef = useRef<string | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isPlayingAnimation, setIsPlayingAnimation] = useState(false);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [videoError, setVideoError] = useState(false);
 
-  const videoUrl = externalVideoUrl;
-
-  // K2 Animation hook for generating lip-sync frames
-  const { 
-    generateAnimation, 
-    isGenerating: k2IsGenerating, 
-    frames: k2Frames,
-    reset: resetK2
-  } = useK2Animation({
-    onAnimationReady: (frames) => {
-      console.log(`🎬 K2 animation ready with ${frames.length} frames`);
-    },
-    onError: (error) => {
-      console.error('❌ K2 animation failed:', error);
-    },
-    frameCount: 5,
-  });
-
-  // Use external frames or K2-generated frames
-  const animationFrames = externalFrames || k2Frames;
-  const isGeneratingVideo = externalIsGenerating || k2IsGenerating;
+  const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo || isPlayingAnimation;
 
   // Stop animation playback
   const stopAnimation = () => {
@@ -77,6 +57,48 @@ const RealisticAvatar = ({
     }
     setIsPlayingAnimation(false);
   };
+
+  // Play audio when audioUrl changes (and no animation frames)
+  useEffect(() => {
+    if (!audioUrl || !audioRef.current) return;
+    
+    // Don't replay same audio
+    if (lastAudioUrlRef.current === audioUrl) return;
+    lastAudioUrlRef.current = audioUrl;
+
+    // If we have animation frames, let the animation effect handle audio
+    if (animationFrames && animationFrames.length > 0) return;
+
+    console.log('🎤 Playing audio with static avatar');
+    audioRef.current.src = audioUrl;
+    audioRef.current.load();
+    
+    const handlePlay = () => setIsPlayingAudio(true);
+    const handleEnded = () => {
+      setIsPlayingAudio(false);
+      onAudioEnd?.();
+    };
+    const handleError = () => {
+      setIsPlayingAudio(false);
+      console.error('Audio playback error');
+    };
+
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('ended', handleEnded);
+    audioRef.current.addEventListener('error', handleError);
+
+    audioRef.current.play().catch(err => {
+      console.error('Audio autoplay failed:', err);
+    });
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.removeEventListener('error', handleError);
+      }
+    };
+  }, [audioUrl, animationFrames, onAudioEnd]);
 
   // Play K2 animation frames synced with audio
   useEffect(() => {
@@ -97,9 +119,8 @@ const RealisticAvatar = ({
       });
     }
 
-    // Estimate total duration based on audio (rough estimate)
-    // We'll update this when audio metadata loads
-    const estimatedDuration = 5000; // Default 5 seconds
+    // Estimate duration, will be updated when audio metadata loads
+    const estimatedDuration = 5000;
     const msPerFrame = estimatedDuration / animationFrames.length;
 
     let frameIndex = 0;
@@ -125,14 +146,13 @@ const RealisticAvatar = ({
     
     const handleLoadedMetadata = () => {
       if (animationIntervalRef.current && audio.duration) {
-        // Restart with correct timing
         stopAnimation();
         setCurrentFrameIndex(0);
         setIsPlayingAnimation(true);
         
         const durationMs = audio.duration * 1000;
         const msPerFrame = durationMs / animationFrames.length;
-        console.log(`🎬 Synced animation: ${durationMs}ms total, ${msPerFrame}ms per frame`);
+        console.log(`🎬 Synced: ${durationMs}ms, ${msPerFrame}ms/frame`);
 
         let frameIndex = 0;
         animationIntervalRef.current = setInterval(() => {
@@ -162,22 +182,6 @@ const RealisticAvatar = ({
     };
   }, [animationFrames, onAnimationEnd]);
 
-  // Generate K2 animation when we have image + audio + text but no external video/frames
-  useEffect(() => {
-    if (!imageUrl || !audioUrl || !greetingText || externalVideoUrl || externalFrames) {
-      return;
-    }
-
-    // Prevent re-processing same audio
-    if (processedAudioRef.current === audioUrl) {
-      return;
-    }
-
-    processedAudioRef.current = audioUrl;
-    console.log('🎬 Starting K2 animation generation');
-    generateAnimation(imageUrl, greetingText, figureId, figureName, audioUrl);
-  }, [imageUrl, audioUrl, greetingText, externalVideoUrl, externalFrames, figureId, figureName, generateAnimation]);
-
   // Play video when URL is available
   useEffect(() => {
     if (videoRef.current && videoUrl && !videoError) {
@@ -190,20 +194,14 @@ const RealisticAvatar = ({
     }
   }, [videoUrl, videoError]);
 
-  // Reset state when figure or video URL changes
+  // Reset state when figure changes
   useEffect(() => {
     setVideoError(false);
-  }, [videoUrl, figureId]);
-
-  // Reset when figure changes
-  useEffect(() => {
-    if (figureId) {
-      processedAudioRef.current = null;
-      stopAnimation();
-      setCurrentFrameIndex(0);
-      resetK2();
-    }
-  }, [figureId, resetK2]);
+    lastAudioUrlRef.current = null;
+    stopAnimation();
+    setCurrentFrameIndex(0);
+    setIsPlayingAudio(false);
+  }, [figureId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -229,26 +227,26 @@ const RealisticAvatar = ({
     );
   }
 
-  // Show generating overlay
+  // Show generating overlay while K2 generates (but audio still plays)
   if (isGeneratingVideo && !videoUrl && !animationFrames) {
-    const statusMessage = status === 'generating' 
-      ? 'Starting animation...' 
-      : 'Creating K2 animation...';
-    
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
         <img 
           src={imageUrl} 
           alt={figureName || 'Avatar'} 
-          className="w-full h-full object-cover opacity-50"
+          className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
-            <p className="text-sm text-white font-medium">{statusMessage}</p>
-            <p className="text-xs text-white/70">K2 + Nano Banana</p>
+        {isSpeaking && (
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-xs text-white">Speaking</span>
           </div>
+        )}
+        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
+          <Loader2 className="w-3 h-3 animate-spin text-white" />
+          <span className="text-xs text-white/70">Animating...</span>
         </div>
+        <audio ref={audioRef} hidden />
       </Card>
     );
   }
@@ -271,13 +269,11 @@ const RealisticAvatar = ({
             <span className="text-xs text-white">Speaking</span>
           </div>
         )}
-        {/* Frame indicator */}
         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
           <span className="text-xs text-white/70">
             {currentFrameIndex + 1}/{animationFrames.length}
           </span>
         </div>
-        {/* Hidden audio element */}
         <audio ref={audioRef} hidden />
       </Card>
     );
@@ -319,15 +315,20 @@ const RealisticAvatar = ({
     );
   }
 
-  // Static image fallback
+  // Static image with audio playback
   return (
-    <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden">
+    <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
       <img 
         src={imageUrl} 
         alt={figureName || 'Avatar'} 
         className="w-full h-full object-cover"
       />
-      {/* Hidden audio for fallback playback */}
+      {isSpeaking && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-xs text-white">Speaking</span>
+        </div>
+      )}
       <audio ref={audioRef} hidden />
     </Card>
   );
