@@ -36,7 +36,7 @@ serve(async (req) => {
     // Step 1: Use K2 to analyze the text and generate frame descriptions
     console.log('🧠 Step 1: Using K2 to analyze speech and generate frame descriptions...');
     
-    const k2Response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+    const k2Response = await fetch('https://api.moonshot.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${MOONSHOT_API_KEY}`,
