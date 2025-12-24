@@ -1125,6 +1125,59 @@ Remember: You're ${figure.name} having a real conversation. Share your experienc
           response = data.content[0].text;
           usedProvider = provider.name;
           
+        } else if (provider.name === 'Kimi K2') {
+          // Kimi K2 with context caching for cost optimization
+          // The system prompt is cached to reduce token costs on repeated conversations
+          console.log('🌙 Using Kimi K2 with context caching enabled...');
+          
+          const aiResponse = await fetch(provider.endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: provider.model,
+              messages: [
+                { 
+                  role: 'system', 
+                  content: systemPrompt,
+                  // Enable context caching for the large system prompt
+                  // This caches the figure's context, personality, and knowledge base
+                  cache_control: { type: 'ephemeral' }
+                },
+                { role: 'user', content: message }
+              ],
+              max_tokens: 4096,
+              temperature: 0.8
+            }),
+          });
+
+          if (aiResponse.status === 429 || aiResponse.status === 402) {
+            console.log(`${provider.name} credits depleted (${aiResponse.status}), trying next provider...`);
+            continue;
+          }
+
+          if (!aiResponse.ok) {
+            const errorText = await aiResponse.text();
+            console.error(`${provider.name} error:`, errorText);
+            throw new Error(`${provider.name} error: ${aiResponse.status}`);
+          }
+
+          const data = await aiResponse.json();
+          
+          // Log cache usage for monitoring cost savings
+          if (data.usage?.cache_creation_input_tokens) {
+            console.log(`🌙 Kimi K2 cache created: ${data.usage.cache_creation_input_tokens} tokens cached`);
+          }
+          if (data.usage?.cache_read_input_tokens) {
+            console.log(`🌙 Kimi K2 cache hit: ${data.usage.cache_read_input_tokens} tokens read from cache (cost savings!)`);
+          }
+          
+          response = data.choices[0].message.content;
+          usedProvider = provider.name;
+          usedModel = provider.model;
+          
         } else {
           // OpenAI, Grok, and Lovable AI use OpenAI-compatible format
           const aiResponse = await fetch(provider.endpoint, {
