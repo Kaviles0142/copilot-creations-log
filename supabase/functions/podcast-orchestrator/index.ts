@@ -325,32 +325,113 @@ CRITICAL: Do NOT prepend your name. Do NOT re-introduce yourself. Do NOT repeat 
     
     console.log(`🎛️ Settings: ${useEnhancedSettings ? 'Enhanced (User-AI)' : 'Standard (AI-AI)'}`);
 
-    // Generate AI response using OpenAI
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: useEnhancedSettings ? 'gpt-4o' : 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.8,
-        max_tokens: useEnhancedSettings ? 1500 : 500,
-      }),
-    });
+    // AI providers with Kimi K2 as primary (context caching for cost savings)
+    const AI_PROVIDERS = [
+      { name: 'Kimi K2', env: 'MOONSHOT_API_KEY', model: 'kimi-k2-0905-preview', endpoint: 'https://api.moonshot.ai/v1/chat/completions' },
+      { name: 'OpenAI', env: 'OPENAI_API_KEY', model: useEnhancedSettings ? 'gpt-4o' : 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
+    ];
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error('Failed to generate AI response');
+    let responseContent = '';
+    let usedProvider = '';
+
+    for (const provider of AI_PROVIDERS) {
+      const apiKey = Deno.env.get(provider.env);
+      if (!apiKey) {
+        console.log(`${provider.name} not configured, skipping...`);
+        continue;
+      }
+
+      try {
+        console.log(`🎙️ Trying ${provider.name} for podcast...`);
+
+        if (provider.name === 'Kimi K2') {
+          // Kimi K2 with context caching
+          console.log('🌙 Using Kimi K2 with context caching enabled...');
+          
+          const aiResponse = await fetch(provider.endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: provider.model,
+              messages: [
+                { 
+                  role: 'system', 
+                  content: enhancedSystemPrompt,
+                  cache_control: { type: 'ephemeral' }
+                },
+                { role: 'user', content: userPrompt }
+              ],
+              max_tokens: useEnhancedSettings ? 1500 : 500,
+              temperature: 0.8
+            }),
+          });
+
+          if (aiResponse.status === 429 || aiResponse.status === 402) {
+            console.log(`${provider.name} credits depleted, trying next...`);
+            continue;
+          }
+
+          if (!aiResponse.ok) {
+            throw new Error(`${provider.name} error: ${aiResponse.status}`);
+          }
+
+          const data = await aiResponse.json();
+          
+          if (data.usage?.cache_read_input_tokens) {
+            console.log(`🌙 Kimi K2 cache hit: ${data.usage.cache_read_input_tokens} tokens from cache`);
+          }
+          
+          responseContent = data.choices[0].message.content;
+          usedProvider = provider.name;
+          break;
+
+        } else {
+          // OpenAI fallback
+          const aiResponse = await fetch(provider.endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: provider.model,
+              messages: [
+                { role: 'system', content: enhancedSystemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              temperature: 0.8,
+              max_tokens: useEnhancedSettings ? 1500 : 500,
+            }),
+          });
+
+          if (aiResponse.status === 429 || aiResponse.status === 402) {
+            console.log(`${provider.name} credits depleted, trying next...`);
+            continue;
+          }
+
+          if (!aiResponse.ok) {
+            throw new Error(`${provider.name} error: ${aiResponse.status}`);
+          }
+
+          const data = await aiResponse.json();
+          responseContent = data.choices[0].message.content;
+          usedProvider = provider.name;
+          break;
+        }
+      } catch (error) {
+        console.error(`${provider.name} failed:`, error);
+        continue;
+      }
     }
 
-    const aiData = await openaiResponse.json();
-    const responseContent = aiData.choices[0].message.content;
+    if (!responseContent) {
+      throw new Error('All AI providers failed');
+    }
+
+    console.log(`✅ Generated response with ${usedProvider}`);
 
     console.log('💬 Generated response:', responseContent.substring(0, 100) + '...');
 

@@ -255,7 +255,7 @@ Now respond to the latest point raised.`;
       .gt('expires_at', new Date().toISOString())
       .maybeSingle();
 
-    let figureResponse: string;
+    let figureResponse: string = '';
 
     if (cachedResponse) {
       console.log(`✅ Cache hit for ${currentFigureName} (used ${cachedResponse.hit_count} times)`);
@@ -355,37 +355,115 @@ Now respond to the latest point raised.`;
         ? `${systemPrompt}\n\nUse this factual data in your response if relevant:${factualContext}`
         : systemPrompt;
       
-      // Call AI to generate response
-      const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-      if (!OPENAI_API_KEY) {
-        throw new Error('OPENAI_API_KEY not configured');
+      // AI providers with Kimi K2 as primary (context caching for cost savings)
+      const AI_PROVIDERS = [
+        { name: 'Kimi K2', env: 'MOONSHOT_API_KEY', model: 'kimi-k2-0905-preview', endpoint: 'https://api.moonshot.ai/v1/chat/completions' },
+        { name: 'OpenAI', env: 'OPENAI_API_KEY', model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
+      ];
+
+      let usedProvider = '';
+      let usedModel = '';
+
+      for (const provider of AI_PROVIDERS) {
+        const apiKey = Deno.env.get(provider.env);
+        if (!apiKey) {
+          console.log(`${provider.name} not configured, skipping...`);
+          continue;
+        }
+
+        try {
+          console.log(`🎭 Trying ${provider.name} for debate...`);
+
+          if (provider.name === 'Kimi K2') {
+            // Kimi K2 with context caching
+            console.log('🌙 Using Kimi K2 with context caching enabled...');
+            
+            const aiResponse = await fetch(provider.endpoint, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: provider.model,
+                messages: [
+                  { 
+                    role: 'system', 
+                    content: enhancedSystemPrompt,
+                    cache_control: { type: 'ephemeral' }
+                  },
+                  { role: 'user', content: userMessage || 'Continue the debate based on the previous points.' }
+                ],
+                max_tokens: 300,
+                temperature: 0.8
+              }),
+            });
+
+            if (aiResponse.status === 429 || aiResponse.status === 402) {
+              console.log(`${provider.name} credits depleted, trying next...`);
+              continue;
+            }
+
+            if (!aiResponse.ok) {
+              throw new Error(`${provider.name} error: ${aiResponse.status}`);
+            }
+
+            const data = await aiResponse.json();
+            
+            if (data.usage?.cache_read_input_tokens) {
+              console.log(`🌙 Kimi K2 cache hit: ${data.usage.cache_read_input_tokens} tokens from cache`);
+            }
+            
+            figureResponse = data.choices[0].message.content;
+            usedProvider = provider.name;
+            usedModel = provider.model;
+            break;
+
+          } else {
+            // OpenAI fallback
+            const aiResponse = await fetch(provider.endpoint, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: provider.model,
+                messages: [
+                  { role: 'system', content: enhancedSystemPrompt },
+                  { role: 'user', content: userMessage || 'Continue the debate based on the previous points.' }
+                ],
+                temperature: 0.8,
+                max_tokens: 300,
+              }),
+            });
+
+            if (aiResponse.status === 429 || aiResponse.status === 402) {
+              console.log(`${provider.name} credits depleted, trying next...`);
+              continue;
+            }
+
+            if (!aiResponse.ok) {
+              throw new Error(`${provider.name} error: ${aiResponse.status}`);
+            }
+
+            const data = await aiResponse.json();
+            figureResponse = data.choices[0].message.content;
+            usedProvider = provider.name;
+            usedModel = provider.model;
+            break;
+          }
+        } catch (error) {
+          console.error(`${provider.name} failed:`, error);
+          continue;
+        }
       }
 
-      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: userMessage || 'Continue the debate based on the previous points.' }
-        ],
-        temperature: 0.8,
-        max_tokens: 300,
-      }),
-    });
+      if (!figureResponse) {
+        throw new Error('All AI providers failed');
+      }
 
-    if (!openAIResponse.ok) {
-      const error = await openAIResponse.text();
-      console.error('OpenAI API error:', error);
-      throw new Error(`OpenAI API error: ${openAIResponse.status}`);
-    }
-
-      const aiData = await openAIResponse.json();
-      figureResponse = aiData.choices[0].message.content;
+      console.log(`✅ Generated response with ${usedProvider}`);
 
       // Cache the response (expires in 7 days)
       const expiresAt = new Date();
@@ -397,8 +475,8 @@ Now respond to the latest point raised.`;
           cache_key: cacheKeyHash,
           response_content: figureResponse,
           figure_name: currentFigureName,
-          ai_provider: 'openai',
-          model: 'gpt-4o-mini',
+          ai_provider: usedProvider.toLowerCase().replace(' ', '-'),
+          model: usedModel,
           expires_at: expiresAt.toISOString(),
         });
       
