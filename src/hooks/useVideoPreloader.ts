@@ -4,15 +4,23 @@ import { supabase } from '@/integrations/supabase/client';
 interface VideoPreloaderOptions {
   pollInterval?: number;
   maxPollAttempts?: number;
+  frameCount?: number;
+}
+
+interface AnimationFrame {
+  frameNumber: number;
+  imageUrl: string;
+  speechSegment: string;
 }
 
 interface PreloadResult {
   videoUrl: string | null;
+  frames?: AnimationFrame[];
   error?: string;
 }
 
 export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
-  const { pollInterval = 3000, maxPollAttempts = 30 } = options;
+  const { pollInterval = 3000, maxPollAttempts = 30, frameCount = 5 } = options;
 
   // Use refs instead of state to avoid stale closure issues
   const videosRef = useRef<Map<string, PreloadResult>>(new Map());
@@ -28,7 +36,7 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
     }
   }, []);
 
-  // Poll for video status
+  // Poll for video status (legacy Ditto support)
   const pollForVideo = useCallback(async (
     key: string,
     jobId: string,
@@ -91,22 +99,69 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
     }
   }, [maxPollAttempts, pollInterval, stopPolling]);
 
-  // Generate and wait for video - returns a promise
-  // NOTE: Each call generates a NEW video - no caching by audio content
-  // Caching caused issues where greeting videos were replayed for responses
+  // Generate K2 animated frames (new approach)
+  const generateK2Animation = useCallback(async (
+    imageUrl: string,
+    text: string,
+    figureId?: string,
+    figureName?: string
+  ): Promise<PreloadResult> => {
+    const uniqueId = Date.now().toString();
+    const key = `k2-${figureId || 'unknown'}-${uniqueId}`;
+    
+    console.log('🎬 Starting K2 + Nano Banana animation:', figureName || figureId);
+    generatingRef.current.add(key);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('k2-animate-portrait', {
+        body: {
+          imageUrl,
+          text,
+          figureName,
+          figureId,
+          frameCount,
+        },
+      });
+
+      if (error) throw error;
+
+      if (!data.success || !data.frames || data.frames.length === 0) {
+        throw new Error(data.error || 'No frames generated');
+      }
+
+      console.log(`✅ K2 Animation complete: ${data.frames.length} frames`);
+      const result: PreloadResult = { 
+        videoUrl: null, 
+        frames: data.frames 
+      };
+      videosRef.current.set(key, result);
+      generatingRef.current.delete(key);
+      return result;
+      
+    } catch (err) {
+      console.error('❌ K2 animation error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Animation failed';
+      const result = { videoUrl: null, error: errorMsg };
+      videosRef.current.set(key, result);
+      generatingRef.current.delete(key);
+      return result;
+    }
+  }, [frameCount]);
+
+  // Generate video using Ditto (legacy) - now tries K2 first as fallback
   const generateVideo = useCallback(async (
     imageUrl: string,
     audioUrl: string,
     figureId?: string,
-    figureName?: string
+    figureName?: string,
+    text?: string
   ): Promise<PreloadResult> => {
-    // Use timestamp to ensure unique key for each generation request
     const uniqueId = Date.now().toString();
     const key = `${figureId || 'unknown'}-${uniqueId}`;
     
-    console.log('🎬 Starting new video generation (no cache):', figureName || figureId);
+    console.log('🎬 Starting video generation:', figureName || figureId);
 
-    // Skip if already generating - wait for it
+    // Skip if already generating
     if (generatingRef.current.has(key)) {
       console.log('⏳ Already generating, waiting...');
       return new Promise((resolve) => {
@@ -124,10 +179,10 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
       });
     }
 
-    console.log('🎬 Starting video generation for:', figureName || figureId);
     generatingRef.current.add(key);
 
     try {
+      // Try Ditto first
       const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
         body: {
           action: 'start',
@@ -160,27 +215,35 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
       throw new Error(data.error || 'Failed to start video generation');
       
     } catch (err) {
-      console.error('❌ Video generation error:', err);
+      console.error('❌ Ditto video generation error:', err);
+      
+      // Fallback: If we have text, try K2 animation
+      if (text) {
+        console.log('🔄 Falling back to K2 animation...');
+        generatingRef.current.delete(key);
+        return generateK2Animation(imageUrl, text, figureId, figureName);
+      }
+      
       const errorMsg = err instanceof Error ? err.message : 'Generation failed';
       const result = { videoUrl: null, error: errorMsg };
       videosRef.current.set(key, result);
       generatingRef.current.delete(key);
       return result;
     }
-  }, [pollForVideo]);
+  }, [pollForVideo, generateK2Animation]);
 
   // Clear cache for a figure
   const clearCache = useCallback((figureId: string) => {
     const keysToDelete: string[] = [];
     videosRef.current.forEach((_, key) => {
-      if (key.startsWith(figureId)) {
+      if (key.startsWith(figureId) || key.includes(figureId)) {
         keysToDelete.push(key);
         stopPolling(key);
       }
     });
     keysToDelete.forEach(key => videosRef.current.delete(key));
     generatingRef.current.forEach(key => {
-      if (key.startsWith(figureId)) {
+      if (key.startsWith(figureId) || key.includes(figureId)) {
         generatingRef.current.delete(key);
       }
     });
@@ -196,6 +259,7 @@ export function useVideoPreloader(options: VideoPreloaderOptions = {}) {
 
   return {
     generateVideo,
+    generateK2Animation,
     clearCache,
     clearAll,
   };
