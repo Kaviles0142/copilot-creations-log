@@ -674,8 +674,9 @@ serve(async (req) => {
       console.error('Error searching comprehensive knowledge base:', knowledgeError);
     }
 
-    // Priority order for AI providers (to use free credits first)
+    // Priority order for AI providers (Kimi K2 first - cost-effective with context caching)
     const AI_PROVIDERS = [
+      { name: 'Kimi K2', env: 'MOONSHOT_API_KEY', model: 'kimi-k2-0905-preview', endpoint: 'https://api.moonshot.ai/v1/chat/completions' },
       { name: 'OpenAI', env: 'OPENAI_API_KEY', model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
       { name: 'Grok', env: 'GROK_API_KEY', model: 'grok-beta', endpoint: 'https://api.x.ai/v1/chat/completions' },
       { name: 'Anthropic', env: 'ANTHROPIC_API_KEY', model: 'claude-sonnet-4-5', endpoint: 'https://api.anthropic.com/v1/messages' },
@@ -683,7 +684,7 @@ serve(async (req) => {
     ];
 
     console.log(`Knowledge context length: ${relevantKnowledge.length} characters`);
-    console.log(`Making Lovable AI (Gemini) request with comprehensive multi-source context...`);
+    console.log(`Making AI request with Kimi K2 (primary) and comprehensive multi-source context...`);
 
     // Get current date for context
     const currentDate = new Date().toLocaleDateString('en-US', { 
