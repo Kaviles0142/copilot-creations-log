@@ -113,6 +113,9 @@ const HistoricalChat = () => {
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   
+  // K2 Animation state
+  const [animationFrames, setAnimationFrames] = useState<Array<{frameNumber: number; imageUrl: string; speechSegment: string}> | null>(null);
+  
   // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
@@ -123,7 +126,7 @@ const HistoricalChat = () => {
   const { toast } = useToast();
   
   // Video generator hook - external generation like PodcastMode
-  const { generateVideo, clearCache: clearVideoCache } = useVideoPreloader();
+  const { generateVideo, generateK2Animation, clearCache: clearVideoCache } = useVideoPreloader();
 
   // Auto-select Australian English voice for Elon Musk
   useEffect(() => {
@@ -241,12 +244,13 @@ const HistoricalChat = () => {
     }
   }, [selectedFigure]);
   
-  // Generate avatar portrait and play greeting (external video generation like PodcastMode)
+  // Generate avatar portrait and play greeting (K2 animation)
   const generateAvatarPortraitAndGreeting = async (figure: HistoricalFigure) => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
     setCurrentVideoUrl(null);
+    setAnimationFrames(null);
     
     try {
       const greetingText = getGreetingForFigure(figure);
@@ -293,21 +297,26 @@ const HistoricalChat = () => {
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
       
-      // Generate video EXTERNALLY like PodcastMode
-      console.log('🎬 Generating greeting video externally...');
+      // Generate K2 animation frames
+      console.log('🎬 Generating K2 animation frames...');
       setIsGeneratingVideo(true);
       
-      const videoResult = await generateVideo(imageUrl, greetingDataUrl, figure.id, figure.name);
+      const animationResult = await generateK2Animation(imageUrl, greetingText, figure.id, figure.name);
       
       setIsGeneratingVideo(false);
       
-      if (videoResult.videoUrl) {
-        console.log('✅ Greeting video ready:', videoResult.videoUrl.substring(0, 60) + '...');
-        setCurrentVideoUrl(videoResult.videoUrl);
-        setGreetingAudioUrl(null); // Clear audio fallback since video is ready
+      if (animationResult.frames && animationResult.frames.length > 0) {
+        console.log(`✅ K2 animation ready: ${animationResult.frames.length} frames`);
+        setAnimationFrames(animationResult.frames);
+        // Audio will be played by RealisticAvatar when it receives frames
+      } else if (animationResult.videoUrl) {
+        // Legacy video support
+        console.log('✅ Video ready:', animationResult.videoUrl.substring(0, 60) + '...');
+        setCurrentVideoUrl(animationResult.videoUrl);
+        setGreetingAudioUrl(null);
       } else {
-        console.log('⚠️ Video generation failed, will use audio fallback');
-        // greetingAudioUrl is already set, RealisticAvatar will show static image + we play audio
+        console.log('⚠️ Animation generation failed, will use audio fallback');
+        // Play audio with static image
         playAudioFallback(greetingDataUrl);
       }
       
@@ -1837,6 +1846,8 @@ const HistoricalChat = () => {
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
               videoUrl={currentVideoUrl}
+              animationFrames={animationFrames || undefined}
+              audioUrl={greetingAudioUrl}
               isGeneratingVideo={isGeneratingVideo}
               figureName={selectedFigure.name}
               figureId={selectedFigure.id}
@@ -1845,11 +1856,18 @@ const HistoricalChat = () => {
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
-                setCurrentVideoUrl(null); // Clear video after playback
+                setCurrentVideoUrl(null);
+                setAnimationFrames(null);
+              }}
+              onAnimationEnd={() => {
+                console.log('⏹️ Animation ended - clearing state');
+                setIsSpeaking(false);
+                setIsPlayingAudio(false);
+                setIsGreetingPlaying(false);
+                setAnimationFrames(null);
               }}
               onVideoReady={(videoUrl) => {
                 console.log('✅ Video ready callback:', videoUrl?.substring(0, 80));
-                // Video is now managed externally - this callback is for backwards compatibility
                 if (videoUrl && !videoUrl.startsWith('data:audio')) {
                   setIsSpeaking(true);
                   setIsPlayingAudio(true);
