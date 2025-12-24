@@ -126,8 +126,8 @@ const HistoricalChat = () => {
   
   const { toast } = useToast();
   
-  // Video generator hook - external generation like PodcastMode
-  const { generateVideo, generateK2Animation, clearCache: clearVideoCache } = useVideoPreloader();
+  // K2 Animation generator hook
+  const { generateK2Animation, clearCache: clearVideoCache } = useVideoPreloader();
 
   // Auto-select Australian English voice for Elon Musk
   useEffect(() => {
@@ -1005,22 +1005,23 @@ const HistoricalChat = () => {
           if (ttsError) throw ttsError;
           if (!ttsData?.audioContent) throw new Error('No audio content received');
 
-          console.log('✅ TTS audio ready, generating video EXTERNALLY');
+          console.log('✅ TTS audio ready, generating K2 animation');
           
-          // Create data URL for video generation
+          // Create data URL for audio playback
           const audioDataUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
+          setGreetingAudioUrl(audioDataUrl);
           
-          // Generate video externally like PodcastMode - wait for completion
-          console.log('🎬 Generating response video externally...');
-          const videoResult = await generateVideo(avatarImageUrl, audioDataUrl, selectedFigure!.id, selectedFigure!.name);
+          // Generate K2 animation frames
+          console.log('🎬 Generating response K2 animation...');
+          const animationResult = await generateK2Animation(avatarImageUrl, aiResponse, selectedFigure!.id, selectedFigure!.name);
           
           setIsGeneratingVideo(false);
           
-          if (videoResult.videoUrl) {
-            console.log('✅ Response video ready:', videoResult.videoUrl.substring(0, 60) + '...');
-            setCurrentVideoUrl(videoResult.videoUrl);
+          if (animationResult.frames && animationResult.frames.length > 0) {
+            console.log(`✅ Response animation ready: ${animationResult.frames.length} frames`);
+            setAnimationFrames(animationResult.frames);
           } else {
-            console.log('⚠️ Video generation failed, playing audio fallback');
+            console.log('⚠️ Animation generation failed, playing audio fallback');
             await playAudioFallback(audioDataUrl);
           }
           
