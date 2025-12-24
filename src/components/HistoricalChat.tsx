@@ -296,32 +296,33 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store data URL for audio fallback
+      // Store data URL for audio
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
       
-      // Generate K2 animation frames
-      console.log('🎬 Generating K2 animation frames...');
+      // Play audio immediately with static image while K2 generates
+      console.log('🎤 Playing greeting audio immediately');
+      playAudioFallback(greetingDataUrl);
+      
+      // Generate K2 animation frames in background (don't block greeting)
+      console.log('🎬 Generating K2 animation frames in background...');
       setIsGeneratingVideo(true);
       
-      const animationResult = await generateK2Animation(imageUrl, greeting, figure.id, figure.name);
-      
-      setIsGeneratingVideo(false);
-      
-      if (animationResult.frames && animationResult.frames.length > 0) {
-        console.log(`✅ K2 animation ready: ${animationResult.frames.length} frames`);
-        setAnimationFrames(animationResult.frames);
-        // Audio will be played by RealisticAvatar when it receives frames
-      } else if (animationResult.videoUrl) {
-        // Legacy video support
-        console.log('✅ Video ready:', animationResult.videoUrl.substring(0, 60) + '...');
-        setCurrentVideoUrl(animationResult.videoUrl);
-        setGreetingAudioUrl(null);
-      } else {
-        console.log('⚠️ Animation generation failed, will use audio fallback');
-        // Play audio with static image
-        playAudioFallback(greetingDataUrl);
-      }
+      generateK2Animation(imageUrl, greeting, figure.id, figure.name)
+        .then((animationResult) => {
+          setIsGeneratingVideo(false);
+          
+          if (animationResult.frames && animationResult.frames.length > 0) {
+            console.log(`✅ K2 animation ready: ${animationResult.frames.length} frames (for next response)`);
+            // Store frames for next response, don't interrupt current greeting
+          } else {
+            console.log('⚠️ K2 animation generation failed');
+          }
+        })
+        .catch((err) => {
+          console.error('❌ K2 animation error:', err);
+          setIsGeneratingVideo(false);
+        });
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
