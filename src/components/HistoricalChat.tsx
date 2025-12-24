@@ -245,7 +245,7 @@ const HistoricalChat = () => {
     }
   }, [selectedFigure]);
   
-  // Generate avatar portrait and play greeting with K2 animation
+  // Generate avatar portrait and play greeting with K2 animation synced to audio
   const generateAvatarPortraitAndGreeting = async (figure: HistoricalFigure) => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
@@ -253,6 +253,7 @@ const HistoricalChat = () => {
     setCurrentVideoUrl(null);
     setAnimationFrames(null);
     setGreetingText(null);
+    setGreetingAudioUrl(null); // Clear previous audio
     
     try {
       const greeting = getGreetingForFigure(figure);
@@ -286,7 +287,7 @@ const HistoricalChat = () => {
       if (audioResult.error) throw audioResult.error;
 
       console.log('✅ Avatar portrait ready:', avatarResult.data.cached ? '(cached)' : '(new)');
-      console.log('🎤 Greeting audio ready');
+      console.log('🎤 Greeting audio ready - waiting for K2 frames...');
       
       const imageUrl = avatarResult.data.imageUrl;
       setAvatarImageUrl(imageUrl);
@@ -296,41 +297,43 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store audio URL - RealisticAvatar will play it immediately with static image
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
-      setGreetingAudioUrl(greetingDataUrl);
-      console.log('🎤 Audio ready - playing immediately');
       
-      // Generate K2 animation in background (non-blocking)
+      // Generate K2 animation - wait for it before playing audio
       setIsGeneratingVideo(true);
-      console.log('🎬 Starting K2 animation generation in background...');
+      console.log('🎬 Generating K2 animation frames...');
       
-      supabase.functions.invoke('k2-animate-portrait', {
+      // Create a promise race: K2 generation vs timeout (30 seconds)
+      const k2Promise = supabase.functions.invoke('k2-animate-portrait', {
         body: {
           imageUrl: imageUrl,
           text: greeting,
           figureName: figure.name,
           figureId: figure.id,
-          frameCount: 3 // Optimized for speed
+          frameCount: 3
         }
-      }).then(({ data: k2Data, error: k2Error }) => {
-        setIsGeneratingVideo(false);
-        
-        if (k2Error) {
-          console.error('❌ K2 animation failed:', k2Error);
-          return;
-        }
-        
-        if (k2Data?.success && k2Data?.frames?.length > 0) {
-          console.log(`✅ K2 animation ready: ${k2Data.frames.length} frames`);
-          setAnimationFrames(k2Data.frames);
-        } else {
-          console.log('⚠️ K2 returned no frames, using static avatar');
-        }
-      }).catch(err => {
-        console.error('❌ K2 background error:', err);
-        setIsGeneratingVideo(false);
       });
+      
+      const timeoutPromise = new Promise<{ data: null, error: Error }>((resolve) => {
+        setTimeout(() => {
+          resolve({ data: null, error: new Error('K2 timeout - falling back to static') });
+        }, 30000); // 30 second timeout
+      });
+      
+      const { data: k2Data, error: k2Error } = await Promise.race([k2Promise, timeoutPromise]);
+      
+      setIsGeneratingVideo(false);
+      
+      if (k2Error || !k2Data?.success || !k2Data?.frames?.length) {
+        console.log('⚠️ K2 failed or timed out, playing audio with static avatar');
+        // Play audio with static avatar (CSS animation)
+        setGreetingAudioUrl(greetingDataUrl);
+      } else {
+        console.log(`✅ K2 ready: ${k2Data.frames.length} frames - playing synced with audio`);
+        // Set BOTH frames and audio together so they play synchronized
+        setAnimationFrames(k2Data.frames);
+        setGreetingAudioUrl(greetingDataUrl);
+      }
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -994,58 +997,59 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
       
-      // Generate TTS and K2 animation (message already shown)
+      // Generate TTS and K2 animation - wait for K2 to sync audio with animation
       if (aiResponse.length > 20 && isAutoVoiceEnabled && avatarImageUrl) {
-        console.log('🎤 IMMEDIATE TTS START for:', selectedFigure!.name);
+        console.log('🎤 Starting TTS + K2 generation for:', selectedFigure!.name);
         setIsGeneratingVideo(true);
+        setAnimationFrames(null); // Clear previous frames
         
         try {
-          // Generate TTS audio
-          const { data: ttsData, error: ttsError } = await supabase.functions.invoke('azure-text-to-speech', {
-            body: {
-              text: aiResponse,
-              figure_name: selectedFigure!.name,
-              figure_id: selectedFigure!.id,
-              voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
-              language: selectedLanguage
-            }
-          });
+          // Generate TTS and K2 in PARALLEL
+          const [ttsResult, k2Result] = await Promise.all([
+            supabase.functions.invoke('azure-text-to-speech', {
+              body: {
+                text: aiResponse,
+                figure_name: selectedFigure!.name,
+                figure_id: selectedFigure!.id,
+                voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
+                language: selectedLanguage
+              }
+            }),
+            // Race K2 against a 25 second timeout
+            Promise.race([
+              supabase.functions.invoke('k2-animate-portrait', {
+                body: {
+                  imageUrl: avatarImageUrl,
+                  text: aiResponse.substring(0, 200),
+                  figureName: selectedFigure!.name,
+                  figureId: selectedFigure!.id,
+                  frameCount: 3
+                }
+              }),
+              new Promise<{ data: null, error: Error }>((resolve) => {
+                setTimeout(() => resolve({ data: null, error: new Error('K2 timeout') }), 25000);
+              })
+            ])
+          ]);
 
-          if (ttsError) throw ttsError;
-          if (!ttsData?.audioContent) throw new Error('No audio content received');
+          setIsGeneratingVideo(false);
 
-          console.log('✅ TTS audio ready - playing immediately with static avatar');
-          
-          // Play audio immediately via RealisticAvatar
-          const audioDataUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
-          setGreetingAudioUrl(audioDataUrl);
-          
-          // Generate K2 animation in background (non-blocking)
-          console.log('🎬 Starting K2 animation for response...');
-          supabase.functions.invoke('k2-animate-portrait', {
-            body: {
-              imageUrl: avatarImageUrl,
-              text: aiResponse.substring(0, 200), // Use first 200 chars for animation
-              figureName: selectedFigure!.name,
-              figureId: selectedFigure!.id,
-              frameCount: 3
-            }
-          }).then(({ data: k2Data, error: k2Error }) => {
-            setIsGeneratingVideo(false);
-            
-            if (k2Error) {
-              console.error('❌ K2 animation failed:', k2Error);
-              return;
-            }
-            
-            if (k2Data?.success && k2Data?.frames?.length > 0) {
-              console.log(`✅ K2 animation ready: ${k2Data.frames.length} frames`);
-              setAnimationFrames(k2Data.frames);
-            }
-          }).catch(err => {
-            console.error('❌ K2 background error:', err);
-            setIsGeneratingVideo(false);
-          });
+          if (ttsResult.error || !ttsResult.data?.audioContent) {
+            throw new Error('TTS failed');
+          }
+
+          const audioDataUrl = `data:audio/mpeg;base64,${ttsResult.data.audioContent}`;
+
+          // Check if K2 succeeded
+          if (!k2Result.error && k2Result.data?.success && k2Result.data?.frames?.length > 0) {
+            console.log(`✅ K2 + TTS ready: ${k2Result.data.frames.length} frames - playing synced`);
+            // Set both together for synchronized playback
+            setAnimationFrames(k2Result.data.frames);
+            setGreetingAudioUrl(audioDataUrl);
+          } else {
+            console.log('⚠️ K2 failed, playing audio with static avatar');
+            setGreetingAudioUrl(audioDataUrl);
+          }
           
         } catch (error) {
           console.error('❌ TTS/K2 error:', error);
