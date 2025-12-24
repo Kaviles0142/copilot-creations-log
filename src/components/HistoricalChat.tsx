@@ -126,8 +126,8 @@ const HistoricalChat = () => {
   
   const { toast } = useToast();
   
-  // K2 Animation generator hook
-  const { generateK2Animation, clearCache: clearVideoCache } = useVideoPreloader();
+  // Video cache cleanup hook (K2 animation disabled for now - too slow)
+  const { clearCache: clearVideoCache } = useVideoPreloader();
 
   // Auto-select Australian English voice for Elon Musk
   useEffect(() => {
@@ -296,33 +296,14 @@ const HistoricalChat = () => {
         throw new Error('No audio content received from Azure TTS');
       }
 
-      // Store data URL for audio
+      // Store data URL for audio - RealisticAvatar will play it automatically
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       setGreetingAudioUrl(greetingDataUrl);
+      console.log('🎤 Audio ready - RealisticAvatar will play it');
       
-      // Play audio immediately with static image while K2 generates
-      console.log('🎤 Playing greeting audio immediately');
-      playAudioFallback(greetingDataUrl);
-      
-      // Generate K2 animation frames in background (don't block greeting)
-      console.log('🎬 Generating K2 animation frames in background...');
-      setIsGeneratingVideo(true);
-      
-      generateK2Animation(imageUrl, greeting, figure.id, figure.name)
-        .then((animationResult) => {
-          setIsGeneratingVideo(false);
-          
-          if (animationResult.frames && animationResult.frames.length > 0) {
-            console.log(`✅ K2 animation ready: ${animationResult.frames.length} frames (for next response)`);
-            // Store frames for next response, don't interrupt current greeting
-          } else {
-            console.log('⚠️ K2 animation generation failed');
-          }
-        })
-        .catch((err) => {
-          console.error('❌ K2 animation error:', err);
-          setIsGeneratingVideo(false);
-        });
+      // Skip K2 animation for now - it's too slow (~60s)
+      // The avatar will show static image with audio playing
+      setIsGeneratingVideo(false);
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -1006,25 +987,14 @@ const HistoricalChat = () => {
           if (ttsError) throw ttsError;
           if (!ttsData?.audioContent) throw new Error('No audio content received');
 
-          console.log('✅ TTS audio ready, generating K2 animation');
+          console.log('✅ TTS audio ready - playing with avatar');
           
-          // Create data URL for audio playback
+          // Create data URL for audio playback - RealisticAvatar will play it
           const audioDataUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
           setGreetingAudioUrl(audioDataUrl);
-          
-          // Generate K2 animation frames
-          console.log('🎬 Generating response K2 animation...');
-          const animationResult = await generateK2Animation(avatarImageUrl, aiResponse, selectedFigure!.id, selectedFigure!.name);
-          
           setIsGeneratingVideo(false);
           
-          if (animationResult.frames && animationResult.frames.length > 0) {
-            console.log(`✅ Response animation ready: ${animationResult.frames.length} frames`);
-            setAnimationFrames(animationResult.frames);
-          } else {
-            console.log('⚠️ Animation generation failed, playing audio fallback');
-            await playAudioFallback(audioDataUrl);
-          }
+          // Audio will be played by RealisticAvatar automatically
           
         } catch (error) {
           console.error('❌ TTS/Video generation error:', error);
@@ -1853,8 +1823,8 @@ const HistoricalChat = () => {
               videoUrl={currentVideoUrl}
               animationFrames={animationFrames || undefined}
               audioUrl={greetingAudioUrl}
-              greetingText={greetingText || undefined}
               isGeneratingVideo={isGeneratingVideo}
+              isSpeaking={isSpeaking}
               figureName={selectedFigure.name}
               figureId={selectedFigure.id}
               onVideoEnd={() => {
@@ -1865,19 +1835,18 @@ const HistoricalChat = () => {
                 setCurrentVideoUrl(null);
                 setAnimationFrames(null);
               }}
+              onAudioEnd={() => {
+                console.log('⏹️ Audio ended - clearing state');
+                setIsSpeaking(false);
+                setIsPlayingAudio(false);
+                setIsGreetingPlaying(false);
+              }}
               onAnimationEnd={() => {
                 console.log('⏹️ Animation ended - clearing state');
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
                 setAnimationFrames(null);
-              }}
-              onVideoReady={(videoUrl) => {
-                console.log('✅ Video ready callback:', videoUrl?.substring(0, 80));
-                if (videoUrl && !videoUrl.startsWith('data:audio')) {
-                  setIsSpeaking(true);
-                  setIsPlayingAudio(true);
-                }
               }}
             />
           </div>
