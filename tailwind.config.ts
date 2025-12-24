@@ -80,10 +80,30 @@ export default {
             height: "0",
           },
         },
+        "speaking-pulse": {
+          "0%, 100%": {
+            transform: "scale(1)",
+            filter: "brightness(1)",
+          },
+          "50%": {
+            transform: "scale(1.02)",
+            filter: "brightness(1.05)",
+          },
+        },
+        "speaking-glow": {
+          "0%, 100%": {
+            boxShadow: "0 0 20px 0px rgba(59, 130, 246, 0.3)",
+          },
+          "50%": {
+            boxShadow: "0 0 30px 5px rgba(59, 130, 246, 0.5)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "speaking-pulse": "speaking-pulse 1.5s ease-in-out infinite",
+        "speaking-glow": "speaking-glow 1.5s ease-in-out infinite",
       },
     },
   },

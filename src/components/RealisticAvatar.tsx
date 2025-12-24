@@ -227,14 +227,14 @@ const RealisticAvatar = ({
     );
   }
 
-  // Show generating overlay while K2 generates (but audio still plays)
+  // Show generating overlay while K2 generates (but audio still plays with animation)
   if (isGeneratingVideo && !videoUrl && !animationFrames) {
     return (
-      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+      <Card className={`w-full max-w-md mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
         <img 
           src={imageUrl} 
           alt={figureName || 'Avatar'} 
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover ${isSpeaking ? 'animate-speaking-pulse' : ''}`}
         />
         {isSpeaking && (
           <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
@@ -315,19 +315,37 @@ const RealisticAvatar = ({
     );
   }
 
-  // Static image with audio playback
+  // Static image with audio playback - apply speaking animation
   return (
-    <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+    <Card className={`w-full max-w-md mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
       <img 
         src={imageUrl} 
         alt={figureName || 'Avatar'} 
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-all duration-300 ${isSpeaking ? 'animate-speaking-pulse' : ''}`}
       />
       {isSpeaking && (
-        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-xs text-white">Speaking</span>
-        </div>
+        <>
+          {/* Animated sound waves overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 flex gap-1">
+              {[...Array(5)].map((_, i) => (
+                <div 
+                  key={i}
+                  className="w-1 bg-primary/60 rounded-full"
+                  style={{
+                    height: `${8 + Math.sin((Date.now() / 150) + i) * 8}px`,
+                    animation: `speaking-pulse ${0.3 + i * 0.1}s ease-in-out infinite`,
+                    animationDelay: `${i * 0.1}s`
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-xs text-white">Speaking</span>
+          </div>
+        </>
       )}
       <audio ref={audioRef} hidden />
     </Card>
