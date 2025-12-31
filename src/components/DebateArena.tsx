@@ -761,23 +761,29 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         ))}
       </div>
 
-      {/* Talking Video Player for Current Speaker */}
-      {speakingFigureId && avatarUrls[speakingFigureId] && currentAudioUrl && (
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <p className="text-sm font-medium">{speakingFigureName} is speaking...</p>
-          </div>
-          <div className="flex justify-center">
+      {/* Large Speaking Avatar - Always visible, shows current speaker or last speaker */}
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          {speakingFigureId ? (
+            <>
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <p className="text-sm font-medium">{speakingFigureName} is speaking...</p>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-muted-foreground">Select a figure to see them speak</p>
+          )}
+        </div>
+        <div className="flex justify-center">
+          <div className="w-full max-w-lg">
             <RealisticAvatar
-              imageUrl={avatarUrls[speakingFigureId]}
-              audioUrl={currentAudioUrl}
-              figureName={speakingFigureName || undefined}
-              figureId={speakingFigureId}
+              imageUrl={speakingFigureId ? avatarUrls[speakingFigureId] : (figures[0] ? avatarUrls[figures[0].id] : null)}
+              figureName={speakingFigureName || figures[0]?.name}
+              figureId={speakingFigureId || figures[0]?.id}
               isGeneratingVideo={chunkedVideo.isGenerating}
               videoUrl={allVideoUrls[allVideoUrls.length - 1] || null}
               allVideoUrls={allVideoUrls}
               isLoadingNextChunk={isLoadingNextChunk}
+              isSpeaking={isPlayingAudio}
               videoChunkProgress={chunkedVideo.totalChunks > 1 ? {
                 current: chunkedVideo.currentChunkIndex + 1,
                 total: chunkedVideo.totalChunks
@@ -788,8 +794,8 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
               }}
             />
           </div>
-        </Card>
-      )}
+        </div>
+      </Card>
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">

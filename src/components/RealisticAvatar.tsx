@@ -300,7 +300,7 @@ const RealisticAvatar = ({
 
   if (isLoading) {
     return (
-      <Card className="w-full max-w-md mx-auto aspect-square flex items-center justify-center bg-muted">
+      <Card className="w-full max-w-lg mx-auto aspect-square flex items-center justify-center bg-muted">
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
           <p className="text-sm text-muted-foreground">Loading portrait...</p>
@@ -311,7 +311,7 @@ const RealisticAvatar = ({
 
   if (!imageUrl) {
     return (
-      <Card className="w-full max-w-md mx-auto aspect-square flex items-center justify-center bg-muted">
+      <Card className="w-full max-w-lg mx-auto aspect-square flex items-center justify-center bg-muted">
         <p className="text-muted-foreground">No avatar selected</p>
       </Card>
     );
@@ -320,7 +320,7 @@ const RealisticAvatar = ({
   // Show generating overlay while video generates with timer and chunk progress
   if (isGeneratingVideo && !videoUrl) {
     return (
-      <Card className={`w-full max-w-md mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
+      <Card className={`w-full max-w-lg mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
         <img 
           src={imageUrl} 
           alt={figureName || 'Avatar'} 
@@ -351,7 +351,7 @@ const RealisticAvatar = ({
   // Show waiting state when video ended but next chunk still loading
   if (isWaitingForNextChunk) {
     return (
-      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+      <Card className="w-full max-w-lg mx-auto aspect-square overflow-hidden relative">
         {/* Background image to prevent flash */}
         <img 
           src={imageUrl} 
@@ -383,7 +383,7 @@ const RealisticAvatar = ({
   // Show video if available and no error with controls
   if (activeVideoUrl && !videoError) {
     return (
-      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+      <Card className="w-full max-w-lg mx-auto aspect-square overflow-hidden relative">
         {/* Background image behind video to prevent jump between chunks */}
         <img 
           src={imageUrl} 
@@ -457,7 +457,7 @@ const RealisticAvatar = ({
 
   // Static image with audio playback - apply speaking animation
   return (
-    <Card className={`w-full max-w-md mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
+    <Card className={`w-full max-w-lg mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
       <img 
         src={imageUrl} 
         alt={figureName || 'Avatar'} 
