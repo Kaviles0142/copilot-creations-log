@@ -258,6 +258,31 @@ const RealisticAvatar = ({
     }
   };
 
+  // Watch for new chunks arriving while waiting
+  useEffect(() => {
+    if (!isWaitingForNextChunk) return;
+    
+    const nextIndex = playbackIndex + 1;
+    console.log('🔍 Checking for next chunk:', nextIndex, 'available:', allVideoUrls.length);
+    
+    if (nextIndex < allVideoUrls.length) {
+      // Next chunk is now available - resume playback
+      console.log(`✅ Chunk ${nextIndex + 1} now available, resuming playback`);
+      setIsWaitingForNextChunk(false);
+      setPlaybackIndex(nextIndex);
+      setActiveVideoUrl(allVideoUrls[nextIndex]);
+    } else if (!isGeneratingVideo && !isLoadingNextChunk) {
+      // Generation complete and no more chunks coming
+      console.log('✅ Generation complete, all chunks played');
+      setIsWaitingForNextChunk(false);
+      setActiveVideoUrl(null);
+      setIsReplaying(false);
+      setIsInitialPlayback(false);
+      setPlaybackIndex(0);
+      onVideoEnd?.();
+    }
+  }, [allVideoUrls.length, isWaitingForNextChunk, playbackIndex, isGeneratingVideo, isLoadingNextChunk, onVideoEnd]);
+
   // Play from beginning (used when clicking spinner)
   const handlePlayFromBeginning = () => {
     if (lastVideoUrls.length > 0) {
