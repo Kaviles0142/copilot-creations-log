@@ -46,9 +46,10 @@ const RealisticAvatar = ({
   const [loadingSeconds, setLoadingSeconds] = useState(0);
   const [lastVideoUrls, setLastVideoUrls] = useState<string[]>([]); // All chunks for replay
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
-  const [replayIndex, setReplayIndex] = useState(0); // Current chunk during replay
+  const [playbackIndex, setPlaybackIndex] = useState(0); // Current chunk index during playback
   const [isReplaying, setIsReplaying] = useState(false);
   const [isWaitingForNextChunk, setIsWaitingForNextChunk] = useState(false);
+  const [isInitialPlayback, setIsInitialPlayback] = useState(false); // Track if we're in first playthrough
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
 
@@ -154,18 +155,27 @@ const RealisticAvatar = ({
     };
   }, [audioUrl, onAudioEnd]);
 
-  // Play video when URL is available - only if not currently playing
+  // Play video when URL is available - start initial playback
   useEffect(() => {
     if (videoUrl && videoUrl !== lastReceivedVideoUrlRef.current) {
-      // Only set new video if we're not already playing (or if it's a completely new URL)
-      if (!isPlayingVideo || !activeVideoUrl) {
-        lastReceivedVideoUrlRef.current = videoUrl;
+      lastReceivedVideoUrlRef.current = videoUrl;
+      
+      // If not currently playing anything, start playing this chunk
+      if (!isPlayingVideo && !activeVideoUrl) {
         setActiveVideoUrl(videoUrl);
-        setIsReplaying(false);
-        console.log('🎬 New video URL received:', videoUrl.substring(0, 50) + '...');
+        setIsInitialPlayback(true);
+        setPlaybackIndex(0);
+        console.log('🎬 Starting initial playback:', videoUrl.substring(0, 50) + '...');
+      } else if (isWaitingForNextChunk) {
+        // We were waiting for this chunk - resume playback
+        console.log('✅ Next chunk ready, resuming playback');
+        setIsWaitingForNextChunk(false);
+        setPlaybackIndex(prev => prev + 1);
+        setActiveVideoUrl(videoUrl);
       }
+      // If already playing, the chunk will be picked up from allVideoUrls when current ends
     }
-  }, [videoUrl, isPlayingVideo, activeVideoUrl]);
+  }, [videoUrl, isPlayingVideo, activeVideoUrl, isWaitingForNextChunk]);
 
   // Handle video playback when activeVideoUrl changes
   useEffect(() => {
@@ -189,10 +199,12 @@ const RealisticAvatar = ({
     setIsPlayingAudio(false);
     setIsPlayingVideo(false);
     setLoadingSeconds(0);
-    setActiveVideoUrl(null);
+  setActiveVideoUrl(null);
     setLastVideoUrls([]);
-    setReplayIndex(0);
+    setPlaybackIndex(0);
     setIsReplaying(false);
+    setIsInitialPlayback(false);
+    setIsWaitingForNextChunk(false);
   }, [figureId]);
 
   const handlePlayPause = () => {
@@ -212,44 +224,39 @@ const RealisticAvatar = ({
     if (lastVideoUrls.length === 0) return;
     setVideoError(false);
     setIsReplaying(true);
-    setReplayIndex(0);
+    setIsInitialPlayback(false);
+    setPlaybackIndex(0);
     setActiveVideoUrl(lastVideoUrls[0]);
     console.log(`🔄 Starting replay: chunk 1/${lastVideoUrls.length}`);
   };
 
-  // Handle video end - play next chunk during replay or wait for next chunk
+  // Handle video end - play next chunk if available
   const handleVideoEnded = () => {
-    console.log('⏹️ Video ended');
+    console.log('⏹️ Video ended, playbackIndex:', playbackIndex, 'available chunks:', allVideoUrls.length);
     setIsPlayingVideo(false);
     
-    if (isReplaying && replayIndex < lastVideoUrls.length - 1) {
-      // Play next chunk in replay sequence
-      const nextIndex = replayIndex + 1;
-      setReplayIndex(nextIndex);
-      setActiveVideoUrl(lastVideoUrls[nextIndex]);
-      console.log(`🔄 Replay: chunk ${nextIndex + 1}/${lastVideoUrls.length}`);
-    } else if (isLoadingNextChunk) {
-      // Video ended but next chunk is still loading - show waiting state
+    const nextIndex = playbackIndex + 1;
+    
+    // Check if next chunk is available in allVideoUrls (works for both initial and replay)
+    if (nextIndex < allVideoUrls.length) {
+      // Next chunk is ready - play it
+      console.log(`▶️ Playing next chunk ${nextIndex + 1}/${allVideoUrls.length}`);
+      setPlaybackIndex(nextIndex);
+      setActiveVideoUrl(allVideoUrls[nextIndex]);
+    } else if (isGeneratingVideo || isLoadingNextChunk) {
+      // Still generating/loading more chunks - wait for next
       console.log('⏳ Waiting for next chunk to load...');
       setIsWaitingForNextChunk(true);
     } else {
-      // End of replay or normal playback
+      // All chunks played, generation complete
+      console.log('✅ All chunks played');
       setActiveVideoUrl(null);
       setIsReplaying(false);
-      setReplayIndex(0);
+      setIsInitialPlayback(false);
+      setPlaybackIndex(0);
       onVideoEnd?.();
     }
   };
-
-  // When next chunk arrives and we were waiting, play it
-  useEffect(() => {
-    if (isWaitingForNextChunk && videoUrl && videoUrl !== activeVideoUrl) {
-      console.log('✅ Next chunk ready, resuming playback');
-      setIsWaitingForNextChunk(false);
-      setActiveVideoUrl(videoUrl);
-      lastReceivedVideoUrlRef.current = videoUrl;
-    }
-  }, [videoUrl, isWaitingForNextChunk, activeVideoUrl]);
 
   // Play from beginning (used when clicking spinner)
   const handlePlayFromBeginning = () => {
@@ -384,11 +391,11 @@ const RealisticAvatar = ({
             <span className="text-xs text-white">Loading next...</span>
           </div>
         )}
-        {/* Replay progress indicator */}
-        {isReplaying && lastVideoUrls.length > 1 && (
+        {/* Playback progress indicator */}
+        {(isReplaying || isInitialPlayback) && allVideoUrls.length > 1 && (
           <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded">
             <span className="text-xs text-white">
-              Chunk {replayIndex + 1}/{lastVideoUrls.length}
+              Chunk {playbackIndex + 1}/{allVideoUrls.length}
             </span>
           </div>
         )}
