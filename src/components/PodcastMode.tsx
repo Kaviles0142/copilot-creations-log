@@ -9,7 +9,7 @@ import ChatMessages from "./ChatMessages";
 import RealisticAvatar from "./RealisticAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useVideoPreloader } from "@/hooks/useVideoPreloader";
+
 
 export interface Message {
   id: string;
@@ -92,9 +92,6 @@ const PodcastMode = () => {
   const messagesRef = useRef<Message[]>([]);
   
   const { toast } = useToast();
-
-  // K2 Animation generator hook
-  const { generateK2Animation, clearAll: clearAllVideos } = useVideoPreloader();
 
   // Azure voice options filtered by gender
   const azureVoices = {
