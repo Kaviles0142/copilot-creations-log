@@ -6,14 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Ditto API endpoint - read from environment variable
-const getDittoApiUrl = () => {
-  const url = Deno.env.get('DITTO_API_URL');
-  if (!url) {
-    throw new Error('DITTO_API_URL environment variable is not set');
-  }
-  return url.replace(/\/$/, ''); // Remove trailing slash if present
-};
+// Ditto API endpoint - hardcoded to new RunPod endpoint
+const DITTO_API_URL = 'https://kkrom2i7drv27i-8000.proxy.runpod.net';
+
+const getDittoApiUrl = () => DITTO_API_URL;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
