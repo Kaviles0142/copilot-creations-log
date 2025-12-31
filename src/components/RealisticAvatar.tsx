@@ -38,6 +38,7 @@ const RealisticAvatar = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const lastAudioUrlRef = useRef<string | null>(null);
+  const lastReceivedVideoUrlRef = useRef<string | null>(null);
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -148,13 +149,18 @@ const RealisticAvatar = ({
     };
   }, [audioUrl, onAudioEnd]);
 
-  // Play video when URL is available
+  // Play video when URL is available - only if not currently playing
   useEffect(() => {
-    if (videoUrl) {
-      setActiveVideoUrl(videoUrl);
-      setIsReplaying(false); // Not a replay
+    if (videoUrl && videoUrl !== lastReceivedVideoUrlRef.current) {
+      // Only set new video if we're not already playing (or if it's a completely new URL)
+      if (!isPlayingVideo || !activeVideoUrl) {
+        lastReceivedVideoUrlRef.current = videoUrl;
+        setActiveVideoUrl(videoUrl);
+        setIsReplaying(false);
+        console.log('🎬 New video URL received:', videoUrl.substring(0, 50) + '...');
+      }
     }
-  }, [videoUrl]);
+  }, [videoUrl, isPlayingVideo, activeVideoUrl]);
 
   // Handle video playback when activeVideoUrl changes
   useEffect(() => {
@@ -171,9 +177,12 @@ const RealisticAvatar = ({
 
   // Reset state when figure changes
   useEffect(() => {
+    console.log('🔄 Figure changed, resetting avatar state');
     setVideoError(false);
     lastAudioUrlRef.current = null;
+    lastReceivedVideoUrlRef.current = null;
     setIsPlayingAudio(false);
+    setIsPlayingVideo(false);
     setLoadingSeconds(0);
     setActiveVideoUrl(null);
     setLastVideoUrls([]);
