@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface RealisticAvatarProps {
   imageUrl: string | null;
@@ -30,11 +31,34 @@ const RealisticAvatar = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const lastAudioUrlRef = useRef<string | null>(null);
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
+
+  // Timer for video generation
+  useEffect(() => {
+    if (isGeneratingVideo && !videoUrl) {
+      setLoadingSeconds(0);
+      loadingTimerRef.current = setInterval(() => {
+        setLoadingSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+      }
+    };
+  }, [isGeneratingVideo, videoUrl]);
 
   // Play audio when audioUrl changes
   useEffect(() => {
@@ -92,7 +116,27 @@ const RealisticAvatar = ({
     setVideoError(false);
     lastAudioUrlRef.current = null;
     setIsPlayingAudio(false);
+    setLoadingSeconds(0);
   }, [figureId]);
+
+  const handlePlayPause = () => {
+    if (!videoRef.current) return;
+    
+    if (isPlayingVideo) {
+      videoRef.current.pause();
+      setIsPlayingVideo(false);
+    } else {
+      videoRef.current.play().catch(console.error);
+      setIsPlayingVideo(true);
+    }
+  };
+
+  const handleReplay = () => {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = 0;
+    videoRef.current.play().catch(console.error);
+    setIsPlayingVideo(true);
+  };
 
   if (isLoading) {
     return (
@@ -113,7 +157,7 @@ const RealisticAvatar = ({
     );
   }
 
-  // Show generating overlay while video generates
+  // Show generating overlay while video generates with timer
   if (isGeneratingVideo && !videoUrl) {
     return (
       <Card className={`w-full max-w-md mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
@@ -128,16 +172,19 @@ const RealisticAvatar = ({
             <span className="text-xs text-white">Speaking</span>
           </div>
         )}
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
-          <Loader2 className="w-3 h-3 animate-spin text-white" />
-          <span className="text-xs text-white/70">Generating video...</span>
+        <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/60 px-3 py-2 rounded">
+          <Loader2 className="w-4 h-4 animate-spin text-white" />
+          <div className="text-right">
+            <span className="text-xs text-white/70 block">Generating video...</span>
+            <span className="text-sm text-white font-bold">{loadingSeconds}s</span>
+          </div>
         </div>
         <audio ref={audioRef} hidden />
       </Card>
     );
   }
 
-  // Show video if available and no error
+  // Show video if available and no error with controls
   if (videoUrl && !videoError) {
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
@@ -163,12 +210,33 @@ const RealisticAvatar = ({
             setVideoError(true);
           }}
         />
-        {isPlayingVideo && (
-          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-xs text-white">Speaking</span>
-          </div>
-        )}
+        {/* Video controls in corner */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0"
+            onClick={handleReplay}
+            title="Replay"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0"
+            onClick={handlePlayPause}
+            title={isPlayingVideo ? "Pause" : "Play"}
+          >
+            {isPlayingVideo ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          {isPlayingVideo && (
+            <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded ml-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs text-white">Speaking</span>
+            </div>
+          )}
+        </div>
       </Card>
     );
   }
