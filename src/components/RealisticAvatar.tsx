@@ -48,6 +48,7 @@ const RealisticAvatar = ({
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
   const [replayIndex, setReplayIndex] = useState(0); // Current chunk during replay
   const [isReplaying, setIsReplaying] = useState(false);
+  const [isWaitingForNextChunk, setIsWaitingForNextChunk] = useState(false);
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
 
@@ -216,7 +217,7 @@ const RealisticAvatar = ({
     console.log(`🔄 Starting replay: chunk 1/${lastVideoUrls.length}`);
   };
 
-  // Handle video end - play next chunk during replay
+  // Handle video end - play next chunk during replay or wait for next chunk
   const handleVideoEnded = () => {
     console.log('⏹️ Video ended');
     setIsPlayingVideo(false);
@@ -227,12 +228,34 @@ const RealisticAvatar = ({
       setReplayIndex(nextIndex);
       setActiveVideoUrl(lastVideoUrls[nextIndex]);
       console.log(`🔄 Replay: chunk ${nextIndex + 1}/${lastVideoUrls.length}`);
+    } else if (isLoadingNextChunk) {
+      // Video ended but next chunk is still loading - show waiting state
+      console.log('⏳ Waiting for next chunk to load...');
+      setIsWaitingForNextChunk(true);
     } else {
       // End of replay or normal playback
       setActiveVideoUrl(null);
       setIsReplaying(false);
       setReplayIndex(0);
       onVideoEnd?.();
+    }
+  };
+
+  // When next chunk arrives and we were waiting, play it
+  useEffect(() => {
+    if (isWaitingForNextChunk && videoUrl && videoUrl !== activeVideoUrl) {
+      console.log('✅ Next chunk ready, resuming playback');
+      setIsWaitingForNextChunk(false);
+      setActiveVideoUrl(videoUrl);
+      lastReceivedVideoUrlRef.current = videoUrl;
+    }
+  }, [videoUrl, isWaitingForNextChunk, activeVideoUrl]);
+
+  // Play from beginning (used when clicking spinner)
+  const handlePlayFromBeginning = () => {
+    if (lastVideoUrls.length > 0) {
+      setIsWaitingForNextChunk(false);
+      handleReplayLastVideo();
     }
   };
 
@@ -293,17 +316,55 @@ const RealisticAvatar = ({
     );
   }
 
+  // Show waiting state when video ended but next chunk still loading
+  if (isWaitingForNextChunk) {
+    return (
+      <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+        {/* Background image to prevent flash */}
+        <img 
+          src={imageUrl} 
+          alt={figureName || 'Avatar'} 
+          className="w-full h-full object-cover"
+        />
+        {/* Centered loading spinner - clickable to play from beginning */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer"
+          onClick={handlePlayFromBeginning}
+          title="Click to play from beginning"
+        >
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-12 h-12 animate-spin text-white" />
+            <span className="text-sm text-white">Loading next chunk...</span>
+            <span className="text-xs text-white/70">Click to restart</span>
+          </div>
+        </div>
+        {/* Show chunk count */}
+        {lastVideoUrls.length > 1 && (
+          <div className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded">
+            <span className="text-xs text-white">{lastVideoUrls.length} chunks</span>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
   // Show video if available and no error with controls
   if (activeVideoUrl && !videoError) {
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
+        {/* Background image behind video to prevent jump between chunks */}
+        <img 
+          src={imageUrl} 
+          alt={figureName || 'Avatar'} 
+          className="absolute inset-0 w-full h-full object-cover"
+        />
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={false}
           controls={false}
-          className="w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover"
           onPlay={() => {
             console.log('▶️ Video playing');
             setIsPlayingVideo(true);
