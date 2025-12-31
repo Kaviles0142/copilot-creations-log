@@ -51,19 +51,23 @@ const RealisticAvatar = ({
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
 
-  // Track all video URLs for replay
+  // Track all video URLs for replay (clears automatically between turns)
   useEffect(() => {
+    setLastVideoUrls(allVideoUrls);
+
     if (allVideoUrls.length > 0) {
-      setLastVideoUrls(allVideoUrls);
       console.log(`📹 Stored ${allVideoUrls.length} video chunks for replay`);
     }
   }, [allVideoUrls]);
 
-  // Fetch last successful videos for this figure from database
+  // Fetch last successful videos for this figure from database (fallback only)
+  // IMPORTANT: Do not override in-progress/current-turn chunk lists.
   useEffect(() => {
+    if (!figureId) return;
+    if (isGeneratingVideo) return;
+    if (allVideoUrls.length > 0) return;
+
     const fetchLastVideos = async () => {
-      if (!figureId) return;
-      
       try {
         const { data, error } = await supabase
           .from('video_jobs')
@@ -72,22 +76,22 @@ const RealisticAvatar = ({
           .eq('status', 'completed')
           .not('video_url', 'is', null)
           .order('created_at', { ascending: false })
-          .limit(10); // Get last 10 chunks
-        
+          .limit(10);
+
         if (!error && data?.length > 0) {
           const urls = data.map(d => d.video_url).filter(Boolean) as string[];
           console.log(`📹 Found ${urls.length} previous videos for figure`);
-          if (lastVideoUrls.length === 0) {
-            setLastVideoUrls(urls.reverse()); // Oldest first for proper playback order
-          }
+
+          // Use functional update to avoid overwriting newer in-session turn videos
+          setLastVideoUrls(prev => (prev.length > 0 ? prev : urls.reverse()));
         }
-      } catch (err) {
+      } catch {
         console.log('No previous videos found for figure');
       }
     };
-    
+
     fetchLastVideos();
-  }, [figureId]);
+  }, [figureId, isGeneratingVideo, allVideoUrls.length]);
 
   // Timer for video generation
   useEffect(() => {

@@ -117,6 +117,7 @@ const HistoricalChat = () => {
   const [videoChunkProgress, setVideoChunkProgress] = useState<{ current: number; total: number } | null>(null);
   const [allGeneratedVideoUrls, setAllGeneratedVideoUrls] = useState<string[]>([]); // All chunks for replay
   const [isLoadingNextChunk, setIsLoadingNextChunk] = useState(false); // Loading between chunks
+  const videoGenerationIdRef = useRef(0); // Cancels stale async chunk generation between turns
   
   // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -377,94 +378,160 @@ const HistoricalChat = () => {
     setAllGeneratedVideoUrls([]);
     setIsGeneratingVideo(false);
   }, []);
-  
+
   // Generate chunked video - splits long audio into 30s segments
   const generateChunkedVideo = async (
-    audioDataUrl: string, 
-    imageUrl: string, 
-    figureId: string, 
+    audioDataUrl: string,
+    imageUrl: string,
+    figureId: string,
     figureName: string
   ) => {
+    // Increment generation ID to cancel any previous in-flight generation
+    const generationId = ++videoGenerationIdRef.current;
+
     // Reset state for fresh generation
     resetVideoState();
-    
+
     const { shouldChunk, chunks, totalDuration } = getChunkConfig(audioDataUrl);
-    
     console.log(`🎬 Video generation: ${chunks.length} chunk(s), ~${totalDuration.toFixed(0)}s total`);
+
     setIsGeneratingVideo(true);
-    
+
+    // Helper: bail out if a newer generation started
+    const isStale = () => generationId !== videoGenerationIdRef.current;
+
     if (!shouldChunk) {
-      // Single chunk - use existing flow
       const videoUrl = await generateSingleVideoAndReturn(chunks[0].dataUrl, imageUrl, figureId, figureName);
-      if (videoUrl) {
-        setAllGeneratedVideoUrls([videoUrl]);
-      }
+      if (isStale()) return;
+      if (videoUrl) setAllGeneratedVideoUrls([videoUrl]);
       return;
     }
-    
-    // Multiple chunks - process sequentially with prefetch
+
     setVideoChunkProgress({ current: 0, total: chunks.length });
-    const completedUrls: string[] = [];
-    let currentlyPlaying = false;
-    
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      console.log(`🎬 Processing chunk ${i + 1}/${chunks.length}...`);
-      
+
+    const MAX_CONCURRENT = 2;
+    const results: (string | null)[] = new Array(chunks.length).fill(null);
+    const inFlightJobs = new Map<number, string>();
+    let nextToStart = 0;
+    let nextToEnqueue = 0;
+    let startedPlayback = false;
+
+    const startChunk = async (index: number) => {
+      if (isStale()) return;
+
+      const chunk = chunks[index];
+      console.log(`🎬 Starting chunk ${index + 1}/${chunks.length}...`);
+
       try {
-        // Start chunk generation
         const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
           body: {
             action: 'start',
             imageUrl,
             audioUrl: chunk.dataUrl,
             figureId,
-            figureName: `${figureName}_chunk${i}`
+            figureName: `${figureName}_chunk${index}`
           }
         });
-        
+
+        if (isStale()) return;
         if (error) throw error;
-        
-        let videoUrl: string | null = null;
-        
-        if (data.status === 'completed' && data.video) {
-          videoUrl = data.video;
-        } else if (data.jobId) {
-          // Poll for completion
-          videoUrl = await pollForVideoCompletion(data.jobId, '', chunk.dataUrl);
+
+        if (data?.status === 'completed' && data.video) {
+          results[index] = data.video;
+          return;
         }
-        
-        if (!videoUrl) {
-          console.error(`❌ Chunk ${i + 1} failed`);
-          continue;
+
+        if (data?.jobId) {
+          inFlightJobs.set(index, data.jobId);
+          return;
         }
-        
-        completedUrls.push(videoUrl);
-        console.log(`✅ Chunk ${i + 1}/${chunks.length} ready`);
-        setVideoChunkProgress({ current: i + 1, total: chunks.length });
-        
-        // Handle playback
-        if (!currentlyPlaying) {
-          // Start playing first chunk immediately
-          currentlyPlaying = true;
+
+        throw new Error('No job ID returned');
+      } catch (err) {
+        console.error(`❌ Chunk ${index + 1} start error:`, err);
+      }
+    };
+
+    const enqueueReadyInOrder = () => {
+      while (results[nextToEnqueue]) {
+        const url = results[nextToEnqueue]!;
+
+        setAllGeneratedVideoUrls(prev => [...prev, url]);
+        setVideoChunkProgress({ current: nextToEnqueue + 1, total: chunks.length });
+
+        if (!startedPlayback) {
+          startedPlayback = true;
           setIsGeneratingVideo(false);
-          setCurrentVideoUrl(videoUrl);
+          setCurrentVideoUrl(url);
           console.log(`▶️ Playing chunk 1/${chunks.length}`);
         } else {
-          // Queue subsequent chunks - they'll play when current ends
-          setVideoQueue(prev => [...prev, videoUrl!]);
-          console.log(`📥 Queued chunk ${i + 1}/${chunks.length}`);
+          setVideoQueue(prev => [...prev, url]);
+          console.log(`📥 Queued chunk ${nextToEnqueue + 1}/${chunks.length}`);
         }
-        
-      } catch (err) {
-        console.error(`❌ Chunk ${i + 1} error:`, err);
+
+        nextToEnqueue++;
       }
+
+      // Loading indicator if we're already playing but the next chunk isn't ready yet
+      if (startedPlayback && nextToEnqueue < chunks.length && !results[nextToEnqueue]) {
+        setIsLoadingNextChunk(true);
+      } else {
+        setIsLoadingNextChunk(false);
+      }
+    };
+
+    // Main loop: prefetch chunks concurrently, enqueue in order, never "jump" playback
+    while (!isStale() && nextToEnqueue < chunks.length) {
+      // Fill concurrency slots
+      while (nextToStart < chunks.length && inFlightJobs.size < MAX_CONCURRENT) {
+        await startChunk(nextToStart);
+        nextToStart++;
+        if (isStale()) return;
+      }
+
+      enqueueReadyInOrder();
+      if (nextToEnqueue >= chunks.length) break;
+
+      // Poll in-flight jobs once
+      for (const [index, jobId] of Array.from(inFlightJobs.entries())) {
+        if (isStale()) return;
+
+        try {
+          const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
+            body: { action: 'status', jobId }
+          });
+
+          if (isStale()) return;
+          if (error) throw error;
+
+          if (data?.status === 'completed' && data.video) {
+            results[index] = data.video;
+            inFlightJobs.delete(index);
+          } else if (data?.status === 'failed') {
+            console.error(`❌ Chunk ${index + 1} failed:`, data?.error);
+            inFlightJobs.delete(index);
+          }
+        } catch (err) {
+          console.error(`❌ Chunk ${index + 1} status error:`, err);
+        }
+      }
+
+      enqueueReadyInOrder();
+
+      // Small delay before next poll cycle
+      await new Promise(resolve => setTimeout(resolve, 1500));
     }
-    
-    console.log(`✅ All ${completedUrls.length} chunks completed`);
+
+    if (isStale()) return;
+
+    console.log('✅ All chunks completed');
     setVideoChunkProgress(null);
     setIsLoadingNextChunk(false);
-    setAllGeneratedVideoUrls(completedUrls);
+
+    // If nothing ever started, stop spinner
+    if (!startedPlayback) {
+      setIsGeneratingVideo(false);
+    }
   };
   
   // Generate single video and return URL (for tracking)
