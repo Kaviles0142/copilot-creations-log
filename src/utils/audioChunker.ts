@@ -6,7 +6,7 @@ export interface AudioChunk {
   estimatedDurationSec: number;
 }
 
-const MAX_CHUNK_DURATION_SEC = 30;
+const MAX_CHUNK_DURATION_SEC = 60;
 const BYTES_PER_SECOND = 2000; // Approximate for MP3 at 16kbps
 
 /**
