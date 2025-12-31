@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useTalkingVideo } from "@/hooks/useTalkingVideo";
+import { useChunkedVideoGeneration } from "@/hooks/useChunkedVideoGeneration";
 
 interface Figure {
   id: string;
@@ -78,10 +78,18 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const [speakingFigureId, setSpeakingFigureId] = useState<string | null>(null);
   const [speakingFigureName, setSpeakingFigureName] = useState<string | null>(null);
+  
+  // Chunked video state
+  const [allVideoUrls, setAllVideoUrls] = useState<string[]>([]);
+  const [isLoadingNextChunk, setIsLoadingNextChunk] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioEnabledRef = useRef(true);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
+  
+  // Chunked video generation hook
+  const chunkedVideo = useChunkedVideoGeneration();
 
   // Azure voice options filtered by gender
   const azureVoices = {
@@ -394,6 +402,10 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       setSpeakingFigureId(figureId);
       setSpeakingFigureName(figureName);
       
+      // Reset video state for new generation
+      setAllVideoUrls([]);
+      setIsLoadingNextChunk(true);
+      
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
           text,
@@ -410,7 +422,29 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         // Create data URL for video generation
         const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
         setCurrentAudioUrl(audioDataUrl);
-        console.log('🎬 Audio ready for video generation');
+        console.log('🎬 Audio ready for chunked video generation');
+        
+        // Start chunked video generation
+        const imageUrl = avatarUrls[figureId];
+        if (imageUrl) {
+          chunkedVideo.generateChunkedVideo(
+            imageUrl,
+            audioDataUrl,
+            figureId,
+            figureName,
+            (videoUrl) => {
+              // Called when each chunk is ready
+              console.log('📹 Video chunk ready');
+              setAllVideoUrls(prev => [...prev, videoUrl]);
+              setIsLoadingNextChunk(chunkedVideo.isGenerating);
+            },
+            () => {
+              // Called when all chunks complete
+              console.log('✅ All video chunks generated');
+              setIsLoadingNextChunk(false);
+            }
+          );
+        }
         
         // Initialize audio element if needed
         if (!audioElementRef.current) {
@@ -470,6 +504,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       setCurrentAudioUrl(null);
       setSpeakingFigureId(null);
       setSpeakingFigureName(null);
+      setIsLoadingNextChunk(false);
       throw error;
     }
   };
@@ -739,8 +774,17 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
               audioUrl={currentAudioUrl}
               figureName={speakingFigureName || undefined}
               figureId={speakingFigureId}
+              isGeneratingVideo={chunkedVideo.isGenerating}
+              videoUrl={allVideoUrls[allVideoUrls.length - 1] || null}
+              allVideoUrls={allVideoUrls}
+              isLoadingNextChunk={isLoadingNextChunk}
+              videoChunkProgress={chunkedVideo.totalChunks > 1 ? {
+                current: chunkedVideo.currentChunkIndex + 1,
+                total: chunkedVideo.totalChunks
+              } : null}
               onVideoEnd={() => {
                 console.log('🎬 Debate video ended');
+                chunkedVideo.onVideoEnded();
               }}
             />
           </div>
