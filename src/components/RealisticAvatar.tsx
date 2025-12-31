@@ -36,6 +36,7 @@ const RealisticAvatar = ({
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
+  const [lastVideoUrl, setLastVideoUrl] = useState<string | null>(null);
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
 
@@ -99,10 +100,11 @@ const RealisticAvatar = ({
     };
   }, [audioUrl, onAudioEnd]);
 
-  // Play video when URL is available
+  // Play video when URL is available and track last video
   useEffect(() => {
     if (videoRef.current && videoUrl && !videoError) {
       console.log('🎬 Loading video:', videoUrl.substring(0, 60) + '...');
+      setLastVideoUrl(videoUrl);
       videoRef.current.load();
       videoRef.current.play().catch(err => {
         console.error('❌ Video autoplay failed:', err);
@@ -117,6 +119,7 @@ const RealisticAvatar = ({
     lastAudioUrlRef.current = null;
     setIsPlayingAudio(false);
     setLoadingSeconds(0);
+    setLastVideoUrl(null);
   }, [figureId]);
 
   const handlePlayPause = () => {
@@ -126,6 +129,23 @@ const RealisticAvatar = ({
       videoRef.current.pause();
       setIsPlayingVideo(false);
     } else {
+      videoRef.current.play().catch(console.error);
+      setIsPlayingVideo(true);
+    }
+  };
+
+  const handleReplayLastVideo = () => {
+    if (!lastVideoUrl) return;
+    
+    // If we have a video ref and video URL matches, just replay
+    if (videoRef.current && videoRef.current.src === lastVideoUrl) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(console.error);
+      setIsPlayingVideo(true);
+    } else if (videoRef.current) {
+      // Load and play the last video
+      videoRef.current.src = lastVideoUrl;
+      videoRef.current.load();
       videoRef.current.play().catch(console.error);
       setIsPlayingVideo(true);
     }
@@ -273,7 +293,23 @@ const RealisticAvatar = ({
           </div>
         </>
       )}
+      {/* Replay button when there's a previous video */}
+      {lastVideoUrl && !isSpeaking && (
+        <div className="absolute bottom-2 right-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0"
+            onClick={handleReplayLastVideo}
+            title="Replay last video"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
       <audio ref={audioRef} hidden />
+      {/* Hidden video element for replay functionality */}
+      <video ref={videoRef} hidden />
     </Card>
   );
 };
