@@ -9,6 +9,7 @@ import ChatMessages from "./ChatMessages";
 import RealisticAvatar from "./RealisticAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useChunkedVideoGeneration } from "@/hooks/useChunkedVideoGeneration";
 
 
 export interface Message {
@@ -81,6 +82,11 @@ const PodcastMode = () => {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [currentVideoSpeaker, setCurrentVideoSpeaker] = useState<'host' | 'guest' | null>(null);
   
+  // Chunked video state
+  const [hostAllVideoUrls, setHostAllVideoUrls] = useState<string[]>([]);
+  const [guestAllVideoUrls, setGuestAllVideoUrls] = useState<string[]>([]);
+  const [isLoadingNextChunk, setIsLoadingNextChunk] = useState(false);
+  
   // Preloading state
   const [preloadedVideoUrl, setPreloadedVideoUrl] = useState<string | null>(null);
   const [preloadedSpeaker, setPreloadedSpeaker] = useState<'host' | 'guest' | null>(null);
@@ -92,6 +98,10 @@ const PodcastMode = () => {
   const messagesRef = useRef<Message[]>([]);
   
   const { toast } = useToast();
+  
+  // Chunked video generation hooks - one for each speaker
+  const hostChunkedVideo = useChunkedVideoGeneration();
+  const guestChunkedVideo = useChunkedVideoGeneration();
 
   // Azure voice options filtered by gender
   const azureVoices = {
@@ -802,7 +812,7 @@ const PodcastMode = () => {
     }
   };
  
-  // Generate TTS and play audio with static avatar (video generation disabled)
+  // Generate TTS and play audio with chunked video generation
   const generateAndPlayAudio = async (
     text: string, 
     figureName: string, 
@@ -813,6 +823,14 @@ const PodcastMode = () => {
       setIsGeneratingVideo(true);
       setCurrentVideoSpeaker(speaker);
       console.log('🎤 Generating TTS for:', figureName);
+      
+      // Reset video state for this speaker
+      if (speaker === 'host') {
+        setHostAllVideoUrls([]);
+      } else {
+        setGuestAllVideoUrls([]);
+      }
+      setIsLoadingNextChunk(true);
       
       // Generate TTS audio
       const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
@@ -833,16 +851,46 @@ const PodcastMode = () => {
 
       const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
       
-      setIsGeneratingVideo(false);
-
-      console.log('✅ Audio ready, playing...');
+      console.log('🎬 Audio ready, starting chunked video generation...');
       
-      // Play audio (video generation disabled - using static avatars)
-      await playAudio(audioDataUrl);
+      // Get avatar URL for the speaker
+      const imageUrl = speaker === 'host' ? hostAvatarUrl : guestAvatarUrl;
+      const chunkedVideo = speaker === 'host' ? hostChunkedVideo : guestChunkedVideo;
+      const setAllVideoUrls = speaker === 'host' ? setHostAllVideoUrls : setGuestAllVideoUrls;
+      const setVideoUrl = speaker === 'host' ? setHostVideoUrl : setGuestVideoUrl;
+      
+      if (imageUrl) {
+        // Start chunked video generation
+        chunkedVideo.generateChunkedVideo(
+          imageUrl,
+          audioDataUrl,
+          figureId,
+          figureName,
+          (videoUrl) => {
+            // Called when each chunk is ready
+            console.log(`📹 ${speaker} video chunk ready`);
+            setAllVideoUrls(prev => [...prev, videoUrl]);
+            setVideoUrl(videoUrl);
+            setIsLoadingNextChunk(chunkedVideo.isGenerating);
+          },
+          () => {
+            // Called when all chunks complete
+            console.log(`✅ All ${speaker} video chunks generated`);
+            setIsGeneratingVideo(false);
+            setIsLoadingNextChunk(false);
+          }
+        );
+      } else {
+        // No avatar URL, fall back to audio-only
+        setIsGeneratingVideo(false);
+        setIsLoadingNextChunk(false);
+        await playAudio(audioDataUrl);
+      }
       
     } catch (error) {
       console.error('Error generating audio:', error);
       setIsGeneratingVideo(false);
+      setIsLoadingNextChunk(false);
     }
   };
 
@@ -1190,6 +1238,16 @@ const PodcastMode = () => {
                   isGeneratingVideo={isGeneratingVideo && currentVideoSpeaker === 'host'}
                   figureName={host.name}
                   figureId={host.id}
+                  allVideoUrls={hostAllVideoUrls}
+                  isLoadingNextChunk={isLoadingNextChunk && currentVideoSpeaker === 'host'}
+                  videoChunkProgress={hostChunkedVideo.totalChunks > 1 ? {
+                    current: hostChunkedVideo.currentChunkIndex + 1,
+                    total: hostChunkedVideo.totalChunks
+                  } : null}
+                  onVideoEnd={() => {
+                    console.log('🎬 Host video ended');
+                    hostChunkedVideo.onVideoEnded();
+                  }}
                 />
                 <Select
                   value={hostVoice}
@@ -1220,6 +1278,16 @@ const PodcastMode = () => {
                   isGeneratingVideo={isGeneratingVideo && currentVideoSpeaker === 'guest'}
                   figureName={guest.name}
                   figureId={guest.id}
+                  allVideoUrls={guestAllVideoUrls}
+                  isLoadingNextChunk={isLoadingNextChunk && currentVideoSpeaker === 'guest'}
+                  videoChunkProgress={guestChunkedVideo.totalChunks > 1 ? {
+                    current: guestChunkedVideo.currentChunkIndex + 1,
+                    total: guestChunkedVideo.totalChunks
+                  } : null}
+                  onVideoEnd={() => {
+                    console.log('🎬 Guest video ended');
+                    guestChunkedVideo.onVideoEnded();
+                  }}
                 />
                 <Select
                   value={guestVoice}
