@@ -115,6 +115,8 @@ const HistoricalChat = () => {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoQueue, setVideoQueue] = useState<string[]>([]);
   const [videoChunkProgress, setVideoChunkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [allGeneratedVideoUrls, setAllGeneratedVideoUrls] = useState<string[]>([]); // All chunks for replay
+  const [isLoadingNextChunk, setIsLoadingNextChunk] = useState(false); // Loading between chunks
   
   // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -376,9 +378,16 @@ const HistoricalChat = () => {
     
     console.log(`🎬 Video generation: ${chunks.length} chunk(s), ~${totalDuration.toFixed(0)}s total`);
     
+    // Clear previous videos for new generation
+    setAllGeneratedVideoUrls([]);
+    
     if (!shouldChunk) {
       // Single chunk - use existing flow
-      return generateSingleVideo(chunks[0].dataUrl, imageUrl, figureId, figureName);
+      const videoUrl = await generateSingleVideoAndReturn(chunks[0].dataUrl, imageUrl, figureId, figureName);
+      if (videoUrl) {
+        setAllGeneratedVideoUrls([videoUrl]);
+      }
+      return;
     }
     
     // Multiple chunks - process in parallel batches of 2
@@ -388,6 +397,7 @@ const HistoricalChat = () => {
     let nextToStart = 0;
     let nextToPlay = 0;
     const activeJobs: Map<number, string> = new Map();
+    const completedUrls: string[] = [];
     
     // Start initial batch
     const startChunk = async (chunk: AudioChunk): Promise<string | null> => {
@@ -434,16 +444,19 @@ const HistoricalChat = () => {
     while (nextToPlay < chunks.length) {
       // Check if next chunk to play is ready
       if (videoUrls[nextToPlay]) {
+        const chunkUrl = videoUrls[nextToPlay]!;
+        completedUrls.push(chunkUrl);
         console.log(`▶️ Playing chunk ${nextToPlay + 1}/${chunks.length}`);
         setVideoChunkProgress({ current: nextToPlay + 1, total: chunks.length });
+        setIsLoadingNextChunk(false);
         
         // Play immediately if it's the first one
         if (nextToPlay === 0) {
           setIsGeneratingVideo(false);
-          setCurrentVideoUrl(videoUrls[nextToPlay]);
+          setCurrentVideoUrl(chunkUrl);
         } else {
           // Queue for sequential playback
-          setVideoQueue(prev => [...prev, videoUrls[nextToPlay]!]);
+          setVideoQueue(prev => [...prev, chunkUrl]);
         }
         
         nextToPlay++;
@@ -457,6 +470,11 @@ const HistoricalChat = () => {
           nextToStart++;
         }
         continue;
+      }
+      
+      // Show loading indicator if we're waiting for next chunk
+      if (nextToPlay > 0) {
+        setIsLoadingNextChunk(true);
       }
       
       // Poll active jobs
@@ -474,15 +492,17 @@ const HistoricalChat = () => {
     
     console.log('✅ All chunks completed');
     setVideoChunkProgress(null);
+    setIsLoadingNextChunk(false);
+    setAllGeneratedVideoUrls(completedUrls);
   };
   
-  // Generate single video (existing flow extracted)
-  const generateSingleVideo = async (
+  // Generate single video and return URL (for tracking)
+  const generateSingleVideoAndReturn = async (
     audioDataUrl: string,
     imageUrl: string,
     figureId: string,
     figureName: string
-  ) => {
+  ): Promise<string | null> => {
     try {
       const { data: videoData, error: videoError } = await supabase.functions.invoke('ditto-generate-video', {
         body: {
@@ -505,12 +525,14 @@ const HistoricalChat = () => {
         console.log('✅ Video ready immediately:', videoData.video);
         setIsGeneratingVideo(false);
         setCurrentVideoUrl(videoData.video);
+        return videoData.video;
       } else if (videoData.status === 'processing' && videoData.jobId) {
         console.log('⏳ Video processing, polling for job:', videoData.jobId);
         const videoUrl = await pollForVideoCompletion(videoData.jobId, audioDataUrl, audioDataUrl);
         if (videoUrl) {
           setIsGeneratingVideo(false);
           setCurrentVideoUrl(videoUrl);
+          return videoUrl;
         } else {
           throw new Error('Video generation timed out');
         }
@@ -522,6 +544,16 @@ const HistoricalChat = () => {
       setIsGeneratingVideo(false);
       throw error;
     }
+  };
+  
+  // Generate single video (existing flow extracted) - kept for compatibility
+  const generateSingleVideo = async (
+    audioDataUrl: string,
+    imageUrl: string,
+    figureId: string,
+    figureName: string
+  ) => {
+    await generateSingleVideoAndReturn(audioDataUrl, imageUrl, figureId, figureName);
   };
   
   // Handle video ending - play next in queue
@@ -2045,6 +2077,8 @@ const HistoricalChat = () => {
               isSpeaking={isSpeaking}
               figureName={selectedFigure.name}
               figureId={selectedFigure.id}
+              allVideoUrls={allGeneratedVideoUrls}
+              isLoadingNextChunk={isLoadingNextChunk}
               onVideoEnd={() => {
                 console.log('⏹️ Video ended - checking queue');
                 // Check if there are queued videos to play
@@ -2055,6 +2089,7 @@ const HistoricalChat = () => {
                   setIsPlayingAudio(false);
                   setIsGreetingPlaying(false);
                   setCurrentVideoUrl(null);
+                  setIsLoadingNextChunk(false);
                 }
               }}
               videoChunkProgress={videoChunkProgress}

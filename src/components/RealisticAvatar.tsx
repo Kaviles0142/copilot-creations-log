@@ -14,6 +14,8 @@ interface RealisticAvatarProps {
   figureName?: string;
   figureId?: string;
   videoChunkProgress?: { current: number; total: number } | null;
+  allVideoUrls?: string[]; // All video chunks for replay
+  isLoadingNextChunk?: boolean; // Loading indicator between chunks
   onVideoEnd?: () => void;
   onAudioEnd?: () => void;
 }
@@ -28,6 +30,8 @@ const RealisticAvatar = ({
   figureName,
   figureId,
   videoChunkProgress,
+  allVideoUrls = [],
+  isLoadingNextChunk = false,
   onVideoEnd,
   onAudioEnd,
 }: RealisticAvatarProps) => {
@@ -39,14 +43,24 @@ const RealisticAvatar = ({
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
-  const [lastVideoUrl, setLastVideoUrl] = useState<string | null>(null);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null); // Currently playing/showing video
+  const [lastVideoUrls, setLastVideoUrls] = useState<string[]>([]); // All chunks for replay
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
+  const [replayIndex, setReplayIndex] = useState(0); // Current chunk during replay
+  const [isReplaying, setIsReplaying] = useState(false);
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
 
-  // Fetch last successful video for this figure from database
+  // Track all video URLs for replay
   useEffect(() => {
-    const fetchLastVideo = async () => {
+    if (allVideoUrls.length > 0) {
+      setLastVideoUrls(allVideoUrls);
+      console.log(`📹 Stored ${allVideoUrls.length} video chunks for replay`);
+    }
+  }, [allVideoUrls]);
+
+  // Fetch last successful videos for this figure from database
+  useEffect(() => {
+    const fetchLastVideos = async () => {
       if (!figureId) return;
       
       try {
@@ -57,20 +71,21 @@ const RealisticAvatar = ({
           .eq('status', 'completed')
           .not('video_url', 'is', null)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(10); // Get last 10 chunks
         
-        if (!error && data?.video_url) {
-          console.log('📹 Found last video for figure:', data.video_url.substring(0, 60) + '...');
-          setLastVideoUrl(data.video_url);
+        if (!error && data?.length > 0) {
+          const urls = data.map(d => d.video_url).filter(Boolean) as string[];
+          console.log(`📹 Found ${urls.length} previous videos for figure`);
+          if (lastVideoUrls.length === 0) {
+            setLastVideoUrls(urls.reverse()); // Oldest first for proper playback order
+          }
         }
       } catch (err) {
-        // No previous video found, that's fine
-        console.log('No previous video found for figure');
+        console.log('No previous videos found for figure');
       }
     };
     
-    fetchLastVideo();
+    fetchLastVideos();
   }, [figureId]);
 
   // Timer for video generation
@@ -133,11 +148,11 @@ const RealisticAvatar = ({
     };
   }, [audioUrl, onAudioEnd]);
 
-  // Play video when URL is available and track last video
+  // Play video when URL is available
   useEffect(() => {
     if (videoUrl) {
-      setLastVideoUrl(videoUrl);
       setActiveVideoUrl(videoUrl);
+      setIsReplaying(false); // Not a replay
     }
   }, [videoUrl]);
 
@@ -154,14 +169,16 @@ const RealisticAvatar = ({
     }
   }, [activeVideoUrl, videoError]);
 
-  // Reset state when figure changes (lastVideoUrl is fetched in separate effect)
+  // Reset state when figure changes
   useEffect(() => {
     setVideoError(false);
     lastAudioUrlRef.current = null;
     setIsPlayingAudio(false);
     setLoadingSeconds(0);
-    setActiveVideoUrl(null); // Clear active video when switching figures
-    // Don't clear lastVideoUrl here - it's fetched from DB in the figureId effect
+    setActiveVideoUrl(null);
+    setLastVideoUrls([]);
+    setReplayIndex(0);
+    setIsReplaying(false);
   }, [figureId]);
 
   const handlePlayPause = () => {
@@ -176,10 +193,34 @@ const RealisticAvatar = ({
     }
   };
 
+  // Replay all video chunks sequentially
   const handleReplayLastVideo = () => {
-    if (!lastVideoUrl) return;
+    if (lastVideoUrls.length === 0) return;
     setVideoError(false);
-    setActiveVideoUrl(lastVideoUrl); // This triggers the video display and playback
+    setIsReplaying(true);
+    setReplayIndex(0);
+    setActiveVideoUrl(lastVideoUrls[0]);
+    console.log(`🔄 Starting replay: chunk 1/${lastVideoUrls.length}`);
+  };
+
+  // Handle video end - play next chunk during replay
+  const handleVideoEnded = () => {
+    console.log('⏹️ Video ended');
+    setIsPlayingVideo(false);
+    
+    if (isReplaying && replayIndex < lastVideoUrls.length - 1) {
+      // Play next chunk in replay sequence
+      const nextIndex = replayIndex + 1;
+      setReplayIndex(nextIndex);
+      setActiveVideoUrl(lastVideoUrls[nextIndex]);
+      console.log(`🔄 Replay: chunk ${nextIndex + 1}/${lastVideoUrls.length}`);
+    } else {
+      // End of replay or normal playback
+      setActiveVideoUrl(null);
+      setIsReplaying(false);
+      setReplayIndex(0);
+      onVideoEnd?.();
+    }
   };
 
   const handleReplay = () => {
@@ -254,19 +295,29 @@ const RealisticAvatar = ({
             console.log('▶️ Video playing');
             setIsPlayingVideo(true);
           }}
-          onEnded={() => {
-            console.log('⏹️ Video ended');
-            console.log('⏹️ Video ended - clearing state');
-            setIsPlayingVideo(false);
-            setActiveVideoUrl(null); // Return to static image after video ends
-            onVideoEnd?.();
-          }}
+          onEnded={handleVideoEnded}
           onError={(e) => {
             console.error('❌ Video playback error:', e);
             setVideoError(true);
             setActiveVideoUrl(null);
+            setIsReplaying(false);
           }}
         />
+        {/* Loading indicator for next chunk */}
+        {isLoadingNextChunk && (
+          <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/60 px-3 py-2 rounded">
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+            <span className="text-xs text-white">Loading next...</span>
+          </div>
+        )}
+        {/* Replay progress indicator */}
+        {isReplaying && lastVideoUrls.length > 1 && (
+          <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded">
+            <span className="text-xs text-white">
+              Chunk {replayIndex + 1}/{lastVideoUrls.length}
+            </span>
+          </div>
+        )}
         {/* Video controls in corner */}
         <div className="absolute bottom-2 right-2 flex items-center gap-1">
           <Button
@@ -330,18 +381,23 @@ const RealisticAvatar = ({
           </div>
         </>
       )}
-      {/* Replay button when there's a previous video */}
-      {lastVideoUrl && !isSpeaking && (
-        <div className="absolute bottom-2 right-2">
+      {/* Replay button when there are previous videos */}
+      {lastVideoUrls.length > 0 && !isSpeaking && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
           <Button
             variant="secondary"
             size="icon"
             className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0"
             onClick={handleReplayLastVideo}
-            title="Replay last video"
+            title={`Replay ${lastVideoUrls.length} video chunk${lastVideoUrls.length > 1 ? 's' : ''}`}
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
+          {lastVideoUrls.length > 1 && (
+            <span className="text-xs text-white bg-black/60 px-1.5 py-0.5 rounded">
+              {lastVideoUrls.length}
+            </span>
+          )}
         </div>
       )}
       <audio ref={audioRef} hidden />
