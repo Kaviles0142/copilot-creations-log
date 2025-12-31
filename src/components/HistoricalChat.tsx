@@ -20,7 +20,6 @@ import MusicVoiceInterface from "./MusicVoiceInterface";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { clearFigureMetadata } from "@/utils/clearCache";
-import { useVideoPreloader } from "@/hooks/useVideoPreloader";
 import { getFigureContext } from "@/utils/figureContextMapper";
 
 export interface Message {
@@ -108,26 +107,20 @@ const HistoricalChat = () => {
   const [isLoadingAvatarImage, setIsLoadingAvatarImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // For audio fallback
-  const [greetingText, setGreetingText] = useState<string | null>(null); // Text for K2 animation
+  const [greetingText, setGreetingText] = useState<string | null>(null);
   
-  // Video state - external video generation like PodcastMode
+  // Video state - Ditto video generation
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   
-  // K2 Animation state
-  const [animationFrames, setAnimationFrames] = useState<Array<{frameNumber: number; imageUrl: string; speechSegment: string}> | null>(null);
-  
   // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null); // Changed to ref for immediate updates
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const currentVideoRef = useRef<HTMLVideoElement | null>(null);
   
   const { toast } = useToast();
-  
-  // Video cache cleanup hook (K2 animation disabled for now - too slow)
-  const { clearCache: clearVideoCache } = useVideoPreloader();
 
   // Auto-select Australian English voice for Elon Musk
   useEffect(() => {
@@ -251,7 +244,6 @@ const HistoricalChat = () => {
     setIsLoadingAvatarImage(true);
     setIsGreetingPlaying(true);
     setCurrentVideoUrl(null);
-    setAnimationFrames(null);
     setGreetingText(null);
     setGreetingAudioUrl(null); // Clear previous audio
     
@@ -1043,7 +1035,6 @@ const HistoricalChat = () => {
       if (aiResponse.length > 20 && isAutoVoiceEnabled && avatarImageUrl) {
         console.log('🎤 Starting TTS + Ditto video generation for:', selectedFigure!.name);
         setIsGeneratingVideo(true);
-        setAnimationFrames(null); // Clear any previous K2 frames
         
         try {
           // First get TTS audio
@@ -1920,7 +1911,6 @@ const HistoricalChat = () => {
               imageUrl={avatarImageUrl}
               isLoading={isLoadingAvatarImage}
               videoUrl={currentVideoUrl}
-              animationFrames={animationFrames || undefined}
               audioUrl={greetingAudioUrl}
               isGeneratingVideo={isGeneratingVideo}
               isSpeaking={isSpeaking}
@@ -1932,20 +1922,12 @@ const HistoricalChat = () => {
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
                 setCurrentVideoUrl(null);
-                setAnimationFrames(null);
               }}
               onAudioEnd={() => {
                 console.log('⏹️ Audio ended - clearing state');
                 setIsSpeaking(false);
                 setIsPlayingAudio(false);
                 setIsGreetingPlaying(false);
-              }}
-              onAnimationEnd={() => {
-                console.log('⏹️ Animation ended - clearing state');
-                setIsSpeaking(false);
-                setIsPlayingAudio(false);
-                setIsGreetingPlaying(false);
-                setAnimationFrames(null);
               }}
             />
           </div>
