@@ -245,7 +245,7 @@ const HistoricalChat = () => {
     }
   }, [selectedFigure]);
   
-  // Generate avatar portrait and play greeting with K2 animation synced to audio
+  // Generate avatar portrait and play greeting with Ditto video
   const generateAvatarPortraitAndGreeting = async (figure: HistoricalFigure) => {
     console.log('🎨 Generating avatar portrait and greeting for:', figure.name);
     setIsLoadingAvatarImage(true);
@@ -287,7 +287,7 @@ const HistoricalChat = () => {
       if (audioResult.error) throw audioResult.error;
 
       console.log('✅ Avatar portrait ready:', avatarResult.data.cached ? '(cached)' : '(new)');
-      console.log('🎤 Greeting audio ready - waiting for K2 frames...');
+      console.log('🎤 Greeting audio ready - generating video...');
       
       const imageUrl = avatarResult.data.imageUrl;
       setAvatarImageUrl(imageUrl);
@@ -299,52 +299,94 @@ const HistoricalChat = () => {
 
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       
-      // Generate K2 animation - wait for it before playing audio
+      // Generate Ditto video instead of K2 frames
       setIsGeneratingVideo(true);
-      console.log('🎬 Generating K2 animation frames...');
+      console.log('🎬 Generating Ditto video...');
       
-      // Create a promise race: K2 generation vs timeout (30 seconds)
-      const k2Promise = supabase.functions.invoke('k2-animate-portrait', {
+      const { data: videoData, error: videoError } = await supabase.functions.invoke('ditto-generate-video', {
         body: {
+          action: 'start',
           imageUrl: imageUrl,
-          text: greeting,
-          figureName: figure.name,
+          audioUrl: greetingDataUrl,
           figureId: figure.id,
-          frameCount: 3
+          figureName: figure.name
         }
       });
       
-      const timeoutPromise = new Promise<{ data: null, error: Error }>((resolve) => {
-        setTimeout(() => {
-          resolve({ data: null, error: new Error('K2 timeout - falling back to static') });
-        }, 30000); // 30 second timeout
-      });
+      if (videoError) {
+        console.error('❌ Ditto API error:', videoError);
+        throw videoError;
+      }
       
-      const { data: k2Data, error: k2Error } = await Promise.race([k2Promise, timeoutPromise]);
+      console.log('📋 Ditto response:', videoData);
       
-      setIsGeneratingVideo(false);
-      
-      if (k2Error || !k2Data?.success || !k2Data?.frames?.length) {
-        console.log('⚠️ K2 failed or timed out, playing audio with static avatar');
-        // Play audio with static avatar (CSS animation)
-        setGreetingAudioUrl(greetingDataUrl);
+      // Check if video is ready immediately
+      if (videoData.status === 'completed' && videoData.video) {
+        console.log('✅ Video ready immediately:', videoData.video);
+        setIsGeneratingVideo(false);
+        setCurrentVideoUrl(videoData.video);
+      } else if (videoData.status === 'processing' && videoData.jobId) {
+        // Poll for video completion
+        console.log('⏳ Video processing, polling for job:', videoData.jobId);
+        await pollForVideoCompletion(videoData.jobId, greetingDataUrl);
       } else {
-        console.log(`✅ K2 ready: ${k2Data.frames.length} frames - playing synced with audio`);
-        // Set BOTH frames and audio together so they play synchronized
-        setAnimationFrames(k2Data.frames);
-        setGreetingAudioUrl(greetingDataUrl);
+        throw new Error('Unexpected video generation response');
       }
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
+      setIsGeneratingVideo(false);
+      // Fall back to audio-only with static avatar
+      if (greetingAudioUrl) {
+        setGreetingAudioUrl(greetingAudioUrl);
+      }
       toast({
-        title: "Setup Complete",
-        description: "You can now start chatting",
+        title: "Video generation failed",
+        description: "Playing audio with static avatar",
         variant: "default",
       });
       setIsGreetingPlaying(false);
-      setIsGeneratingVideo(false);
     }
+  };
+  
+  // Poll for Ditto video completion
+  const pollForVideoCompletion = async (jobId: string, fallbackAudioUrl: string) => {
+    const maxAttempts = 60;
+    const pollInterval = 3000;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`🔄 Polling video status (${attempt}/${maxAttempts})...`);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
+          body: { action: 'status', jobId }
+        });
+        
+        if (error) throw error;
+        
+        if (data.status === 'completed' && data.video) {
+          console.log('✅ Video ready:', data.video);
+          setIsGeneratingVideo(false);
+          setCurrentVideoUrl(data.video);
+          return;
+        }
+        
+        if (data.status === 'failed') {
+          throw new Error(data.error || 'Video generation failed');
+        }
+        
+        // Still processing - wait and try again
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (err) {
+        console.error('❌ Poll error:', err);
+        break;
+      }
+    }
+    
+    // Timeout or error - fall back to audio
+    console.log('⚠️ Video polling failed, falling back to audio');
+    setIsGeneratingVideo(false);
+    setGreetingAudioUrl(fallbackAudioUrl);
   };
   
   // Helper to play audio when video fails
@@ -997,62 +1039,64 @@ const HistoricalChat = () => {
       setIsLoading(false);
       setAbortController(null);
       
-      // Generate TTS and K2 animation - wait for K2 to sync audio with animation
+      // Generate TTS and Ditto video for talking avatar
       if (aiResponse.length > 20 && isAutoVoiceEnabled && avatarImageUrl) {
-        console.log('🎤 Starting TTS + K2 generation for:', selectedFigure!.name);
+        console.log('🎤 Starting TTS + Ditto video generation for:', selectedFigure!.name);
         setIsGeneratingVideo(true);
-        setAnimationFrames(null); // Clear previous frames
+        setAnimationFrames(null); // Clear any previous K2 frames
         
         try {
-          // Generate TTS and K2 in PARALLEL
-          const [ttsResult, k2Result] = await Promise.all([
-            supabase.functions.invoke('azure-text-to-speech', {
-              body: {
-                text: aiResponse,
-                figure_name: selectedFigure!.name,
-                figure_id: selectedFigure!.id,
-                voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
-                language: selectedLanguage
-              }
-            }),
-            // Race K2 against a 25 second timeout
-            Promise.race([
-              supabase.functions.invoke('k2-animate-portrait', {
-                body: {
-                  imageUrl: avatarImageUrl,
-                  text: aiResponse.substring(0, 200),
-                  figureName: selectedFigure!.name,
-                  figureId: selectedFigure!.id,
-                  frameCount: 3
-                }
-              }),
-              new Promise<{ data: null, error: Error }>((resolve) => {
-                setTimeout(() => resolve({ data: null, error: new Error('K2 timeout') }), 25000);
-              })
-            ])
-          ]);
-
-          setIsGeneratingVideo(false);
+          // First get TTS audio
+          const ttsResult = await supabase.functions.invoke('azure-text-to-speech', {
+            body: {
+              text: aiResponse,
+              figure_name: selectedFigure!.name,
+              figure_id: selectedFigure!.id,
+              voice: selectedVoiceId === 'auto' ? 'auto' : selectedVoiceId,
+              language: selectedLanguage
+            }
+          });
 
           if (ttsResult.error || !ttsResult.data?.audioContent) {
             throw new Error('TTS failed');
           }
 
           const audioDataUrl = `data:audio/mpeg;base64,${ttsResult.data.audioContent}`;
-
-          // Check if K2 succeeded
-          if (!k2Result.error && k2Result.data?.success && k2Result.data?.frames?.length > 0) {
-            console.log(`✅ K2 + TTS ready: ${k2Result.data.frames.length} frames - playing synced`);
-            // Set both together for synchronized playback
-            setAnimationFrames(k2Result.data.frames);
-            setGreetingAudioUrl(audioDataUrl);
+          
+          // Now generate Ditto video with the audio
+          console.log('🎬 Generating Ditto video for chat response...');
+          const { data: videoData, error: videoError } = await supabase.functions.invoke('ditto-generate-video', {
+            body: {
+              action: 'start',
+              imageUrl: avatarImageUrl,
+              audioUrl: audioDataUrl,
+              figureId: selectedFigure!.id,
+              figureName: selectedFigure!.name
+            }
+          });
+          
+          if (videoError) {
+            console.error('❌ Ditto API error:', videoError);
+            throw videoError;
+          }
+          
+          console.log('📋 Ditto response:', videoData);
+          
+          // Check if video is ready immediately
+          if (videoData.status === 'completed' && videoData.video) {
+            console.log('✅ Video ready immediately:', videoData.video);
+            setIsGeneratingVideo(false);
+            setCurrentVideoUrl(videoData.video);
+          } else if (videoData.status === 'processing' && videoData.jobId) {
+            // Poll for video completion
+            console.log('⏳ Video processing, polling for job:', videoData.jobId);
+            await pollForVideoCompletion(videoData.jobId, audioDataUrl);
           } else {
-            console.log('⚠️ K2 failed, playing audio with static avatar');
-            setGreetingAudioUrl(audioDataUrl);
+            throw new Error('Unexpected video generation response');
           }
           
         } catch (error) {
-          console.error('❌ TTS/K2 error:', error);
+          console.error('❌ TTS/Video error:', error);
           setIsGeneratingVideo(false);
           toast({
             title: "Voice generation failed",
