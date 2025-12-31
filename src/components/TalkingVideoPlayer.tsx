@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
+import { Button } from './ui/button';
 import { useTalkingVideo } from '@/hooks/useTalkingVideo';
 
 interface TalkingVideoPlayerProps {
@@ -29,6 +30,8 @@ const TalkingVideoPlayer = ({
   const processedAudioRef = useRef<string | null>(null);
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { 
     generateVideo, 
@@ -41,9 +44,19 @@ const TalkingVideoPlayer = ({
       console.log('🎥 Video ready from hook:', url);
       setCurrentVideoUrl(url);
       onVideoReady?.(url);
+      // Stop the timer when video is ready
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
     },
     onError: (error) => {
       console.error('❌ Video generation failed:', error);
+      // Stop the timer on error
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
       // Fallback: play audio only with static image
       if (audioUrl && audioRef.current) {
         console.log('🔊 Falling back to audio-only playback');
@@ -52,6 +65,27 @@ const TalkingVideoPlayer = ({
       }
     }
   });
+
+  // Start timer when generating starts
+  useEffect(() => {
+    if (isGenerating) {
+      setLoadingSeconds(0);
+      loadingTimerRef.current = setInterval(() => {
+        setLoadingSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+      }
+    };
+  }, [isGenerating]);
 
   // Generate video when we have both image and audio
   useEffect(() => {
@@ -112,8 +146,28 @@ const TalkingVideoPlayer = ({
     if (figureId) {
       setCurrentVideoUrl(null);
       processedAudioRef.current = null;
+      setLoadingSeconds(0);
     }
   }, [figureId]);
+
+  const handlePlayPause = () => {
+    if (!videoRef.current) return;
+    
+    if (isPlayingVideo) {
+      videoRef.current.pause();
+      setIsPlayingVideo(false);
+    } else {
+      videoRef.current.play().catch(console.error);
+      setIsPlayingVideo(true);
+    }
+  };
+
+  const handleReplay = () => {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = 0;
+    videoRef.current.play().catch(console.error);
+    setIsPlayingVideo(true);
+  };
 
   if (isLoading) {
     return (
@@ -126,7 +180,7 @@ const TalkingVideoPlayer = ({
     );
   }
 
-  // Show portrait with generating overlay
+  // Show portrait with generating overlay and timer
   if (isGenerating && imageUrl) {
     const statusMessage = status === 'generating' 
       ? 'Starting video generation...' 
@@ -144,6 +198,7 @@ const TalkingVideoPlayer = ({
             <Loader2 className="w-12 h-12 animate-spin mx-auto text-white" />
             <p className="text-sm text-white font-medium">{statusMessage}</p>
             <p className="text-xs text-white/70">Creating lip-sync animation...</p>
+            <p className="text-lg text-white font-bold">{loadingSeconds}s</p>
           </div>
         </div>
         {/* Hidden audio for fallback */}
@@ -160,7 +215,7 @@ const TalkingVideoPlayer = ({
     );
   }
 
-  // Show video if available
+  // Show video if available with controls
   if (currentVideoUrl) {
     console.log('🎥 Rendering VIDEO element with URL:', currentVideoUrl);
     
@@ -187,12 +242,33 @@ const TalkingVideoPlayer = ({
             setCurrentVideoUrl(null);
           }}
         />
-        {isPlayingVideo && (
-          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/50 px-2 py-1 rounded">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-xs text-white">Speaking</span>
-          </div>
-        )}
+        {/* Video controls in corner */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0"
+            onClick={handleReplay}
+            title="Replay"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0"
+            onClick={handlePlayPause}
+            title={isPlayingVideo ? "Pause" : "Play"}
+          >
+            {isPlayingVideo ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          {isPlayingVideo && (
+            <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded ml-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs text-white">Speaking</span>
+            </div>
+          )}
+        </div>
       </Card>
     );
   }
