@@ -401,6 +401,8 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
       // Set speaking figure info for video generation
       setSpeakingFigureId(figureId);
       setSpeakingFigureName(figureName);
+      setIsPlayingAudio(true);
+      setCurrentSpeaker(figureId);
       
       // Reset video state for new generation
       setAllVideoUrls([]);
@@ -422,9 +424,9 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         // Create data URL for video generation
         const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
         setCurrentAudioUrl(audioDataUrl);
-        console.log('🎬 Audio ready for chunked video generation');
+        console.log('🎬 Starting chunked video generation (video contains audio)');
         
-        // Start chunked video generation
+        // Start chunked video generation - video will handle audio playback
         const imageUrl = avatarUrls[figureId];
         if (imageUrl) {
           chunkedVideo.generateChunkedVideo(
@@ -442,63 +444,21 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
               // Called when all chunks complete
               console.log('✅ All video chunks generated');
               setIsLoadingNextChunk(false);
+              // Audio ended when video ends
+              setIsPlayingAudio(false);
+              setCurrentSpeaker(null);
+              setCurrentAudioUrl(null);
+              setSpeakingFigureId(null);
+              setSpeakingFigureName(null);
             }
           );
+        } else {
+          console.error('No image URL for figure:', figureId);
+          throw new Error('No avatar image available');
         }
-        
-        // Initialize audio element if needed
-        if (!audioElementRef.current) {
-          audioElementRef.current = new Audio();
-          audioElementRef.current.crossOrigin = 'anonymous';
-        }
-
-        // Set up event handlers
-        audioElementRef.current.onplay = () => {
-          console.log('▶️ Audio playing:', figureName);
-          setIsPlayingAudio(true);
-          setIsStopped(false);
-          setCurrentSpeaker(figureId);
-        };
-
-        audioElementRef.current.onended = () => {
-          console.log('⏹️ Audio ended:', figureName);
-          setCurrentAudio(null);
-          setIsPlayingAudio(false);
-          setIsPaused(false);
-          setCurrentSpeaker(null);
-          setCurrentAudioUrl(null);
-          setSpeakingFigureId(null);
-          setSpeakingFigureName(null);
-        };
-
-        audioElementRef.current.onerror = (err) => {
-          console.error('❌ Audio error:', err);
-          setCurrentAudio(null);
-          setIsPlayingAudio(false);
-          setCurrentAudioUrl(null);
-          setSpeakingFigureId(null);
-          setSpeakingFigureName(null);
-        };
-
-        // Convert base64 to blob for playback
-        const byteCharacters = atob(data.audioContent);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
-        const playbackUrl = URL.createObjectURL(audioBlob);
-
-        // Set source and play
-        audioElementRef.current.src = playbackUrl;
-        setCurrentAudio(audioElementRef.current);
-        audioElementRef.current.load();
-        await audioElementRef.current.play();
-        console.log('🔊 Audio playing for:', figureName);
       }
     } catch (error) {
-      console.error('Error playing audio:', error);
+      console.error('Error generating video:', error);
       setCurrentAudio(null);
       setIsPlayingAudio(false);
       setCurrentAudioUrl(null);
@@ -555,16 +515,19 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   };
 
   const handleStopAudio = () => {
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-      setCurrentAudio(null);
-      setIsPlayingAudio(false);
-      setIsPaused(false);
-      setIsStopped(true);
-      setCurrentSpeaker(null);
-      console.log('⏹️ Audio stopped');
-    }
+    // Reset video generation state
+    chunkedVideo.reset();
+    setAllVideoUrls([]);
+    setIsLoadingNextChunk(false);
+    setSpeakingFigureId(null);
+    setSpeakingFigureName(null);
+    setCurrentAudioUrl(null);
+    setIsPlayingAudio(false);
+    setIsPaused(false);
+    setIsStopped(true);
+    setCurrentSpeaker(null);
+    console.log('⏹️ Stopped video/audio playback');
+    
     // Clear queue to prevent auto-playing next
     setAudioQueue([]);
     setIsProcessingQueue(false);
@@ -789,8 +752,14 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
                 total: chunkedVideo.totalChunks
               } : null}
               onVideoEnd={() => {
-                console.log('🎬 Debate video ended');
+                console.log('🎬 Debate video playback ended');
                 chunkedVideo.onVideoEnded();
+                // Reset speaking state when video ends
+                setIsPlayingAudio(false);
+                setCurrentSpeaker(null);
+                setSpeakingFigureId(null);
+                setSpeakingFigureName(null);
+                setCurrentAudioUrl(null);
               }}
             />
           </div>
