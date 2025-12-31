@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from './ui/card';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RealisticAvatarProps {
   imageUrl: string | null;
@@ -39,6 +40,35 @@ const RealisticAvatar = ({
   const [lastVideoUrl, setLastVideoUrl] = useState<string | null>(null);
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
+
+  // Fetch last successful video for this figure from database
+  useEffect(() => {
+    const fetchLastVideo = async () => {
+      if (!figureId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('video_jobs')
+          .select('video_url')
+          .eq('figure_id', figureId)
+          .eq('status', 'completed')
+          .not('video_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (!error && data?.video_url) {
+          console.log('📹 Found last video for figure:', data.video_url.substring(0, 60) + '...');
+          setLastVideoUrl(data.video_url);
+        }
+      } catch (err) {
+        // No previous video found, that's fine
+        console.log('No previous video found for figure');
+      }
+    };
+    
+    fetchLastVideo();
+  }, [figureId]);
 
   // Timer for video generation
   useEffect(() => {
@@ -113,13 +143,13 @@ const RealisticAvatar = ({
     }
   }, [videoUrl, videoError]);
 
-  // Reset state when figure changes
+  // Reset state when figure changes (lastVideoUrl is fetched in separate effect)
   useEffect(() => {
     setVideoError(false);
     lastAudioUrlRef.current = null;
     setIsPlayingAudio(false);
     setLoadingSeconds(0);
-    setLastVideoUrl(null);
+    // Don't clear lastVideoUrl here - it's fetched from DB in the figureId effect
   }, [figureId]);
 
   const handlePlayPause = () => {
