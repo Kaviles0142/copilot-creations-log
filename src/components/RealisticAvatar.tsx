@@ -38,6 +38,7 @@ const RealisticAvatar = ({
   const [videoError, setVideoError] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
   const [lastVideoUrl, setLastVideoUrl] = useState<string | null>(null);
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null); // Currently playing/showing video
 
   const isSpeaking = externalIsSpeaking || isPlayingAudio || isPlayingVideo;
 
@@ -132,16 +133,24 @@ const RealisticAvatar = ({
 
   // Play video when URL is available and track last video
   useEffect(() => {
-    if (videoRef.current && videoUrl && !videoError) {
-      console.log('🎬 Loading video:', videoUrl.substring(0, 60) + '...');
+    if (videoUrl) {
       setLastVideoUrl(videoUrl);
+      setActiveVideoUrl(videoUrl);
+    }
+  }, [videoUrl]);
+
+  // Handle video playback when activeVideoUrl changes
+  useEffect(() => {
+    if (videoRef.current && activeVideoUrl && !videoError) {
+      console.log('🎬 Loading video:', activeVideoUrl.substring(0, 60) + '...');
+      videoRef.current.src = activeVideoUrl;
       videoRef.current.load();
       videoRef.current.play().catch(err => {
         console.error('❌ Video autoplay failed:', err);
         setVideoError(true);
       });
     }
-  }, [videoUrl, videoError]);
+  }, [activeVideoUrl, videoError]);
 
   // Reset state when figure changes (lastVideoUrl is fetched in separate effect)
   useEffect(() => {
@@ -149,6 +158,7 @@ const RealisticAvatar = ({
     lastAudioUrlRef.current = null;
     setIsPlayingAudio(false);
     setLoadingSeconds(0);
+    setActiveVideoUrl(null); // Clear active video when switching figures
     // Don't clear lastVideoUrl here - it's fetched from DB in the figureId effect
   }, [figureId]);
 
@@ -166,19 +176,8 @@ const RealisticAvatar = ({
 
   const handleReplayLastVideo = () => {
     if (!lastVideoUrl) return;
-    
-    // If we have a video ref and video URL matches, just replay
-    if (videoRef.current && videoRef.current.src === lastVideoUrl) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(console.error);
-      setIsPlayingVideo(true);
-    } else if (videoRef.current) {
-      // Load and play the last video
-      videoRef.current.src = lastVideoUrl;
-      videoRef.current.load();
-      videoRef.current.play().catch(console.error);
-      setIsPlayingVideo(true);
-    }
+    setVideoError(false);
+    setActiveVideoUrl(lastVideoUrl); // This triggers the video display and playback
   };
 
   const handleReplay = () => {
@@ -235,12 +234,11 @@ const RealisticAvatar = ({
   }
 
   // Show video if available and no error with controls
-  if (videoUrl && !videoError) {
+  if (activeVideoUrl && !videoError) {
     return (
       <Card className="w-full max-w-md mx-auto aspect-square overflow-hidden relative">
         <video
           ref={videoRef}
-          src={videoUrl}
           autoPlay
           playsInline
           muted={false}
@@ -252,12 +250,15 @@ const RealisticAvatar = ({
           }}
           onEnded={() => {
             console.log('⏹️ Video ended');
+            console.log('⏹️ Video ended - clearing state');
             setIsPlayingVideo(false);
+            setActiveVideoUrl(null); // Return to static image after video ends
             onVideoEnd?.();
           }}
           onError={(e) => {
             console.error('❌ Video playback error:', e);
             setVideoError(true);
+            setActiveVideoUrl(null);
           }}
         />
         {/* Video controls in corner */}
