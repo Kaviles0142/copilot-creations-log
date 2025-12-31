@@ -15,6 +15,7 @@ const Index = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-center mb-2">Historical AI Experience</h1>
           <p className="text-muted-foreground text-center">Chat with history in their authentic voice</p>
+          <p className="text-xs text-muted-foreground text-center mt-1">Kimi K2 primary AI provider</p>
           
           <div className="flex justify-center gap-2 mt-4">
             <Button
