@@ -13,6 +13,7 @@ interface RealisticAvatarProps {
   isSpeaking?: boolean;
   figureName?: string;
   figureId?: string;
+  videoChunkProgress?: { current: number; total: number } | null;
   onVideoEnd?: () => void;
   onAudioEnd?: () => void;
 }
@@ -26,6 +27,7 @@ const RealisticAvatar = ({
   isSpeaking: externalIsSpeaking,
   figureName,
   figureId,
+  videoChunkProgress,
   onVideoEnd,
   onAudioEnd,
 }: RealisticAvatarProps) => {
@@ -206,7 +208,7 @@ const RealisticAvatar = ({
     );
   }
 
-  // Show generating overlay while video generates with timer
+  // Show generating overlay while video generates with timer and chunk progress
   if (isGeneratingVideo && !videoUrl) {
     return (
       <Card className={`w-full max-w-md mx-auto aspect-square overflow-hidden relative ${isSpeaking ? 'animate-speaking-glow' : ''}`}>
@@ -224,7 +226,11 @@ const RealisticAvatar = ({
         <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/60 px-3 py-2 rounded">
           <Loader2 className="w-4 h-4 animate-spin text-white" />
           <div className="text-right">
-            <span className="text-xs text-white/70 block">Generating video...</span>
+            <span className="text-xs text-white/70 block">
+              {videoChunkProgress 
+                ? `Generating chunk ${videoChunkProgress.current}/${videoChunkProgress.total}...` 
+                : 'Generating video...'}
+            </span>
             <span className="text-sm text-white font-bold">{loadingSeconds}s</span>
           </div>
         </div>

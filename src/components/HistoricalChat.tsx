@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { clearFigureMetadata } from "@/utils/clearCache";
 import { getFigureContext } from "@/utils/figureContextMapper";
+import { getChunkConfig, AudioChunk } from "@/utils/audioChunker";
 
 export interface Message {
   id: string;
@@ -109,9 +110,11 @@ const HistoricalChat = () => {
   const [greetingAudioUrl, setGreetingAudioUrl] = useState<string | null>(null); // For audio fallback
   const [greetingText, setGreetingText] = useState<string | null>(null);
   
-  // Video state - Ditto video generation
+  // Video state - Ditto video generation with chunking
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [videoQueue, setVideoQueue] = useState<string[]>([]);
+  const [videoChunkProgress, setVideoChunkProgress] = useState<{ current: number; total: number } | null>(null);
   
   // pendingResponse removed - now showing messages immediately while video generates
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -291,39 +294,11 @@ const HistoricalChat = () => {
 
       const greetingDataUrl = `data:audio/mpeg;base64,${audioResult.data.audioContent}`;
       
-      // Generate Ditto video instead of K2 frames
+      // Generate Ditto video (uses chunking for long audio)
       setIsGeneratingVideo(true);
-      console.log('🎬 Generating Ditto video...');
+      console.log('🎬 Generating Ditto video (with chunking support)...');
       
-      const { data: videoData, error: videoError } = await supabase.functions.invoke('ditto-generate-video', {
-        body: {
-          action: 'start',
-          imageUrl: imageUrl,
-          audioUrl: greetingDataUrl,
-          figureId: figure.id,
-          figureName: figure.name
-        }
-      });
-      
-      if (videoError) {
-        console.error('❌ Ditto API error:', videoError);
-        throw videoError;
-      }
-      
-      console.log('📋 Ditto response:', videoData);
-      
-      // Check if video is ready immediately
-      if (videoData.status === 'completed' && videoData.video) {
-        console.log('✅ Video ready immediately:', videoData.video);
-        setIsGeneratingVideo(false);
-        setCurrentVideoUrl(videoData.video);
-      } else if (videoData.status === 'processing' && videoData.jobId) {
-        // Poll for video completion - pass audio URL for duration estimation
-        console.log('⏳ Video processing, polling for job:', videoData.jobId);
-        await pollForVideoCompletion(videoData.jobId, greetingDataUrl, greetingDataUrl);
-      } else {
-        throw new Error('Unexpected video generation response');
-      }
+      await generateChunkedVideo(greetingDataUrl, imageUrl, figure.id, figure.name);
       
     } catch (error) {
       console.error('❌ Error in avatar/greeting:', error);
@@ -342,7 +317,7 @@ const HistoricalChat = () => {
   };
   
   // Poll for Ditto video completion - scale timeout based on audio length
-  const pollForVideoCompletion = async (jobId: string, fallbackAudioUrl: string, audioDataUrl?: string) => {
+  const pollForVideoCompletion = async (jobId: string, fallbackAudioUrl: string, audioDataUrl?: string): Promise<string | null> => {
     // Estimate audio duration from base64 size (rough: base64 is ~1.33x raw, mp3 ~16kbps = 2KB/sec)
     let estimatedDurationSec = 30; // Default 30 seconds
     if (audioDataUrl?.startsWith('data:')) {
@@ -370,9 +345,7 @@ const HistoricalChat = () => {
         
         if (data.status === 'completed' && data.video) {
           console.log('✅ Video ready:', data.video);
-          setIsGeneratingVideo(false);
-          setCurrentVideoUrl(data.video);
-          return;
+          return data.video;
         }
         
         if (data.status === 'failed') {
@@ -387,11 +360,183 @@ const HistoricalChat = () => {
       }
     }
     
-    // Timeout or error - fall back to audio
-    console.log('⚠️ Video polling failed, falling back to audio');
-    setIsGeneratingVideo(false);
-    setGreetingAudioUrl(fallbackAudioUrl);
+    // Timeout or error
+    console.log('⚠️ Video polling failed');
+    return null;
   };
+  
+  // Generate chunked video - splits long audio into 30s segments
+  const generateChunkedVideo = async (
+    audioDataUrl: string, 
+    imageUrl: string, 
+    figureId: string, 
+    figureName: string
+  ) => {
+    const { shouldChunk, chunks, totalDuration } = getChunkConfig(audioDataUrl);
+    
+    console.log(`🎬 Video generation: ${chunks.length} chunk(s), ~${totalDuration.toFixed(0)}s total`);
+    
+    if (!shouldChunk) {
+      // Single chunk - use existing flow
+      return generateSingleVideo(chunks[0].dataUrl, imageUrl, figureId, figureName);
+    }
+    
+    // Multiple chunks - process in parallel batches of 2
+    setVideoChunkProgress({ current: 0, total: chunks.length });
+    const MAX_CONCURRENT = 2;
+    const videoUrls: (string | null)[] = new Array(chunks.length).fill(null);
+    let nextToStart = 0;
+    let nextToPlay = 0;
+    const activeJobs: Map<number, string> = new Map();
+    
+    // Start initial batch
+    const startChunk = async (chunk: AudioChunk): Promise<string | null> => {
+      try {
+        console.log(`🎬 Starting chunk ${chunk.index + 1}/${chunks.length}...`);
+        const { data, error } = await supabase.functions.invoke('ditto-generate-video', {
+          body: {
+            action: 'start',
+            imageUrl,
+            audioUrl: chunk.dataUrl,
+            figureId,
+            figureName: `${figureName}_chunk${chunk.index}`
+          }
+        });
+        
+        if (error) throw error;
+        
+        if (data.status === 'completed' && data.video) {
+          return data.video;
+        }
+        
+        if (data.jobId) {
+          activeJobs.set(chunk.index, data.jobId);
+          return null; // Will be polled
+        }
+        
+        throw new Error('No job ID returned');
+      } catch (err) {
+        console.error(`❌ Chunk ${chunk.index} start error:`, err);
+        return null;
+      }
+    };
+    
+    // Start first batch
+    while (nextToStart < chunks.length && activeJobs.size < MAX_CONCURRENT) {
+      const result = await startChunk(chunks[nextToStart]);
+      if (result) {
+        videoUrls[nextToStart] = result;
+      }
+      nextToStart++;
+    }
+    
+    // Process until all chunks are done
+    while (nextToPlay < chunks.length) {
+      // Check if next chunk to play is ready
+      if (videoUrls[nextToPlay]) {
+        console.log(`▶️ Playing chunk ${nextToPlay + 1}/${chunks.length}`);
+        setVideoChunkProgress({ current: nextToPlay + 1, total: chunks.length });
+        
+        // Play immediately if it's the first one
+        if (nextToPlay === 0) {
+          setIsGeneratingVideo(false);
+          setCurrentVideoUrl(videoUrls[nextToPlay]);
+        } else {
+          // Queue for sequential playback
+          setVideoQueue(prev => [...prev, videoUrls[nextToPlay]!]);
+        }
+        
+        nextToPlay++;
+        
+        // Start next chunk if available
+        if (nextToStart < chunks.length) {
+          const result = await startChunk(chunks[nextToStart]);
+          if (result) {
+            videoUrls[nextToStart] = result;
+          }
+          nextToStart++;
+        }
+        continue;
+      }
+      
+      // Poll active jobs
+      for (const [index, jobId] of activeJobs) {
+        const videoUrl = await pollForVideoCompletion(jobId, '', chunks[index].dataUrl);
+        if (videoUrl) {
+          videoUrls[index] = videoUrl;
+          activeJobs.delete(index);
+        }
+      }
+      
+      // Small delay before next check
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.log('✅ All chunks completed');
+    setVideoChunkProgress(null);
+  };
+  
+  // Generate single video (existing flow extracted)
+  const generateSingleVideo = async (
+    audioDataUrl: string,
+    imageUrl: string,
+    figureId: string,
+    figureName: string
+  ) => {
+    try {
+      const { data: videoData, error: videoError } = await supabase.functions.invoke('ditto-generate-video', {
+        body: {
+          action: 'start',
+          imageUrl,
+          audioUrl: audioDataUrl,
+          figureId,
+          figureName
+        }
+      });
+      
+      if (videoError) {
+        console.error('❌ Ditto API error:', videoError);
+        throw videoError;
+      }
+      
+      console.log('📋 Ditto response:', videoData);
+      
+      if (videoData.status === 'completed' && videoData.video) {
+        console.log('✅ Video ready immediately:', videoData.video);
+        setIsGeneratingVideo(false);
+        setCurrentVideoUrl(videoData.video);
+      } else if (videoData.status === 'processing' && videoData.jobId) {
+        console.log('⏳ Video processing, polling for job:', videoData.jobId);
+        const videoUrl = await pollForVideoCompletion(videoData.jobId, audioDataUrl, audioDataUrl);
+        if (videoUrl) {
+          setIsGeneratingVideo(false);
+          setCurrentVideoUrl(videoUrl);
+        } else {
+          throw new Error('Video generation timed out');
+        }
+      } else {
+        throw new Error('Unexpected video generation response');
+      }
+    } catch (error) {
+      console.error('❌ Video generation error:', error);
+      setIsGeneratingVideo(false);
+      throw error;
+    }
+  };
+  
+  // Handle video ending - play next in queue
+  const handleVideoEnd = useCallback(() => {
+    setVideoQueue(prev => {
+      if (prev.length > 0) {
+        const [next, ...rest] = prev;
+        console.log(`▶️ Playing next queued video (${rest.length} remaining)`);
+        setCurrentVideoUrl(next);
+        return rest;
+      }
+      setCurrentVideoUrl(null);
+      return [];
+    });
+  }, []);
   
   // Helper to play audio when video fails
   const playAudioFallback = async (audioDataUrl: string) => {
@@ -1066,37 +1211,9 @@ const HistoricalChat = () => {
 
           const audioDataUrl = `data:audio/mpeg;base64,${ttsResult.data.audioContent}`;
           
-          // Now generate Ditto video with the audio
-          console.log('🎬 Generating Ditto video for chat response...');
-          const { data: videoData, error: videoError } = await supabase.functions.invoke('ditto-generate-video', {
-            body: {
-              action: 'start',
-              imageUrl: avatarImageUrl,
-              audioUrl: audioDataUrl,
-              figureId: selectedFigure!.id,
-              figureName: selectedFigure!.name
-            }
-          });
-          
-          if (videoError) {
-            console.error('❌ Ditto API error:', videoError);
-            throw videoError;
-          }
-          
-          console.log('📋 Ditto response:', videoData);
-          
-          // Check if video is ready immediately
-          if (videoData.status === 'completed' && videoData.video) {
-            console.log('✅ Video ready immediately:', videoData.video);
-            setIsGeneratingVideo(false);
-            setCurrentVideoUrl(videoData.video);
-          } else if (videoData.status === 'processing' && videoData.jobId) {
-            // Poll for video completion - pass audio URL for duration estimation
-            console.log('⏳ Video processing, polling for job:', videoData.jobId);
-            await pollForVideoCompletion(videoData.jobId, audioDataUrl, audioDataUrl);
-          } else {
-            throw new Error('Unexpected video generation response');
-          }
+          // Generate Ditto video (uses chunking for long audio)
+          console.log('🎬 Generating Ditto video for chat response (with chunking support)...');
+          await generateChunkedVideo(audioDataUrl, avatarImageUrl, selectedFigure!.id, selectedFigure!.name);
           
         } catch (error) {
           console.error('❌ TTS/Video error:', error);
@@ -1929,12 +2046,18 @@ const HistoricalChat = () => {
               figureName={selectedFigure.name}
               figureId={selectedFigure.id}
               onVideoEnd={() => {
-                console.log('⏹️ Video ended - clearing state');
-                setIsSpeaking(false);
-                setIsPlayingAudio(false);
-                setIsGreetingPlaying(false);
-                setCurrentVideoUrl(null);
+                console.log('⏹️ Video ended - checking queue');
+                // Check if there are queued videos to play
+                if (videoQueue.length > 0) {
+                  handleVideoEnd();
+                } else {
+                  setIsSpeaking(false);
+                  setIsPlayingAudio(false);
+                  setIsGreetingPlaying(false);
+                  setCurrentVideoUrl(null);
+                }
               }}
+              videoChunkProgress={videoChunkProgress}
               onAudioEnd={() => {
                 console.log('⏹️ Audio ended - clearing state');
                 setIsSpeaking(false);
