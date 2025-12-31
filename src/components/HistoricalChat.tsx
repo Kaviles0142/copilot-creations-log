@@ -318,9 +318,9 @@ const HistoricalChat = () => {
         setIsGeneratingVideo(false);
         setCurrentVideoUrl(videoData.video);
       } else if (videoData.status === 'processing' && videoData.jobId) {
-        // Poll for video completion
+        // Poll for video completion - pass audio URL for duration estimation
         console.log('⏳ Video processing, polling for job:', videoData.jobId);
-        await pollForVideoCompletion(videoData.jobId, greetingDataUrl);
+        await pollForVideoCompletion(videoData.jobId, greetingDataUrl, greetingDataUrl);
       } else {
         throw new Error('Unexpected video generation response');
       }
@@ -341,10 +341,22 @@ const HistoricalChat = () => {
     }
   };
   
-  // Poll for Ditto video completion
-  const pollForVideoCompletion = async (jobId: string, fallbackAudioUrl: string) => {
-    const maxAttempts = 60;
-    const pollInterval = 3000;
+  // Poll for Ditto video completion - scale timeout based on audio length
+  const pollForVideoCompletion = async (jobId: string, fallbackAudioUrl: string, audioDataUrl?: string) => {
+    // Estimate audio duration from base64 size (rough: base64 is ~1.33x raw, mp3 ~16kbps = 2KB/sec)
+    let estimatedDurationSec = 30; // Default 30 seconds
+    if (audioDataUrl?.startsWith('data:')) {
+      const base64Part = audioDataUrl.split(',')[1] || '';
+      const estimatedBytes = base64Part.length * 0.75; // Base64 to raw bytes
+      estimatedDurationSec = Math.max(10, estimatedBytes / 2000); // MP3 ~2KB per second
+    }
+    
+    // Scale polling: longer audio = more attempts and longer intervals
+    const pollInterval = Math.max(3000, Math.min(10000, estimatedDurationSec * 100)); // 3-10 seconds
+    const maxWaitTime = Math.max(180000, estimatedDurationSec * 5000); // At least 3 min, or 5x audio length
+    const maxAttempts = Math.ceil(maxWaitTime / pollInterval);
+    
+    console.log(`⏳ Polling config: ${maxAttempts} attempts, ${pollInterval}ms interval for ~${estimatedDurationSec.toFixed(0)}s audio`);
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       console.log(`🔄 Polling video status (${attempt}/${maxAttempts})...`);
@@ -1079,9 +1091,9 @@ const HistoricalChat = () => {
             setIsGeneratingVideo(false);
             setCurrentVideoUrl(videoData.video);
           } else if (videoData.status === 'processing' && videoData.jobId) {
-            // Poll for video completion
+            // Poll for video completion - pass audio URL for duration estimation
             console.log('⏳ Video processing, polling for job:', videoData.jobId);
-            await pollForVideoCompletion(videoData.jobId, audioDataUrl);
+            await pollForVideoCompletion(videoData.jobId, audioDataUrl, audioDataUrl);
           } else {
             throw new Error('Unexpected video generation response');
           }

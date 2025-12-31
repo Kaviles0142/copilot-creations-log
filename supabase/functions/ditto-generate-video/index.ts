@@ -258,14 +258,18 @@ serve(async (req) => {
       .eq("id", jobId);
 
     // Call Ditto generate endpoint (with retry/backoff for transient 524 timeouts)
-    // Use more retries for longer audio
-    const maxRetries = estimatedDurationSec > 15 ? 5 : 3;
+    // Scale retries and delays based on audio length - longer audio needs more time
+    const maxRetries = Math.max(5, Math.ceil(estimatedDurationSec / 10)); // At least 5 retries, +1 per 10 seconds
+    const baseDelay = Math.max(5000, estimatedDurationSec * 200); // At least 5s, scale with audio
+    const maxDelay = Math.max(30000, estimatedDurationSec * 1000); // At least 30s, scale with audio
+    console.log(`⏳ Using ${maxRetries} retries, baseDelay: ${baseDelay}ms, maxDelay: ${maxDelay}ms for ${estimatedDurationSec.toFixed(1)}s audio`);
+    
     const response = await fetchWithRetry(
       () => fetch(`${getDittoApiUrl()}/generate`, {
         method: "POST",
         body: buildFormData(),
       }),
-      { attempts: maxRetries, baseDelayMs: 3000, maxDelayMs: 20000, label: 'generate' }
+      { attempts: maxRetries, baseDelayMs: baseDelay, maxDelayMs: maxDelay, label: 'generate' }
     );
 
     if (!response.ok) {
