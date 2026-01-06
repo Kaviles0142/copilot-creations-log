@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,9 +32,16 @@ interface Room {
   created_at: string;
 }
 
+interface LocationState {
+  figures?: string[];
+}
+
 const Room = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState | null;
+  
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +49,7 @@ const Room = () => {
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const [figures, setFigures] = useState<string[]>(state?.figures || []);
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -114,8 +122,8 @@ const Room = () => {
     );
   }
 
-  const figureName = room.figure_name || 'AI Assistant';
-  const guestName = 'Guest';
+  const displayFigures = figures.length > 0 ? figures : (room.figure_name ? [room.figure_name] : ['AI Assistant']);
+  const guestName = 'You';
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -127,7 +135,9 @@ const Room = () => {
             <div className="w-3 h-3 rounded-full bg-yellow-500" />
             <div className="w-3 h-3 rounded-full bg-green-500" />
           </div>
-          <span className="text-foreground text-sm font-medium">{figureName}</span>
+          <span className="text-foreground text-sm font-medium">
+            {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} participants`}
+          </span>
         </div>
         <span className="text-xs text-muted-foreground font-mono">{room.room_code}</span>
       </header>
@@ -137,30 +147,32 @@ const Room = () => {
         {/* Main Area */}
         <main className="flex-1 flex flex-col overflow-hidden p-4">
           {/* Video Tiles */}
-          <div className="flex-shrink-0 flex justify-center gap-3 mb-4">
-            {/* Figure Tile */}
+          <div className="flex-shrink-0 flex justify-center gap-3 mb-4 flex-wrap">
+            {/* Guest (You) Tile */}
             <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                  <User className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                <span className="text-foreground text-xs font-medium">{figureName}</span>
-              </div>
-            </div>
-
-            {/* Guest Tile */}
-            <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                  <User className="w-5 h-5 text-muted-foreground" />
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary" />
                 </div>
               </div>
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                 <span className="text-foreground text-xs font-medium">{guestName}</span>
               </div>
             </div>
+
+            {/* Figure Tiles */}
+            {displayFigures.map((figure, index) => (
+              <div key={index} className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <User className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
+                  <span className="text-foreground text-xs font-medium truncate block">{figure}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Content Area */}
@@ -170,8 +182,15 @@ const Room = () => {
                 Conversation with
               </h1>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
-                {figureName}
+                {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Figures`}
               </h2>
+              <div className="flex flex-wrap justify-center gap-2 mt-4">
+                {displayFigures.map((figure, index) => (
+                  <Badge key={index} variant="secondary" className="text-sm">
+                    {figure}
+                  </Badge>
+                ))}
+              </div>
               <p className="text-muted-foreground mt-6">
                 Voice conversation coming soon...
               </p>
