@@ -89,10 +89,117 @@ const Join = () => {
     };
   }, []);
 
-  const addParticipant = () => {
-    const trimmed = participantInput.trim();
-    if (trimmed && !participants.includes(trimmed)) {
-      setParticipants([...participants, trimmed]);
+  // Normalize and format a historical figure name
+  const normalizeFigureName = (input: string): string => {
+    const trimmed = input.trim().toLowerCase();
+    if (!trimmed) return '';
+
+    // Common historical figure name mappings (nicknames, partial names, typos)
+    const knownFigures: Record<string, string> = {
+      // Sports
+      'lebron': 'LeBron James',
+      'lebron james': 'LeBron James',
+      'mj': 'Michael Jordan',
+      'michael jordan': 'Michael Jordan',
+      'kobe': 'Kobe Bryant',
+      'kobe bryant': 'Kobe Bryant',
+      'ali': 'Muhammad Ali',
+      'muhammad ali': 'Muhammad Ali',
+      
+      // Scientists
+      'einstein': 'Albert Einstein',
+      'albert einstein': 'Albert Einstein',
+      'newton': 'Isaac Newton',
+      'isaac newton': 'Isaac Newton',
+      'darwin': 'Charles Darwin',
+      'charles darwin': 'Charles Darwin',
+      'tesla': 'Nikola Tesla',
+      'nikola tesla': 'Nikola Tesla',
+      'curie': 'Marie Curie',
+      'marie curie': 'Marie Curie',
+      'hawking': 'Stephen Hawking',
+      'stephen hawking': 'Stephen Hawking',
+      
+      // Artists & Writers
+      'da vinci': 'Leonardo da Vinci',
+      'davinci': 'Leonardo da Vinci',
+      'leonardo': 'Leonardo da Vinci',
+      'leonardo da vinci': 'Leonardo da Vinci',
+      'shakespeare': 'William Shakespeare',
+      'william shakespeare': 'William Shakespeare',
+      'picasso': 'Pablo Picasso',
+      'pablo picasso': 'Pablo Picasso',
+      'van gogh': 'Vincent van Gogh',
+      'vincent van gogh': 'Vincent van Gogh',
+      'beethoven': 'Ludwig van Beethoven',
+      'ludwig van beethoven': 'Ludwig van Beethoven',
+      'mozart': 'Wolfgang Amadeus Mozart',
+      'wolfgang amadeus mozart': 'Wolfgang Amadeus Mozart',
+      
+      // Leaders & Politicians
+      'napoleon': 'Napoleon Bonaparte',
+      'napoleon bonaparte': 'Napoleon Bonaparte',
+      'lincoln': 'Abraham Lincoln',
+      'abraham lincoln': 'Abraham Lincoln',
+      'mlk': 'Martin Luther King Jr.',
+      'martin luther king': 'Martin Luther King Jr.',
+      'martin luther king jr': 'Martin Luther King Jr.',
+      'gandhi': 'Mahatma Gandhi',
+      'mahatma gandhi': 'Mahatma Gandhi',
+      'mandela': 'Nelson Mandela',
+      'nelson mandela': 'Nelson Mandela',
+      'churchill': 'Winston Churchill',
+      'winston churchill': 'Winston Churchill',
+      'jfk': 'John F. Kennedy',
+      'kennedy': 'John F. Kennedy',
+      'john f kennedy': 'John F. Kennedy',
+      
+      // Historical Figures
+      'cleopatra': 'Cleopatra VII',
+      'caesar': 'Julius Caesar',
+      'julius caesar': 'Julius Caesar',
+      'alexander': 'Alexander the Great',
+      'alexander the great': 'Alexander the Great',
+      'socrates': 'Socrates',
+      'plato': 'Plato',
+      'aristotle': 'Aristotle',
+      
+      // Entrepreneurs & Innovators
+      'jobs': 'Steve Jobs',
+      'steve jobs': 'Steve Jobs',
+      'elon': 'Elon Musk',
+      'elon musk': 'Elon Musk',
+      'gates': 'Bill Gates',
+      'bill gates': 'Bill Gates',
+    };
+
+    // Check if we have a known mapping
+    if (knownFigures[trimmed]) {
+      return knownFigures[trimmed];
+    }
+
+    // Otherwise, title case the input
+    return input.trim()
+      .split(' ')
+      .map(word => {
+        // Handle special cases like "da", "van", "von", "de"
+        const lowercase = ['da', 'van', 'von', 'de', 'the', 'of'];
+        if (lowercase.includes(word.toLowerCase())) {
+          return word.toLowerCase();
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
+  const addParticipant = (inputOverride?: string) => {
+    const raw = typeof inputOverride === 'string' ? inputOverride : participantInput;
+    const normalized = normalizeFigureName(raw);
+    if (normalized && !participants.some(p => p.toLowerCase() === normalized.toLowerCase())) {
+      setParticipants([...participants, normalized]);
+      setParticipantInput('');
+    } else if (normalized) {
+      // Already exists, just clear input
       setParticipantInput('');
     }
   };
@@ -102,7 +209,20 @@ const Join = () => {
   };
 
   const handleStart = async () => {
-    if (participants.length === 0) {
+    // Process any pending input first
+    let finalParticipants = [...participants];
+    const pendingInput = participantInput.trim();
+    if (pendingInput) {
+      const normalized = normalizeFigureName(pendingInput);
+      if (normalized && !finalParticipants.some(p => p.toLowerCase() === normalized.toLowerCase())) {
+        finalParticipants = [...finalParticipants, normalized];
+      }
+      setParticipantInput('');
+    }
+    
+    setParticipants(finalParticipants);
+
+    if (finalParticipants.length === 0) {
       setError('Please add at least one historical figure');
       return;
     }
@@ -133,7 +253,7 @@ const Join = () => {
       // Pass figures as state to the room
       navigate(`/rooms/${data.room_code}`, { 
         replace: true,
-        state: { figures: participants }
+        state: { figures: finalParticipants }
       });
     } catch (err) {
       console.error('Error creating room:', err);
@@ -260,7 +380,7 @@ const Join = () => {
               <Button 
                 variant="secondary" 
                 size="sm" 
-                onClick={addParticipant}
+                onClick={() => addParticipant()}
                 className="h-7 px-2.5 text-xs"
               >
                 Add
