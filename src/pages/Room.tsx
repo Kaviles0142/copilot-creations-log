@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +35,6 @@ interface Room {
 const Room = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +79,7 @@ const Room = () => {
   }, [roomCode]);
 
   const handleEndCall = () => {
-    navigate('/dashboard');
+    navigate('/join');
   };
 
   const handleSendMessage = () => {
@@ -108,8 +106,8 @@ const Room = () => {
           <p className="text-muted-foreground mb-6">
             This room may have expired or doesn't exist.
           </p>
-          <Button onClick={() => navigate('/dashboard')} className="bg-hero-gradient hover:opacity-90">
-            Back to Dashboard
+          <Button onClick={() => navigate('/join')} className="bg-hero-gradient hover:opacity-90">
+            Back to Join
           </Button>
         </div>
       </div>
@@ -117,7 +115,7 @@ const Room = () => {
   }
 
   const figureName = room.figure_name || 'AI Assistant';
-  const guestName = user?.email?.split('@')[0] || 'Guest';
+  const guestName = 'Guest';
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">

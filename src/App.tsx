@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Join from "./pages/Join";
 import Room from "./pages/Room";
+import OldApp from "./pages/OldApp";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,9 @@ const App = () => (
           {/* Rooms */}
           <Route path="/join" element={<Join />} />
           <Route path="/rooms/:roomCode" element={<Room />} />
+          
+          {/* Legacy App for reference */}
+          <Route path="/old" element={<OldApp />} />
           
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
