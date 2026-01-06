@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Search, MessageSquare, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface Profile {
   display_name: string | null;
@@ -23,6 +23,7 @@ const suggestedFigures = [
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFigures, setSelectedFigures] = useState<string[]>([]);
@@ -65,8 +66,7 @@ const Dashboard = () => {
   };
 
   const handleStartConversation = () => {
-    // Navigate to conversation with selected figures
-    console.log("Starting conversation with:", selectedFigures);
+    navigate('/join');
   };
 
   return (

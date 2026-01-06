@@ -673,6 +673,42 @@ export type Database = {
         }
         Relationships: []
       }
+      rooms: {
+        Row: {
+          created_at: string
+          figure_id: string | null
+          figure_name: string | null
+          guest_id: string | null
+          id: string
+          room_code: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          figure_id?: string | null
+          figure_name?: string | null
+          guest_id?: string | null
+          id?: string
+          room_code?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          figure_id?: string | null
+          figure_name?: string | null
+          guest_id?: string | null
+          id?: string
+          room_code?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       serpapi_cache: {
         Row: {
           created_at: string | null
