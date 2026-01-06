@@ -9,7 +9,7 @@ import ChatMessages from "./ChatMessages";
 import RealisticAvatar from "./RealisticAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useChunkedVideoGeneration } from "@/hooks/useChunkedVideoGeneration";
+import { useTalkingVideo } from "@/hooks/useTalkingVideo";
 
 
 export interface Message {
@@ -99,9 +99,29 @@ const PodcastMode = () => {
   
   const { toast } = useToast();
   
-  // Chunked video generation hooks - one for each speaker
-  const hostChunkedVideo = useChunkedVideoGeneration();
-  const guestChunkedVideo = useChunkedVideoGeneration();
+  // Video generation hooks - one for each speaker (simplified - no chunking)
+  const hostTalkingVideo = useTalkingVideo({
+    onVideoReady: (videoUrl) => {
+      console.log('📹 Host video ready');
+      setHostAllVideoUrls(prev => [...prev, videoUrl]);
+      setIsLoadingNextChunk(false);
+    },
+    onError: (error) => {
+      console.error('❌ Host video generation failed:', error);
+      setIsLoadingNextChunk(false);
+    }
+  });
+  const guestTalkingVideo = useTalkingVideo({
+    onVideoReady: (videoUrl) => {
+      console.log('📹 Guest video ready');
+      setGuestAllVideoUrls(prev => [...prev, videoUrl]);
+      setIsLoadingNextChunk(false);
+    },
+    onError: (error) => {
+      console.error('❌ Guest video generation failed:', error);
+      setIsLoadingNextChunk(false);
+    }
+  });
 
   // Azure voice options filtered by gender
   const azureVoices = {
@@ -851,35 +871,15 @@ const PodcastMode = () => {
 
       const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
       
-      console.log('🎬 Audio ready, starting chunked video generation...');
+      console.log('🎬 Audio ready, starting video generation...');
       
       // Get avatar URL for the speaker
       const imageUrl = speaker === 'host' ? hostAvatarUrl : guestAvatarUrl;
-      const chunkedVideo = speaker === 'host' ? hostChunkedVideo : guestChunkedVideo;
-      const setAllVideoUrls = speaker === 'host' ? setHostAllVideoUrls : setGuestAllVideoUrls;
-      const setVideoUrl = speaker === 'host' ? setHostVideoUrl : setGuestVideoUrl;
+      const talkingVideo = speaker === 'host' ? hostTalkingVideo : guestTalkingVideo;
       
       if (imageUrl) {
-        // Start chunked video generation
-        chunkedVideo.generateChunkedVideo(
-          imageUrl,
-          audioDataUrl,
-          figureId,
-          figureName,
-          (videoUrl) => {
-            // Called when each chunk is ready
-            console.log(`📹 ${speaker} video chunk ready`);
-            setAllVideoUrls(prev => [...prev, videoUrl]);
-            setVideoUrl(videoUrl);
-            setIsLoadingNextChunk(chunkedVideo.isGenerating);
-          },
-          () => {
-            // Called when all chunks complete
-            console.log(`✅ All ${speaker} video chunks generated`);
-            setIsGeneratingVideo(false);
-            setIsLoadingNextChunk(false);
-          }
-        );
+        // Start video generation
+        talkingVideo.generateVideo(imageUrl, audioDataUrl, figureId, figureName);
       } else {
         // No avatar URL, fall back to audio-only
         setIsGeneratingVideo(false);
@@ -1234,19 +1234,16 @@ const PodcastMode = () => {
                 <RealisticAvatar
                   imageUrl={hostAvatarUrl}
                   isLoading={isLoadingHostAvatar}
-                  videoUrl={hostVideoUrl}
-                  isGeneratingVideo={isGeneratingVideo && currentVideoSpeaker === 'host'}
+                  videoUrl={hostTalkingVideo.videoUrl || hostVideoUrl}
+                  isGeneratingVideo={hostTalkingVideo.isGenerating || (isGeneratingVideo && currentVideoSpeaker === 'host')}
                   figureName={host.name}
                   figureId={host.id}
                   allVideoUrls={hostAllVideoUrls}
                   isLoadingNextChunk={isLoadingNextChunk && currentVideoSpeaker === 'host'}
-                  videoChunkProgress={hostChunkedVideo.totalChunks > 1 ? {
-                    current: hostChunkedVideo.currentChunkIndex + 1,
-                    total: hostChunkedVideo.totalChunks
-                  } : null}
+                  videoChunkProgress={null}
                   onVideoEnd={() => {
                     console.log('🎬 Host video ended');
-                    hostChunkedVideo.onVideoEnded();
+                    setIsPlayingVideo(false);
                   }}
                 />
                 <Select
@@ -1274,19 +1271,16 @@ const PodcastMode = () => {
                 <RealisticAvatar
                   imageUrl={guestAvatarUrl}
                   isLoading={isLoadingGuestAvatar}
-                  videoUrl={guestVideoUrl}
-                  isGeneratingVideo={isGeneratingVideo && currentVideoSpeaker === 'guest'}
+                  videoUrl={guestTalkingVideo.videoUrl || guestVideoUrl}
+                  isGeneratingVideo={guestTalkingVideo.isGenerating || (isGeneratingVideo && currentVideoSpeaker === 'guest')}
                   figureName={guest.name}
                   figureId={guest.id}
                   allVideoUrls={guestAllVideoUrls}
                   isLoadingNextChunk={isLoadingNextChunk && currentVideoSpeaker === 'guest'}
-                  videoChunkProgress={guestChunkedVideo.totalChunks > 1 ? {
-                    current: guestChunkedVideo.currentChunkIndex + 1,
-                    total: guestChunkedVideo.totalChunks
-                  } : null}
+                  videoChunkProgress={null}
                   onVideoEnd={() => {
                     console.log('🎬 Guest video ended');
-                    guestChunkedVideo.onVideoEnded();
+                    setIsPlayingVideo(false);
                   }}
                 />
                 <Select

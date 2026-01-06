@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useChunkedVideoGeneration } from "@/hooks/useChunkedVideoGeneration";
+import { useTalkingVideo } from "@/hooks/useTalkingVideo";
 
 interface Figure {
   id: string;
@@ -88,8 +88,21 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
   
-  // Chunked video generation hook
-  const chunkedVideo = useChunkedVideoGeneration();
+  // Video generation hook (simplified - no chunking)
+  const talkingVideo = useTalkingVideo({
+    figureName: speakingFigureName || undefined,
+    onVideoReady: (videoUrl) => {
+      console.log('📹 Video ready');
+      setAllVideoUrls(prev => [...prev, videoUrl]);
+      setIsLoadingNextChunk(false);
+    },
+    onError: (error) => {
+      console.error('❌ Video generation failed:', error);
+      setIsLoadingNextChunk(false);
+      setIsPlayingAudio(false);
+      setCurrentSpeaker(null);
+    }
+  });
 
   // Azure voice options filtered by gender
   const azureVoices = {
@@ -424,34 +437,12 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
         // Create data URL for video generation
         const audioDataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
         setCurrentAudioUrl(audioDataUrl);
-        console.log('🎬 Starting chunked video generation (video contains audio)');
+        console.log('🎬 Starting video generation (video contains audio)');
         
-        // Start chunked video generation - video will handle audio playback
+        // Start video generation - video will handle audio playback
         const imageUrl = avatarUrls[figureId];
         if (imageUrl) {
-          chunkedVideo.generateChunkedVideo(
-            imageUrl,
-            audioDataUrl,
-            figureId,
-            figureName,
-            (videoUrl) => {
-              // Called when each chunk is ready
-              console.log('📹 Video chunk ready');
-              setAllVideoUrls(prev => [...prev, videoUrl]);
-              setIsLoadingNextChunk(chunkedVideo.isGenerating);
-            },
-            () => {
-              // Called when all chunks complete
-              console.log('✅ All video chunks generated');
-              setIsLoadingNextChunk(false);
-              // Audio ended when video ends
-              setIsPlayingAudio(false);
-              setCurrentSpeaker(null);
-              setCurrentAudioUrl(null);
-              setSpeakingFigureId(null);
-              setSpeakingFigureName(null);
-            }
-          );
+          talkingVideo.generateVideo(imageUrl, audioDataUrl, figureId, figureName);
         } else {
           console.error('No image URL for figure:', figureId);
           throw new Error('No avatar image available');
@@ -516,7 +507,7 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
 
   const handleStopAudio = () => {
     // Reset video generation state
-    chunkedVideo.reset();
+    talkingVideo.reset();
     setAllVideoUrls([]);
     setIsLoadingNextChunk(false);
     setSpeakingFigureId(null);
@@ -742,18 +733,14 @@ export default function DebateArena({ sessionId, topic, figures, format, languag
               imageUrl={speakingFigureId ? avatarUrls[speakingFigureId] : (figures[0] ? avatarUrls[figures[0].id] : null)}
               figureName={speakingFigureName || figures[0]?.name}
               figureId={speakingFigureId || figures[0]?.id}
-              isGeneratingVideo={chunkedVideo.isGenerating}
-              videoUrl={allVideoUrls[allVideoUrls.length - 1] || null}
+              isGeneratingVideo={talkingVideo.isGenerating}
+              videoUrl={talkingVideo.videoUrl || allVideoUrls[allVideoUrls.length - 1] || null}
               allVideoUrls={allVideoUrls}
               isLoadingNextChunk={isLoadingNextChunk}
               isSpeaking={isPlayingAudio}
-              videoChunkProgress={chunkedVideo.totalChunks > 1 ? {
-                current: chunkedVideo.currentChunkIndex + 1,
-                total: chunkedVideo.totalChunks
-              } : null}
+              videoChunkProgress={null}
               onVideoEnd={() => {
                 console.log('🎬 Debate video playback ended');
-                chunkedVideo.onVideoEnded();
                 // Reset speaking state when video ends
                 setIsPlayingAudio(false);
                 setCurrentSpeaker(null);

@@ -6,65 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Ditto API endpoint - hardcoded to new RunPod endpoint
-const DITTO_API_URL = 'https://kkrom2i7drv27i-8000.proxy.runpod.net';
-
-const getDittoApiUrl = () => DITTO_API_URL;
+// RunPod InfiniteTalk API endpoint
+const RUNPOD_API_URL = 'https://api.runpod.ai/v2/h1iotgppuh4nvm';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const isRetryableDittoStatus = (status: number) => {
-  // Cloudflare / transient gateway errors (including RunPod cold start)
-  return [408, 425, 429, 500, 502, 503, 504, 524].includes(status);
-};
-
-const fetchWithRetry = async (
-  makeRequest: () => Promise<Response>,
-  opts: { attempts: number; baseDelayMs?: number; maxDelayMs?: number; label?: string }
-) => {
-  const attempts = Math.max(1, opts.attempts);
-  const baseDelayMs = opts.baseDelayMs ?? 2000;
-  const maxDelayMs = opts.maxDelayMs ?? 15000;
-  const label = opts.label ?? 'request';
-
-  let lastError: unknown = null;
-
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const res = await makeRequest();
-
-      if (res.ok) return res;
-
-      const retryable = isRetryableDittoStatus(res.status);
-      if (!retryable || attempt === attempts) return res;
-
-      let preview = '';
-      try {
-        preview = (await res.clone().text()).slice(0, 400);
-      } catch {
-        preview = '<unable to read body>';
-      }
-
-      console.error(`❌ Ditto ${label} retryable status ${res.status} (attempt ${attempt}/${attempts}):`, preview);
-
-      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
-      console.log(`⏳ Retrying Ditto ${label} in ${delay}ms...`);
-      await sleep(delay);
-    } catch (err) {
-      lastError = err;
-      if (attempt === attempts) throw err;
-
-      console.error(`❌ Ditto ${label} threw (attempt ${attempt}/${attempts}):`, err);
-      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
-      console.log(`⏳ Retrying Ditto ${label} in ${delay}ms...`);
-      await sleep(delay);
-    }
-  }
-
-  throw lastError ?? new Error('Ditto request failed');
-};
-
-// Background processing function - runs after response is sent
+// Background processing function - uses RunPod InfiniteTalk API
 async function processVideoGeneration(
   jobId: string,
   imageUrl: string,
@@ -74,224 +21,218 @@ async function processVideoGeneration(
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const runpodApiKey = Deno.env.get('RUNPOD_API_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     console.log('🔄 Background processing started for job:', jobId);
     
-    // Fetch image
-    console.log('⬇️ Fetching image...');
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-    }
-    const imageBlob = await imageResponse.blob();
-    console.log('✅ Image fetched, size:', imageBlob.size);
-
-    // Handle audio - convert base64 to blob if needed
-    let audioBlob: Blob;
-    if (audioUrl.startsWith('data:')) {
-      console.log('🔄 Converting base64 audio to blob...');
-      const base64Data = audioUrl.split(',')[1];
+    // Handle image URL - upload to storage if it's a data URL
+    let publicImageUrl = imageUrl;
+    if (imageUrl.startsWith('data:')) {
+      console.log('📤 Uploading image to storage...');
+      const base64Data = imageUrl.split(',')[1];
+      const mimeMatch = imageUrl.match(/data:([^;]+);/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const ext = mimeType.split('/')[1] || 'jpg';
+      
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      // Determine content type from data URL
-      const mimeMatch = audioUrl.match(/data:([^;]+);/);
-      const mimeType = mimeMatch ? mimeMatch[1] : 'audio/wav';
-      audioBlob = new Blob([bytes], { type: mimeType });
-      console.log('✅ Audio converted, size:', audioBlob.size, 'type:', mimeType);
-    } else {
-      console.log('⬇️ Fetching audio from URL...');
-      const audioResponse = await fetch(audioUrl);
-      if (!audioResponse.ok) {
-        throw new Error(`Failed to fetch audio: ${audioResponse.status}`);
-      }
-      audioBlob = await audioResponse.blob();
-      console.log('✅ Audio fetched, size:', audioBlob.size);
+      
+      const filename = `images/${Date.now()}-${jobId}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('audio-files')
+        .upload(filename, bytes, { contentType: mimeType, upsert: true });
+      
+      if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
+      
+      const { data: urlData } = supabase.storage.from('audio-files').getPublicUrl(filename);
+      publicImageUrl = urlData.publicUrl;
+      console.log('✅ Image uploaded:', publicImageUrl);
     }
 
-    // Build multipart form - CRITICAL: audio first, then image (as per Ditto API)
-    const audioBytes = new Uint8Array(await audioBlob.arrayBuffer());
-    const imageBytes = new Uint8Array(await imageBlob.arrayBuffer());
+    // Handle audio URL - upload to storage if it's a data URL
+    let publicAudioUrl = audioUrl;
+    if (audioUrl.startsWith('data:')) {
+      console.log('📤 Uploading audio to storage...');
+      const base64Data = audioUrl.split(',')[1];
+      const mimeMatch = audioUrl.match(/data:([^;]+);/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'audio/wav';
+      const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+      
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const filename = `audio/${Date.now()}-${jobId}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('audio-files')
+        .upload(filename, bytes, { contentType: mimeType, upsert: true });
+      
+      if (uploadError) throw new Error(`Audio upload failed: ${uploadError.message}`);
+      
+      const { data: urlData } = supabase.storage.from('audio-files').getPublicUrl(filename);
+      publicAudioUrl = urlData.publicUrl;
+      console.log('✅ Audio uploaded:', publicAudioUrl);
+    }
 
-    // Calculate estimated audio duration (assuming 16kHz WAV mono = 32000 bytes/sec)
-    const estimatedDurationSec = audioBytes.length / 32000;
-    console.log('⏱️ Estimated audio duration:', estimatedDurationSec.toFixed(1), 'seconds');
+    console.log('📸 Image URL:', publicImageUrl);
+    console.log('🎵 Audio URL:', publicAudioUrl);
 
-    const buildFormData = () => {
-      const formData = new FormData();
-      formData.append(
-        "audio_file",
-        new Blob([audioBytes], { type: "audio/wav" }),
-        "audio.wav"
-      );
-      formData.append(
-        "image_file",
-        new Blob([imageBytes], { type: "image/jpeg" }),
-        "portrait.jpg"
-      );
-      // Use TensorRT for faster processing
-      formData.append("model_type", "trt");
-      // Enable streaming mode for real-time video generation
-      formData.append("streaming", "true");
-      formData.append("fade_in", "-1");
-      formData.append("fade_out", "-1");
-      return formData;
-    };
-
-    console.log('📤 Sending to Ditto API with streaming + TRT...');
+    // Update job status
     await supabase
       .from("video_jobs")
       .update({ status: "generating" })
       .eq("id", jobId);
 
-    // Scale retries and delays based on audio length
-    const maxRetries = Math.max(5, Math.ceil(estimatedDurationSec / 10));
-    const baseDelay = Math.max(5000, estimatedDurationSec * 200);
-    const maxDelay = Math.max(30000, estimatedDurationSec * 1000);
-    console.log(`⏳ Using ${maxRetries} retries, baseDelay: ${baseDelay}ms, maxDelay: ${maxDelay}ms`);
-    
-    const response = await fetchWithRetry(
-      () => fetch(`${getDittoApiUrl()}/generate`, {
-        method: "POST",
-        body: buildFormData(),
-      }),
-      { attempts: maxRetries, baseDelayMs: baseDelay, maxDelayMs: maxDelay, label: 'generate' }
-    );
+    // Call RunPod InfiniteTalk API - Image-to-Video Single Person
+    console.log('📤 Sending to RunPod InfiniteTalk API...');
+    const runpodPayload = {
+      input: {
+        input_type: "image",
+        person_count: "single",
+        prompt: `${figureName || 'A person'} speaking naturally and expressively`,
+        image_url: publicImageUrl,
+        wav_url: publicAudioUrl,
+        width: 512,
+        height: 512,
+      }
+    };
+
+    console.log('📋 RunPod payload:', JSON.stringify(runpodPayload, null, 2));
+
+    const response = await fetch(`${RUNPOD_API_URL}/run`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${runpodApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(runpodPayload),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Ditto API error:', response.status, errorText);
+      console.error('❌ RunPod API error:', response.status, errorText);
       await supabase
         .from("video_jobs")
-        .update({ status: "failed", error: `Ditto API error: ${response.status}`, updated_at: new Date().toISOString() })
+        .update({ status: "failed", error: `RunPod API error: ${response.status}`, updated_at: new Date().toISOString() })
         .eq("id", jobId);
       return;
     }
 
-    const contentType = response.headers.get("content-type") || "";
-    console.log('📨 Ditto response content-type:', contentType);
-
-    // Check if video returned directly (synchronous response)
-    if (contentType.includes("video")) {
-      console.log('🎥 Video returned directly! Uploading to storage...');
-      const videoBuffer = await response.arrayBuffer();
-      const filename = `videos/${Date.now()}-${jobId}.mp4`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from("audio-files")
-        .upload(filename, new Uint8Array(videoBuffer), {
-          contentType: "video/mp4",
-        });
-
-      if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        await supabase
-          .from("video_jobs")
-          .update({ status: "failed", error: `Upload failed: ${uploadError.message}`, updated_at: new Date().toISOString() })
-          .eq("id", jobId);
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from("audio-files")
-        .getPublicUrl(filename);
-
-      await supabase
-        .from("video_jobs")
-        .update({ status: "completed", video_url: urlData.publicUrl, updated_at: new Date().toISOString() })
-        .eq("id", jobId);
-
-      console.log('✅ Video ready:', urlData.publicUrl);
-      return;
-    }
-
-    // Check if streaming response
-    if (contentType.includes("text/event-stream") || contentType.includes("application/octet-stream")) {
-      console.log('🌊 Streaming response detected, collecting video chunks...');
-      
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body for streaming');
-      }
-
-      const chunks: Uint8Array[] = [];
-      let done = false;
-      
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          chunks.push(value);
-          console.log('📦 Received chunk:', value.length, 'bytes');
-        }
-      }
-
-      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const videoBuffer = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const chunk of chunks) {
-        videoBuffer.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      console.log('🎥 Streaming complete! Total size:', totalLength, 'bytes');
-      
-      const filename = `videos/${Date.now()}-${jobId}.mp4`;
-      const { error: uploadError } = await supabase.storage
-        .from("audio-files")
-        .upload(filename, videoBuffer, {
-          contentType: "video/mp4",
-        });
-
-      if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        await supabase
-          .from("video_jobs")
-          .update({ status: "failed", error: `Upload failed: ${uploadError.message}`, updated_at: new Date().toISOString() })
-          .eq("id", jobId);
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from("audio-files")
-        .getPublicUrl(filename);
-
-      await supabase
-        .from("video_jobs")
-        .update({ status: "completed", video_url: urlData.publicUrl, updated_at: new Date().toISOString() })
-        .eq("id", jobId);
-
-      console.log('✅ Streamed video ready:', urlData.publicUrl);
-      return;
-    }
-
-    // Async response - store request_id for polling
     const result = await response.json();
-    console.log('📋 Ditto async response:', result);
+    console.log('📋 RunPod response:', JSON.stringify(result));
 
-    if (result.request_id) {
-      await supabase
-        .from("video_jobs")
-        .update({ 
-          status: "processing", 
-          ditto_request_id: result.request_id,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", jobId);
-
-      console.log('⏳ Video processing started, request_id:', result.request_id);
-      return;
+    // RunPod returns { id, status } for async jobs
+    const runpodJobId = result.id;
+    if (!runpodJobId) {
+      throw new Error('No job ID returned from RunPod');
     }
 
-    // Unknown response
-    console.error('❓ Unexpected Ditto response:', result);
+    console.log('⏳ RunPod job started:', runpodJobId);
+
+    // Store RunPod job ID for polling
     await supabase
       .from("video_jobs")
-      .update({ status: "failed", error: "Unexpected API response", updated_at: new Date().toISOString() })
+      .update({ 
+        status: "processing", 
+        ditto_request_id: runpodJobId, // Reusing this field for RunPod job ID
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", jobId);
+
+    // Poll for completion
+    const maxAttempts = 120; // 10 minutes max
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`🔄 Polling RunPod (attempt ${attempt}/${maxAttempts})...`);
+      
+      await sleep(5000); // Wait 5 seconds between polls
+
+      const statusResponse = await fetch(`${RUNPOD_API_URL}/status/${runpodJobId}`, {
+        headers: {
+          'Authorization': `Bearer ${runpodApiKey}`,
+        },
+      });
+
+      if (!statusResponse.ok) {
+        console.error('❌ RunPod status check failed:', statusResponse.status);
+        continue;
+      }
+
+      const statusResult = await statusResponse.json();
+      console.log('📊 RunPod status:', statusResult.status);
+
+      if (statusResult.status === 'COMPLETED') {
+        console.log('✅ RunPod job completed!');
+        
+        // Extract video from output
+        const output = statusResult.output;
+        let videoData: string | null = null;
+
+        if (output?.video) {
+          videoData = output.video;
+        } else if (output?.video_path) {
+          // If network_volume was used
+          videoData = output.video_path;
+        }
+
+        if (!videoData) {
+          throw new Error('No video data in RunPod response');
+        }
+
+        // If video is base64, upload to storage
+        let videoUrl = videoData;
+        if (videoData.startsWith('data:video')) {
+          console.log('📤 Uploading video to storage...');
+          const base64Data = videoData.split(',')[1];
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          const filename = `videos/${Date.now()}-${jobId}.mp4`;
+          const { error: uploadError } = await supabase.storage
+            .from('audio-files')
+            .upload(filename, bytes, { contentType: 'video/mp4', upsert: true });
+
+          if (uploadError) throw new Error(`Video upload failed: ${uploadError.message}`);
+
+          const { data: urlData } = supabase.storage.from('audio-files').getPublicUrl(filename);
+          videoUrl = urlData.publicUrl;
+        }
+
+        await supabase
+          .from("video_jobs")
+          .update({ status: "completed", video_url: videoUrl, updated_at: new Date().toISOString() })
+          .eq("id", jobId);
+
+        console.log('✅ Video ready:', videoUrl);
+        return;
+      }
+
+      if (statusResult.status === 'FAILED') {
+        console.error('❌ RunPod job failed:', statusResult.error);
+        await supabase
+          .from("video_jobs")
+          .update({ status: "failed", error: statusResult.error || 'RunPod job failed', updated_at: new Date().toISOString() })
+          .eq("id", jobId);
+        return;
+      }
+
+      // Status is IN_QUEUE or IN_PROGRESS - continue polling
+    }
+
+    // Timeout
+    console.error('⏰ RunPod job timed out');
+    await supabase
+      .from("video_jobs")
+      .update({ status: "failed", error: "Video generation timed out", updated_at: new Date().toISOString() })
       .eq("id", jobId);
 
   } catch (error) {
@@ -324,7 +265,7 @@ serve(async (req) => {
     const body = await req.json();
     const action = body?.action || "start";
 
-    console.log('🎬 Ditto Video Generation - Action:', action);
+    console.log('🎬 RunPod Video Generation - Action:', action);
 
     // ============ STATUS CHECK MODE ============
     if (action === "status") {
@@ -359,51 +300,6 @@ serve(async (req) => {
         });
       }
 
-      // Poll Ditto if we have a request_id
-      if (jobData?.ditto_request_id) {
-        console.log('🔄 Polling Ditto for request:', jobData.ditto_request_id);
-        
-        try {
-          const response = await fetch(`${getDittoApiUrl()}/download/${jobData.ditto_request_id}`);
-          const contentType = response.headers.get("content-type") || "";
-
-          if (contentType.includes("video")) {
-            console.log('🎥 Video ready! Uploading to storage...');
-            const videoBuffer = await response.arrayBuffer();
-            const videoData = new Uint8Array(videoBuffer);
-            const filename = `videos/${Date.now()}-${jobId}.mp4`;
-
-            const { error: uploadError } = await supabase.storage
-              .from("audio-files")
-              .upload(filename, videoData, {
-                contentType: "video/mp4",
-                upsert: true,
-              });
-
-            if (uploadError) {
-              console.error('❌ Video upload error:', uploadError);
-              throw uploadError;
-            }
-
-            const { data: urlData } = supabase.storage
-              .from("audio-files")
-              .getPublicUrl(filename);
-
-            await supabase
-              .from("video_jobs")
-              .update({ status: "completed", video_url: urlData.publicUrl, updated_at: new Date().toISOString() })
-              .eq("id", jobId);
-
-            console.log('✅ Video uploaded and job completed:', urlData.publicUrl);
-            return new Response(JSON.stringify({ status: "completed", video: urlData.publicUrl }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-        } catch (pollError) {
-          console.log('⏳ Still processing or poll error:', pollError);
-        }
-      }
-
       return new Response(JSON.stringify({ status: "processing" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -428,22 +324,20 @@ serve(async (req) => {
       id: jobId,
       status: "initiating",
       image_url: imageUrl.substring(0, 500),
-      audio_url: audioUrl.substring(0, 100), // Store first 100 chars for reference
+      audio_url: audioUrl.substring(0, 100),
       figure_id: figureId,
       figure_name: figureName,
     });
 
     console.log('📝 Job created:', jobId);
 
-    // Start background processing - THIS IS THE KEY CHANGE
-    // Use globalThis.EdgeRuntime for Supabase edge functions
+    // Start background processing
     const runtime = (globalThis as any).EdgeRuntime;
     if (runtime && typeof runtime.waitUntil === 'function') {
       runtime.waitUntil(
         processVideoGeneration(jobId, imageUrl, audioUrl, figureId, figureName)
       );
     } else {
-      // Fallback: start processing without awaiting (less reliable but works)
       processVideoGeneration(jobId, imageUrl, audioUrl, figureId, figureName).catch(console.error);
     }
 
