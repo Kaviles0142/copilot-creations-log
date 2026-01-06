@@ -3,8 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Users } from 'lucide-react';
+import { 
+  Loader2, 
+  Mic, 
+  MicOff, 
+  Video, 
+  VideoOff, 
+  Users, 
+  MessageSquare, 
+  Heart, 
+  Share2, 
+  MoreHorizontal,
+  User
+} from 'lucide-react';
 
 interface Room {
   id: string;
@@ -24,6 +35,8 @@ const Room = () => {
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [videoEnabled, setVideoEnabled] = useState(false);
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -60,88 +73,191 @@ const Room = () => {
     fetchRoom();
   }, [roomCode]);
 
+  const handleEndCall = () => {
+    navigate('/dashboard');
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
 
   if (error || !room) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="p-8 text-center max-w-md">
-          <h2 className="text-xl font-semibold text-foreground mb-2">
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-white mb-2">
             {error || 'Room not found'}
           </h2>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-gray-400 mb-6">
             This room may have expired or doesn't exist.
           </p>
-          <Button onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+          <Button onClick={() => navigate('/dashboard')} variant="secondary">
             Back to Dashboard
           </Button>
-        </Card>
+        </div>
       </div>
     );
   }
 
+  // Mock figure name for now - will be dynamic later
+  const figureName = room.figure_name || 'AI Assistant';
+  const guestName = user?.email?.split('@')[0] || 'Guest';
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Leave Room
-          </Button>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span className="text-sm font-mono">{room.room_code}</span>
-          </div>
+      <header className="bg-zinc-900 px-4 py-2 flex items-center gap-4 border-b border-zinc-800">
+        <div className="flex gap-2">
+          <div className="w-3 h-3 rounded-full bg-red-500" />
+          <div className="w-3 h-3 rounded-full bg-yellow-500" />
+          <div className="w-3 h-3 rounded-full bg-green-500" />
         </div>
+        <span className="text-white text-sm font-medium">{figureName}</span>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-3xl font-bold text-foreground mb-4">
-            Room: {room.room_code}
-          </h1>
-          <p className="text-muted-foreground mb-8">
-            {user ? `Logged in as ${user.email}` : 'Joined as guest'}
-          </p>
-
-          <Card className="p-12 border-dashed border-2 border-border">
-            <div className="text-muted-foreground">
-              <p className="text-lg mb-2">Room is ready</p>
-              <p className="text-sm">
-                This is where the conversation experience will be built.
-              </p>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Video Grid */}
+        <div className="flex-shrink-0 p-6 flex justify-center gap-4">
+          {/* Figure Video Tile */}
+          <div className="relative w-64 h-44 bg-zinc-800 rounded-lg overflow-hidden border border-zinc-700">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-zinc-700 flex items-center justify-center">
+                <User className="w-8 h-8 text-zinc-500" />
+              </div>
             </div>
-          </Card>
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+              <span className="text-white text-sm font-medium">{figureName}</span>
+            </div>
+          </div>
 
-          {/* Room Info */}
-          <div className="mt-8 text-left max-w-sm mx-auto">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Room Details</h3>
-            <div className="bg-card border border-border rounded-lg p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <span className="text-foreground capitalize">{room.status}</span>
+          {/* Guest Video Tile */}
+          <div className="relative w-64 h-44 bg-zinc-800 rounded-lg overflow-hidden border border-zinc-700">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-zinc-700 flex items-center justify-center">
+                <User className="w-8 h-8 text-zinc-500" />
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span className="text-foreground">
-                  {new Date(room.created_at).toLocaleTimeString()}
-                </span>
-              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+              <span className="text-white text-sm font-medium">{guestName}</span>
             </div>
           </div>
         </div>
+
+        {/* Content/Presentation Area */}
+        <div className="flex-1 mx-6 mb-6 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center overflow-hidden">
+          <div className="text-center p-12">
+            <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-4 tracking-tight">
+              Conversation with
+            </h1>
+            <h2 className="text-5xl md:text-6xl font-display font-bold text-gradient">
+              {figureName}
+            </h2>
+            <p className="text-zinc-500 mt-6 text-lg">
+              Room: {room.room_code}
+            </p>
+          </div>
+        </div>
       </main>
+
+      {/* Bottom Toolbar */}
+      <footer className="bg-zinc-900 border-t border-zinc-800 px-6 py-4">
+        <div className="flex items-center justify-center gap-2">
+          {/* Audio Toggle */}
+          <ToolbarButton 
+            icon={audioEnabled ? Mic : MicOff}
+            label="Audio"
+            active={audioEnabled}
+            onClick={() => setAudioEnabled(!audioEnabled)}
+            muted={!audioEnabled}
+          />
+
+          {/* Video Toggle */}
+          <ToolbarButton 
+            icon={videoEnabled ? Video : VideoOff}
+            label="Video"
+            active={videoEnabled}
+            onClick={() => setVideoEnabled(!videoEnabled)}
+            muted={!videoEnabled}
+          />
+
+          {/* Participants */}
+          <ToolbarButton 
+            icon={Users}
+            label="Participants"
+            onClick={() => {}}
+          />
+
+          {/* Chat */}
+          <ToolbarButton 
+            icon={MessageSquare}
+            label="Chat"
+            onClick={() => {}}
+          />
+
+          {/* React */}
+          <ToolbarButton 
+            icon={Heart}
+            label="React"
+            onClick={() => {}}
+          />
+
+          {/* Share */}
+          <ToolbarButton 
+            icon={Share2}
+            label="Share"
+            onClick={() => {}}
+          />
+
+          {/* More */}
+          <ToolbarButton 
+            icon={MoreHorizontal}
+            label="More"
+            onClick={() => {}}
+          />
+
+          {/* Spacer */}
+          <div className="w-8" />
+
+          {/* End Button */}
+          <Button 
+            variant="destructive"
+            className="px-6 rounded-lg"
+            onClick={handleEndCall}
+          >
+            End
+          </Button>
+        </div>
+      </footer>
     </div>
   );
 };
+
+interface ToolbarButtonProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active?: boolean;
+  muted?: boolean;
+  onClick: () => void;
+}
+
+const ToolbarButton = ({ icon: Icon, label, active, muted, onClick }: ToolbarButtonProps) => (
+  <button
+    onClick={onClick}
+    className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg hover:bg-zinc-800 transition-colors group"
+  >
+    <div className="relative">
+      <Icon className={`w-5 h-5 ${muted ? 'text-red-400' : 'text-zinc-400 group-hover:text-white'}`} />
+      {active !== undefined && (
+        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+      )}
+    </div>
+    <span className="text-xs text-zinc-500 group-hover:text-zinc-300">{label}</span>
+  </button>
+);
 
 export default Room;
