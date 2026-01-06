@@ -26,15 +26,8 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             
-            {/* Protected Routes */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
+            {/* Dashboard - accessible by guests and authenticated users */}
+            <Route path="/dashboard" element={<Dashboard />} />
             
             {/* Legacy App */}
             <Route path="/old" element={<OldApp />} />
