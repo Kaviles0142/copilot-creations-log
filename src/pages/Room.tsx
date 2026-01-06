@@ -227,9 +227,9 @@ const Room = () => {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Area */}
-        <main className="flex-1 flex flex-col overflow-hidden p-4">
+        <main className={`flex-1 flex flex-col overflow-hidden p-4 ${!podcastMode ? 'justify-center' : ''}`}>
           {/* Video Tiles */}
-          <div className="flex-shrink-0 flex justify-center gap-3 mb-4 flex-wrap">
+          <div className={`flex justify-center gap-3 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
             {/* Guest (You) Tile */}
             <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
               {videoEnabled ? (
