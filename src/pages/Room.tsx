@@ -482,18 +482,6 @@ const Room = () => {
                   </div>
                 </div>
               )}
-              {/* Overlay with participant names */}
-              {podcastSceneImage && (
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4">
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {displayFigures.map((figure, index) => (
-                      <Badge key={index} variant="secondary" className="bg-white/20 text-white border-white/30 text-sm">
-                        {figure}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </main>
