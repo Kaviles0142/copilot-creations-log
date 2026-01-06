@@ -1,4 +1,4 @@
-import { MessageSquare, Clock, BookOpen } from "lucide-react";
+import { MessageSquare, Mic, BookOpen, Sparkles } from "lucide-react";
 
 interface Feature {
   icon: React.ReactNode;
@@ -8,46 +8,53 @@ interface Feature {
 
 const features: Feature[] = [
   {
-    icon: <MessageSquare className="w-8 h-8" />,
-    title: "AI-Powered Conversations",
-    description: "Engage in realistic dialogues powered by advanced AI that captures the essence of historical personalities.",
+    icon: <Mic className="w-6 h-6" />,
+    title: "Voice Conversations",
+    description: "Speak naturally with historical figures using advanced voice AI that captures their unique personalities and knowledge.",
   },
   {
-    icon: <Clock className="w-8 h-8" />,
-    title: "Time Travel Experience",
-    description: "Immerse yourself in different eras through authentic voice interactions and period-accurate responses.",
+    icon: <Sparkles className="w-6 h-6" />,
+    title: "AI-Powered Authenticity",
+    description: "Each figure is crafted with deep historical research, ensuring accurate and engaging dialogues across any topic.",
   },
   {
-    icon: <BookOpen className="w-8 h-8" />,
-    title: "Personal Journal",
-    description: "Save your favorite conversations and build a collection of wisdom from history's greatest minds.",
+    icon: <MessageSquare className="w-6 h-6" />,
+    title: "Real-Time Chat",
+    description: "Engage in seamless text conversations when you prefer typing, with instant responses from history's greatest minds.",
+  },
+  {
+    icon: <BookOpen className="w-6 h-6" />,
+    title: "Learn & Discover",
+    description: "Save conversations, explore different perspectives, and build your personal archive of historical wisdom.",
   },
 ];
 
 export function FeaturesSection() {
   return (
-    <section className="py-20 px-6">
+    <section id="features" className="py-24 px-6">
       <div className="container mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
-            Why Never Gone?
+        {/* Header */}
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="font-display text-4xl md:text-5xl font-bold mb-4 opacity-0 animate-fade-in-up">
+            Built for <span className="text-gradient">Immersive Learning</span>
           </h2>
-          <p className="text-muted-foreground max-w-lg mx-auto">
-            Experience history like never before with our cutting-edge features.
+          <p className="text-lg text-muted-foreground opacity-0 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+            Experience history like never before with cutting-edge AI technology.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        {/* Features Grid */}
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {features.map((feature, index) => (
             <div
               key={feature.title}
-              className="group p-8 rounded-2xl bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-lg opacity-0 animate-fade-in-up"
-              style={{ animationDelay: `${0.15 * index}s` }}
+              className="group p-8 rounded-2xl bg-card border border-border hover:border-primary/30 transition-all duration-300 opacity-0 animate-fade-in-up"
+              style={{ animationDelay: `${0.15 + index * 0.1}s` }}
             >
-              <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
                 {feature.icon}
               </div>
-              <h3 className="font-display text-xl font-semibold mb-3">
+              <h3 className="font-display text-xl font-semibold mb-3 text-foreground">
                 {feature.title}
               </h3>
               <p className="text-muted-foreground leading-relaxed">

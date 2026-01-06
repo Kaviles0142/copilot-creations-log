@@ -3,32 +3,34 @@ import { Button } from "@/components/ui/button";
 
 export function LandingHeader() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 glass-effect">
+    <header className="fixed top-0 left-0 right-0 z-50 glass-dark">
       <div className="container mx-auto px-6 py-4">
         <nav className="flex items-center justify-between">
-          {/* Logo Section */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-hero-gradient flex items-center justify-center">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-full bg-hero-gradient flex items-center justify-center transition-transform group-hover:scale-105">
               <span className="text-primary-foreground font-display font-bold text-lg">N</span>
             </div>
             <span className="font-display text-xl font-semibold text-foreground">Never Gone</span>
+          </Link>
+
+          {/* Navigation */}
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#figures" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Figures
+            </a>
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Features
+            </a>
           </div>
 
-          {/* Right Section */}
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Built with</span>
-              <a 
-                href="https://lovable.dev" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="font-semibold text-primary hover:underline"
-              >
-                Lovable
-              </a>
-            </div>
+          {/* CTA */}
+          <div className="flex items-center gap-4">
+            <Button asChild variant="ghost" className="hidden sm:inline-flex text-muted-foreground hover:text-foreground">
+              <Link to="/auth">Sign In</Link>
+            </Button>
             <Button asChild className="bg-hero-gradient hover:opacity-90 transition-opacity">
-              <Link to="/auth">Get Started</Link>
+              <Link to="/dashboard">Start Free</Link>
             </Button>
           </div>
         </nav>
