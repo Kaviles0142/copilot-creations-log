@@ -53,7 +53,8 @@ const Dashboard = () => {
     }
   };
 
-  const displayName = profile?.display_name || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Traveler";
+  const isGuest = !user;
+  const displayName = profile?.display_name || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Guest";
 
   const toggleFigure = (id: string) => {
     setSelectedFigures(prev => 
@@ -82,13 +83,21 @@ const Dashboard = () => {
             </Link>
 
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground hidden sm:block">
-                {user?.email}
-              </span>
-              <Button variant="ghost" size="sm" onClick={signOut}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
+              {user ? (
+                <>
+                  <span className="text-sm text-muted-foreground hidden sm:block">
+                    {user.email}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={signOut}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/auth">Sign In</Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -99,10 +108,16 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-12">
           <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
-            Welcome back, <span className="text-gradient">{displayName}</span>
+            {isGuest ? (
+              <>Welcome, <span className="text-gradient">Time Traveler</span></>
+            ) : (
+              <>Welcome back, <span className="text-gradient">{displayName}</span></>
+            )}
           </h1>
           <p className="text-lg text-muted-foreground">
-            Ready to explore history? Choose the minds you'd like to converse with.
+            {isGuest 
+              ? "You're exploring as a guest. Sign in to save your conversations."
+              : "Ready to explore history? Choose the minds you'd like to converse with."}
           </p>
         </div>
 

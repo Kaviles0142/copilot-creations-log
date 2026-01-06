@@ -30,20 +30,27 @@ const Auth = () => {
         if (error) throw error;
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
             data: {
               display_name: displayName,
             },
           },
         });
         if (error) throw error;
-        toast({
-          title: "Account created!",
-          description: "Please check your email to verify your account.",
-        });
+        
+        // If user is immediately confirmed (email confirmation disabled), redirect
+        if (data.session) {
+          navigate("/dashboard");
+        } else {
+          toast({
+            title: "Account created!",
+            description: "Please check your email to verify your account.",
+          });
+        }
       }
     } catch (error: any) {
       toast({
@@ -106,7 +113,7 @@ const Auth = () => {
             <Button
               type="button"
               variant="outline"
-              className="w-full mb-6 py-6"
+              className="w-full mb-3 py-6"
               onClick={handleGoogleAuth}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -130,13 +137,23 @@ const Auth = () => {
               Continue with Google
             </Button>
 
+            {/* Continue as Guest */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full mb-6 py-6 text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/dashboard")}
+            >
+              Continue as Guest
+            </Button>
+
             {/* Divider */}
             <div className="relative mb-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-card px-4 text-muted-foreground">or</span>
+                <span className="bg-card px-4 text-muted-foreground">or sign in with email</span>
               </div>
             </div>
 
