@@ -66,6 +66,9 @@ const Room = () => {
   const [podcastMode, setPodcastMode] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [figureAvatars, setFigureAvatars] = useState<Map<string, FigureAvatar>>(new Map());
+  const [podcastSceneImage, setPodcastSceneImage] = useState<string | null>(null);
+  const [isGeneratingPodcastScene, setIsGeneratingPodcastScene] = useState(false);
+  const podcastSceneGeneratedFor = useRef<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -192,6 +195,59 @@ const Room = () => {
       generateAvatarsForFigures();
     }
   }, [figures]);
+
+  // Generate podcast scene image when podcast mode is enabled
+  useEffect(() => {
+    const generatePodcastScene = async () => {
+      if (!podcastMode || figures.length === 0) return;
+      
+      // Create a unique key for this combination of figures
+      const figuresKey = figures.sort().join('|');
+      if (podcastSceneGeneratedFor.current === figuresKey) return;
+      
+      podcastSceneGeneratedFor.current = figuresKey;
+      setIsGeneratingPodcastScene(true);
+      setPodcastSceneImage(null);
+
+      try {
+        // Build a detailed podcast scene prompt
+        const figuresList = figures.join(', ');
+        const figureCount = figures.length;
+        
+        let sceneDescription: string;
+        if (figureCount === 1) {
+          sceneDescription = `${figures[0]} sitting comfortably in a modern podcast studio, speaking into a professional microphone. They are seated in a stylish leather armchair with warm studio lighting. Behind them are acoustic panels and subtle LED accent lighting. The setting is intimate and professional, like a high-end interview show.`;
+        } else if (figureCount === 2) {
+          sceneDescription = `${figures[0]} and ${figures[1]} sitting together on a luxurious velvet couch in a modern podcast studio, facing each other in conversation. Professional microphones on boom arms in front of each person. Warm ambient lighting with acoustic panels and plants in the background. The atmosphere is like a premium talk show set.`;
+        } else {
+          sceneDescription = `${figuresList} all sitting together on a large curved sectional sofa in a sophisticated podcast studio. They are arranged in a semi-circle facing the camera, each with a professional microphone. The studio has warm Edison bulb lighting, exposed brick walls, acoustic foam panels, and vintage rugs. The vibe is like a famous group podcast or late-night talk show panel.`;
+        }
+
+        const prompt = `Create a photorealistic, cinematic photograph of a podcast recording session. ${sceneDescription} CRITICAL: Show historically accurate representations of each person with correct period-appropriate facial features, clothing visible from shoulders up blending naturally with modern podcast equipment. Ultra high resolution, 4K quality, professional photography, shallow depth of field, golden hour studio lighting. The image should feel like a real behind-the-scenes photo from a premium streaming platform's flagship interview show. Aspect ratio 16:9 landscape orientation.`;
+
+        console.log('🎙️ Generating podcast scene with prompt:', prompt);
+
+        const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
+          body: {
+            figureName: `Podcast-${figuresKey.replace(/\|/g, '-')}`,
+            figureId: `podcast-scene-${figuresKey.replace(/\|/g, '-').toLowerCase().replace(/\s+/g, '-')}`,
+            context: prompt
+          }
+        });
+
+        if (error) throw error;
+
+        console.log('✅ Podcast scene ready:', data.cached ? '(cached)' : '(new)');
+        setPodcastSceneImage(data.imageUrl);
+      } catch (err) {
+        console.error('❌ Failed to generate podcast scene:', err);
+      } finally {
+        setIsGeneratingPodcastScene(false);
+      }
+    };
+
+    generatePodcastScene();
+  }, [podcastMode, figures]);
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -411,25 +467,52 @@ const Room = () => {
 
           {/* Content Area - Only shown in podcast mode */}
           {podcastMode && (
-            <div className="flex-1 bg-card rounded-xl border border-border flex items-center justify-center overflow-hidden min-h-0">
-              <div className="text-center p-8">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
-                  Conversation with
-                </h1>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
-                  {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Figures`}
-                </h2>
-                <div className="flex flex-wrap justify-center gap-2 mt-4">
-                  {displayFigures.map((figure, index) => (
-                    <Badge key={index} variant="secondary" className="text-sm">
-                      {figure}
-                    </Badge>
-                  ))}
+            <div className="flex-1 bg-black rounded-xl border border-border overflow-hidden min-h-0 relative">
+              {isGeneratingPodcastScene ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                  <p className="text-muted-foreground text-sm">Generating podcast scene...</p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Setting up studio with {displayFigures.join(', ')}
+                  </p>
                 </div>
-                <p className="text-muted-foreground mt-6">
-                  Voice conversation coming soon...
-                </p>
-              </div>
+              ) : podcastSceneImage ? (
+                <img 
+                  src={podcastSceneImage} 
+                  alt={`Podcast scene with ${displayFigures.join(', ')}`}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-card">
+                  <div className="text-center p-8">
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
+                      Conversation with
+                    </h1>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
+                      {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Figures`}
+                    </h2>
+                    <div className="flex flex-wrap justify-center gap-2 mt-4">
+                      {displayFigures.map((figure, index) => (
+                        <Badge key={index} variant="secondary" className="text-sm">
+                          {figure}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Overlay with participant names */}
+              {podcastSceneImage && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {displayFigures.map((figure, index) => (
+                      <Badge key={index} variant="secondary" className="bg-white/20 text-white border-white/30 text-sm">
+                        {figure}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>
