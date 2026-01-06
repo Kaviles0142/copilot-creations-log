@@ -138,20 +138,24 @@ const Room = () => {
     };
   }, []);
 
-  // Generate avatar portraits for each figure
+  // Generate avatar portraits for each figure - all at once in parallel
   useEffect(() => {
     const generateAvatarsForFigures = async () => {
-      for (const figureName of figures) {
-        // Skip if we already have this figure's avatar
-        if (figureAvatars.has(figureName)) continue;
+      // Filter to only new figures that we haven't started loading
+      const newFigures = figures.filter(f => !figureAvatars.has(f));
+      if (newFigures.length === 0) return;
 
-        // Set loading state
-        setFigureAvatars(prev => new Map(prev).set(figureName, {
-          figureName,
-          imageUrl: null,
-          isLoading: true
-        }));
+      // Set all to loading state at once
+      setFigureAvatars(prev => {
+        const updated = new Map(prev);
+        newFigures.forEach(figureName => {
+          updated.set(figureName, { figureName, imageUrl: null, isLoading: true });
+        });
+        return updated;
+      });
 
+      // Generate all portraits in parallel
+      const promises = newFigures.map(async (figureName) => {
         try {
           const figureId = figureName.toLowerCase().replace(/\s+/g, '-');
           const context = getFigureContext(figureName);
@@ -159,31 +163,29 @@ const Room = () => {
           console.log(`🎨 Generating portrait for ${figureName}...`);
           
           const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
-            body: {
-              figureName,
-              figureId,
-              context
-            }
+            body: { figureName, figureId, context }
           });
 
           if (error) throw error;
 
           console.log(`✅ Portrait ready for ${figureName}:`, data.cached ? '(cached)' : '(new)');
-          
-          setFigureAvatars(prev => new Map(prev).set(figureName, {
-            figureName,
-            imageUrl: data.imageUrl,
-            isLoading: false
-          }));
+          return { figureName, imageUrl: data.imageUrl, isLoading: false };
         } catch (err) {
           console.error(`❌ Failed to generate portrait for ${figureName}:`, err);
-          setFigureAvatars(prev => new Map(prev).set(figureName, {
-            figureName,
-            imageUrl: null,
-            isLoading: false
-          }));
+          return { figureName, imageUrl: null, isLoading: false };
         }
-      }
+      });
+
+      const results = await Promise.all(promises);
+      
+      // Update all at once
+      setFigureAvatars(prev => {
+        const updated = new Map(prev);
+        results.forEach(result => {
+          updated.set(result.figureName, result);
+        });
+        return updated;
+      });
     };
 
     if (figures.length > 0) {
@@ -373,17 +375,18 @@ const Room = () => {
             {/* Figure Tiles */}
             {displayFigures.map((figure, index) => {
               const avatar = figureAvatars.get(figure);
+              const showImage = !podcastMode && avatar?.imageUrl;
               return (
-                <div key={index} className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
+                <div key={index} className={`relative bg-black rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
                   {avatar?.isLoading ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
                     </div>
-                  ) : avatar?.imageUrl ? (
+                  ) : showImage ? (
                     <img 
                       src={avatar.imageUrl} 
                       alt={figure}
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -392,8 +395,8 @@ const Room = () => {
                       </div>
                     </div>
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                    <span className={`text-foreground font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{figure}</span>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
+                    <span className={`text-white font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{figure}</span>
                   </div>
                   {/* Camera off badge in podcast mode */}
                   {podcastMode && (
