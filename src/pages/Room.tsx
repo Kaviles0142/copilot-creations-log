@@ -376,8 +376,8 @@ const Room = () => {
             {displayFigures.map((figure, index) => {
               const avatar = figureAvatars.get(figure);
               const showImage = !podcastMode && avatar?.imageUrl;
-              return (
-                <div key={index} className={`relative bg-black rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
+                return (
+                <div key={index} className={`relative rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'}`}>
                   {avatar?.isLoading ? (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
@@ -395,8 +395,8 @@ const Room = () => {
                       </div>
                     </div>
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
-                    <span className={`text-white font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{figure}</span>
+                  <div className={`absolute bottom-0 left-0 right-0 p-2 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
+                    <span className={`font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'} ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
                   </div>
                   {/* Camera off badge in podcast mode */}
                   {podcastMode && (
