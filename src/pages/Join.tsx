@@ -236,8 +236,8 @@ const Join = () => {
               <Input
                 value={participantInput}
                 onChange={(e) => setParticipantInput(e.target.value)}
-                placeholder={participants.length === 0 ? "Type a name and press Enter..." : "Add another..."}
-                className="flex-1 min-w-[120px] border-0 h-7 text-sm p-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                placeholder={participants.length === 0 ? "Type a name..." : "Add another..."}
+                className="flex-1 min-w-[100px] border-0 h-7 text-sm p-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -245,6 +245,14 @@ const Join = () => {
                   }
                 }}
               />
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={addParticipant}
+                className="h-7 px-2.5 text-xs"
+              >
+                Add
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">
               e.g. Albert Einstein, Cleopatra, Leonardo da Vinci
