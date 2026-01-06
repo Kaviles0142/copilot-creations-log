@@ -453,9 +453,6 @@ const Room = () => {
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
                   <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
                   <p className="text-muted-foreground text-sm">Generating podcast scene...</p>
-                  <p className="text-muted-foreground text-xs mt-1">
-                    Setting up studio with {displayFigures.join(', ')}
-                  </p>
                 </div>
               ) : podcastSceneImage ? (
                 <img 
