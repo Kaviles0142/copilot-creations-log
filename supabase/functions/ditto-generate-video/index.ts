@@ -300,6 +300,77 @@ serve(async (req) => {
         });
       }
 
+      // If still processing and we have a RunPod job ID, poll RunPod directly
+      if (jobData?.ditto_request_id) {
+        const runpodApiKey = Deno.env.get('RUNPOD_API_KEY');
+        if (runpodApiKey) {
+          try {
+            console.log('🔄 Polling RunPod for status:', jobData.ditto_request_id);
+            const statusResponse = await fetch(`${RUNPOD_API_URL}/status/${jobData.ditto_request_id}`, {
+              headers: { 'Authorization': `Bearer ${runpodApiKey}` },
+            });
+
+            if (statusResponse.ok) {
+              const statusResult = await statusResponse.json();
+              console.log('📊 RunPod status:', statusResult.status);
+
+              if (statusResult.status === 'COMPLETED') {
+                const output = statusResult.output;
+                let videoData = output?.video || output?.video_path;
+
+                if (videoData) {
+                  // If video is base64, upload to storage
+                  let videoUrl = videoData;
+                  if (videoData.startsWith('data:video')) {
+                    console.log('📤 Uploading video to storage...');
+                    const base64Data = videoData.split(',')[1];
+                    const binaryString = atob(base64Data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                      bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    const filename = `videos/${Date.now()}-${jobId}.mp4`;
+                    const { error: uploadError } = await supabase.storage
+                      .from('audio-files')
+                      .upload(filename, bytes, { contentType: 'video/mp4', upsert: true });
+
+                    if (!uploadError) {
+                      const { data: urlData } = supabase.storage.from('audio-files').getPublicUrl(filename);
+                      videoUrl = urlData.publicUrl;
+                    }
+                  }
+
+                  // Update job status
+                  await supabase
+                    .from("video_jobs")
+                    .update({ status: "completed", video_url: videoUrl, updated_at: new Date().toISOString() })
+                    .eq("id", jobId);
+
+                  console.log('✅ Video ready:', videoUrl);
+                  return new Response(JSON.stringify({ status: "completed", video: videoUrl }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  });
+                }
+              }
+
+              if (statusResult.status === 'FAILED') {
+                await supabase
+                  .from("video_jobs")
+                  .update({ status: "failed", error: statusResult.error || 'RunPod job failed', updated_at: new Date().toISOString() })
+                  .eq("id", jobId);
+
+                return new Response(JSON.stringify({ status: "failed", error: statusResult.error }), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+              }
+            }
+          } catch (pollError) {
+            console.error('❌ RunPod poll error:', pollError);
+          }
+        }
+      }
+
       return new Response(JSON.stringify({ status: "processing" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
