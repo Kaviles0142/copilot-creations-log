@@ -229,9 +229,11 @@ const Room = () => {
         {/* Main Area */}
         <main className={`flex-1 flex flex-col overflow-hidden p-4 ${!podcastMode ? 'justify-center' : ''}`}>
           {/* Video Tiles */}
-          <div className={`flex justify-center gap-3 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
+          <div className={`flex justify-center gap-4 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
             {/* Guest (You) Tile */}
-            <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
+            <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${
+              podcastMode ? 'w-36 h-24' : 'w-64 h-48 md:w-80 md:h-60'
+            }`}>
               {videoEnabled ? (
                 <video 
                   ref={videoRef} 
@@ -242,31 +244,39 @@ const Room = () => {
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary" />
+                  <div className={`rounded-full bg-primary/20 flex items-center justify-center transition-all ${
+                    podcastMode ? 'w-10 h-10' : 'w-20 h-20'
+                  }`}>
+                    <User className={`text-primary transition-all ${podcastMode ? 'w-5 h-5' : 'w-10 h-10'}`} />
                   </div>
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                <span className="text-foreground text-xs font-medium">{guestName}</span>
+                <span className={`text-foreground font-medium ${podcastMode ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
               </div>
               {!audioEnabled && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
-                  <MicOff className="w-3 h-3 text-destructive-foreground" />
+                <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${
+                  podcastMode ? 'w-5 h-5' : 'w-7 h-7'
+                }`}>
+                  <MicOff className={`text-destructive-foreground ${podcastMode ? 'w-3 h-3' : 'w-4 h-4'}`} />
                 </div>
               )}
             </div>
 
             {/* Figure Tiles */}
             {displayFigures.map((figure, index) => (
-              <div key={index} className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
+              <div key={index} className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${
+                podcastMode ? 'w-36 h-24' : 'w-64 h-48 md:w-80 md:h-60'
+              }`}>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                    <User className="w-5 h-5 text-muted-foreground" />
+                  <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${
+                    podcastMode ? 'w-10 h-10' : 'w-20 h-20'
+                  }`}>
+                    <User className={`text-muted-foreground transition-all ${podcastMode ? 'w-5 h-5' : 'w-10 h-10'}`} />
                   </div>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                  <span className="text-foreground text-xs font-medium truncate block">{figure}</span>
+                  <span className={`text-foreground font-medium truncate block ${podcastMode ? 'text-xs' : 'text-sm'}`}>{figure}</span>
                 </div>
               </div>
             ))}
