@@ -185,11 +185,15 @@ async function processVideoGeneration(
           throw new Error('No video data in RunPod response');
         }
 
-        // If video is base64, upload to storage
+        // Upload video to storage if it's base64 (with or without data: prefix)
         let videoUrl = videoData;
-        if (videoData.startsWith('data:video')) {
-          console.log('📤 Uploading video to storage...');
-          const base64Data = videoData.split(',')[1];
+        const isBase64 = videoData.startsWith('data:video') || 
+                         (!videoData.startsWith('http') && videoData.length > 1000);
+        
+        if (isBase64) {
+          console.log('📤 Uploading base64 video to storage...');
+          // Remove data: prefix if present
+          const base64Data = videoData.includes(',') ? videoData.split(',')[1] : videoData;
           const binaryString = atob(base64Data);
           const bytes = new Uint8Array(binaryString.length);
           for (let i = 0; i < binaryString.length; i++) {
@@ -205,6 +209,7 @@ async function processVideoGeneration(
 
           const { data: urlData } = supabase.storage.from('audio-files').getPublicUrl(filename);
           videoUrl = urlData.publicUrl;
+          console.log('✅ Video uploaded to:', videoUrl);
         }
 
         await supabase
@@ -319,11 +324,14 @@ serve(async (req) => {
                 let videoData = output?.video || output?.video_path;
 
                 if (videoData) {
-                  // If video is base64, upload to storage
+                  // Upload video to storage if it's base64 (with or without data: prefix)
                   let videoUrl = videoData;
-                  if (videoData.startsWith('data:video')) {
-                    console.log('📤 Uploading video to storage...');
-                    const base64Data = videoData.split(',')[1];
+                  const isBase64 = videoData.startsWith('data:video') || 
+                                   (!videoData.startsWith('http') && videoData.length > 1000);
+                  
+                  if (isBase64) {
+                    console.log('📤 Uploading base64 video to storage...');
+                    const base64Data = videoData.includes(',') ? videoData.split(',')[1] : videoData;
                     const binaryString = atob(base64Data);
                     const bytes = new Uint8Array(binaryString.length);
                     for (let i = 0; i < binaryString.length; i++) {
@@ -338,6 +346,7 @@ serve(async (req) => {
                     if (!uploadError) {
                       const { data: urlData } = supabase.storage.from('audio-files').getPublicUrl(filename);
                       videoUrl = urlData.publicUrl;
+                      console.log('✅ Video uploaded to:', videoUrl);
                     }
                   }
 
