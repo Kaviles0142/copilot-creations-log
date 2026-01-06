@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +15,6 @@ import { Loader2, Mic, MicOff, Video, VideoOff, X, UserPlus } from 'lucide-react
 
 const Join = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [isConnecting, setIsConnecting] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
@@ -120,12 +118,11 @@ const Join = () => {
     }
 
     try {
-      const guestId = !user ? `guest_${crypto.randomUUID()}` : null;
+      const guestId = `guest_${crypto.randomUUID()}`;
       
       const { data, error: insertError } = await supabase
         .from('rooms')
         .insert({
-          user_id: user?.id || null,
           guest_id: guestId,
         })
         .select('room_code')
