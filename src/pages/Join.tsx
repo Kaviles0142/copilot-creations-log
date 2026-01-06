@@ -145,13 +145,25 @@ const Join = () => {
   // Connecting overlay
   if (isConnecting) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="bg-card border border-border rounded-2xl p-12 text-center shadow-xl max-w-sm w-full mx-4 glow-sm">
-          <div className="w-3 h-3 rounded-full bg-primary mb-8 mx-auto animate-pulse" />
-          <h1 className="font-display text-xl text-muted-foreground mb-1">Never Gone</h1>
-          <h2 className="font-display text-2xl font-bold text-foreground mb-8">Connecting...</h2>
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Preparing your session</p>
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="bg-card border border-border rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
+          {/* Header Bar with dots */}
+          <div className="bg-muted/30 px-5 py-2.5 flex items-center gap-3 border-b border-border">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+            </div>
+            <span className="text-sm text-muted-foreground flex-1 text-center font-medium">
+              Never Gone
+            </span>
+          </div>
+          
+          <div className="p-12 text-center">
+            <h2 className="font-display text-2xl font-bold text-foreground mb-8">Connecting...</h2>
+            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground">Preparing your session</p>
+          </div>
         </div>
       </div>
     );
