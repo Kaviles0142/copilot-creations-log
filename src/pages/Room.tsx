@@ -202,7 +202,7 @@ const Room = () => {
       if (!podcastMode || figures.length === 0) return;
       
       // Create a unique key for this combination of figures
-      const figuresKey = figures.sort().join('|');
+      const figuresKey = [...figures].sort().join('|');
       if (podcastSceneGeneratedFor.current === figuresKey) return;
       
       podcastSceneGeneratedFor.current = figuresKey;
@@ -210,29 +210,10 @@ const Room = () => {
       setPodcastSceneImage(null);
 
       try {
-        // Build a detailed podcast scene prompt
-        const figuresList = figures.join(', ');
-        const figureCount = figures.length;
-        
-        let sceneDescription: string;
-        if (figureCount === 1) {
-          sceneDescription = `${figures[0]} sitting comfortably in a modern podcast studio, speaking into a professional microphone. They are seated in a stylish leather armchair with warm studio lighting. Behind them are acoustic panels and subtle LED accent lighting. The setting is intimate and professional, like a high-end interview show.`;
-        } else if (figureCount === 2) {
-          sceneDescription = `${figures[0]} and ${figures[1]} sitting together on a luxurious velvet couch in a modern podcast studio, facing each other in conversation. Professional microphones on boom arms in front of each person. Warm ambient lighting with acoustic panels and plants in the background. The atmosphere is like a premium talk show set.`;
-        } else {
-          sceneDescription = `${figuresList} all sitting together on a large curved sectional sofa in a sophisticated podcast studio. They are arranged in a semi-circle facing the camera, each with a professional microphone. The studio has warm Edison bulb lighting, exposed brick walls, acoustic foam panels, and vintage rugs. The vibe is like a famous group podcast or late-night talk show panel.`;
-        }
+        console.log('🎙️ Generating podcast scene for:', figures);
 
-        const prompt = `Create a photorealistic, cinematic photograph of a podcast recording session. ${sceneDescription} CRITICAL: Show historically accurate representations of each person with correct period-appropriate facial features, clothing visible from shoulders up blending naturally with modern podcast equipment. Ultra high resolution, 4K quality, professional photography, shallow depth of field, golden hour studio lighting. The image should feel like a real behind-the-scenes photo from a premium streaming platform's flagship interview show. Aspect ratio 16:9 landscape orientation.`;
-
-        console.log('🎙️ Generating podcast scene with prompt:', prompt);
-
-        const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
-          body: {
-            figureName: `Podcast-${figuresKey.replace(/\|/g, '-')}`,
-            figureId: `podcast-scene-${figuresKey.replace(/\|/g, '-').toLowerCase().replace(/\s+/g, '-')}`,
-            context: prompt
-          }
+        const { data, error } = await supabase.functions.invoke('generate-podcast-scene', {
+          body: { figures }
         });
 
         if (error) throw error;
