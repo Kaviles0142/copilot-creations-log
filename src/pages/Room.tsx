@@ -86,30 +86,29 @@ const Room = () => {
 
   const handleSendMessage = () => {
     if (message.trim()) {
-      // TODO: Implement message sending
       setMessage('');
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (error || !room) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-white mb-2">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center bg-card border border-border rounded-2xl p-8 max-w-md">
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             {error || 'Room not found'}
           </h2>
-          <p className="text-gray-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             This room may have expired or doesn't exist.
           </p>
-          <Button onClick={() => navigate('/dashboard')} variant="secondary">
+          <Button onClick={() => navigate('/dashboard')} className="bg-hero-gradient hover:opacity-90">
             Back to Dashboard
           </Button>
         </div>
@@ -121,61 +120,62 @@ const Room = () => {
   const guestName = user?.email?.split('@')[0] || 'Guest';
 
   return (
-    <div className="h-screen bg-black flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex-shrink-0 bg-zinc-900 px-4 py-2 flex items-center justify-between border-b border-zinc-800">
+      <header className="flex-shrink-0 bg-card px-4 py-2 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-4">
           <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
+            <div className="w-3 h-3 rounded-full bg-destructive" />
             <div className="w-3 h-3 rounded-full bg-yellow-500" />
             <div className="w-3 h-3 rounded-full bg-green-500" />
           </div>
-          <span className="text-white text-sm font-medium">{figureName}</span>
+          <span className="text-foreground text-sm font-medium">{figureName}</span>
         </div>
+        <span className="text-xs text-muted-foreground font-mono">{room.room_code}</span>
       </header>
 
-      {/* Main Content with Optional Sidebar */}
+      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Video Tiles - Compact */}
-          <div className="flex-shrink-0 p-4 flex justify-center gap-3">
-            {/* Figure Video Tile */}
-            <div className="relative w-40 h-28 bg-zinc-800 rounded-lg overflow-hidden border border-zinc-700">
+        <main className="flex-1 flex flex-col overflow-hidden p-4">
+          {/* Video Tiles */}
+          <div className="flex-shrink-0 flex justify-center gap-3 mb-4">
+            {/* Figure Tile */}
+            <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center">
-                  <User className="w-6 h-6 text-zinc-500" />
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <User className="w-5 h-5 text-muted-foreground" />
                 </div>
               </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                <span className="text-white text-xs font-medium">{figureName}</span>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
+                <span className="text-foreground text-xs font-medium">{figureName}</span>
               </div>
             </div>
 
-            {/* Guest Video Tile */}
-            <div className="relative w-40 h-28 bg-zinc-800 rounded-lg overflow-hidden border border-zinc-700">
+            {/* Guest Tile */}
+            <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center">
-                  <User className="w-6 h-6 text-zinc-500" />
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <User className="w-5 h-5 text-muted-foreground" />
                 </div>
               </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                <span className="text-white text-xs font-medium">{guestName}</span>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
+                <span className="text-foreground text-xs font-medium">{guestName}</span>
               </div>
             </div>
           </div>
 
-          {/* Large Content/Presentation Area */}
-          <div className="flex-1 mx-4 mb-4 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center overflow-hidden min-h-0">
-            <div className="text-center p-8 md:p-16">
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-white mb-2 tracking-tight leading-tight">
+          {/* Content Area */}
+          <div className="flex-1 bg-card rounded-xl border border-border flex items-center justify-center overflow-hidden min-h-0">
+            <div className="text-center p-8">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
                 Conversation with
               </h1>
-              <h2 className="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-gradient leading-tight">
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
                 {figureName}
               </h2>
-              <p className="text-zinc-500 mt-8 text-lg">
-                Room: {room.room_code}
+              <p className="text-muted-foreground mt-6">
+                Voice conversation coming soon...
               </p>
             </div>
           </div>
@@ -183,51 +183,41 @@ const Room = () => {
 
         {/* Chat Sidebar */}
         {chatOpen && (
-          <aside className="w-80 bg-zinc-900 border-l border-zinc-800 flex flex-col">
-            {/* Sidebar Header */}
-            <div className="flex-shrink-0 p-4 border-b border-zinc-800">
+          <aside className="w-80 bg-card border-l border-border flex flex-col">
+            <div className="flex-shrink-0 p-4 border-b border-border">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-white font-semibold">{figureName} : Session</h3>
-                <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white">
+                <h3 className="text-foreground font-semibold">Session Chat</h3>
+                <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="flex items-center gap-2">
                 <Badge className="bg-primary text-primary-foreground">Everyone</Badge>
-                <button className="w-7 h-7 rounded bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700">
+                <button className="w-7 h-7 rounded bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Messages Area */}
             <div className="flex-1 p-4 overflow-y-auto">
-              <div className="flex items-center gap-2 text-zinc-500 text-sm">
-                <div className="w-4 h-4 rounded-full border border-zinc-600" />
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <div className="w-4 h-4 rounded-full border border-border" />
                 <span>Who can see your messages?</span>
               </div>
             </div>
 
-            {/* Message Input */}
-            <div className="flex-shrink-0 p-4 border-t border-zinc-800">
+            <div className="flex-shrink-0 p-4 border-t border-border">
               <div className="flex items-center gap-2">
                 <Input
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Message everyone"
-                  className="flex-1 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                  className="flex-1 bg-background border-border"
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                 />
-                <button 
-                  onClick={handleSendMessage}
-                  className="text-zinc-400 hover:text-white p-2"
-                >
+                <button onClick={handleSendMessage} className="text-muted-foreground hover:text-foreground p-2">
                   <Send className="w-5 h-5" />
                 </button>
-              </div>
-              <div className="flex items-center gap-3 mt-3 text-zinc-500 text-sm">
-                <span className="cursor-pointer hover:text-white">T</span>
-                <span className="cursor-pointer hover:text-white">GIF</span>
               </div>
             </div>
           </aside>
@@ -235,8 +225,8 @@ const Room = () => {
       </div>
 
       {/* Bottom Toolbar */}
-      <footer className="flex-shrink-0 bg-zinc-900 border-t border-zinc-800 px-6 py-4">
-        <div className="flex items-center justify-center gap-1 md:gap-2">
+      <footer className="flex-shrink-0 bg-card border-t border-border px-6 py-3">
+        <div className="flex items-center justify-center gap-1">
           <ToolbarButton 
             icon={audioEnabled ? Mic : MicOff}
             label="Audio"
@@ -244,7 +234,6 @@ const Room = () => {
             onClick={() => setAudioEnabled(!audioEnabled)}
             muted={!audioEnabled}
           />
-
           <ToolbarButton 
             icon={videoEnabled ? Video : VideoOff}
             label="Video"
@@ -252,45 +241,20 @@ const Room = () => {
             onClick={() => setVideoEnabled(!videoEnabled)}
             muted={!videoEnabled}
           />
-
+          <ToolbarButton icon={Users} label="Participants" onClick={() => {}} />
           <ToolbarButton 
-            icon={Users}
-            label="Participants"
-            onClick={() => {}}
-          />
-
-          <ToolbarButton 
-            icon={MessageSquare}
-            label="Chat"
+            icon={MessageSquare} 
+            label="Chat" 
             active={chatOpen}
-            onClick={() => setChatOpen(!chatOpen)}
+            onClick={() => setChatOpen(!chatOpen)} 
           />
-
-          <ToolbarButton 
-            icon={Heart}
-            label="React"
-            onClick={() => {}}
-          />
-
-          <ToolbarButton 
-            icon={Share2}
-            label="Share"
-            onClick={() => {}}
-          />
-
-          <ToolbarButton 
-            icon={MoreHorizontal}
-            label="More"
-            onClick={() => {}}
-          />
-
-          <div className="w-4 md:w-8" />
-
-          <Button 
-            variant="destructive"
-            className="px-6 rounded-lg"
-            onClick={handleEndCall}
-          >
+          <ToolbarButton icon={Heart} label="React" onClick={() => {}} />
+          <ToolbarButton icon={Share2} label="Share" onClick={() => {}} />
+          <ToolbarButton icon={MoreHorizontal} label="More" onClick={() => {}} />
+          
+          <div className="w-6" />
+          
+          <Button variant="destructive" className="px-6" onClick={handleEndCall}>
             End
           </Button>
         </div>
@@ -310,17 +274,12 @@ interface ToolbarButtonProps {
 const ToolbarButton = ({ icon: Icon, label, active, muted, onClick }: ToolbarButtonProps) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center gap-1 px-3 md:px-4 py-2 rounded-lg transition-colors group ${
-      active ? 'bg-zinc-800' : 'hover:bg-zinc-800'
+    className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors group ${
+      active ? 'bg-muted' : 'hover:bg-muted'
     }`}
   >
-    <div className="relative">
-      <Icon className={`w-5 h-5 ${muted ? 'text-red-400' : active ? 'text-white' : 'text-zinc-400 group-hover:text-white'}`} />
-      {active !== undefined && active && (
-        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
-      )}
-    </div>
-    <span className={`text-xs ${active ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{label}</span>
+    <Icon className={`w-5 h-5 ${muted ? 'text-destructive' : active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+    <span className={`text-xs ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>{label}</span>
   </button>
 );
 
