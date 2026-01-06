@@ -53,10 +53,10 @@ const Room = () => {
   const [error, setError] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
   const [message, setMessage] = useState('');
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
-  const [podcastMode, setPodcastMode] = useState(true);
+  const [podcastMode, setPodcastMode] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -307,9 +307,9 @@ const Room = () => {
           )}
         </main>
 
-        {/* Chat Sidebar */}
+        {/* Chat Sidebar - Desktop: side panel, Mobile: bottom sheet */}
         {chatOpen && (
-          <aside className="w-80 bg-card border-l border-border flex flex-col">
+          <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-80 bg-card border-t md:border-t-0 md:border-l border-border flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
             <div className="flex-shrink-0 p-4 border-b border-border">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-foreground font-semibold">Session Chat</h3>
