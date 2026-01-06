@@ -26,6 +26,7 @@ import {
   Send,
   Radio
 } from 'lucide-react';
+import { getFigureContext } from '@/utils/figureContextMapper';
 
 interface Room {
   id: string;
@@ -40,6 +41,12 @@ interface Room {
 
 interface LocationState {
   figures?: string[];
+}
+
+interface FigureAvatar {
+  figureName: string;
+  imageUrl: string | null;
+  isLoading: boolean;
 }
 
 const Room = () => {
@@ -58,6 +65,7 @@ const Room = () => {
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
   const [podcastMode, setPodcastMode] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [figureAvatars, setFigureAvatars] = useState<Map<string, FigureAvatar>>(new Map());
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -129,6 +137,59 @@ const Room = () => {
       }
     };
   }, []);
+
+  // Generate avatar portraits for each figure
+  useEffect(() => {
+    const generateAvatarsForFigures = async () => {
+      for (const figureName of figures) {
+        // Skip if we already have this figure's avatar
+        if (figureAvatars.has(figureName)) continue;
+
+        // Set loading state
+        setFigureAvatars(prev => new Map(prev).set(figureName, {
+          figureName,
+          imageUrl: null,
+          isLoading: true
+        }));
+
+        try {
+          const figureId = figureName.toLowerCase().replace(/\s+/g, '-');
+          const context = getFigureContext(figureName);
+          
+          console.log(`🎨 Generating portrait for ${figureName}...`);
+          
+          const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
+            body: {
+              figureName,
+              figureId,
+              context
+            }
+          });
+
+          if (error) throw error;
+
+          console.log(`✅ Portrait ready for ${figureName}:`, data.cached ? '(cached)' : '(new)');
+          
+          setFigureAvatars(prev => new Map(prev).set(figureName, {
+            figureName,
+            imageUrl: data.imageUrl,
+            isLoading: false
+          }));
+        } catch (err) {
+          console.error(`❌ Failed to generate portrait for ${figureName}:`, err);
+          setFigureAvatars(prev => new Map(prev).set(figureName, {
+            figureName,
+            imageUrl: null,
+            isLoading: false
+          }));
+        }
+      }
+    };
+
+    if (figures.length > 0) {
+      generateAvatarsForFigures();
+    }
+  }, [figures]);
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -310,18 +371,39 @@ const Room = () => {
             </div>
 
             {/* Figure Tiles */}
-            {displayFigures.map((figure, index) => (
-              <div key={index} className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${getAvatarClasses()}`}>
-                    <User className={`text-muted-foreground transition-all ${getIconClasses()}`} />
+            {displayFigures.map((figure, index) => {
+              const avatar = figureAvatars.get(figure);
+              return (
+                <div key={index} className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
+                  {avatar?.isLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                      <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
+                    </div>
+                  ) : avatar?.imageUrl ? (
+                    <img 
+                      src={avatar.imageUrl} 
+                      alt={figure}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${getAvatarClasses()}`}>
+                        <User className={`text-muted-foreground transition-all ${getIconClasses()}`} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
+                    <span className={`text-foreground font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{figure}</span>
                   </div>
+                  {/* Camera off badge in podcast mode */}
+                  {podcastMode && (
+                    <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
+                      <VideoOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
+                    </div>
+                  )}
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                  <span className={`text-foreground font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{figure}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Content Area - Only shown in podcast mode */}
