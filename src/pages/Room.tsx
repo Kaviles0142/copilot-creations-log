@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { 
   Loader2, 
   Mic, 
@@ -18,7 +23,8 @@ import {
   User,
   X,
   Plus,
-  Send
+  Send,
+  Radio
 } from 'lucide-react';
 
 interface Room {
@@ -50,6 +56,79 @@ const Room = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
+  const [podcastMode, setPodcastMode] = useState(true);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Handle video toggle
+  useEffect(() => {
+    const handleVideo = async () => {
+      if (videoEnabled) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: true,
+            audio: audioEnabled 
+          });
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          console.error('Error accessing camera:', err);
+          setVideoEnabled(false);
+        }
+      } else {
+        if (streamRef.current) {
+          streamRef.current.getVideoTracks().forEach(track => track.stop());
+          if (!audioEnabled) {
+            streamRef.current = null;
+            if (videoRef.current) {
+              videoRef.current.srcObject = null;
+            }
+          }
+        }
+      }
+    };
+    handleVideo();
+  }, [videoEnabled, audioEnabled]);
+
+  // Handle audio toggle
+  useEffect(() => {
+    const handleAudio = async () => {
+      if (audioEnabled && !streamRef.current) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true,
+            video: videoEnabled 
+          });
+          streamRef.current = stream;
+          if (videoRef.current && videoEnabled) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          console.error('Error accessing microphone:', err);
+          setAudioEnabled(false);
+        }
+      } else if (!audioEnabled && streamRef.current) {
+        streamRef.current.getAudioTracks().forEach(track => track.stop());
+        if (!videoEnabled) {
+          streamRef.current = null;
+        }
+      }
+    };
+    handleAudio();
+  }, [audioEnabled, videoEnabled]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -87,6 +166,9 @@ const Room = () => {
   }, [roomCode]);
 
   const handleEndCall = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
     navigate('/join');
   };
 
@@ -150,14 +232,29 @@ const Room = () => {
           <div className="flex-shrink-0 flex justify-center gap-3 mb-4 flex-wrap">
             {/* Guest (You) Tile */}
             <div className="relative w-36 h-24 bg-card rounded-lg overflow-hidden border border-border">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <User className="w-5 h-5 text-primary" />
+              {videoEnabled ? (
+                <video 
+                  ref={videoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <User className="w-5 h-5 text-primary" />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                 <span className="text-foreground text-xs font-medium">{guestName}</span>
               </div>
+              {!audioEnabled && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
+                  <MicOff className="w-3 h-3 text-destructive-foreground" />
+                </div>
+              )}
             </div>
 
             {/* Figure Tiles */}
@@ -175,27 +272,29 @@ const Room = () => {
             ))}
           </div>
 
-          {/* Content Area */}
-          <div className="flex-1 bg-card rounded-xl border border-border flex items-center justify-center overflow-hidden min-h-0">
-            <div className="text-center p-8">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
-                Conversation with
-              </h1>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
-                {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Figures`}
-              </h2>
-              <div className="flex flex-wrap justify-center gap-2 mt-4">
-                {displayFigures.map((figure, index) => (
-                  <Badge key={index} variant="secondary" className="text-sm">
-                    {figure}
-                  </Badge>
-                ))}
+          {/* Content Area - Only shown in podcast mode */}
+          {podcastMode && (
+            <div className="flex-1 bg-card rounded-xl border border-border flex items-center justify-center overflow-hidden min-h-0">
+              <div className="text-center p-8">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
+                  Conversation with
+                </h1>
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
+                  {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Figures`}
+                </h2>
+                <div className="flex flex-wrap justify-center gap-2 mt-4">
+                  {displayFigures.map((figure, index) => (
+                    <Badge key={index} variant="secondary" className="text-sm">
+                      {figure}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-muted-foreground mt-6">
+                  Voice conversation coming soon...
+                </p>
               </div>
-              <p className="text-muted-foreground mt-6">
-                Voice conversation coming soon...
-              </p>
             </div>
-          </div>
+          )}
         </main>
 
         {/* Chat Sidebar */}
@@ -267,7 +366,31 @@ const Room = () => {
           />
           <ToolbarButton icon={Heart} label="React" onClick={() => {}} />
           <ToolbarButton icon={Share2} label="Share" onClick={() => {}} />
-          <ToolbarButton icon={MoreHorizontal} label="More" onClick={() => {}} />
+          
+          <Popover open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors group ${
+                  moreMenuOpen ? 'bg-muted' : 'hover:bg-muted'
+                }`}
+              >
+                <MoreHorizontal className={`w-5 h-5 ${moreMenuOpen ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                <span className={`text-xs ${moreMenuOpen ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>More</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="center" className="w-48 p-1 bg-card border-border">
+              <button
+                onClick={() => {
+                  setPodcastMode(!podcastMode);
+                  setMoreMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-foreground"
+              >
+                <Radio className="w-4 h-4" />
+                {podcastMode ? 'Disable' : 'Enable'} Podcast Mode
+              </button>
+            </PopoverContent>
+          </Popover>
           
           <div className="w-6" />
           
