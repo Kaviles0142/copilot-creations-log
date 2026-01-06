@@ -4,13 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Loader2, Mic, MicOff, Video, VideoOff, X, UserPlus } from 'lucide-react';
 
 const Join = () => {
@@ -109,6 +102,11 @@ const Join = () => {
   };
 
   const handleStart = async () => {
+    if (participants.length === 0) {
+      setError('Please add at least one historical figure');
+      return;
+    }
+    
     setIsConnecting(true);
     setError(null);
 
@@ -132,7 +130,11 @@ const Join = () => {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      navigate(`/rooms/${data.room_code}`, { replace: true });
+      // Pass figures as state to the room
+      navigate(`/rooms/${data.room_code}`, { 
+        replace: true,
+        state: { figures: participants }
+      });
     } catch (err) {
       console.error('Error creating room:', err);
       setError('Failed to create room. Please try again.');
@@ -209,74 +211,44 @@ const Join = () => {
             </div>
           </div>
 
-          {/* Device Selectors */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <div className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <Select defaultValue="default">
-                <SelectTrigger className="flex-1 bg-background border-border h-9 text-sm">
-                  <SelectValue placeholder="Microphone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default Microphone</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Video className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <Select defaultValue="default">
-                <SelectTrigger className="flex-1 bg-background border-border h-9 text-sm">
-                  <SelectValue placeholder="Camera" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default Camera</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Add Participants */}
+          {/* Historical Figures Input */}
           <div className="mb-5">
             <label className="text-sm text-muted-foreground mb-2 block flex items-center gap-1.5">
               <UserPlus className="w-4 h-4" />
-              Add Participants
+              Add Historical Figures
             </label>
-            <div className="flex gap-2 mb-2">
+            <div className="min-h-[42px] flex flex-wrap items-center gap-1.5 p-2 bg-background border border-border rounded-lg focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              {participants.map((p) => (
+                <Badge 
+                  key={p} 
+                  variant="secondary" 
+                  className="pr-1 gap-1 text-xs h-7"
+                >
+                  {p}
+                  <button 
+                    onClick={() => removeParticipant(p)}
+                    className="ml-0.5 hover:text-destructive rounded-full p-0.5 hover:bg-destructive/10"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
               <Input
                 value={participantInput}
                 onChange={(e) => setParticipantInput(e.target.value)}
-                placeholder="Enter name or email..."
-                className="flex-1 bg-background border-border h-9 text-sm"
-                onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
+                placeholder={participants.length === 0 ? "Type a name and press Enter..." : "Add another..."}
+                className="flex-1 min-w-[120px] border-0 h-7 text-sm p-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addParticipant();
+                  }
+                }}
               />
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={addParticipant}
-                className="px-3"
-              >
-                Add
-              </Button>
             </div>
-            {participants.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {participants.map((p) => (
-                  <Badge 
-                    key={p} 
-                    variant="secondary" 
-                    className="pr-1.5 gap-1 text-xs"
-                  >
-                    {p}
-                    <button 
-                      onClick={() => removeParticipant(p)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground mt-1.5">
+              e.g. Albert Einstein, Cleopatra, Leonardo da Vinci
+            </p>
           </div>
 
           {/* Error */}
