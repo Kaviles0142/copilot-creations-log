@@ -206,6 +206,58 @@ const Room = () => {
 
   const displayFigures = figures.length > 0 ? figures : (room.figure_name ? [room.figure_name] : ['AI Assistant']);
   const guestName = 'You';
+  const totalParticipants = displayFigures.length + 1; // +1 for "You"
+
+  // Dynamic tile sizing based on participant count (only for non-podcast mode)
+  const getTileClasses = () => {
+    if (podcastMode) return 'w-36 h-24';
+    
+    if (totalParticipants <= 2) {
+      return 'w-64 h-48 md:w-80 md:h-60';
+    } else if (totalParticipants <= 4) {
+      return 'w-40 h-28 md:w-56 md:h-40';
+    } else if (totalParticipants <= 6) {
+      return 'w-32 h-24 md:w-44 md:h-32';
+    } else {
+      return 'w-28 h-20 md:w-36 md:h-28';
+    }
+  };
+
+  const getAvatarClasses = () => {
+    if (podcastMode) return 'w-10 h-10';
+    
+    if (totalParticipants <= 2) {
+      return 'w-20 h-20';
+    } else if (totalParticipants <= 4) {
+      return 'w-14 h-14';
+    } else {
+      return 'w-10 h-10';
+    }
+  };
+
+  const getIconClasses = () => {
+    if (podcastMode) return 'w-5 h-5';
+    
+    if (totalParticipants <= 2) {
+      return 'w-10 h-10';
+    } else if (totalParticipants <= 4) {
+      return 'w-7 h-7';
+    } else {
+      return 'w-5 h-5';
+    }
+  };
+
+  const getMuteIconClasses = () => {
+    if (podcastMode) return 'w-5 h-5';
+    if (totalParticipants <= 2) return 'w-7 h-7';
+    return 'w-5 h-5';
+  };
+
+  const getMuteInnerIconClasses = () => {
+    if (podcastMode) return 'w-3 h-3';
+    if (totalParticipants <= 2) return 'w-4 h-4';
+    return 'w-3 h-3';
+  };
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -231,9 +283,7 @@ const Room = () => {
           {/* Video Tiles */}
           <div className={`flex justify-center gap-4 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
             {/* Guest (You) Tile */}
-            <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${
-              podcastMode ? 'w-36 h-24' : 'w-64 h-48 md:w-80 md:h-60'
-            }`}>
+            <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
               {videoEnabled ? (
                 <video 
                   ref={videoRef} 
@@ -244,39 +294,31 @@ const Room = () => {
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`rounded-full bg-primary/20 flex items-center justify-center transition-all ${
-                    podcastMode ? 'w-10 h-10' : 'w-20 h-20'
-                  }`}>
-                    <User className={`text-primary transition-all ${podcastMode ? 'w-5 h-5' : 'w-10 h-10'}`} />
+                  <div className={`rounded-full bg-primary/20 flex items-center justify-center transition-all ${getAvatarClasses()}`}>
+                    <User className={`text-primary transition-all ${getIconClasses()}`} />
                   </div>
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                <span className={`text-foreground font-medium ${podcastMode ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
+                <span className={`text-foreground font-medium ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
               </div>
               {!audioEnabled && (
-                <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${
-                  podcastMode ? 'w-5 h-5' : 'w-7 h-7'
-                }`}>
-                  <MicOff className={`text-destructive-foreground ${podcastMode ? 'w-3 h-3' : 'w-4 h-4'}`} />
+                <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
+                  <MicOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
                 </div>
               )}
             </div>
 
             {/* Figure Tiles */}
             {displayFigures.map((figure, index) => (
-              <div key={index} className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${
-                podcastMode ? 'w-36 h-24' : 'w-64 h-48 md:w-80 md:h-60'
-              }`}>
+              <div key={index} className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${
-                    podcastMode ? 'w-10 h-10' : 'w-20 h-20'
-                  }`}>
-                    <User className={`text-muted-foreground transition-all ${podcastMode ? 'w-5 h-5' : 'w-10 h-10'}`} />
+                  <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${getAvatarClasses()}`}>
+                    <User className={`text-muted-foreground transition-all ${getIconClasses()}`} />
                   </div>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                  <span className={`text-foreground font-medium truncate block ${podcastMode ? 'text-xs' : 'text-sm'}`}>{figure}</span>
+                  <span className={`text-foreground font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{figure}</span>
                 </div>
               </div>
             ))}
