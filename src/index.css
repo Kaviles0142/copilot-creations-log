@@ -19,40 +19,40 @@
     --popover: 40 25% 98%;
     --popover-foreground: 20 15% 12%;
 
-    --primary: 38 92% 50%;
+    --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 20% 92%;
-    --secondary-foreground: 20 15% 20%;
+    --secondary: 160 20% 92%;
+    --secondary-foreground: 160 15% 20%;
 
-    --muted: 40 15% 90%;
-    --muted-foreground: 20 10% 45%;
+    --muted: 160 15% 90%;
+    --muted-foreground: 160 10% 45%;
 
-    --accent: 38 92% 50%;
+    --accent: 160 84% 39%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 35 20% 88%;
-    --input: 35 20% 90%;
-    --ring: 38 92% 50%;
+    --border: 160 20% 88%;
+    --input: 160 20% 90%;
+    --ring: 160 84% 39%;
 
     --radius: 0.75rem;
 
-    --hero-gradient-start: 38 92% 50%;
-    --hero-gradient-end: 28 85% 40%;
-    --gold: 45 100% 50%;
-    --gold-muted: 40 40% 70%;
+    --hero-gradient-start: 160 84% 39%;
+    --hero-gradient-end: 150 80% 30%;
+    --emerald: 160 84% 45%;
+    --emerald-muted: 160 40% 70%;
     
-    --sidebar-background: 40 25% 97%;
-    --sidebar-foreground: 20 15% 20%;
-    --sidebar-primary: 38 92% 50%;
+    --sidebar-background: 160 25% 97%;
+    --sidebar-foreground: 160 15% 20%;
+    --sidebar-primary: 160 84% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 20% 93%;
-    --sidebar-accent-foreground: 20 15% 20%;
-    --sidebar-border: 35 20% 88%;
-    --sidebar-ring: 38 92% 50%;
+    --sidebar-accent: 160 20% 93%;
+    --sidebar-accent-foreground: 160 15% 20%;
+    --sidebar-border: 160 20% 88%;
+    --sidebar-ring: 160 84% 39%;
   }
 
   .dark {
@@ -66,40 +66,40 @@
     --popover: 20 12% 10%;
     --popover-foreground: 40 20% 96%;
 
-    /* Rich amber gold primary */
-    --primary: 38 92% 50%;
-    --primary-foreground: 20 15% 6%;
+    /* Emerald green primary */
+    --primary: 160 84% 39%;
+    --primary-foreground: 160 15% 6%;
 
-    --secondary: 20 10% 15%;
-    --secondary-foreground: 40 20% 90%;
+    --secondary: 160 10% 15%;
+    --secondary-foreground: 160 20% 90%;
 
-    --muted: 20 10% 12%;
-    --muted-foreground: 40 10% 55%;
+    --muted: 160 10% 12%;
+    --muted-foreground: 160 10% 55%;
 
-    /* Warm gold accent */
-    --accent: 38 92% 50%;
-    --accent-foreground: 20 15% 6%;
+    /* Emerald green accent */
+    --accent: 160 84% 39%;
+    --accent-foreground: 160 15% 6%;
 
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 20 10% 18%;
-    --input: 20 10% 15%;
-    --ring: 38 92% 50%;
+    --border: 160 10% 18%;
+    --input: 160 10% 15%;
+    --ring: 160 84% 39%;
 
-    --hero-gradient-start: 38 92% 50%;
-    --hero-gradient-end: 28 85% 35%;
-    --gold: 45 100% 55%;
-    --gold-muted: 40 30% 40%;
+    --hero-gradient-start: 160 84% 39%;
+    --hero-gradient-end: 150 80% 30%;
+    --emerald: 160 84% 45%;
+    --emerald-muted: 160 30% 40%;
 
-    --sidebar-background: 20 12% 8%;
-    --sidebar-foreground: 40 20% 90%;
-    --sidebar-primary: 38 92% 50%;
-    --sidebar-primary-foreground: 20 15% 6%;
-    --sidebar-accent: 20 10% 12%;
-    --sidebar-accent-foreground: 40 20% 90%;
-    --sidebar-border: 20 10% 15%;
-    --sidebar-ring: 38 92% 50%;
+    --sidebar-background: 160 12% 8%;
+    --sidebar-foreground: 160 20% 90%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 160 15% 6%;
+    --sidebar-accent: 160 10% 12%;
+    --sidebar-accent-foreground: 160 20% 90%;
+    --sidebar-border: 160 10% 15%;
+    --sidebar-ring: 160 84% 39%;
   }
 }
 
