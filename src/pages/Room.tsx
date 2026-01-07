@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Popover,
   PopoverContent,
@@ -24,7 +26,9 @@ import {
   X,
   Plus,
   Send,
-  Radio
+  Radio,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
 
@@ -53,6 +57,7 @@ const Room = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, setTheme } = useTheme();
   const state = location.state as LocationState | null;
   
   const [room, setRoom] = useState<Room | null>(null);
@@ -373,7 +378,17 @@ const Room = () => {
             {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} participants`}
           </span>
         </div>
-        <span className="text-xs text-muted-foreground font-mono">{room.room_code}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-foreground">Never Gone</span>
+          <div className="flex items-center gap-2">
+            <Sun className="w-4 h-4 text-muted-foreground" />
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            />
+            <Moon className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </div>
       </header>
 
       {/* Main Content */}
