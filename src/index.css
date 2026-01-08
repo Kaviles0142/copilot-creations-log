@@ -176,12 +176,12 @@
     }
   }
 
-  @keyframes pulse-gold {
+  @keyframes pulse-speaking {
     0%, 100% {
-      box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
+      box-shadow: 0 0 8px hsl(var(--primary) / 0.3);
     }
     50% {
-      box-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
+      box-shadow: 0 0 14px hsl(var(--primary) / 0.5);
     }
   }
 }
