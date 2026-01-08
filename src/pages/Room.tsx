@@ -60,7 +60,7 @@ const Room = () => {
   const [error, setError] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
   const [podcastMode, setPodcastMode] = useState(false);
   const [speakingFigure, setSpeakingFigure] = useState<string | null>(null);
