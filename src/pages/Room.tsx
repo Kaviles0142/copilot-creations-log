@@ -392,10 +392,10 @@ const Room = () => {
                     <div 
                       className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${showImage ? 'bg-black' : 'bg-card'} ${
                         isSpeaking 
-                          ? 'ring-1 ring-primary/70 shadow-[0_0_12px_hsl(var(--primary)/0.3)]' 
+                          ? 'ring-2 ring-primary' 
                           : 'border border-border'
                       }`}
-                      style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
+                      style={isSpeaking ? { animation: 'pulse-speaking 1.5s ease-in-out infinite' } : undefined}
                     >
                       {avatar?.isLoading ? (
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -490,10 +490,10 @@ const Room = () => {
                     key={index} 
                     className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} ${
                       isSpeaking 
-                        ? 'ring-1 ring-primary/70 shadow-[0_0_12px_hsl(var(--primary)/0.3)]' 
+                        ? 'ring-2 ring-primary' 
                         : 'border border-border'
                     }`}
-                    style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
+                    style={isSpeaking ? { animation: 'pulse-speaking 1.5s ease-in-out infinite' } : undefined}
                   >
                     {avatar?.isLoading ? (
                       <div className="absolute inset-0 flex items-center justify-center">
