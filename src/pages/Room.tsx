@@ -63,7 +63,7 @@ const Room = () => {
   const [chatOpen, setChatOpen] = useState(true);
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
   const [podcastMode, setPodcastMode] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingFigure, setSpeakingFigure] = useState<string | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [figureAvatars, setFigureAvatars] = useState<Map<string, FigureAvatar>>(new Map());
   const [podcastSceneImage, setPodcastSceneImage] = useState<string | null>(null);
@@ -410,8 +410,18 @@ const Room = () => {
             {displayFigures.map((figure, index) => {
               const avatar = figureAvatars.get(figure);
               const showImage = !podcastMode && avatar?.imageUrl;
-                return (
-                <div key={index} className={`relative rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'}`}>
+              const isSpeaking = speakingFigure === figure;
+              
+              return (
+                <div 
+                  key={index} 
+                  className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} ${
+                    isSpeaking 
+                      ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-background shadow-[0_0_20px_rgba(251,191,36,0.5)]' 
+                      : 'border border-border'
+                  }`}
+                  style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
+                >
                   {avatar?.isLoading ? (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
@@ -485,7 +495,7 @@ const Room = () => {
           figures={displayFigures}
           isOpen={chatOpen}
           onClose={() => setChatOpen(false)}
-          onSpeakingChange={setIsSpeaking}
+          onSpeakingChange={(speaking, speaker) => setSpeakingFigure(speaking ? speaker || null : null)}
         />
       </div>
 
