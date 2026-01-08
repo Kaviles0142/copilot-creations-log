@@ -389,13 +389,12 @@ const Room = () => {
                 
                 return (
                   <div className="flex-1 flex items-center justify-center">
-                    <div 
-                      className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${showImage ? 'bg-black' : 'bg-card'} ${
-                        isSpeaking 
-                          ? 'ring-2 ring-primary' 
-                          : 'border border-border'
-                      }`}
-                      style={isSpeaking ? { animation: 'pulse-speaking 1.5s ease-in-out infinite' } : undefined}
+                  <div 
+                    className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${
+                      isSpeaking 
+                        ? 'bg-primary' 
+                        : showImage ? 'bg-black' : 'bg-card border border-border'
+                    }`}
                     >
                       {avatar?.isLoading ? (
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -488,12 +487,11 @@ const Room = () => {
                 return (
                   <div 
                     key={index} 
-                    className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} ${
+                    className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${
                       isSpeaking 
-                        ? 'ring-2 ring-primary' 
-                        : 'border border-border'
+                        ? 'bg-primary' 
+                        : showImage ? 'bg-black' : 'bg-card border border-border'
                     }`}
-                    style={isSpeaking ? { animation: 'pulse-speaking 1.5s ease-in-out infinite' } : undefined}
                   >
                     {avatar?.isLoading ? (
                       <div className="absolute inset-0 flex items-center justify-center">
