@@ -9,50 +9,51 @@
 
 @layer base {
   :root {
-    /* Light mode - warm cream */
-    --background: 40 30% 96%;
-    --foreground: 20 15% 12%;
+    /* Light mode - elegant with purple accent */
+    --background: 270 20% 98%;
+    --foreground: 270 15% 12%;
 
-    --card: 40 25% 98%;
-    --card-foreground: 20 15% 12%;
+    --card: 270 15% 99%;
+    --card-foreground: 270 15% 12%;
 
-    --popover: 40 25% 98%;
-    --popover-foreground: 20 15% 12%;
+    --popover: 270 15% 99%;
+    --popover-foreground: 270 15% 12%;
 
-    --primary: 38 92% 50%;
+    /* Rich purple primary for light mode */
+    --primary: 270 70% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 20% 92%;
-    --secondary-foreground: 20 15% 20%;
+    --secondary: 270 15% 93%;
+    --secondary-foreground: 270 15% 20%;
 
-    --muted: 40 15% 90%;
-    --muted-foreground: 20 10% 45%;
+    --muted: 270 10% 92%;
+    --muted-foreground: 270 10% 45%;
 
-    --accent: 38 92% 50%;
+    --accent: 270 70% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 35 20% 88%;
-    --input: 35 20% 90%;
-    --ring: 38 92% 50%;
+    --border: 270 15% 88%;
+    --input: 270 15% 90%;
+    --ring: 270 70% 55%;
 
     --radius: 0.75rem;
 
-    --hero-gradient-start: 38 92% 50%;
-    --hero-gradient-end: 28 85% 40%;
-    --gold: 45 100% 50%;
-    --gold-muted: 40 40% 70%;
+    --hero-gradient-start: 270 70% 55%;
+    --hero-gradient-end: 280 65% 45%;
+    --gold: 270 70% 55%;
+    --gold-muted: 270 30% 70%;
     
-    --sidebar-background: 40 25% 97%;
-    --sidebar-foreground: 20 15% 20%;
-    --sidebar-primary: 38 92% 50%;
+    --sidebar-background: 270 15% 98%;
+    --sidebar-foreground: 270 15% 20%;
+    --sidebar-primary: 270 70% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 20% 93%;
-    --sidebar-accent-foreground: 20 15% 20%;
-    --sidebar-border: 35 20% 88%;
-    --sidebar-ring: 38 92% 50%;
+    --sidebar-accent: 270 15% 94%;
+    --sidebar-accent-foreground: 270 15% 20%;
+    --sidebar-border: 270 15% 88%;
+    --sidebar-ring: 270 70% 55%;
   }
 
   .dark {
