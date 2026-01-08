@@ -390,10 +390,10 @@ const Room = () => {
                 return (
                   <div className="flex-1 flex items-center justify-center">
                   <div 
-                    className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${
+                    className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${showImage ? 'bg-black' : 'bg-card'} border-2 ${
                       isSpeaking 
-                        ? 'bg-primary' 
-                        : showImage ? 'bg-black' : 'bg-card border border-border'
+                        ? 'border-primary' 
+                        : 'border-border'
                     }`}
                     >
                       {avatar?.isLoading ? (
@@ -487,10 +487,10 @@ const Room = () => {
                 return (
                   <div 
                     key={index} 
-                    className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${
+                    className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} border-2 ${
                       isSpeaking 
-                        ? 'bg-primary' 
-                        : showImage ? 'bg-black' : 'bg-card border border-border'
+                        ? 'border-primary' 
+                        : 'border-border'
                     }`}
                   >
                     {avatar?.isLoading ? (
