@@ -188,10 +188,10 @@
   .dark {
     @keyframes pulse-speaking {
       0%, 100% {
-        box-shadow: 0 0 8px hsl(var(--primary) / 0.3);
+        box-shadow: 0 0 12px hsl(var(--primary) / 0.5);
       }
       50% {
-        box-shadow: 0 0 14px hsl(var(--primary) / 0.5);
+        box-shadow: 0 0 18px hsl(var(--primary) / 0.7);
       }
     }
   }
