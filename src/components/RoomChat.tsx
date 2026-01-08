@@ -353,12 +353,16 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
         <div className="flex items-center gap-2 p-4 flex-wrap">
           {figures.length > 1 && (
             <Badge 
-              className={`cursor-pointer transition-all ${
+              className={`cursor-pointer transition-all select-none ${
                 isEveryoneSelected 
                   ? 'bg-primary text-primary-foreground' 
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
-              onClick={toggleEveryone}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleEveryone();
+              }}
             >
               Everyone
             </Badge>
@@ -366,16 +370,20 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
           {figures.map((figure) => (
             <Badge 
               key={figure}
-              className={`cursor-pointer transition-all ${
+              className={`cursor-pointer transition-all select-none ${
                 selectedResponders.has(figure) && !isEveryoneSelected
                   ? 'bg-primary text-primary-foreground' 
                   : selectedResponders.has(figure) && isEveryoneSelected
                     ? 'bg-primary/20 text-primary border border-primary/30'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
-              onClick={() => toggleResponder(figure)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleResponder(figure);
+              }}
             >
-              {figure.split(' ')[0]}
+              {figure}
             </Badge>
           ))}
           {isPlayingAudio && (
@@ -442,7 +450,7 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
           <Input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={isEveryoneSelected ? "Message everyone" : `Message ${[...selectedResponders].map(f => f.split(' ')[0]).join(', ')}`}
+            placeholder={isEveryoneSelected ? "Message everyone" : `Message ${[...selectedResponders].join(', ')}`}
             className="flex-1 bg-background border-border"
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
             disabled={isLoading}

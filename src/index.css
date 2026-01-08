@@ -178,20 +178,20 @@
 
   @keyframes pulse-speaking {
     0%, 100% {
-      box-shadow: 0 0 16px hsl(var(--primary) / 0.6);
+      box-shadow: 0 0 8px hsl(var(--primary) / 0.15);
     }
     50% {
-      box-shadow: 0 0 24px hsl(var(--primary) / 0.8);
+      box-shadow: 0 0 12px hsl(var(--primary) / 0.25);
     }
   }
 
   .dark {
     @keyframes pulse-speaking {
       0%, 100% {
-        box-shadow: 0 0 12px hsl(var(--primary) / 0.2);
+        box-shadow: 0 0 8px hsl(var(--primary) / 0.15);
       }
       50% {
-        box-shadow: 0 0 18px hsl(var(--primary) / 0.35);
+        box-shadow: 0 0 12px hsl(var(--primary) / 0.25);
       }
     }
   }
