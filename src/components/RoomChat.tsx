@@ -134,11 +134,11 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
       addMessage('assistant', greeting, figureName);
       setGreetingsPlayed(prev => new Set([...prev, figureName]));
 
-      // Generate TTS audio
-      const { data: audioData, error } = await supabase.functions.invoke('generate-tts-audio', {
+      // Generate TTS audio using Azure
+      const { data: audioData, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
           text: greeting,
-          figureName,
+          figure_name: figureName,
         }
       });
 
@@ -297,11 +297,11 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
         // Add the response message
         addMessage('assistant', response, figureName);
 
-        // Generate TTS for the response
-        const { data: audioData, error: audioError } = await supabase.functions.invoke('generate-tts-audio', {
+        // Generate TTS for the response using Azure
+        const { data: audioData, error: audioError } = await supabase.functions.invoke('azure-text-to-speech', {
           body: {
             text: response,
-            figureName,
+            figure_name: figureName,
           }
         });
 
