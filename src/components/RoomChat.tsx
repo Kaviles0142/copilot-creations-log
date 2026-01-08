@@ -336,10 +336,10 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex items-center gap-2 p-4 flex-wrap">
+        <div className="flex items-center gap-2 p-4 overflow-x-auto scrollbar-none">
           {figures.length > 1 && (
             <Badge 
-              className={`cursor-pointer transition-all select-none ${
+              className={`cursor-pointer transition-all select-none shrink-0 whitespace-nowrap ${
                 isEveryoneSelected 
                   ? 'bg-primary text-primary-foreground' 
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -356,7 +356,7 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
           {figures.map((figure) => (
             <Badge 
               key={figure}
-              className={`cursor-pointer transition-all select-none ${
+              className={`cursor-pointer transition-all select-none shrink-0 whitespace-nowrap ${
                 selectedResponders.has(figure) && selectedResponders.size === 1
                   ? 'bg-primary text-primary-foreground' 
                   : isEveryoneSelected
