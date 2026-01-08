@@ -35,30 +35,16 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
   // Check if everyone is selected
   const isEveryoneSelected = selectedResponders.size === figures.length && figures.every(f => selectedResponders.has(f));
   
-  const toggleResponder = (figureName: string) => {
-    setSelectedResponders(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(figureName)) {
-        // Don't allow deselecting if it's the last one
-        if (newSet.size > 1) {
-          newSet.delete(figureName);
-        }
-      } else {
-        newSet.add(figureName);
-      }
-      return newSet;
-    });
+  const selectResponder = (figureName: string) => {
+    // Tapping a person selects ONLY that person
+    setSelectedResponders(new Set([figureName]));
   };
   
-  const toggleEveryone = () => {
-    if (isEveryoneSelected) {
-      // Select only the first figure
-      setSelectedResponders(new Set([figures[0]]));
-    } else {
-      // Select all
-      setSelectedResponders(new Set(figures));
-    }
+  const selectEveryone = () => {
+    // Select all figures
+    setSelectedResponders(new Set(figures));
   };
+  
   
   const audioQueueRef = useRef<{ audioUrl: string; figureName: string }[]>([]);
   const isProcessingAudioRef = useRef(false);
@@ -361,7 +347,7 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleEveryone();
+                selectEveryone();
               }}
             >
               Everyone
@@ -371,16 +357,16 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
             <Badge 
               key={figure}
               className={`cursor-pointer transition-all select-none ${
-                selectedResponders.has(figure) && !isEveryoneSelected
+                selectedResponders.has(figure) && selectedResponders.size === 1
                   ? 'bg-primary text-primary-foreground' 
-                  : selectedResponders.has(figure) && isEveryoneSelected
+                  : isEveryoneSelected
                     ? 'bg-primary/20 text-primary border border-primary/30'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleResponder(figure);
+                selectResponder(figure);
               }}
             >
               {figure}
