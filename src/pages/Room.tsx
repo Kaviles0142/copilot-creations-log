@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -23,14 +22,10 @@ import {
   Share2, 
   MoreHorizontal,
   User,
-  X,
-  Plus,
-  Send,
   Radio,
-  Sun,
-  Moon
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
+import RoomChat from '@/components/RoomChat';
 
 interface Room {
   id: string;
@@ -66,9 +61,9 @@ const Room = () => {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
-  const [message, setMessage] = useState('');
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
   const [podcastMode, setPodcastMode] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [figureAvatars, setFigureAvatars] = useState<Map<string, FigureAvatar>>(new Map());
   const [podcastSceneImage, setPodcastSceneImage] = useState<string | null>(null);
@@ -275,12 +270,6 @@ const Room = () => {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     navigate('/join');
-  };
-
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      setMessage('');
-    }
   };
 
   if (loading) {
@@ -491,47 +480,13 @@ const Room = () => {
           )}
         </main>
 
-        {/* Chat Sidebar - Desktop: side panel, Mobile: bottom sheet */}
-        {chatOpen && (
-          <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-80 bg-card border-t md:border-t-0 md:border-l border-border flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
-            <div className="flex-shrink-0 p-4 border-b border-border">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-foreground font-semibold">Session Chat</h3>
-                <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-primary text-primary-foreground">Everyone</Badge>
-                <button className="w-7 h-7 rounded bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 p-4 overflow-y-auto">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <div className="w-4 h-4 rounded-full border border-border" />
-                <span>Who can see your messages?</span>
-              </div>
-            </div>
-
-            <div className="flex-shrink-0 p-4 border-t border-border">
-              <div className="flex items-center gap-2">
-                <Input
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Message everyone"
-                  className="flex-1 bg-background border-border"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <button onClick={handleSendMessage} className="text-muted-foreground hover:text-foreground p-2">
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </aside>
-        )}
+        {/* Chat Sidebar - Using RoomChat component */}
+        <RoomChat
+          figures={displayFigures}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+          onSpeakingChange={setIsSpeaking}
+        />
       </div>
 
       {/* Bottom Toolbar */}
