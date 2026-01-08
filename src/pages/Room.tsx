@@ -376,82 +376,156 @@ const Room = () => {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Area */}
-        <main className={`flex-1 flex flex-col overflow-hidden p-4 ${!podcastMode ? 'justify-center' : ''}`}>
-          {/* Video Tiles */}
-          <div className={`flex justify-center gap-4 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
-            {/* Guest (You) Tile */}
-            <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
-              {videoEnabled ? (
-                <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`rounded-full bg-primary/20 flex items-center justify-center transition-all ${getAvatarClasses()}`}>
-                    <User className={`text-primary transition-all ${getIconClasses()}`} />
-                  </div>
-                </div>
-              )}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                <span className={`text-foreground font-medium ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
-              </div>
-              {!audioEnabled && (
-                <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
-                  <MicOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
-                </div>
-              )}
-            </div>
-
-            {/* Figure Tiles */}
-            {displayFigures.map((figure, index) => {
-              const avatar = figureAvatars.get(figure);
-              const showImage = !podcastMode && avatar?.imageUrl;
-              const isSpeaking = speakingFigure === figure;
-              
-              return (
-                <div 
-                  key={index} 
-                  className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} ${
-                    isSpeaking 
-                      ? 'ring-1 ring-amber-400/70 shadow-[0_0_12px_rgba(251,191,36,0.3)]' 
-                      : 'border border-border'
-                  }`}
-                  style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
-                >
-                  {avatar?.isLoading ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
-                    </div>
-                  ) : showImage ? (
-                    <img 
-                      src={avatar.imageUrl} 
-                      alt={figure}
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${getAvatarClasses()}`}>
-                        <User className={`text-muted-foreground transition-all ${getIconClasses()}`} />
+        <main className={`flex-1 flex flex-col overflow-hidden p-4 ${!podcastMode ? 'justify-center' : ''} relative`}>
+          {/* 1-on-1 Layout: Single figure centered, You tile floating */}
+          {displayFigures.length === 1 && !podcastMode ? (
+            <>
+              {/* Main Figure Tile - Centered */}
+              {(() => {
+                const figure = displayFigures[0];
+                const avatar = figureAvatars.get(figure);
+                const showImage = avatar?.imageUrl;
+                const isSpeaking = speakingFigure === figure;
+                
+                return (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div 
+                      className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${showImage ? 'bg-black' : 'bg-card'} ${
+                        isSpeaking 
+                          ? 'ring-1 ring-amber-400/70 shadow-[0_0_12px_rgba(251,191,36,0.3)]' 
+                          : 'border border-border'
+                      }`}
+                      style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
+                    >
+                      {avatar?.isLoading ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Loader2 className="w-12 h-12 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : showImage ? (
+                        <img 
+                          src={avatar.imageUrl} 
+                          alt={figure}
+                          className="absolute inset-0 w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
+                            <User className="w-12 h-12 text-muted-foreground" />
+                          </div>
+                        </div>
+                      )}
+                      <div className={`absolute bottom-0 left-0 right-0 p-3 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
+                        <span className={`font-medium text-base ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
                       </div>
                     </div>
-                  )}
-                  <div className={`absolute bottom-0 left-0 right-0 p-2 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
-                    <span className={`font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'} ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
                   </div>
-                  {/* Camera off badge in podcast mode */}
-                  {podcastMode && (
-                    <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
-                      <VideoOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
+                );
+              })()}
+              
+              {/* Floating You Tile - Bottom Right */}
+              <div className="absolute bottom-6 right-6 w-40 h-28 rounded-xl overflow-hidden border border-border bg-card shadow-lg z-10">
+                {videoEnabled ? (
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                      <User className="w-6 h-6 text-primary" />
                     </div>
-                  )}
+                  </div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-1.5">
+                  <span className="text-foreground font-medium text-xs">{guestName}</span>
                 </div>
-              );
-            })}
-          </div>
+                {!audioEnabled && (
+                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
+                    <MicOff className="w-3 h-3 text-destructive-foreground" />
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Multi-participant Layout - Original grid */
+            <div className={`flex justify-center gap-4 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
+              {/* Guest (You) Tile */}
+              <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
+                {videoEnabled ? (
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className={`rounded-full bg-primary/20 flex items-center justify-center transition-all ${getAvatarClasses()}`}>
+                      <User className={`text-primary transition-all ${getIconClasses()}`} />
+                    </div>
+                  </div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
+                  <span className={`text-foreground font-medium ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
+                </div>
+                {!audioEnabled && (
+                  <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
+                    <MicOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
+                  </div>
+                )}
+              </div>
+
+              {/* Figure Tiles */}
+              {displayFigures.map((figure, index) => {
+                const avatar = figureAvatars.get(figure);
+                const showImage = !podcastMode && avatar?.imageUrl;
+                const isSpeaking = speakingFigure === figure;
+                
+                return (
+                  <div 
+                    key={index} 
+                    className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} ${
+                      isSpeaking 
+                        ? 'ring-1 ring-amber-400/70 shadow-[0_0_12px_rgba(251,191,36,0.3)]' 
+                        : 'border border-border'
+                    }`}
+                    style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
+                  >
+                    {avatar?.isLoading ? (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
+                      </div>
+                    ) : showImage ? (
+                      <img 
+                        src={avatar.imageUrl} 
+                        alt={figure}
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${getAvatarClasses()}`}>
+                          <User className={`text-muted-foreground transition-all ${getIconClasses()}`} />
+                        </div>
+                      </div>
+                    )}
+                    <div className={`absolute bottom-0 left-0 right-0 p-2 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
+                      <span className={`font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'} ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
+                    </div>
+                    {/* Camera off badge in podcast mode */}
+                    {podcastMode && (
+                      <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
+                        <VideoOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Content Area - Only shown in podcast mode */}
           {podcastMode && (
