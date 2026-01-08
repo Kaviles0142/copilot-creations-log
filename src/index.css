@@ -174,4 +174,13 @@
       box-shadow: 0 0 60px -15px hsl(var(--primary) / 0.4);
     }
   }
+
+  @keyframes pulse-gold {
+    0%, 100% {
+      box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+    }
+  }
 }

@@ -19,7 +19,7 @@ interface RoomChatProps {
   figures: string[];
   isOpen: boolean;
   onClose: () => void;
-  onSpeakingChange?: (speaking: boolean) => void;
+  onSpeakingChange?: (speaking: boolean, speakerName?: string) => void;
 }
 
 const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps) => {
@@ -182,6 +182,9 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
     return new Promise((resolve) => {
       const audio = new Audio(audioUrl);
       
+      // Notify that this figure is now speaking
+      onSpeakingChange?.(true, figureName);
+      
       // Mark message as playing
       setMessages(prev => prev.map(msg => 
         msg.speakerName === figureName && msg.type === 'assistant'
@@ -190,6 +193,9 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
       ));
 
       audio.onended = () => {
+        // Notify speaking stopped
+        onSpeakingChange?.(false, undefined);
+        
         // Unmark message
         setMessages(prev => prev.map(msg => 
           msg.speakerName === figureName
