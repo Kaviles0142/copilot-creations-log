@@ -30,6 +30,35 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [figuresJoined, setFiguresJoined] = useState<Set<string>>(new Set());
   const [greetingsPlayed, setGreetingsPlayed] = useState<Set<string>>(new Set());
+  const [selectedResponders, setSelectedResponders] = useState<Set<string>>(new Set(figures));
+  
+  // Check if everyone is selected
+  const isEveryoneSelected = selectedResponders.size === figures.length && figures.every(f => selectedResponders.has(f));
+  
+  const toggleResponder = (figureName: string) => {
+    setSelectedResponders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(figureName)) {
+        // Don't allow deselecting if it's the last one
+        if (newSet.size > 1) {
+          newSet.delete(figureName);
+        }
+      } else {
+        newSet.add(figureName);
+      }
+      return newSet;
+    });
+  };
+  
+  const toggleEveryone = () => {
+    if (isEveryoneSelected) {
+      // Select only the first figure
+      setSelectedResponders(new Set([figures[0]]));
+    } else {
+      // Select all
+      setSelectedResponders(new Set(figures));
+    }
+  };
   
   const audioQueueRef = useRef<{ audioUrl: string; figureName: string }[]>([]);
   const isProcessingAudioRef = useRef(false);
@@ -244,8 +273,9 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
     setIsLoading(true);
 
     try {
-      // Get responses from all figures (sequentially for natural conversation)
-      for (const figureName of figures) {
+      // Get responses only from selected figures
+      const respondingFigures = figures.filter(f => selectedResponders.has(f));
+      for (const figureName of respondingFigures) {
         const figureId = figureName.toLowerCase().replace(/\s+/g, '-');
         
         // Build conversation context from recent messages
@@ -296,7 +326,7 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
         }
 
         // Small delay between figure responses for natural flow
-        if (figures.indexOf(figureName) < figures.length - 1) {
+        if (respondingFigures.indexOf(figureName) < respondingFigures.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
@@ -320,8 +350,34 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex items-center gap-2 p-4">
-          <Badge className="bg-primary text-primary-foreground">Everyone</Badge>
+        <div className="flex items-center gap-2 p-4 flex-wrap">
+          {figures.length > 1 && (
+            <Badge 
+              className={`cursor-pointer transition-all ${
+                isEveryoneSelected 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+              onClick={toggleEveryone}
+            >
+              Everyone
+            </Badge>
+          )}
+          {figures.map((figure) => (
+            <Badge 
+              key={figure}
+              className={`cursor-pointer transition-all ${
+                selectedResponders.has(figure) && !isEveryoneSelected
+                  ? 'bg-primary text-primary-foreground' 
+                  : selectedResponders.has(figure) && isEveryoneSelected
+                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+              onClick={() => toggleResponder(figure)}
+            >
+              {figure.split(' ')[0]}
+            </Badge>
+          ))}
           {isPlayingAudio && (
             <Badge variant="secondary" className="text-xs animate-pulse">
               <Volume2 className="w-3 h-3 mr-1" />
@@ -386,7 +442,7 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
           <Input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Message everyone"
+            placeholder={isEveryoneSelected ? "Message everyone" : `Message ${[...selectedResponders].map(f => f.split(' ')[0]).join(', ')}`}
             className="flex-1 bg-background border-border"
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
             disabled={isLoading}
