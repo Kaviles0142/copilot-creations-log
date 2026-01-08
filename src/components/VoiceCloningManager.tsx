@@ -203,11 +203,11 @@ const VoiceCloningManager: React.FC<VoiceCloningManagerProps> = ({
 
     setIsGenerating(true);
     try {
-      // Use ElevenLabs for reliable TTS
-      const { data, error } = await supabase.functions.invoke('elevenlabs-text-to-speech', {
+      // Use Azure TTS for reliable TTS
+      const { data, error } = await supabase.functions.invoke('azure-text-to-speech', {
         body: {
           text: testText,
-          voice: selectedVoiceId || 'Brian' // Default to Brian if no voice selected
+          figure_name: 'Test Voice'
         }
       });
 
