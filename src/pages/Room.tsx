@@ -590,15 +590,21 @@ const Room = () => {
             onClick={() => setVideoEnabled(!videoEnabled)}
             muted={!videoEnabled}
           />
-          <ToolbarButton icon={Users} label="Participants" onClick={() => {}} />
+          <div className="hidden md:block">
+            <ToolbarButton icon={Users} label="Participants" onClick={() => {}} />
+          </div>
           <ToolbarButton 
             icon={MessageSquare} 
             label="Chat" 
             active={chatOpen}
             onClick={() => setChatOpen(!chatOpen)} 
           />
-          <ToolbarButton icon={Heart} label="React" onClick={() => {}} />
-          <ToolbarButton icon={Share2} label="Share" onClick={() => {}} />
+          <div className="hidden md:block">
+            <ToolbarButton icon={Heart} label="React" onClick={() => {}} />
+          </div>
+          <div className="hidden md:block">
+            <ToolbarButton icon={Share2} label="Share" onClick={() => {}} />
+          </div>
           
           <Popover open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
             <PopoverTrigger asChild>
