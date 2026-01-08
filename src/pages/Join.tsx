@@ -280,7 +280,7 @@ const Join = () => {
           </div>
           
           <div className="p-12 text-center">
-            <h2 className="font-display text-2xl font-bold text-foreground mb-8">Connecting...</h2>
+            <h2 className="font-display text-3xl font-semibold italic text-foreground mb-8 tracking-wide">Connecting...</h2>
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
             <p className="text-sm text-muted-foreground">Preparing your session</p>
           </div>
