@@ -314,13 +314,13 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
     <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-96 bg-card border-t md:border-t-0 md:border-l border-border flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
           <h3 className="text-foreground font-semibold">Session Chat</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-3">
           <Badge className="bg-primary text-primary-foreground">Everyone</Badge>
           {isPlayingAudio && (
             <Badge variant="secondary" className="text-xs animate-pulse">
