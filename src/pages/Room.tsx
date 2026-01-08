@@ -417,7 +417,7 @@ const Room = () => {
                   key={index} 
                   className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} ${
                     isSpeaking 
-                      ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-background shadow-[0_0_20px_rgba(251,191,36,0.5)]' 
+                      ? 'ring-1 ring-amber-400/70 shadow-[0_0_12px_rgba(251,191,36,0.3)]' 
                       : 'border border-border'
                   }`}
                   style={isSpeaking ? { animation: 'pulse-gold 1.5s ease-in-out infinite' } : undefined}
