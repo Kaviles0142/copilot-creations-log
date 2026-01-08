@@ -13,6 +13,7 @@ export interface ChatMessage {
   speakerName?: string;
   timestamp: Date;
   isPlaying?: boolean;
+  audioUrl?: string;
 }
 
 interface RoomChatProps {
@@ -70,16 +71,25 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
     setMessages(prev => [...prev, message]);
   };
 
-  const addMessage = (type: 'user' | 'assistant', content: string, speakerName?: string) => {
+  const addMessage = (type: 'user' | 'assistant', content: string, speakerName?: string, audioUrl?: string) => {
     const message: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random()}`,
       type,
       content,
       speakerName,
       timestamp: new Date(),
+      audioUrl,
     };
     setMessages(prev => [...prev, message]);
-    return message;
+    return message.id;
+  };
+
+  const updateMessageAudio = (speakerName: string, content: string, audioUrl: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.speakerName === speakerName && msg.content === content && !msg.audioUrl
+        ? { ...msg, audioUrl }
+        : msg
+    ));
   };
 
   const handleFigureJoin = async (figureName: string) => {
@@ -124,11 +134,17 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
 
       if (audioData?.audioContent) {
         const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
+        updateMessageAudio(figureName, greeting, audioUrl);
         queueAudio(audioUrl, figureName);
       }
     } catch (error) {
       console.error('Error generating greeting:', error);
     }
+  };
+
+  const replayMessage = async (msg: ChatMessage) => {
+    if (!msg.audioUrl || isPlayingAudio) return;
+    queueAudio(msg.audioUrl, msg.speakerName || 'Unknown');
   };
 
   const getGreetingForFigure = (figureName: string): string => {
@@ -275,6 +291,7 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
 
         if (!audioError && audioData?.audioContent) {
           const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
+          updateMessageAudio(figureName, response, audioUrl);
           queueAudio(audioUrl, figureName);
         }
 
@@ -334,12 +351,18 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
               ) : (
                 // Assistant/Figure message
                 <div className="flex flex-col">
-                  <span className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                  <button 
+                    onClick={() => replayMessage(msg)}
+                    disabled={!msg.audioUrl || isPlayingAudio}
+                    className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer disabled:cursor-default disabled:hover:text-muted-foreground w-fit"
+                  >
                     {msg.speakerName}
-                    {msg.isPlaying && (
+                    {msg.isPlaying ? (
                       <Volume2 className="w-3 h-3 animate-pulse text-primary" />
+                    ) : msg.audioUrl && (
+                      <Volume2 className="w-3 h-3 opacity-0 group-hover:opacity-50" />
                     )}
-                  </span>
+                  </button>
                   <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2 max-w-[85%]">
                     <p className="text-sm text-foreground">{msg.content}</p>
                   </div>

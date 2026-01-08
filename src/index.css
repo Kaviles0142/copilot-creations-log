@@ -177,10 +177,10 @@
 
   @keyframes pulse-gold {
     0%, 100% {
-      box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+      box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
     }
     50% {
-      box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+      box-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
     }
   }
 }
