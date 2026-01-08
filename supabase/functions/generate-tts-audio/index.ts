@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,10 +57,8 @@ serve(async (req) => {
     // Get audio as array buffer
     const audioBuffer = await response.arrayBuffer();
     
-    // Convert to base64
-    const audioBase64 = btoa(
-      String.fromCharCode(...new Uint8Array(audioBuffer))
-    );
+    // Convert to base64 using Deno's encoding library (avoids stack overflow)
+    const audioBase64 = base64Encode(audioBuffer);
 
     console.log('✅ TTS audio generated');
 
