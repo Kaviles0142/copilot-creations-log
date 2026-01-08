@@ -19,8 +19,8 @@
     --popover: 270 15% 99%;
     --popover-foreground: 270 15% 12%;
 
-    /* Rich purple primary for light mode */
-    --primary: 270 70% 55%;
+    /* Dark gray/black primary for light mode */
+    --primary: 0 0% 12%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 270 15% 93%;
@@ -29,7 +29,7 @@
     --muted: 270 10% 92%;
     --muted-foreground: 270 10% 45%;
 
-    --accent: 270 70% 55%;
+    --accent: 0 0% 12%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -37,23 +37,23 @@
 
     --border: 270 15% 88%;
     --input: 270 15% 90%;
-    --ring: 270 70% 55%;
+    --ring: 0 0% 12%;
 
     --radius: 0.75rem;
 
-    --hero-gradient-start: 270 70% 55%;
-    --hero-gradient-end: 280 65% 45%;
-    --gold: 270 70% 55%;
-    --gold-muted: 270 30% 70%;
+    --hero-gradient-start: 0 0% 12%;
+    --hero-gradient-end: 0 0% 20%;
+    --gold: 0 0% 12%;
+    --gold-muted: 0 0% 40%;
     
     --sidebar-background: 270 15% 98%;
     --sidebar-foreground: 270 15% 20%;
-    --sidebar-primary: 270 70% 55%;
+    --sidebar-primary: 0 0% 12%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 270 15% 94%;
-    --sidebar-accent-foreground: 270 15% 20%;
-    --sidebar-border: 270 15% 88%;
-    --sidebar-ring: 270 70% 55%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 0% 12%;
   }
 
   .dark {
