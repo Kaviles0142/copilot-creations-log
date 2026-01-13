@@ -30,6 +30,8 @@ interface RoomChatProps {
   onCancelMode?: () => void;
   onAddParticipant?: (name: string) => void;
   onRemoveParticipant?: (name: string) => void;
+  showParticipantsModal?: boolean;
+  onParticipantsModalChange?: (open: boolean) => void;
 }
 
 const RoomChat = ({ 
@@ -44,6 +46,8 @@ const RoomChat = ({
   onCancelMode,
   onAddParticipant,
   onRemoveParticipant,
+  showParticipantsModal = false,
+  onParticipantsModalChange,
 }: RoomChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -53,8 +57,7 @@ const RoomChat = ({
   const [greetingsPlayed, setGreetingsPlayed] = useState<Set<string>>(new Set());
   const [selectedResponders, setSelectedResponders] = useState<Set<string>>(new Set(figures));
   
-  // Participants modal state
-  const [showParticipants, setShowParticipants] = useState(false);
+  // Participants modal state - controlled by parent if provided
   const [newParticipantName, setNewParticipantName] = useState('');
   // Mode orchestration state
   const [modeRunning, setModeRunning] = useState(false);
@@ -676,7 +679,7 @@ const RoomChat = ({
           </div>
         </ScrollArea>
 
-        {/* Footer with input and participants button */}
+        {/* Footer with input */}
         <div className="flex-shrink-0 p-3 border-t border-border/50">
           <div className="flex items-center gap-1.5">
             <input
@@ -686,17 +689,6 @@ const RoomChat = ({
               accept=".pdf"
               className="hidden"
             />
-            
-            {/* Participants button */}
-            <Button 
-              size="icon" 
-              variant="ghost"
-              onClick={() => setShowParticipants(true)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
-              title="Participants"
-            >
-              <Users className="w-4 h-4" />
-            </Button>
             
             <Input
               value={inputMessage}
@@ -717,7 +709,7 @@ const RoomChat = ({
               <FileText className="w-4 h-4" />
             </Button>
             
-            <Button 
+            <Button
               size="icon" 
               variant="ghost"
               onClick={handleSendMessage} 
@@ -731,7 +723,7 @@ const RoomChat = ({
       </aside>
 
       {/* Participants Modal */}
-      <Dialog open={showParticipants} onOpenChange={setShowParticipants}>
+      <Dialog open={showParticipantsModal} onOpenChange={onParticipantsModalChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base">Participants</DialogTitle>
@@ -773,7 +765,7 @@ const RoomChat = ({
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         onClick={() => {
                           onRemoveParticipant(figure);
-                          setShowParticipants(false);
+                          onParticipantsModalChange?.(false);
                         }}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

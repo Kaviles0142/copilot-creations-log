@@ -92,6 +92,7 @@ const Room = () => {
   
   // End call confirmation
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -687,6 +688,8 @@ const Room = () => {
               setFigures(figures.filter(f => f !== name));
             }
           }}
+          showParticipantsModal={showParticipantsModal}
+          onParticipantsModalChange={setShowParticipantsModal}
         />
       </div>
 
@@ -708,7 +711,7 @@ const Room = () => {
             muted={!videoEnabled}
           />
           <div className="hidden md:block">
-            <ToolbarButton icon={Users} label="Participants" onClick={() => {}} />
+            <ToolbarButton icon={Users} label="Participants" onClick={() => setShowParticipantsModal(true)} />
           </div>
           <ToolbarButton 
             icon={MessageSquare} 
