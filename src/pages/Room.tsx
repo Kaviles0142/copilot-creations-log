@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   User,
   Radio,
+  Swords,
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
 import RoomChat from '@/components/RoomChat';
@@ -60,7 +61,7 @@ const Room = () => {
   const [error, setError] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true); // Open by default
   const [figures, setFigures] = useState<string[]>(state?.figures || []);
   const [podcastMode, setPodcastMode] = useState(false);
   const [speakingFigure, setSpeakingFigure] = useState<string | null>(null);
@@ -69,6 +70,15 @@ const Room = () => {
   const [podcastSceneImage, setPodcastSceneImage] = useState<string | null>(null);
   const [isGeneratingPodcastScene, setIsGeneratingPodcastScene] = useState(false);
   const podcastSceneGeneratedFor = useRef<string | null>(null);
+  
+  // Debate mode state
+  const [debateMode, setDebateMode] = useState(false);
+  const [debateSceneImage, setDebateSceneImage] = useState<string | null>(null);
+  const [isGeneratingDebateScene, setIsGeneratingDebateScene] = useState(false);
+  const debateSceneGeneratedFor = useRef<string | null>(null);
+  
+  // Topic input for modes
+  const [pendingModeTopic, setPendingModeTopic] = useState('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -230,6 +240,40 @@ const Room = () => {
     generatePodcastScene();
   }, [podcastMode, figures]);
 
+  // Generate debate scene image when debate mode is enabled
+  useEffect(() => {
+    const generateDebateScene = async () => {
+      if (!debateMode || figures.length === 0) return;
+      
+      // Create a unique key for this combination of figures
+      const figuresKey = [...figures].sort().join('|');
+      if (debateSceneGeneratedFor.current === figuresKey) return;
+      
+      debateSceneGeneratedFor.current = figuresKey;
+      setIsGeneratingDebateScene(true);
+      setDebateSceneImage(null);
+
+      try {
+        console.log('⚔️ Generating debate scene for:', figures);
+
+        const { data, error } = await supabase.functions.invoke('generate-debate-scene', {
+          body: { figures }
+        });
+
+        if (error) throw error;
+
+        console.log('✅ Debate scene ready:', data.cached ? '(cached)' : '(new)');
+        setDebateSceneImage(data.imageUrl);
+      } catch (err) {
+        console.error('❌ Failed to generate debate scene:', err);
+      } finally {
+        setIsGeneratingDebateScene(false);
+      }
+    };
+
+    generateDebateScene();
+  }, [debateMode, figures]);
+
   useEffect(() => {
     const fetchRoom = async () => {
       if (!roomCode) {
@@ -302,9 +346,9 @@ const Room = () => {
   const guestName = 'You';
   const totalParticipants = displayFigures.length + 1; // +1 for "You"
 
-  // Dynamic tile sizing based on participant count (only for non-podcast mode)
+  // Dynamic tile sizing based on participant count (only for normal mode)
   const getTileClasses = () => {
-    if (podcastMode) return 'w-36 h-24';
+    if (podcastMode || debateMode) return 'w-36 h-24';
     
     if (totalParticipants <= 2) {
       return 'w-64 h-48 md:w-80 md:h-60';
@@ -318,7 +362,7 @@ const Room = () => {
   };
 
   const getAvatarClasses = () => {
-    if (podcastMode) return 'w-10 h-10';
+    if (podcastMode || debateMode) return 'w-10 h-10';
     
     if (totalParticipants <= 2) {
       return 'w-20 h-20';
@@ -330,7 +374,7 @@ const Room = () => {
   };
 
   const getIconClasses = () => {
-    if (podcastMode) return 'w-5 h-5';
+    if (podcastMode || debateMode) return 'w-5 h-5';
     
     if (totalParticipants <= 2) {
       return 'w-10 h-10';
@@ -342,13 +386,13 @@ const Room = () => {
   };
 
   const getMuteIconClasses = () => {
-    if (podcastMode) return 'w-5 h-5';
+    if (podcastMode || debateMode) return 'w-5 h-5';
     if (totalParticipants <= 2) return 'w-7 h-7';
     return 'w-5 h-5';
   };
 
   const getMuteInnerIconClasses = () => {
-    if (podcastMode) return 'w-3 h-3';
+    if (podcastMode || debateMode) return 'w-3 h-3';
     if (totalParticipants <= 2) return 'w-4 h-4';
     return 'w-3 h-3';
   };
@@ -376,9 +420,9 @@ const Room = () => {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Area */}
-        <main className={`flex-1 flex flex-col overflow-hidden p-4 ${!podcastMode ? 'justify-center' : ''} relative`}>
+        <main className={`flex-1 flex flex-col overflow-hidden p-4 ${!podcastMode && !debateMode ? 'justify-center' : ''} relative`}>
           {/* 1-on-1 Layout: Single figure centered, You tile floating */}
-          {displayFigures.length === 1 && !podcastMode ? (
+          {displayFigures.length === 1 && !podcastMode && !debateMode ? (
             <>
               {/* Main Figure Tile - Centered */}
               {(() => {
@@ -450,7 +494,7 @@ const Room = () => {
             </>
           ) : (
             /* Multi-participant Layout - Original grid */
-            <div className={`flex justify-center gap-4 flex-wrap ${podcastMode ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
+            <div className={`flex justify-center gap-4 flex-wrap ${(podcastMode || debateMode) ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
               {/* Guest (You) Tile */}
               <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
                 {videoEnabled ? (
@@ -469,7 +513,7 @@ const Room = () => {
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
-                  <span className={`text-foreground font-medium ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
+                  <span className={`text-foreground font-medium ${(podcastMode || debateMode) || totalParticipants > 2 ? 'text-xs' : 'text-sm'}`}>{guestName}</span>
                 </div>
                 {!audioEnabled && (
                   <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
@@ -481,7 +525,7 @@ const Room = () => {
               {/* Figure Tiles */}
               {displayFigures.map((figure, index) => {
                 const avatar = figureAvatars.get(figure);
-                const showImage = !podcastMode && avatar?.imageUrl;
+                const showImage = !(podcastMode || debateMode) && avatar?.imageUrl;
                 const isSpeaking = speakingFigure === figure;
                 
                 return (
@@ -511,10 +555,10 @@ const Room = () => {
                       </div>
                     )}
                     <div className={`absolute bottom-0 left-0 right-0 p-2 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
-                      <span className={`font-medium truncate block ${podcastMode || totalParticipants > 2 ? 'text-xs' : 'text-sm'} ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
+                      <span className={`font-medium truncate block ${(podcastMode || debateMode) || totalParticipants > 2 ? 'text-xs' : 'text-sm'} ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
                     </div>
-                    {/* Camera off badge in podcast mode */}
-                    {podcastMode && (
+                    {/* Camera off badge in special modes */}
+                    {(podcastMode || debateMode) && (
                       <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
                         <VideoOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
                       </div>
@@ -525,7 +569,7 @@ const Room = () => {
             </div>
           )}
 
-          {/* Content Area - Only shown in podcast mode */}
+          {/* Content Area - Fullscreen scene for podcast mode */}
           {podcastMode && (
             <div className="flex-1 bg-black rounded-xl border border-border overflow-hidden min-h-0 relative">
               {isGeneratingPodcastScene ? (
@@ -543,10 +587,46 @@ const Room = () => {
                 <div className="absolute inset-0 flex items-center justify-center bg-card">
                   <div className="text-center p-8">
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
-                      Conversation with
+                      🎙️ Podcast Mode
                     </h1>
                     <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
-                      {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Figures`}
+                      {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Guests`}
+                    </h2>
+                    <div className="flex flex-wrap justify-center gap-2 mt-4">
+                      {displayFigures.map((figure, index) => (
+                        <Badge key={index} variant="secondary" className="text-sm">
+                          {figure}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Content Area - Fullscreen scene for debate mode */}
+          {debateMode && (
+            <div className="flex-1 bg-black rounded-xl border border-border overflow-hidden min-h-0 relative">
+              {isGeneratingDebateScene ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                  <p className="text-muted-foreground text-sm">Generating debate scene...</p>
+                </div>
+              ) : debateSceneImage ? (
+                <img 
+                  src={debateSceneImage} 
+                  alt={`Debate scene with ${displayFigures.join(', ')}`}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-card">
+                  <div className="text-center p-8">
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
+                      ⚔️ Debate Mode
+                    </h1>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
+                      {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Debaters`}
                     </h2>
                     <div className="flex flex-wrap justify-center gap-2 mt-4">
                       {displayFigures.map((figure, index) => (
@@ -568,6 +648,19 @@ const Room = () => {
           isOpen={chatOpen}
           onClose={() => setChatOpen(false)}
           onSpeakingChange={(speaking, speaker) => setSpeakingFigure(speaking ? speaker || null : null)}
+          activeMode={podcastMode ? 'podcast' : debateMode ? 'debate' : null}
+          pendingTopic={pendingModeTopic}
+          onTopicChange={setPendingModeTopic}
+          onStartMode={() => {
+            // For now, just keep the mode active - topic can be used for future orchestration
+            console.log(`Starting ${podcastMode ? 'podcast' : 'debate'} with topic:`, pendingModeTopic);
+            setPendingModeTopic('');
+          }}
+          onCancelMode={() => {
+            setPodcastMode(false);
+            setDebateMode(false);
+            setPendingModeTopic('');
+          }}
         />
       </div>
 
@@ -618,13 +711,39 @@ const Room = () => {
             <PopoverContent side="top" align="center" className="w-48 p-1 bg-card border-border">
               <button
                 onClick={() => {
-                  setPodcastMode(!podcastMode);
+                  // Only one mode at a time
+                  if (!podcastMode) {
+                    setDebateMode(false);
+                    setPodcastMode(true);
+                    setChatOpen(true); // Open chat to show topic prompt
+                  } else {
+                    setPodcastMode(false);
+                    setPendingModeTopic('');
+                  }
                   setMoreMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-foreground"
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${podcastMode ? 'text-primary bg-primary/10' : 'text-foreground'}`}
               >
                 <Radio className="w-4 h-4" />
                 {podcastMode ? 'Disable' : 'Enable'} Podcast Mode
+              </button>
+              <button
+                onClick={() => {
+                  // Only one mode at a time
+                  if (!debateMode) {
+                    setPodcastMode(false);
+                    setDebateMode(true);
+                    setChatOpen(true); // Open chat to show topic prompt
+                  } else {
+                    setDebateMode(false);
+                    setPendingModeTopic('');
+                  }
+                  setMoreMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${debateMode ? 'text-primary bg-primary/10' : 'text-foreground'}`}
+              >
+                <Swords className="w-4 h-4" />
+                {debateMode ? 'Disable' : 'Enable'} Debate Mode
               </button>
             </PopoverContent>
           </Popover>
