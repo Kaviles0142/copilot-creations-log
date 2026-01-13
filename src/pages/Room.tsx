@@ -10,6 +10,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   Loader2, 
   Mic, 
@@ -79,6 +89,9 @@ const Room = () => {
   
   // Topic input for modes
   const [pendingModeTopic, setPendingModeTopic] = useState('');
+  
+  // End call confirmation
+  const [showEndConfirmation, setShowEndConfirmation] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -309,11 +322,15 @@ const Room = () => {
     fetchRoom();
   }, [roomCode]);
 
-  const handleEndCall = () => {
+  const confirmEndCall = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     navigate('/join');
+  };
+
+  const handleEndCall = () => {
+    setShowEndConfirmation(true);
   };
 
   if (loading) {
@@ -755,6 +772,24 @@ const Room = () => {
           </Button>
         </div>
       </footer>
+
+      {/* End Call Confirmation Dialog */}
+      <AlertDialog open={showEndConfirmation} onOpenChange={setShowEndConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to end this call? You'll leave the room and lose any unsaved conversation history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEndCall} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              End Call
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
