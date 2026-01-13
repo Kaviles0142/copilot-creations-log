@@ -32,7 +32,9 @@ interface RoomChatProps {
   onRemoveParticipant?: (name: string) => void;
   showParticipantsModal?: boolean;
   onParticipantsModalChange?: (open: boolean) => void;
+  onModeStateChange?: (state: { running: boolean; paused: boolean; topic: string; pause: () => void; resume: () => void; stop: () => void }) => void;
 }
+
 
 const RoomChat = ({ 
   figures, 
@@ -48,6 +50,7 @@ const RoomChat = ({
   onRemoveParticipant,
   showParticipantsModal = false,
   onParticipantsModalChange,
+  onModeStateChange,
 }: RoomChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -127,6 +130,19 @@ const RoomChat = ({
   useEffect(() => {
     pausedRef.current = modePaused;
   }, [modePaused]);
+
+  // Notify parent of mode state changes (with controls)
+  useEffect(() => {
+    onModeStateChange?.({ 
+      running: modeRunning, 
+      paused: modePaused, 
+      topic: currentTopic,
+      pause: () => pauseMode(),
+      resume: () => resumeMode(),
+      stop: () => stopMode(),
+    });
+  }, [modeRunning, modePaused, currentTopic]);
+
 
   const addSystemMessage = (content: string) => {
     const message: ChatMessage = {
@@ -320,13 +336,13 @@ const RoomChat = ({
       if (error) throw error;
 
       if (data?.content) {
-        // Add the message
-        addMessage('assistant', data.content, data.speakerName);
-        
-        // Generate TTS
+        // Generate TTS first, then show message when audio is ready
         const { data: audioData } = await supabase.functions.invoke('azure-text-to-speech', {
           body: { text: data.content, figure_name: data.speakerName }
         });
+
+        // Only add message once TTS is ready (or failed)
+        const messageId = addMessage('assistant', data.content, data.speakerName);
 
         if (audioData?.audioContent) {
           const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
@@ -346,7 +362,7 @@ const RoomChat = ({
         // Keep only last 15 messages for context
         const trimmedHistory = newHistory.slice(-15);
 
-        // Schedule next turn - continue the conversation automatically
+        // Schedule next turn - wait for audio to likely finish before next speaker
         const nextIndex = data.nextSpeakerIndex;
         setCurrentSpeakerIndex(nextIndex);
         
@@ -412,6 +428,7 @@ const RoomChat = ({
     addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} ended`);
     onCancelMode?.();
   };
+
 
   // File upload handling
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -651,31 +668,6 @@ const RoomChat = ({
               </div>
             )}
             
-            {/* Mode controls when running */}
-            {modeRunning && (
-              <div className="flex items-center justify-center py-2">
-                <div className="flex items-center gap-1.5 bg-muted/30 rounded-full px-2.5 py-1">
-                  <span className="text-[11px] text-muted-foreground">
-                    {activeMode === 'podcast' ? '🎙️' : '⚔️'} {currentTopic.substring(0, 20)}{currentTopic.length > 20 ? '...' : ''}
-                  </span>
-                  {!modePaused && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />}
-                  <div className="flex items-center">
-                    {modePaused ? (
-                      <Button size="icon" variant="ghost" onClick={resumeMode} className="h-5 w-5">
-                        <Play className="w-2.5 h-2.5" />
-                      </Button>
-                    ) : (
-                      <Button size="icon" variant="ghost" onClick={pauseMode} className="h-5 w-5">
-                        <Pause className="w-2.5 h-2.5" />
-                      </Button>
-                    )}
-                    <Button size="icon" variant="ghost" onClick={stopMode} className="h-5 w-5 text-destructive">
-                      <X className="w-2.5 h-2.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </ScrollArea>
 
