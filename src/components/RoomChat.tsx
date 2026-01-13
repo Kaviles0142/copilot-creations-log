@@ -286,10 +286,16 @@ const RoomChat = ({
     await runOrchestrationTurn(topic, 0, []);
   };
 
-  const runOrchestrationTurn = async (topic: string, speakerIndex: number, history: ChatMessage[]) => {
-    if (!modeRunning || pausedRef.current) return;
+  const runOrchestrationTurn = useCallback(async (topic: string, speakerIndex: number, history: ChatMessage[]) => {
+    // Check refs instead of state for immediate values
+    if (pausedRef.current) {
+      console.log('Orchestration paused, waiting...');
+      return;
+    }
 
     try {
+      console.log(`🎙️ Running turn for speaker ${speakerIndex}, topic: ${topic}`);
+      
       const { data, error } = await supabase.functions.invoke('room-orchestrator', {
         body: {
           figures,
@@ -326,23 +332,35 @@ const RoomChat = ({
           timestamp: new Date() 
         }];
 
-        // Schedule next turn after a delay (wait for audio to finish + pause)
+        // Keep only last 15 messages for context
+        const trimmedHistory = newHistory.slice(-15);
+
+        // Schedule next turn - continue the conversation automatically
+        const nextIndex = data.nextSpeakerIndex;
+        setCurrentSpeakerIndex(nextIndex);
+        
         orchestrationRef.current = setTimeout(() => {
-          if (modeRunning && !pausedRef.current) {
-            setCurrentSpeakerIndex(data.nextSpeakerIndex);
-            runOrchestrationTurn(topic, data.nextSpeakerIndex, newHistory);
+          if (!pausedRef.current) {
+            runOrchestrationTurn(topic, nextIndex, trimmedHistory);
           }
-        }, 8000); // 8 second delay between speakers
+        }, 6000); // 6 second delay between speakers
       }
     } catch (error) {
       console.error('Orchestration error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to continue the conversation. Please try again.',
+        description: 'Failed to continue the conversation. Retrying...',
         variant: 'destructive',
       });
+      
+      // Retry after a delay
+      orchestrationRef.current = setTimeout(() => {
+        if (!pausedRef.current) {
+          runOrchestrationTurn(topic, speakerIndex, history);
+        }
+      }, 3000);
     }
-  };
+  }, [figures, activeMode, toast]);
 
   const pauseMode = () => {
     setModePaused(true);
@@ -532,53 +550,7 @@ const RoomChat = ({
 
   return (
     <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-96 bg-card border-t md:border-t-0 md:border-l border-border flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
-      {/* Sticky Mode Header - shown when mode is running */}
-      {modeRunning && (
-        <div className="flex-shrink-0 bg-primary/10 border-b border-primary/20 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-primary">
-                {activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'}
-              </span>
-              {modePaused ? (
-                <Badge variant="secondary" className="text-xs">Paused</Badge>
-              ) : (
-                <Badge variant="default" className="text-xs animate-pulse">Live</Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {modePaused ? (
-                <Button size="sm" variant="ghost" onClick={resumeMode} className="h-7 px-2">
-                  <Play className="w-4 h-4 mr-1" />
-                  Resume
-                </Button>
-              ) : (
-                <Button size="sm" variant="ghost" onClick={pauseMode} className="h-7 px-2">
-                  <Pause className="w-4 h-4 mr-1" />
-                  Pause
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={stopMode} className="h-7 px-2 text-destructive hover:text-destructive">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1 truncate">Topic: {currentTopic}</p>
-          
-          {/* Topic change input */}
-          {topicChanged && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={switchTopic}
-              className="mt-2 w-full h-7 text-xs"
-            >
-              <RefreshCw className="w-3 h-3 mr-1" />
-              Switch to: "{pendingTopic.substring(0, 30)}{pendingTopic.length > 30 ? '...' : ''}"
-            </Button>
-          )}
-        </div>
-      )}
+      {/* Mode controls - minimal inline controls when running */}
 
       {/* Header */}
       <div className="flex-shrink-0 border-b border-border">
@@ -708,6 +680,47 @@ const RoomChat = ({
                   Cancel
                 </Button>
               </div>
+            </div>
+          )}
+          
+          {/* Inline mode controls when running */}
+          {modeRunning && (
+            <div className="flex items-center justify-center gap-2 py-2 mt-2">
+              <div className="flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {activeMode === 'podcast' ? '🎙️' : '⚔️'} {currentTopic.substring(0, 25)}{currentTopic.length > 25 ? '...' : ''}
+                </span>
+                {modePaused ? (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Paused</Badge>
+                ) : (
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+                <div className="flex items-center gap-0.5 ml-1">
+                  {modePaused ? (
+                    <Button size="icon" variant="ghost" onClick={resumeMode} className="h-6 w-6">
+                      <Play className="w-3 h-3" />
+                    </Button>
+                  ) : (
+                    <Button size="icon" variant="ghost" onClick={pauseMode} className="h-6 w-6">
+                      <Pause className="w-3 h-3" />
+                    </Button>
+                  )}
+                  <Button size="icon" variant="ghost" onClick={stopMode} className="h-6 w-6 text-destructive hover:text-destructive">
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              {topicChanged && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={switchTopic}
+                  className="h-7 text-xs rounded-full"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Switch topic
+                </Button>
+              )}
             </div>
           )}
         </div>
