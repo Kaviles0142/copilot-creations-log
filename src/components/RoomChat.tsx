@@ -21,9 +21,24 @@ interface RoomChatProps {
   isOpen: boolean;
   onClose: () => void;
   onSpeakingChange?: (speaking: boolean, speakerName?: string) => void;
+  activeMode?: 'podcast' | 'debate' | null;
+  pendingTopic?: string;
+  onTopicChange?: (topic: string) => void;
+  onStartMode?: () => void;
+  onCancelMode?: () => void;
 }
 
-const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps) => {
+const RoomChat = ({ 
+  figures, 
+  isOpen, 
+  onClose, 
+  onSpeakingChange,
+  activeMode,
+  pendingTopic = '',
+  onTopicChange,
+  onStartMode,
+  onCancelMode,
+}: RoomChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -425,6 +440,40 @@ const RoomChat = ({ figures, isOpen, onClose, onSpeakingChange }: RoomChatProps)
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-xs italic">Thinking...</span>
+            </div>
+          )}
+          
+          {/* Mode setup prompt */}
+          {activeMode && (
+            <div className="bg-accent/50 border border-accent rounded-lg p-3 mt-2">
+              <p className="text-sm text-foreground mb-2">
+                {activeMode === 'podcast' 
+                  ? '🎙️ Podcast Mode enabled! Enter a topic for discussion:'
+                  : '⚔️ Debate Mode enabled! Enter a topic for the debate:'}
+              </p>
+              <Input
+                value={pendingTopic}
+                onChange={(e) => onTopicChange?.(e.target.value)}
+                placeholder={activeMode === 'podcast' ? 'e.g., The future of AI' : 'e.g., Was the French Revolution successful?'}
+                className="mb-2 bg-background"
+                onKeyDown={(e) => e.key === 'Enter' && pendingTopic.trim() && onStartMode?.()}
+              />
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  onClick={onStartMode}
+                  disabled={!pendingTopic.trim()}
+                >
+                  Start {activeMode === 'podcast' ? 'Podcast' : 'Debate'}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={onCancelMode}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
         </div>
