@@ -34,6 +34,9 @@ import {
   User,
   Radio,
   Swords,
+  Play,
+  Pause,
+  Square,
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
 import RoomChat from '@/components/RoomChat';
@@ -89,6 +92,11 @@ const Room = () => {
   
   // Topic input for modes
   const [pendingModeTopic, setPendingModeTopic] = useState('');
+  
+  // Mode state from RoomChat
+  const [modeState, setModeState] = useState<{ running: boolean; paused: boolean; topic: string; pause: () => void; resume: () => void; stop: () => void }>({ 
+    running: false, paused: false, topic: '', pause: () => {}, resume: () => {}, stop: () => {} 
+  });
   
   // End call confirmation
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
@@ -620,6 +628,35 @@ const Room = () => {
                   </div>
                 </div>
               )}
+              
+              {/* Mode Controls Overlay */}
+              {modeState.running && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm rounded-full px-4 py-2">
+                  <span className="text-sm text-white font-medium">
+                    {modeState.topic.substring(0, 30)}{modeState.topic.length > 30 ? '...' : ''}
+                  </span>
+                  {!modeState.paused && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+                  {modeState.paused && <span className="text-xs text-white/70">Paused</span>}
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8 text-white hover:bg-white/20"
+                      onClick={() => modeState.paused ? modeState.resume() : modeState.pause()}
+                    >
+                      {modeState.paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8 text-red-400 hover:bg-white/20"
+                      onClick={() => modeState.stop()}
+                    >
+                      <Square className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -653,6 +690,35 @@ const Room = () => {
                         </Badge>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Mode Controls Overlay */}
+              {modeState.running && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm rounded-full px-4 py-2">
+                  <span className="text-sm text-white font-medium">
+                    {modeState.topic.substring(0, 30)}{modeState.topic.length > 30 ? '...' : ''}
+                  </span>
+                  {!modeState.paused && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+                  {modeState.paused && <span className="text-xs text-white/70">Paused</span>}
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8 text-white hover:bg-white/20"
+                      onClick={() => modeState.paused ? modeState.resume() : modeState.pause()}
+                    >
+                      {modeState.paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8 text-red-400 hover:bg-white/20"
+                      onClick={() => modeState.stop()}
+                    >
+                      <Square className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               )}
@@ -690,6 +756,7 @@ const Room = () => {
           }}
           showParticipantsModal={showParticipantsModal}
           onParticipantsModalChange={setShowParticipantsModal}
+          onModeStateChange={setModeState}
         />
       </div>
 
