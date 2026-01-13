@@ -669,7 +669,6 @@ const Room = () => {
           pendingTopic={pendingModeTopic}
           onTopicChange={setPendingModeTopic}
           onStartMode={() => {
-            // For now, just keep the mode active - topic can be used for future orchestration
             console.log(`Starting ${podcastMode ? 'podcast' : 'debate'} with topic:`, pendingModeTopic);
             setPendingModeTopic('');
           }}
@@ -677,6 +676,16 @@ const Room = () => {
             setPodcastMode(false);
             setDebateMode(false);
             setPendingModeTopic('');
+          }}
+          onAddParticipant={(name) => {
+            if (!figures.includes(name)) {
+              setFigures([...figures, name]);
+            }
+          }}
+          onRemoveParticipant={(name) => {
+            if (figures.length > 1) {
+              setFigures(figures.filter(f => f !== name));
+            }
           }}
         />
       </div>
