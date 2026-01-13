@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, X, Plus, Volume2, Loader2 } from 'lucide-react';
+import { Send, X, Volume2, Loader2, Pause, Play, FileText, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export interface ChatMessage {
   id: string;
@@ -47,19 +48,33 @@ const RoomChat = ({
   const [greetingsPlayed, setGreetingsPlayed] = useState<Set<string>>(new Set());
   const [selectedResponders, setSelectedResponders] = useState<Set<string>>(new Set(figures));
   
+  // Mode orchestration state
+  const [modeRunning, setModeRunning] = useState(false);
+  const [modePaused, setModePaused] = useState(false);
+  const [currentTopic, setCurrentTopic] = useState('');
+  const [currentSpeakerIndex, setCurrentSpeakerIndex] = useState(0);
+  const orchestrationRef = useRef<NodeJS.Timeout | null>(null);
+  const pausedRef = useRef(false);
+  
+  // File upload state
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const { toast } = useToast();
+  
   // Check if everyone is selected
   const isEveryoneSelected = selectedResponders.size === figures.length && figures.every(f => selectedResponders.has(f));
   
+  // Check if topic changed while running
+  const topicChanged = modeRunning && pendingTopic.trim() && pendingTopic.trim() !== currentTopic;
+  
   const selectResponder = (figureName: string) => {
-    // Tapping a person selects ONLY that person
     setSelectedResponders(new Set([figureName]));
   };
   
   const selectEveryone = () => {
-    // Select all figures
     setSelectedResponders(new Set(figures));
   };
-  
   
   const audioQueueRef = useRef<{ audioUrl: string; figureName: string }[]>([]);
   const isProcessingAudioRef = useRef(false);
@@ -79,10 +94,7 @@ const RoomChat = ({
     hasInitializedRef.current = true;
 
     const initializeFigures = async () => {
-      // Add "You joined" message first
       addSystemMessage('You joined the call');
-
-      // Process each figure sequentially
       for (const figureName of figures) {
         await handleFigureJoin(figureName);
       }
@@ -90,6 +102,20 @@ const RoomChat = ({
 
     initializeFigures();
   }, [figures]);
+
+  // Cleanup orchestration on unmount
+  useEffect(() => {
+    return () => {
+      if (orchestrationRef.current) {
+        clearTimeout(orchestrationRef.current);
+      }
+    };
+  }, []);
+
+  // Sync paused ref
+  useEffect(() => {
+    pausedRef.current = modePaused;
+  }, [modePaused]);
 
   const addSystemMessage = (content: string) => {
     const message: ChatMessage = {
@@ -125,14 +151,10 @@ const RoomChat = ({
   const handleFigureJoin = async (figureName: string) => {
     if (figuresJoined.has(figureName)) return;
 
-    // Add "joined" system message
     addSystemMessage(`${figureName} joined the call`);
     setFiguresJoined(prev => new Set([...prev, figureName]));
 
-    // Wait a moment for visual effect
     await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Generate greeting
     await generateGreeting(figureName);
   };
 
@@ -140,21 +162,12 @@ const RoomChat = ({
     if (greetingsPlayed.has(figureName)) return;
 
     try {
-      const figureId = figureName.toLowerCase().replace(/\s+/g, '-');
-      
-      // Generate a contextual greeting
       const greeting = getGreetingForFigure(figureName);
-      
-      // Add greeting message immediately
       addMessage('assistant', greeting, figureName);
       setGreetingsPlayed(prev => new Set([...prev, figureName]));
 
-      // Generate TTS audio using Azure
       const { data: audioData, error } = await supabase.functions.invoke('azure-text-to-speech', {
-        body: {
-          text: greeting,
-          figure_name: figureName,
-        }
+        body: { text: greeting, figure_name: figureName }
       });
 
       if (error) {
@@ -179,7 +192,6 @@ const RoomChat = ({
 
   const getGreetingForFigure = (figureName: string): string => {
     const name = figureName.toLowerCase();
-    
     const greetings: Record<string, string> = {
       'albert einstein': "Hello! It's wonderful to connect with you. I'm always eager to discuss the mysteries of the universe.",
       'marie curie': "Bonjour! I'm delighted to join this conversation. Science awaits!",
@@ -213,9 +225,13 @@ const RoomChat = ({
     onSpeakingChange?.(true);
 
     while (audioQueueRef.current.length > 0) {
+      // Check if paused
+      while (pausedRef.current) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       const { audioUrl, figureName } = audioQueueRef.current.shift()!;
       await playAudio(audioUrl, figureName);
-      // Small pause between messages
       await new Promise(resolve => setTimeout(resolve, 300));
     }
 
@@ -227,11 +243,8 @@ const RoomChat = ({
   const playAudio = (audioUrl: string, figureName: string): Promise<void> => {
     return new Promise((resolve) => {
       const audio = new Audio(audioUrl);
-      
-      // Notify that this figure is now speaking
       onSpeakingChange?.(true, figureName);
       
-      // Mark message as playing
       setMessages(prev => prev.map(msg => 
         msg.speakerName === figureName && msg.type === 'assistant'
           ? { ...msg, isPlaying: true }
@@ -239,10 +252,7 @@ const RoomChat = ({
       ));
 
       audio.onended = () => {
-        // Notify speaking stopped
         onSpeakingChange?.(false, undefined);
-        
-        // Unmark message
         setMessages(prev => prev.map(msg => 
           msg.speakerName === figureName
             ? { ...msg, isPlaying: false }
@@ -263,23 +273,213 @@ const RoomChat = ({
     });
   };
 
+  // Mode orchestration functions
+  const startModeOrchestration = async (topic: string) => {
+    setModeRunning(true);
+    setModePaused(false);
+    setCurrentTopic(topic);
+    setCurrentSpeakerIndex(0);
+    
+    addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} started: "${topic}"`);
+    
+    // Start the orchestration loop
+    await runOrchestrationTurn(topic, 0, []);
+  };
+
+  const runOrchestrationTurn = async (topic: string, speakerIndex: number, history: ChatMessage[]) => {
+    if (!modeRunning || pausedRef.current) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('room-orchestrator', {
+        body: {
+          figures,
+          topic,
+          mode: activeMode,
+          conversationHistory: history.map(m => ({ speakerName: m.speakerName, content: m.content })),
+          currentSpeakerIndex: speakerIndex,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.content) {
+        // Add the message
+        addMessage('assistant', data.content, data.speakerName);
+        
+        // Generate TTS
+        const { data: audioData } = await supabase.functions.invoke('azure-text-to-speech', {
+          body: { text: data.content, figure_name: data.speakerName }
+        });
+
+        if (audioData?.audioContent) {
+          const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
+          updateMessageAudio(data.speakerName, data.content, audioUrl);
+          queueAudio(audioUrl, data.speakerName);
+        }
+
+        // Update history for next turn
+        const newHistory = [...history, { 
+          id: `hist-${Date.now()}`, 
+          type: 'assistant' as const, 
+          content: data.content, 
+          speakerName: data.speakerName, 
+          timestamp: new Date() 
+        }];
+
+        // Schedule next turn after a delay (wait for audio to finish + pause)
+        orchestrationRef.current = setTimeout(() => {
+          if (modeRunning && !pausedRef.current) {
+            setCurrentSpeakerIndex(data.nextSpeakerIndex);
+            runOrchestrationTurn(topic, data.nextSpeakerIndex, newHistory);
+          }
+        }, 8000); // 8 second delay between speakers
+      }
+    } catch (error) {
+      console.error('Orchestration error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to continue the conversation. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const pauseMode = () => {
+    setModePaused(true);
+    if (orchestrationRef.current) {
+      clearTimeout(orchestrationRef.current);
+    }
+    addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} paused`);
+  };
+
+  const resumeMode = () => {
+    setModePaused(false);
+    addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} resumed`);
+    
+    // Get recent messages for context
+    const recentMessages = messages.filter(m => m.type === 'assistant').slice(-10);
+    runOrchestrationTurn(currentTopic, currentSpeakerIndex, recentMessages);
+  };
+
+  const switchTopic = () => {
+    if (orchestrationRef.current) {
+      clearTimeout(orchestrationRef.current);
+    }
+    const newTopic = pendingTopic.trim();
+    setCurrentTopic(newTopic);
+    setCurrentSpeakerIndex(0);
+    onTopicChange?.('');
+    
+    addSystemMessage(`Topic changed to: "${newTopic}"`);
+    runOrchestrationTurn(newTopic, 0, []);
+  };
+
+  const stopMode = () => {
+    setModeRunning(false);
+    setModePaused(false);
+    if (orchestrationRef.current) {
+      clearTimeout(orchestrationRef.current);
+    }
+    addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} ended`);
+    onCancelMode?.();
+  };
+
+  // File upload handling
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload a PDF file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload a file smaller than 10MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingFile(true);
+    addSystemMessage(`📄 Uploading document: ${file.name}`);
+
+    try {
+      const respondingFigures = figures.filter(f => selectedResponders.has(f));
+      
+      for (const figureName of respondingFigures) {
+        const figureId = figureName.toLowerCase().replace(/\s+/g, '-');
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('figureName', figureName);
+        formData.append('figureId', figureId);
+        formData.append('prompt', inputMessage || 'Please review this document and provide your feedback.');
+
+        const { data, error } = await supabase.functions.invoke('analyze-document', {
+          body: formData,
+        });
+
+        if (error) {
+          console.error('Document analysis error:', error);
+          addMessage('assistant', "I'm having trouble analyzing the document. Please try again.", figureName);
+          continue;
+        }
+
+        if (data?.content) {
+          addMessage('assistant', data.content, figureName);
+
+          // Generate TTS
+          const { data: audioData } = await supabase.functions.invoke('azure-text-to-speech', {
+            body: { text: data.content, figure_name: figureName }
+          });
+
+          if (audioData?.audioContent) {
+            const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
+            updateMessageAudio(figureName, data.content, audioUrl);
+            queueAudio(audioUrl, figureName);
+          }
+        }
+      }
+
+      setInputMessage('');
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload document. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
     const userMessage = inputMessage.trim();
     setInputMessage('');
     
-    // Add user message
     addMessage('user', userMessage, 'You');
     setIsLoading(true);
 
     try {
-      // Get responses only from selected figures
       const respondingFigures = figures.filter(f => selectedResponders.has(f));
       for (const figureName of respondingFigures) {
         const figureId = figureName.toLowerCase().replace(/\s+/g, '-');
         
-        // Build conversation context from recent messages
         const recentContext = messages
           .slice(-10)
           .map(msg => ({
@@ -287,14 +487,10 @@ const RoomChat = ({
             content: msg.speakerName ? `${msg.speakerName}: ${msg.content}` : msg.content
           }));
 
-        // Call the chat edge function with full research capabilities
         const { data: chatData, error: chatError } = await supabase.functions.invoke('chat-with-historical-figure', {
           body: {
             message: userMessage,
-            figure: {
-              id: figureId,
-              name: figureName,
-            },
+            figure: { id: figureId, name: figureName },
             context: recentContext,
             conversationType: 'casual',
             language: 'en',
@@ -308,16 +504,10 @@ const RoomChat = ({
         }
 
         const response = chatData?.reply || chatData?.response || "I couldn't generate a response.";
-        
-        // Add the response message
         addMessage('assistant', response, figureName);
 
-        // Generate TTS for the response using Azure
         const { data: audioData, error: audioError } = await supabase.functions.invoke('azure-text-to-speech', {
-          body: {
-            text: response,
-            figure_name: figureName,
-          }
+          body: { text: response, figure_name: figureName }
         });
 
         if (!audioError && audioData?.audioContent) {
@@ -326,7 +516,6 @@ const RoomChat = ({
           queueAudio(audioUrl, figureName);
         }
 
-        // Small delay between figure responses for natural flow
         if (respondingFigures.indexOf(figureName) < respondingFigures.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -343,6 +532,54 @@ const RoomChat = ({
 
   return (
     <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-96 bg-card border-t md:border-t-0 md:border-l border-border flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
+      {/* Sticky Mode Header - shown when mode is running */}
+      {modeRunning && (
+        <div className="flex-shrink-0 bg-primary/10 border-b border-primary/20 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-primary">
+                {activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'}
+              </span>
+              {modePaused ? (
+                <Badge variant="secondary" className="text-xs">Paused</Badge>
+              ) : (
+                <Badge variant="default" className="text-xs animate-pulse">Live</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {modePaused ? (
+                <Button size="sm" variant="ghost" onClick={resumeMode} className="h-7 px-2">
+                  <Play className="w-4 h-4 mr-1" />
+                  Resume
+                </Button>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={pauseMode} className="h-7 px-2">
+                  <Pause className="w-4 h-4 mr-1" />
+                  Pause
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={stopMode} className="h-7 px-2 text-destructive hover:text-destructive">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 truncate">Topic: {currentTopic}</p>
+          
+          {/* Topic change input */}
+          {topicChanged && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={switchTopic}
+              className="mt-2 w-full h-7 text-xs"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Switch to: "{pendingTopic.substring(0, 30)}{pendingTopic.length > 30 ? '...' : ''}"
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-shrink-0 border-b border-border">
         <div className="flex items-center justify-between p-4 border-b border-border">
@@ -402,19 +639,16 @@ const RoomChat = ({
           {messages.map((msg) => (
             <div key={msg.id}>
               {msg.type === 'system' ? (
-                // System message - join notifications
                 <p className="text-xs text-muted-foreground italic text-center py-1">
                   {msg.content}
                 </p>
               ) : msg.type === 'user' ? (
-                // User message
                 <div className="flex justify-end">
                   <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[80%]">
                     <p className="text-sm">{msg.content}</p>
                   </div>
                 </div>
               ) : (
-                // Assistant/Figure message
                 <div className="flex flex-col">
                   <button 
                     onClick={() => replayMessage(msg)}
@@ -436,15 +670,15 @@ const RoomChat = ({
             </div>
           ))}
           
-          {isLoading && (
+          {(isLoading || isUploadingFile) && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-xs italic">Thinking...</span>
+              <span className="text-xs italic">{isUploadingFile ? 'Analyzing document...' : 'Thinking...'}</span>
             </div>
           )}
           
-          {/* Mode setup prompt */}
-          {activeMode && (
+          {/* Mode setup prompt - only show when mode is active but not running */}
+          {activeMode && !modeRunning && (
             <div className="bg-accent/50 border border-accent rounded-lg p-3 mt-2">
               <p className="text-sm text-foreground mb-2">
                 {activeMode === 'podcast' 
@@ -456,12 +690,12 @@ const RoomChat = ({
                 onChange={(e) => onTopicChange?.(e.target.value)}
                 placeholder={activeMode === 'podcast' ? 'e.g., The future of AI' : 'e.g., Was the French Revolution successful?'}
                 className="mb-2 bg-background"
-                onKeyDown={(e) => e.key === 'Enter' && pendingTopic.trim() && onStartMode?.()}
+                onKeyDown={(e) => e.key === 'Enter' && pendingTopic.trim() && startModeOrchestration(pendingTopic.trim())}
               />
               <div className="flex gap-2">
                 <Button 
                   size="sm" 
-                  onClick={onStartMode}
+                  onClick={() => startModeOrchestration(pendingTopic.trim())}
                   disabled={!pendingTopic.trim()}
                 >
                   Start {activeMode === 'podcast' ? 'Podcast' : 'Debate'}
@@ -482,19 +716,41 @@ const RoomChat = ({
       {/* Input */}
       <div className="flex-shrink-0 p-4 border-t border-border">
         <div className="flex items-center gap-2">
+          {/* Hidden file input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept=".pdf"
+            className="hidden"
+          />
+          
           <Input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={isEveryoneSelected ? "Message everyone" : `Message ${[...selectedResponders].join(', ')}`}
+            placeholder={modeRunning ? "Change topic..." : isEveryoneSelected ? "Message everyone" : `Message ${[...selectedResponders].join(', ')}`}
             className="flex-1 bg-background border-border"
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-            disabled={isLoading}
+            disabled={isLoading || isUploadingFile}
           />
+          
+          {/* File upload button */}
+          <Button 
+            size="icon" 
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || isUploadingFile || modeRunning}
+            className="text-muted-foreground hover:text-foreground"
+            title="Upload PDF for feedback"
+          >
+            <FileText className="w-5 h-5" />
+          </Button>
+          
           <Button 
             size="icon" 
             variant="ghost"
             onClick={handleSendMessage} 
-            disabled={isLoading || !inputMessage.trim()}
+            disabled={isLoading || isUploadingFile || !inputMessage.trim()}
             className="text-muted-foreground hover:text-foreground"
           >
             <Send className="w-5 h-5" />
