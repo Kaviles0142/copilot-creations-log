@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, X, Volume2, Loader2, Pause, Play, FileText, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Send, X, Volume2, Loader2, Pause, Play, FileText, RefreshCw, Users, Check, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export interface ChatMessage {
@@ -27,6 +28,8 @@ interface RoomChatProps {
   onTopicChange?: (topic: string) => void;
   onStartMode?: () => void;
   onCancelMode?: () => void;
+  onAddParticipant?: (name: string) => void;
+  onRemoveParticipant?: (name: string) => void;
 }
 
 const RoomChat = ({ 
@@ -39,6 +42,8 @@ const RoomChat = ({
   onTopicChange,
   onStartMode,
   onCancelMode,
+  onAddParticipant,
+  onRemoveParticipant,
 }: RoomChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -48,6 +53,9 @@ const RoomChat = ({
   const [greetingsPlayed, setGreetingsPlayed] = useState<Set<string>>(new Set());
   const [selectedResponders, setSelectedResponders] = useState<Set<string>>(new Set(figures));
   
+  // Participants modal state
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState('');
   // Mode orchestration state
   const [modeRunning, setModeRunning] = useState(false);
   const [modePaused, setModePaused] = useState(false);
@@ -549,228 +557,282 @@ const RoomChat = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-96 bg-card border-t md:border-t-0 md:border-l border-border flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
-      {/* Mode controls - minimal inline controls when running */}
-
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-border">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="text-foreground font-semibold">Chat</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="w-5 h-5" />
+    <>
+      <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-80 bg-background border-t md:border-t-0 md:border-l border-border/50 flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
+        {/* Minimal Header */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-foreground">Chat</h3>
+            {isPlayingAudio && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Volume2 className="w-3 h-3 animate-pulse text-primary" />
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex items-center gap-2 p-4 overflow-x-auto scrollbar-none">
-          {figures.length > 1 && (
-            <Badge 
-              className={`cursor-pointer transition-all select-none shrink-0 whitespace-nowrap ${
-                isEveryoneSelected 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                selectEveryone();
-              }}
-            >
-              Everyone
-            </Badge>
-          )}
-          {figures.map((figure) => (
-            <Badge 
-              key={figure}
-              className={`cursor-pointer transition-all select-none shrink-0 whitespace-nowrap ${
-                selectedResponders.has(figure) && selectedResponders.size === 1
-                  ? 'bg-primary text-primary-foreground' 
-                  : isEveryoneSelected
-                    ? 'bg-primary/20 text-primary border border-primary/30'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                selectResponder(figure);
-              }}
-            >
-              {figure}
-            </Badge>
-          ))}
-          {isPlayingAudio && (
-            <Badge variant="secondary" className="text-xs animate-pulse">
-              <Volume2 className="w-3 h-3 mr-1" />
-              Speaking...
-            </Badge>
-          )}
-        </div>
-      </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-3">
-          {messages.map((msg) => (
-            <div key={msg.id}>
-              {msg.type === 'system' ? (
-                <p className="text-xs text-muted-foreground italic text-center py-1">
-                  {msg.content}
-                </p>
-              ) : msg.type === 'user' ? (
-                <div className="flex justify-end">
-                  <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[80%]">
-                    <p className="text-sm">{msg.content}</p>
+        {/* Messages */}
+        <ScrollArea className="flex-1 px-3 py-2" ref={scrollRef}>
+          <div className="space-y-2">
+            {messages.map((msg) => (
+              <div key={msg.id}>
+                {msg.type === 'system' ? (
+                  <p className="text-[11px] text-muted-foreground/70 text-center py-1">
+                    {msg.content}
+                  </p>
+                ) : msg.type === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-1.5 max-w-[85%]">
+                      <p className="text-sm">{msg.content}</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col">
-                  <button 
-                    onClick={() => replayMessage(msg)}
-                    disabled={!msg.audioUrl || isPlayingAudio}
-                    className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer disabled:cursor-default disabled:hover:text-muted-foreground w-fit"
-                  >
-                    {msg.speakerName}
-                    {msg.isPlaying ? (
-                      <Volume2 className="w-3 h-3 animate-pulse text-primary" />
-                    ) : msg.audioUrl && (
-                      <Volume2 className="w-3 h-3 opacity-0 group-hover:opacity-50" />
-                    )}
-                  </button>
-                  <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2 max-w-[85%]">
-                    <p className="text-sm text-foreground">{msg.content}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {(isLoading || isUploadingFile) && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-xs italic">{isUploadingFile ? 'Analyzing document...' : 'Thinking...'}</span>
-            </div>
-          )}
-          
-          {/* Mode setup prompt - only show when mode is active but not running */}
-          {activeMode && !modeRunning && (
-            <div className="bg-accent/50 border border-accent rounded-lg p-3 mt-2">
-              <p className="text-sm text-foreground mb-2">
-                {activeMode === 'podcast' 
-                  ? '🎙️ Podcast Mode enabled! Enter a topic for discussion:'
-                  : '⚔️ Debate Mode enabled! Enter a topic for the debate:'}
-              </p>
-              <Input
-                value={pendingTopic}
-                onChange={(e) => onTopicChange?.(e.target.value)}
-                placeholder={activeMode === 'podcast' ? 'e.g., The future of AI' : 'e.g., Was the French Revolution successful?'}
-                className="mb-2 bg-background"
-                onKeyDown={(e) => e.key === 'Enter' && pendingTopic.trim() && startModeOrchestration(pendingTopic.trim())}
-              />
-              <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  onClick={() => startModeOrchestration(pendingTopic.trim())}
-                  disabled={!pendingTopic.trim()}
-                >
-                  Start {activeMode === 'podcast' ? 'Podcast' : 'Debate'}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={onCancelMode}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Inline mode controls when running */}
-          {modeRunning && (
-            <div className="flex items-center justify-center gap-2 py-2 mt-2">
-              <div className="flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5">
-                <span className="text-xs text-muted-foreground">
-                  {activeMode === 'podcast' ? '🎙️' : '⚔️'} {currentTopic.substring(0, 25)}{currentTopic.length > 25 ? '...' : ''}
-                </span>
-                {modePaused ? (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Paused</Badge>
                 ) : (
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <div className="flex flex-col gap-0.5">
+                    <button 
+                      onClick={() => replayMessage(msg)}
+                      disabled={!msg.audioUrl || isPlayingAudio}
+                      className="text-[11px] font-medium text-muted-foreground/80 flex items-center gap-1 hover:text-foreground transition-colors w-fit"
+                    >
+                      {msg.speakerName}
+                      {msg.isPlaying && <Volume2 className="w-2.5 h-2.5 animate-pulse text-primary" />}
+                    </button>
+                    <div className="bg-muted/50 rounded-2xl rounded-tl-md px-3 py-1.5 max-w-[85%]">
+                      <p className="text-sm text-foreground">{msg.content}</p>
+                    </div>
+                  </div>
                 )}
-                <div className="flex items-center gap-0.5 ml-1">
-                  {modePaused ? (
-                    <Button size="icon" variant="ghost" onClick={resumeMode} className="h-6 w-6">
-                      <Play className="w-3 h-3" />
-                    </Button>
-                  ) : (
-                    <Button size="icon" variant="ghost" onClick={pauseMode} className="h-6 w-6">
-                      <Pause className="w-3 h-3" />
-                    </Button>
-                  )}
-                  <Button size="icon" variant="ghost" onClick={stopMode} className="h-6 w-6 text-destructive hover:text-destructive">
-                    <X className="w-3 h-3" />
+              </div>
+            ))}
+            
+            {(isLoading || isUploadingFile) && (
+              <div className="flex items-center gap-2 text-muted-foreground py-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span className="text-xs">{isUploadingFile ? 'Analyzing...' : 'Thinking...'}</span>
+              </div>
+            )}
+            
+            {/* Mode setup prompt */}
+            {activeMode && !modeRunning && (
+              <div className="bg-muted/30 border border-border/50 rounded-xl p-3 mt-2">
+                <p className="text-xs text-muted-foreground mb-2">
+                  {activeMode === 'podcast' ? '🎙️ Enter a podcast topic:' : '⚔️ Enter a debate topic:'}
+                </p>
+                <Input
+                  value={pendingTopic}
+                  onChange={(e) => onTopicChange?.(e.target.value)}
+                  placeholder={activeMode === 'podcast' ? 'The future of AI...' : 'Was the revolution successful?'}
+                  className="mb-2 h-8 text-sm bg-background border-border/50"
+                  onKeyDown={(e) => e.key === 'Enter' && pendingTopic.trim() && startModeOrchestration(pendingTopic.trim())}
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={() => startModeOrchestration(pendingTopic.trim())}
+                    disabled={!pendingTopic.trim()}
+                  >
+                    Start
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={onCancelMode}
+                  >
+                    Cancel
                   </Button>
                 </div>
               </div>
-              {topicChanged && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={switchTopic}
-                  className="h-7 text-xs rounded-full"
-                >
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Switch topic
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+            )}
+            
+            {/* Mode controls when running */}
+            {modeRunning && (
+              <div className="flex items-center justify-center py-2">
+                <div className="flex items-center gap-1.5 bg-muted/30 rounded-full px-2.5 py-1">
+                  <span className="text-[11px] text-muted-foreground">
+                    {activeMode === 'podcast' ? '🎙️' : '⚔️'} {currentTopic.substring(0, 20)}{currentTopic.length > 20 ? '...' : ''}
+                  </span>
+                  {!modePaused && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />}
+                  <div className="flex items-center">
+                    {modePaused ? (
+                      <Button size="icon" variant="ghost" onClick={resumeMode} className="h-5 w-5">
+                        <Play className="w-2.5 h-2.5" />
+                      </Button>
+                    ) : (
+                      <Button size="icon" variant="ghost" onClick={pauseMode} className="h-5 w-5">
+                        <Pause className="w-2.5 h-2.5" />
+                      </Button>
+                    )}
+                    <Button size="icon" variant="ghost" onClick={stopMode} className="h-5 w-5 text-destructive">
+                      <X className="w-2.5 h-2.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
 
-      {/* Input */}
-      <div className="flex-shrink-0 p-4 border-t border-border">
-        <div className="flex items-center gap-2">
-          {/* Hidden file input */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            accept=".pdf"
-            className="hidden"
-          />
-          
-          <Input
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={modeRunning ? "Change topic..." : isEveryoneSelected ? "Message everyone" : `Message ${[...selectedResponders].join(', ')}`}
-            className="flex-1 bg-background border-border"
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-            disabled={isLoading || isUploadingFile}
-          />
-          
-          {/* File upload button */}
-          <Button 
-            size="icon" 
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || isUploadingFile || modeRunning}
-            className="text-muted-foreground hover:text-foreground"
-            title="Upload PDF for feedback"
-          >
-            <FileText className="w-5 h-5" />
-          </Button>
-          
-          <Button 
-            size="icon" 
-            variant="ghost"
-            onClick={handleSendMessage} 
-            disabled={isLoading || isUploadingFile || !inputMessage.trim()}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Send className="w-5 h-5" />
-          </Button>
+        {/* Footer with input and participants button */}
+        <div className="flex-shrink-0 p-3 border-t border-border/50">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".pdf"
+              className="hidden"
+            />
+            
+            {/* Participants button */}
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={() => setShowParticipants(true)}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+              title="Participants"
+            >
+              <Users className="w-4 h-4" />
+            </Button>
+            
+            <Input
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder={modeRunning ? "Change topic..." : "Message..."}
+              className="flex-1 h-8 text-sm bg-muted/30 border-0 focus-visible:ring-1"
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              disabled={isLoading || isUploadingFile}
+            />
+            
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploadingFile || modeRunning}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <FileText className="w-4 h-4" />
+            </Button>
+            
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={handleSendMessage} 
+              disabled={isLoading || isUploadingFile || !inputMessage.trim()}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+
+      {/* Participants Modal */}
+      <Dialog open={showParticipants} onOpenChange={setShowParticipants}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Participants</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-2">
+            {/* Current participants */}
+            <div className="space-y-1.5">
+              {figures.map((figure) => (
+                <div key={figure} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-medium text-primary">
+                        {figure.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium">{figure}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant={selectedResponders.has(figure) ? "default" : "ghost"}
+                      className="h-7 w-7"
+                      onClick={() => {
+                        if (selectedResponders.size === 1 && selectedResponders.has(figure)) {
+                          selectEveryone();
+                        } else {
+                          selectResponder(figure);
+                        }
+                      }}
+                      title={selectedResponders.has(figure) && selectedResponders.size === 1 ? "Selected to reply" : "Select to reply"}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </Button>
+                    {figures.length > 1 && onRemoveParticipant && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          onRemoveParticipant(figure);
+                          setShowParticipants(false);
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add participant */}
+            {onAddParticipant && (
+              <div className="pt-2 border-t border-border/50">
+                <p className="text-xs text-muted-foreground mb-2">Add participant</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newParticipantName}
+                    onChange={(e) => setNewParticipantName(e.target.value)}
+                    placeholder="e.g., Nikola Tesla"
+                    className="flex-1 h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newParticipantName.trim()) {
+                        onAddParticipant(newParticipantName.trim());
+                        setNewParticipantName('');
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    disabled={!newParticipantName.trim()}
+                    onClick={() => {
+                      onAddParticipant(newParticipantName.trim());
+                      setNewParticipantName('');
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Select all option */}
+            {figures.length > 1 && (
+              <Button
+                variant={isEveryoneSelected ? "default" : "outline"}
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={() => {
+                  selectEveryone();
+                }}
+              >
+                {isEveryoneSelected ? "✓ Everyone selected" : "Select everyone"}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
