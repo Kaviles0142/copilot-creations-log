@@ -733,36 +733,19 @@ const RoomChat = ({
                     </div>
                     <span className="text-sm font-medium">{figure}</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  {figures.length > 1 && onRemoveParticipant && (
                     <Button
                       size="icon"
-                      variant={selectedResponders.has(figure) ? "default" : "ghost"}
-                      className="h-7 w-7"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={() => {
-                        if (selectedResponders.size === 1 && selectedResponders.has(figure)) {
-                          selectEveryone();
-                        } else {
-                          selectResponder(figure);
-                        }
+                        onRemoveParticipant(figure);
+                        onParticipantsModalChange?.(false);
                       }}
-                      title={selectedResponders.has(figure) && selectedResponders.size === 1 ? "Selected to reply" : "Select to reply"}
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
-                    {figures.length > 1 && onRemoveParticipant && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          onRemoveParticipant(figure);
-                          onParticipantsModalChange?.(false);
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -799,19 +782,6 @@ const RoomChat = ({
               </div>
             )}
 
-            {/* Select all option */}
-            {figures.length > 1 && (
-              <Button
-                variant={isEveryoneSelected ? "default" : "outline"}
-                size="sm"
-                className="w-full h-8 text-xs"
-                onClick={() => {
-                  selectEveryone();
-                }}
-              >
-                {isEveryoneSelected ? "✓ Everyone selected" : "Select everyone"}
-              </Button>
-            )}
           </div>
         </DialogContent>
       </Dialog>
