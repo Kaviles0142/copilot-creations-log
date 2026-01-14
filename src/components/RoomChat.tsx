@@ -34,6 +34,7 @@ interface RoomChatProps {
   onParticipantsModalChange?: (open: boolean) => void;
   onModeStateChange?: (state: { running: boolean; paused: boolean; topic: string; pause: () => void; resume: () => void; stop: () => void }) => void;
   onFileUploadRef?: (trigger: () => void) => void;
+  conversationTone?: 'casual' | 'educational' | 'philosophical';
 }
 
 
@@ -53,6 +54,7 @@ const RoomChat = ({
   onParticipantsModalChange,
   onModeStateChange,
   onFileUploadRef,
+  conversationTone = 'casual',
 }: RoomChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -545,7 +547,7 @@ const RoomChat = ({
             message: userMessage,
             figure: { id: figureId, name: figureName },
             context: recentContext,
-            conversationType: 'casual',
+            conversationType: conversationTone,
             language: 'en',
           }
         });
