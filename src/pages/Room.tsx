@@ -37,6 +37,7 @@ import {
   Play,
   Pause,
   Square,
+  FileText,
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
 import RoomChat from '@/components/RoomChat';
@@ -101,6 +102,9 @@ const Room = () => {
   // End call confirmation
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  
+  // File upload trigger from chat
+  const fileUploadTriggerRef = useRef<(() => void) | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -757,6 +761,7 @@ const Room = () => {
           showParticipantsModal={showParticipantsModal}
           onParticipantsModalChange={setShowParticipantsModal}
           onModeStateChange={setModeState}
+          onFileUploadRef={(trigger) => { fileUploadTriggerRef.current = trigger; }}
         />
       </div>
 
@@ -840,6 +845,17 @@ const Room = () => {
               >
                 <Swords className="w-4 h-4" />
                 {debateMode ? 'Disable' : 'Enable'} Debate Mode
+              </button>
+              <div className="h-px bg-border my-1" />
+              <button
+                onClick={() => {
+                  fileUploadTriggerRef.current?.();
+                  setMoreMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-foreground"
+              >
+                <FileText className="w-4 h-4" />
+                Upload File
               </button>
             </PopoverContent>
           </Popover>
