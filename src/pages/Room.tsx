@@ -103,6 +103,10 @@ const Room = () => {
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
+  // Tone selector state
+  const [conversationTone, setConversationTone] = useState<'casual' | 'educational' | 'philosophical'>('casual');
+  const [toneMenuOpen, setToneMenuOpen] = useState(false);
+  
   // File upload trigger from chat
   const fileUploadTriggerRef = useRef<(() => void) | null>(null);
   
@@ -762,6 +766,7 @@ const Room = () => {
           onParticipantsModalChange={setShowParticipantsModal}
           onModeStateChange={setModeState}
           onFileUploadRef={(trigger) => { fileUploadTriggerRef.current = trigger; }}
+          conversationTone={conversationTone}
         />
       </div>
 
@@ -792,7 +797,47 @@ const Room = () => {
             onClick={() => setChatOpen(!chatOpen)} 
           />
           <div className="hidden md:block">
-            <ToolbarButton icon={Heart} label="React" onClick={() => {}} />
+            <Popover open={toneMenuOpen} onOpenChange={setToneMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors group ${
+                    toneMenuOpen ? 'bg-muted' : 'hover:bg-muted'
+                  }`}
+                >
+                  <Heart className={`w-5 h-5 ${toneMenuOpen ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                  <span className={`text-xs ${toneMenuOpen ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>React</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="center" className="w-44 p-1 bg-card border-border">
+                <button
+                  onClick={() => {
+                    setConversationTone('casual');
+                    setToneMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${conversationTone === 'casual' ? 'text-primary bg-primary/10' : 'text-foreground'}`}
+                >
+                  😊 Casual
+                </button>
+                <button
+                  onClick={() => {
+                    setConversationTone('educational');
+                    setToneMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${conversationTone === 'educational' ? 'text-primary bg-primary/10' : 'text-foreground'}`}
+                >
+                  🎓 Intellectual
+                </button>
+                <button
+                  onClick={() => {
+                    setConversationTone('philosophical');
+                    setToneMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${conversationTone === 'philosophical' ? 'text-primary bg-primary/10' : 'text-foreground'}`}
+                >
+                  🔮 Philosophical
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="hidden md:block">
             <ToolbarButton icon={Share2} label="Share" onClick={() => {}} />
