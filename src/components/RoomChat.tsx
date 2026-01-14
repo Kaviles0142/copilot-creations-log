@@ -33,6 +33,7 @@ interface RoomChatProps {
   showParticipantsModal?: boolean;
   onParticipantsModalChange?: (open: boolean) => void;
   onModeStateChange?: (state: { running: boolean; paused: boolean; topic: string; pause: () => void; resume: () => void; stop: () => void }) => void;
+  onFileUploadRef?: (trigger: () => void) => void;
 }
 
 
@@ -51,6 +52,7 @@ const RoomChat = ({
   showParticipantsModal = false,
   onParticipantsModalChange,
   onModeStateChange,
+  onFileUploadRef,
 }: RoomChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -142,6 +144,11 @@ const RoomChat = ({
       stop: () => stopMode(),
     });
   }, [modeRunning, modePaused, currentTopic]);
+
+  // Expose file upload trigger to parent
+  useEffect(() => {
+    onFileUploadRef?.(() => fileInputRef.current?.click());
+  }, [onFileUploadRef]);
 
 
   const addSystemMessage = (content: string) => {
@@ -690,16 +697,6 @@ const RoomChat = ({
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               disabled={isLoading || isUploadingFile}
             />
-            
-            <Button 
-              size="icon" 
-              variant="ghost"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading || isUploadingFile || modeRunning}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <FileText className="w-4 h-4" />
-            </Button>
             
             <Button
               size="icon" 
