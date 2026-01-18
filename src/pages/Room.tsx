@@ -242,24 +242,29 @@ const Room = () => {
     }
   }, [figures]);
 
-  // Generate podcast scene image when podcast mode is enabled
+  // Generate podcast scene image when podcast mode is enabled with topic/scene
   useEffect(() => {
     const generatePodcastScene = async () => {
-      if (!podcastMode || figures.length === 0) return;
+      if (!podcastMode || figures.length === 0 || !modeConfig) return;
       
-      // Create a unique key for this combination of figures
+      // Create a unique key including topic and scene
       const figuresKey = [...figures].sort().join('|');
-      if (podcastSceneGeneratedFor.current === figuresKey) return;
+      const cacheKey = `${figuresKey}|${modeConfig.topic}|${modeConfig.scene || 'studio'}`;
+      if (podcastSceneGeneratedFor.current === cacheKey) return;
       
-      podcastSceneGeneratedFor.current = figuresKey;
+      podcastSceneGeneratedFor.current = cacheKey;
       setIsGeneratingPodcastScene(true);
       setPodcastSceneImage(null);
 
       try {
-        console.log('🎙️ Generating podcast scene for:', figures);
+        console.log('🎙️ Generating podcast scene for:', figures, 'Topic:', modeConfig.topic, 'Scene:', modeConfig.scene);
 
         const { data, error } = await supabase.functions.invoke('generate-podcast-scene', {
-          body: { figures }
+          body: { 
+            figures,
+            topic: modeConfig.topic,
+            scene: modeConfig.scene || 'studio'
+          }
         });
 
         if (error) throw error;
@@ -274,26 +279,31 @@ const Room = () => {
     };
 
     generatePodcastScene();
-  }, [podcastMode, figures]);
+  }, [podcastMode, figures, modeConfig]);
 
-  // Generate debate scene image when debate mode is enabled
+  // Generate debate scene image when debate mode is enabled with topic/scene
   useEffect(() => {
     const generateDebateScene = async () => {
-      if (!debateMode || figures.length === 0) return;
+      if (!debateMode || figures.length === 0 || !modeConfig) return;
       
-      // Create a unique key for this combination of figures
+      // Create a unique key including topic and scene
       const figuresKey = [...figures].sort().join('|');
-      if (debateSceneGeneratedFor.current === figuresKey) return;
+      const cacheKey = `${figuresKey}|${modeConfig.topic}|${modeConfig.scene || 'senate'}`;
+      if (debateSceneGeneratedFor.current === cacheKey) return;
       
-      debateSceneGeneratedFor.current = figuresKey;
+      debateSceneGeneratedFor.current = cacheKey;
       setIsGeneratingDebateScene(true);
       setDebateSceneImage(null);
 
       try {
-        console.log('⚔️ Generating debate scene for:', figures);
+        console.log('⚔️ Generating debate scene for:', figures, 'Topic:', modeConfig.topic, 'Scene:', modeConfig.scene);
 
         const { data, error } = await supabase.functions.invoke('generate-debate-scene', {
-          body: { figures }
+          body: { 
+            figures,
+            topic: modeConfig.topic,
+            scene: modeConfig.scene || 'senate'
+          }
         });
 
         if (error) throw error;
@@ -308,7 +318,7 @@ const Room = () => {
     };
 
     generateDebateScene();
-  }, [debateMode, figures]);
+  }, [debateMode, figures, modeConfig]);
 
   useEffect(() => {
     const fetchRoom = async () => {
