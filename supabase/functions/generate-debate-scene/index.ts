@@ -13,13 +13,13 @@ serve(async (req) => {
   }
 
   try {
-    const { figures } = await req.json();
+    const { figures, topic, scene } = await req.json();
 
     if (!figures || !Array.isArray(figures) || figures.length === 0) {
       throw new Error('figures array is required');
     }
 
-    console.log('⚔️ Generating debate scene for:', figures);
+    console.log('⚔️ Generating debate scene for:', figures, 'Topic:', topic, 'Scene:', scene);
 
     // Initialize Supabase client
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -28,9 +28,11 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Create a stable cache key from sorted figure names
+    // Create a cache key including topic and scene for unique images
     const sortedFigures = [...figures].sort();
-    const cacheKey = `debate-${sortedFigures.map(f => f.toLowerCase().replace(/\s+/g, '-')).join('-')}`;
+    const topicSlug = (topic || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
+    const sceneId = scene || 'senate';
+    const cacheKey = `debate-${sceneId}-${topicSlug}-${sortedFigures.map(f => f.toLowerCase().replace(/\s+/g, '-')).join('-')}`;
     
     // Check cache first
     console.log('🔍 Checking cache for:', cacheKey);
@@ -53,9 +55,9 @@ serve(async (req) => {
 
     console.log('🎨 No cache found, generating new debate scene...');
 
-    // Build a concise, focused prompt based on participant count
-    const prompt = buildDebatePrompt(figures);
-    console.log('📝 Prompt length:', prompt.length, 'chars');
+    // Build creative prompt with topic incorporated
+    const prompt = buildDebatePrompt(figures, topic, sceneId);
+    console.log('📝 Prompt:', prompt);
 
     // Get API key
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -100,7 +102,7 @@ serve(async (req) => {
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     
-    const fileName = `${cacheKey}-${Date.now()}.png`;
+    const fileName = `${cacheKey.slice(0, 100)}-${Date.now()}.png`;
     const { error: uploadError } = await supabase.storage
       .from('audio-files')
       .upload(fileName, imageBuffer, { contentType: 'image/png', upsert: false });
@@ -116,20 +118,18 @@ serve(async (req) => {
 
     console.log('✅ Image uploaded:', publicUrl);
 
-    // Cache the result (use upsert to handle duplicates)
+    // Cache the result
     const { error: cacheInsertError } = await supabase
       .from('avatar_image_cache')
       .upsert({
         figure_id: cacheKey,
         figure_name: `Debate: ${figures.join(', ')}`,
         cloudinary_url: publicUrl,
-        visual_prompt: prompt.substring(0, 500), // Truncate for storage
+        visual_prompt: prompt.substring(0, 500),
       }, { onConflict: 'figure_id' });
 
     if (cacheInsertError) {
       console.error('⚠️ Cache insert warning:', cacheInsertError);
-    } else {
-      console.log('✅ Cached successfully');
     }
 
     return new Response(JSON.stringify({
@@ -150,23 +150,20 @@ serve(async (req) => {
   }
 });
 
-function buildDebatePrompt(figures: string[]): string {
-  const count = figures.length;
-  const names = figures.join(', ');
+function buildDebatePrompt(figures: string[], topic?: string, scene?: string): string {
+  const names = figures.join(' versus ');
+  const topicContext = topic ? `debating "${topic}"` : 'in heated intellectual debate';
   
-  // Keep prompt concise but descriptive - debate stage setting
-  if (count === 2) {
-    return `Photorealistic photo of ${figures[0]} and ${figures[1]} standing at opposing debate podiums on a formal debate stage. Each has a microphone. Red curtains behind, dramatic spotlights. University or political debate setting. High quality, 4K.`;
-  }
+  // Scene-specific settings with creative topic integration
+  const scenePrompts: Record<string, string> = {
+    senate: `Photorealistic epic cinematic photo of ${names} ${topicContext} in an ancient Roman senate chamber. Marble columns, dramatic torchlight casting long shadows, senators in togas watching from tiered seats. ${topic ? `Symbolic representations of "${topic}" carved into the marble walls and pedestals.` : ''} Dramatic chiaroscuro lighting, tension palpable. Shot like Gladiator, 16:9 aspect ratio, 4K quality.`,
+    
+    colosseum: `Photorealistic epic cinematic photo of ${names} facing off in a Roman colosseum arena, ${topicContext}. Crowds in the stands, sand beneath their feet, dramatic sunset sky. ${topic ? `Banners and shields bearing symbols related to "${topic}" decorating the arena.` : ''} Gladiatorial intensity without weapons, intellectual combat. Epic scale, dramatic lighting, 4K quality.`,
+    
+    courtroom: `Photorealistic cinematic photo of ${names} in a grand Supreme Court chamber, ${topicContext}. Imposing marble columns, American flags, mahogany benches, dramatic judicial lighting. ${topic ? `Legal documents and evidence related to "${topic}" visible on the tables.` : ''} High stakes atmosphere, wood-paneled gravitas. Shot like a legal thriller, 4K quality.`,
+    
+    theatre: `Photorealistic epic cinematic photo of ${names} standing on an ancient Greek amphitheatre stage, ${topicContext}. Stone semicircle of seats rising behind them, Mediterranean sea visible in the distance, golden hour lighting. ${topic ? `Theatrical masks and props representing "${topic}" decorating the orchestra.` : ''} Classical tragedy meets intellectual discourse. Dramatic atmosphere, 4K quality.`
+  };
   
-  if (count === 3) {
-    return `Photorealistic photo of ${names} at separate podiums arranged in a triangle on a debate stage. Each speaker has a microphone. Blue and red stage lighting, formal academic setting. 4K quality.`;
-  }
-  
-  if (count <= 5) {
-    return `Photorealistic photo of ${names} standing at podiums in a semi-circle on an elegant debate stage. Professional lighting, red velvet curtains, wood paneling. Each has a microphone. Presidential debate style. 4K quality.`;
-  }
-  
-  // For 6+ people, keep it simple
-  return `Photorealistic wide shot of ${count} famous historical figures (${names}) at individual podiums on a grand debate stage. Professional theater lighting, red curtains, formal setting. 4K quality, group portrait.`;
+  return scenePrompts[scene || 'senate'] || scenePrompts.senate;
 }
