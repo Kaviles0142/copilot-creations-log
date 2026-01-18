@@ -78,13 +78,16 @@ const RoomChat = ({
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Audio control refs for pause/resume
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioQueueRef = useRef<{ audioUrl: string; figureName: string; content: string }[]>([]);
+  const isProcessingAudioRef = useRef(false);
+  const onAudioCompleteRef = useRef<(() => void) | null>(null);
+  
   const { toast } = useToast();
   
   // Check if everyone is selected
   const isEveryoneSelected = selectedResponders.size === figures.length && figures.every(f => selectedResponders.has(f));
-  
-  // Check if topic changed while running
-  const topicChanged = modeRunning && pendingTopic.trim() && pendingTopic.trim() !== currentTopic;
   
   const selectResponder = (figureName: string) => {
     setSelectedResponders(new Set([figureName]));
@@ -94,8 +97,6 @@ const RoomChat = ({
     setSelectedResponders(new Set(figures));
   };
   
-  const audioQueueRef = useRef<{ audioUrl: string; figureName: string }[]>([]);
-  const isProcessingAudioRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasInitializedRef = useRef(false);
 
@@ -121,11 +122,15 @@ const RoomChat = ({
     initializeFigures();
   }, [figures]);
 
-  // Cleanup orchestration on unmount
+  // Cleanup orchestration and audio on unmount
   useEffect(() => {
     return () => {
       if (orchestrationRef.current) {
         clearTimeout(orchestrationRef.current);
+      }
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
       }
     };
   }, []);
@@ -151,6 +156,19 @@ const RoomChat = ({
   useEffect(() => {
     onFileUploadRef?.(() => fileInputRef.current?.click());
   }, [onFileUploadRef]);
+
+  // Auto-start mode when topic is provided from config dialog
+  const autoStartTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (activeMode && !modeRunning && pendingTopic.trim() && !autoStartTriggeredRef.current) {
+      autoStartTriggeredRef.current = true;
+      startModeOrchestration(pendingTopic.trim());
+    }
+    // Reset when mode ends
+    if (!activeMode) {
+      autoStartTriggeredRef.current = false;
+    }
+  }, [activeMode, modeRunning, pendingTopic]);
 
 
   const addSystemMessage = (content: string) => {
@@ -214,7 +232,7 @@ const RoomChat = ({
       if (audioData?.audioContent) {
         const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
         updateMessageAudio(figureName, greeting, audioUrl);
-        queueAudio(audioUrl, figureName);
+        queueAudio(audioUrl, figureName, greeting);
       }
     } catch (error) {
       console.error('Error generating greeting:', error);
@@ -223,7 +241,7 @@ const RoomChat = ({
 
   const replayMessage = async (msg: ChatMessage) => {
     if (!msg.audioUrl || isPlayingAudio) return;
-    queueAudio(msg.audioUrl, msg.speakerName || 'Unknown');
+    queueAudio(msg.audioUrl, msg.speakerName || 'Unknown', msg.content);
   };
 
   const getGreetingForFigure = (figureName: string): string => {
@@ -248,9 +266,19 @@ const RoomChat = ({
     return `Hello everyone! Great to join this conversation. I'm ${figureName}, ready to share my thoughts and perspectives.`;
   };
 
-  const queueAudio = (audioUrl: string, figureName: string) => {
-    audioQueueRef.current.push({ audioUrl, figureName });
+  // Queue audio with content for synced message display
+  const queueAudio = (audioUrl: string, figureName: string, content: string) => {
+    audioQueueRef.current.push({ audioUrl, figureName, content });
     processAudioQueue();
+  };
+
+  // Queue audio for mode orchestration with callback when complete
+  const queueModeAudio = (audioUrl: string, figureName: string, content: string): Promise<void> => {
+    return new Promise((resolve) => {
+      audioQueueRef.current.push({ audioUrl, figureName, content });
+      onAudioCompleteRef.current = resolve;
+      processAudioQueue();
+    });
   };
 
   const processAudioQueue = async () => {
@@ -261,24 +289,48 @@ const RoomChat = ({
     onSpeakingChange?.(true);
 
     while (audioQueueRef.current.length > 0) {
-      // Check if paused
+      // Wait while paused
       while (pausedRef.current) {
+        // If we have a current audio, pause it
+        if (currentAudioRef.current && !currentAudioRef.current.paused) {
+          currentAudioRef.current.pause();
+        }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      const { audioUrl, figureName } = audioQueueRef.current.shift()!;
-      await playAudio(audioUrl, figureName);
+      // Resume audio if it was paused
+      if (currentAudioRef.current && currentAudioRef.current.paused && currentAudioRef.current.currentTime > 0) {
+        await new Promise<void>((resolve) => {
+          const audio = currentAudioRef.current!;
+          audio.onended = () => {
+            currentAudioRef.current = null;
+            resolve();
+          };
+          audio.play().catch(() => resolve());
+        });
+        continue;
+      }
+      
+      const item = audioQueueRef.current.shift()!;
+      await playAudio(item.audioUrl, item.figureName);
       await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     isProcessingAudioRef.current = false;
     setIsPlayingAudio(false);
     onSpeakingChange?.(false);
+    
+    // Notify any waiting orchestration
+    if (onAudioCompleteRef.current) {
+      onAudioCompleteRef.current();
+      onAudioCompleteRef.current = null;
+    }
   };
 
   const playAudio = (audioUrl: string, figureName: string): Promise<void> => {
     return new Promise((resolve) => {
       const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
       onSpeakingChange?.(true, figureName);
       
       setMessages(prev => prev.map(msg => 
@@ -288,6 +340,7 @@ const RoomChat = ({
       ));
 
       audio.onended = () => {
+        currentAudioRef.current = null;
         onSpeakingChange?.(false, undefined);
         setMessages(prev => prev.map(msg => 
           msg.speakerName === figureName
@@ -299,11 +352,13 @@ const RoomChat = ({
 
       audio.onerror = () => {
         console.error('Audio playback error');
+        currentAudioRef.current = null;
         resolve();
       };
 
       audio.play().catch((err) => {
         console.error('Failed to play audio:', err);
+        currentAudioRef.current = null;
         resolve();
       });
     });
@@ -356,7 +411,9 @@ const RoomChat = ({
         if (audioData?.audioContent) {
           const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
           updateMessageAudio(data.speakerName, data.content, audioUrl);
-          queueAudio(audioUrl, data.speakerName);
+          
+          // Wait for audio to complete before next turn
+          await queueModeAudio(audioUrl, data.speakerName, data.content);
         }
 
         // Update history for next turn
@@ -371,15 +428,16 @@ const RoomChat = ({
         // Keep only last 15 messages for context
         const trimmedHistory = newHistory.slice(-15);
 
-        // Schedule next turn - wait for audio to likely finish before next speaker
+        // Continue to next turn immediately after audio finishes
         const nextIndex = data.nextSpeakerIndex;
         setCurrentSpeakerIndex(nextIndex);
         
-        orchestrationRef.current = setTimeout(() => {
-          if (!pausedRef.current) {
+        // Small delay then continue (no fixed 6s wait)
+        if (!pausedRef.current) {
+          orchestrationRef.current = setTimeout(() => {
             runOrchestrationTurn(topic, nextIndex, trimmedHistory);
-          }
-        }, 6000); // 6 second delay between speakers
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('Orchestration error:', error);
@@ -400,6 +458,13 @@ const RoomChat = ({
 
   const pauseMode = () => {
     setModePaused(true);
+    pausedRef.current = true;
+    
+    // Pause the currently playing audio
+    if (currentAudioRef.current && !currentAudioRef.current.paused) {
+      currentAudioRef.current.pause();
+    }
+    
     if (orchestrationRef.current) {
       clearTimeout(orchestrationRef.current);
     }
@@ -408,9 +473,19 @@ const RoomChat = ({
 
   const resumeMode = () => {
     setModePaused(false);
+    pausedRef.current = false;
+    
+    // Resume the paused audio if any
+    if (currentAudioRef.current && currentAudioRef.current.paused && currentAudioRef.current.currentTime > 0) {
+      currentAudioRef.current.play().catch(console.error);
+      addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} resumed`);
+      // Audio queue will continue after current audio ends
+      return;
+    }
+    
     addSystemMessage(`${activeMode === 'podcast' ? '🎙️ Podcast' : '⚔️ Debate'} resumed`);
     
-    // Get recent messages for context
+    // If no audio was paused, continue with next turn
     const recentMessages = messages.filter(m => m.type === 'assistant').slice(-10);
     runOrchestrationTurn(currentTopic, currentSpeakerIndex, recentMessages);
   };
@@ -431,6 +506,19 @@ const RoomChat = ({
   const stopMode = () => {
     setModeRunning(false);
     setModePaused(false);
+    pausedRef.current = false;
+    
+    // Stop any playing audio
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    
+    // Clear audio queue
+    audioQueueRef.current = [];
+    isProcessingAudioRef.current = false;
+    setIsPlayingAudio(false);
+    
     if (orchestrationRef.current) {
       clearTimeout(orchestrationRef.current);
     }
@@ -500,7 +588,7 @@ const RoomChat = ({
           if (audioData?.audioContent) {
             const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
             updateMessageAudio(figureName, data.content, audioUrl);
-            queueAudio(audioUrl, figureName);
+            queueAudio(audioUrl, figureName, data.content);
           }
         }
       }
@@ -568,7 +656,7 @@ const RoomChat = ({
         if (!audioError && audioData?.audioContent) {
           const audioUrl = `data:audio/mpeg;base64,${audioData.audioContent}`;
           updateMessageAudio(figureName, response, audioUrl);
-          queueAudio(audioUrl, figureName);
+          queueAudio(audioUrl, figureName, response);
         }
 
         if (respondingFigures.indexOf(figureName) < respondingFigures.length - 1) {
@@ -640,40 +728,6 @@ const RoomChat = ({
               <div className="flex items-center gap-2 text-muted-foreground py-1">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 <span className="text-xs">{isUploadingFile ? 'Analyzing...' : 'Thinking...'}</span>
-              </div>
-            )}
-            
-            {/* Mode setup prompt */}
-            {activeMode && !modeRunning && (
-              <div className="bg-muted/30 border border-border/50 rounded-xl p-3 mt-2">
-                <p className="text-xs text-muted-foreground mb-2">
-                  {activeMode === 'podcast' ? '🎙️ Enter a podcast topic:' : '⚔️ Enter a debate topic:'}
-                </p>
-                <Input
-                  value={pendingTopic}
-                  onChange={(e) => onTopicChange?.(e.target.value)}
-                  placeholder={activeMode === 'podcast' ? 'The future of AI...' : 'Was the revolution successful?'}
-                  className="mb-2 h-8 text-sm bg-background border-border/50"
-                  onKeyDown={(e) => e.key === 'Enter' && pendingTopic.trim() && startModeOrchestration(pendingTopic.trim())}
-                />
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    className="h-7 text-xs"
-                    onClick={() => startModeOrchestration(pendingTopic.trim())}
-                    disabled={!pendingTopic.trim()}
-                  >
-                    Start
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost"
-                    className="h-7 text-xs"
-                    onClick={onCancelMode}
-                  >
-                    Cancel
-                  </Button>
-                </div>
               </div>
             )}
             
