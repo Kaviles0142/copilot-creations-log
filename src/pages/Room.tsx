@@ -41,6 +41,8 @@ import {
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
 import RoomChat from '@/components/RoomChat';
+import ModeConfigDialog, { ModeConfig } from '@/components/ModeConfigDialog';
+import LiveVideoOverlay from '@/components/LiveVideoOverlay';
 
 interface Room {
   id: string;
@@ -93,6 +95,10 @@ const Room = () => {
   
   // Topic input for modes
   const [pendingModeTopic, setPendingModeTopic] = useState('');
+  
+  // Mode config dialog state
+  const [modeConfigDialogOpen, setModeConfigDialogOpen] = useState<'podcast' | 'debate' | null>(null);
+  const [modeConfig, setModeConfig] = useState<ModeConfig | null>(null);
   
   // Mode state from RoomChat
   const [modeState, setModeState] = useState<{ running: boolean; paused: boolean; topic: string; pause: () => void; resume: () => void; stop: () => void }>({ 
@@ -606,130 +612,92 @@ const Room = () => {
           {/* Content Area - Fullscreen scene for podcast mode */}
           {podcastMode && (
             <div className="flex-1 bg-black rounded-xl border border-border overflow-hidden min-h-0 relative">
-              {isGeneratingPodcastScene ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
-                  <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-                  <p className="text-muted-foreground text-sm">Generating podcast scene...</p>
-                </div>
-              ) : podcastSceneImage ? (
-                <img 
-                  src={podcastSceneImage} 
-                  alt={`Podcast scene with ${displayFigures.join(', ')}`}
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-card">
-                  <div className="text-center p-8">
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
-                      🎙️ Podcast Mode
-                    </h1>
-                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
-                      {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Guests`}
-                    </h2>
-                    <div className="flex flex-wrap justify-center gap-2 mt-4">
-                      {displayFigures.map((figure, index) => (
-                        <Badge key={index} variant="secondary" className="text-sm">
-                          {figure}
-                        </Badge>
-                      ))}
+              <LiveVideoOverlay
+                isPlaying={modeState.running}
+                isPaused={modeState.paused}
+                onPause={() => modeState.pause()}
+                onResume={() => modeState.resume()}
+                topic={modeState.topic || modeConfig?.topic}
+              >
+                <div className="w-full h-full bg-black">
+                  {isGeneratingPodcastScene ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
+                      <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                      <p className="text-muted-foreground text-sm">Generating podcast scene...</p>
                     </div>
-                  </div>
+                  ) : podcastSceneImage ? (
+                    <img 
+                      src={podcastSceneImage} 
+                      alt={`Podcast scene with ${displayFigures.join(', ')}`}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-card">
+                      <div className="text-center p-8">
+                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
+                          🎙️ Podcast Mode
+                        </h1>
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
+                          {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Guests`}
+                        </h2>
+                        <div className="flex flex-wrap justify-center gap-2 mt-4">
+                          {displayFigures.map((figure, index) => (
+                            <Badge key={index} variant="secondary" className="text-sm">
+                              {figure}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              
-              {/* Mode Controls Overlay */}
-              {modeState.running && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm rounded-full px-4 py-2">
-                  <span className="text-sm text-white font-medium">
-                    {modeState.topic.substring(0, 30)}{modeState.topic.length > 30 ? '...' : ''}
-                  </span>
-                  {!modeState.paused && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
-                  {modeState.paused && <span className="text-xs text-white/70">Paused</span>}
-                  <div className="flex items-center gap-1 ml-2">
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-white hover:bg-white/20"
-                      onClick={() => modeState.paused ? modeState.resume() : modeState.pause()}
-                    >
-                      {modeState.paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-red-400 hover:bg-white/20"
-                      onClick={() => modeState.stop()}
-                    >
-                      <Square className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              </LiveVideoOverlay>
             </div>
           )}
 
           {/* Content Area - Fullscreen scene for debate mode */}
           {debateMode && (
             <div className="flex-1 bg-black rounded-xl border border-border overflow-hidden min-h-0 relative">
-              {isGeneratingDebateScene ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
-                  <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-                  <p className="text-muted-foreground text-sm">Generating debate scene...</p>
-                </div>
-              ) : debateSceneImage ? (
-                <img 
-                  src={debateSceneImage} 
-                  alt={`Debate scene with ${displayFigures.join(', ')}`}
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-card">
-                  <div className="text-center p-8">
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
-                      ⚔️ Debate Mode
-                    </h1>
-                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
-                      {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Debaters`}
-                    </h2>
-                    <div className="flex flex-wrap justify-center gap-2 mt-4">
-                      {displayFigures.map((figure, index) => (
-                        <Badge key={index} variant="secondary" className="text-sm">
-                          {figure}
-                        </Badge>
-                      ))}
+              <LiveVideoOverlay
+                isPlaying={modeState.running}
+                isPaused={modeState.paused}
+                onPause={() => modeState.pause()}
+                onResume={() => modeState.resume()}
+                topic={modeState.topic || modeConfig?.topic}
+              >
+                <div className="w-full h-full bg-black">
+                  {isGeneratingDebateScene ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-card">
+                      <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                      <p className="text-muted-foreground text-sm">Generating debate scene...</p>
                     </div>
-                  </div>
+                  ) : debateSceneImage ? (
+                    <img 
+                      src={debateSceneImage} 
+                      alt={`Debate scene with ${displayFigures.join(', ')}`}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-card">
+                      <div className="text-center p-8">
+                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-2 leading-tight">
+                          ⚔️ Debate Mode
+                        </h1>
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gradient leading-tight">
+                          {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} Debaters`}
+                        </h2>
+                        <div className="flex flex-wrap justify-center gap-2 mt-4">
+                          {displayFigures.map((figure, index) => (
+                            <Badge key={index} variant="secondary" className="text-sm">
+                              {figure}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              
-              {/* Mode Controls Overlay */}
-              {modeState.running && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm rounded-full px-4 py-2">
-                  <span className="text-sm text-white font-medium">
-                    {modeState.topic.substring(0, 30)}{modeState.topic.length > 30 ? '...' : ''}
-                  </span>
-                  {!modeState.paused && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
-                  {modeState.paused && <span className="text-xs text-white/70">Paused</span>}
-                  <div className="flex items-center gap-1 ml-2">
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-white hover:bg-white/20"
-                      onClick={() => modeState.paused ? modeState.resume() : modeState.pause()}
-                    >
-                      {modeState.paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-red-400 hover:bg-white/20"
-                      onClick={() => modeState.stop()}
-                    >
-                      <Square className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              </LiveVideoOverlay>
             </div>
           )}
         </main>
@@ -857,14 +825,14 @@ const Room = () => {
             <PopoverContent side="top" align="center" className="w-48 p-1 bg-card border-border">
               <button
                 onClick={() => {
-                  // Only one mode at a time
-                  if (!podcastMode) {
-                    setDebateMode(false);
-                    setPodcastMode(true);
-                    setChatOpen(true); // Open chat to show topic prompt
-                  } else {
+                  if (podcastMode) {
+                    // Disable mode
                     setPodcastMode(false);
                     setPendingModeTopic('');
+                    setModeConfig(null);
+                  } else {
+                    // Open config dialog
+                    setModeConfigDialogOpen('podcast');
                   }
                   setMoreMenuOpen(false);
                 }}
@@ -875,14 +843,14 @@ const Room = () => {
               </button>
               <button
                 onClick={() => {
-                  // Only one mode at a time
-                  if (!debateMode) {
-                    setPodcastMode(false);
-                    setDebateMode(true);
-                    setChatOpen(true); // Open chat to show topic prompt
-                  } else {
+                  if (debateMode) {
+                    // Disable mode
                     setDebateMode(false);
                     setPendingModeTopic('');
+                    setModeConfig(null);
+                  } else {
+                    // Open config dialog
+                    setModeConfigDialogOpen('debate');
                   }
                   setMoreMenuOpen(false);
                 }}
@@ -930,6 +898,26 @@ const Room = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Mode Configuration Dialog */}
+      <ModeConfigDialog
+        mode={modeConfigDialogOpen}
+        figures={displayFigures}
+        onClose={() => setModeConfigDialogOpen(null)}
+        onStart={(config) => {
+          setModeConfig(config);
+          setPendingModeTopic(config.topic);
+          if (modeConfigDialogOpen === 'podcast') {
+            setDebateMode(false);
+            setPodcastMode(true);
+          } else {
+            setPodcastMode(false);
+            setDebateMode(true);
+          }
+          setChatOpen(true);
+          setModeConfigDialogOpen(null);
+        }}
+      />
     </div>
   );
 };
