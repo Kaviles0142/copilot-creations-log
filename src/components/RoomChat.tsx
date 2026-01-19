@@ -754,15 +754,39 @@ const RoomChat = ({
               disabled={isLoading || isUploadingFile}
             />
             
-            <Button
-              size="icon" 
-              variant="ghost"
-              onClick={handleSendMessage} 
-              disabled={isLoading || isUploadingFile || !inputMessage.trim()}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+            {isPlayingAudio ? (
+              <Button
+                size="icon" 
+                variant="ghost"
+                onClick={() => {
+                  // Pause TTS - works for both regular chat and podcast/debate modes
+                  if (currentAudioRef.current) {
+                    currentAudioRef.current.pause();
+                  }
+                  setIsPlayingAudio(false);
+                  onSpeakingChange?.(false);
+                  
+                  // If in mode, also pause the mode
+                  if (modeRunning && !modePaused) {
+                    pausedRef.current = true;
+                    setModePaused(true);
+                  }
+                }}
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+              >
+                <Pause className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button
+                size="icon" 
+                variant="ghost"
+                onClick={handleSendMessage} 
+                disabled={isLoading || isUploadingFile || !inputMessage.trim()}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </aside>
