@@ -33,13 +33,25 @@ serve(async (req) => {
     const currentSpeaker = figures[speakerIndex];
     const figureId = currentSpeaker.toLowerCase().replace(/\s+/g, '-');
 
-    // Build conversation context
+    // Build conversation context, detecting user steering messages
     const recentMessages = conversationHistory.slice(-10);
+    const lastUserMessage = recentMessages.filter((m: any) => m.type === 'user' || m.speakerName === 'You').pop();
+    const hasUserSteering = lastUserMessage && recentMessages.indexOf(lastUserMessage) >= recentMessages.length - 3;
+    
     const conversationContext = recentMessages.length > 0
-      ? recentMessages.map((m: any) => `${m.speakerName}: ${m.content}`).join('\n')
+      ? recentMessages.map((m: any) => {
+          if (m.type === 'user' || m.speakerName === 'You') {
+            return `[HOST/AUDIENCE INTERJECTION]: ${m.content}`;
+          }
+          return `${m.speakerName}: ${m.content}`;
+        }).join('\n')
       : '';
 
-    // Build system prompt based on mode
+    // Build system prompt based on mode, with user steering acknowledgment
+    const steeringInstruction = hasUserSteering 
+      ? `\n\nIMPORTANT: The host/audience just interjected with: "${lastUserMessage?.content}". You should acknowledge and address this directly in your response.`
+      : '';
+
     const systemPrompt = mode === 'podcast' 
       ? `You are ${currentSpeaker}, a guest on a podcast discussing "${topic}". 
          
@@ -50,8 +62,9 @@ serve(async (req) => {
          - Keep responses conversational (2-4 sentences typically)
          - Ask thought-provoking questions occasionally to keep the discussion flowing
          - Be insightful but accessible
-         
-         ${conversationContext ? `Recent conversation:\n${conversationContext}` : 'You are starting the discussion.'}`
+         - If the host/audience interjects, acknowledge and respond to their input naturally
+         ${steeringInstruction}
+         ${conversationContext ? `\nRecent conversation:\n${conversationContext}` : '\nYou are starting the discussion.'}`
       : `You are ${currentSpeaker}, participating in a formal debate on "${topic}".
          
          Guidelines:
@@ -61,8 +74,9 @@ serve(async (req) => {
          - Support your arguments with examples from your expertise
          - Keep responses focused (2-4 sentences typically)
          - Maintain your intellectual position while acknowledging valid counterpoints
-         
-         ${conversationContext ? `Recent debate:\n${conversationContext}` : 'You are giving your opening statement.'}`;
+         - If the moderator/audience interjects, acknowledge and incorporate their input
+         ${steeringInstruction}
+         ${conversationContext ? `\nRecent debate:\n${conversationContext}` : '\nYou are giving your opening statement.'}`;
 
     // Call Lovable AI
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
