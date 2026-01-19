@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,18 +77,17 @@ export default function ModeConfigDialog({ mode, figures, onClose, onStart }: Mo
   const [topic, setTopic] = useState('');
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [isFormatting, setIsFormatting] = useState(false);
+  const previousModeRef = useRef<'podcast' | 'debate' | null>(null);
 
   // Reset state whenever dialog opens with a new mode
-  const previousMode = useState<'podcast' | 'debate' | null>(null);
-  if (mode !== previousMode[0]) {
-    previousMode[0] = mode;
-    if (mode) {
-      // Dialog just opened - reset all state
+  useEffect(() => {
+    if (mode && mode !== previousModeRef.current) {
       setTopic('');
       setSelectedScene(null);
       setIsFormatting(false);
     }
-  }
+    previousModeRef.current = mode;
+  }, [mode]);
 
   const isPodcast = mode === 'podcast';
   const scenes = isPodcast ? PODCAST_SCENES : DEBATE_SCENES;
