@@ -21,7 +21,7 @@ export default function LiveVideoOverlay({
 }: LiveVideoOverlayProps) {
   const [isHovered, setIsHovered] = useState(false);
 
-  const showControls = isHovered || isPaused;
+  const showControls = isHovered;
 
   return (
     <div 
@@ -57,11 +57,6 @@ export default function LiveVideoOverlay({
             }`} />
             {isPaused ? 'PAUSED' : 'LIVE'}
           </div>
-          
-          {/* Viewer count simulation */}
-          <span className="text-white/70 text-sm">
-            Streaming
-          </span>
         </div>
       </div>
 
