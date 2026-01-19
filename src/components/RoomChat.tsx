@@ -741,10 +741,83 @@ const RoomChat = ({
     }
   };
 
-  if (!isOpen) return null;
-
+  // Always render the participants modal, but only show chat sidebar when isOpen
   return (
     <>
+      {/* Participants Modal - Always rendered so it works even when chat is closed */}
+      <Dialog open={showParticipantsModal} onOpenChange={onParticipantsModalChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Participants</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-2">
+            {/* Current participants */}
+            <div className="space-y-1.5">
+              {figures.map((figure) => (
+                <div key={figure} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-medium text-primary">
+                        {figure.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium">{figure}</span>
+                  </div>
+                  {figures.length > 1 && onRemoveParticipant && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        onRemoveParticipant(figure);
+                        onParticipantsModalChange?.(false);
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add participant */}
+            {onAddParticipant && (
+              <div className="pt-2 border-t border-border/50">
+                <p className="text-xs text-muted-foreground mb-2">Add participant</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newParticipantName}
+                    onChange={(e) => setNewParticipantName(e.target.value)}
+                    placeholder="e.g., Nikola Tesla"
+                    className="flex-1 h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newParticipantName.trim()) {
+                        onAddParticipant(newParticipantName.trim());
+                        setNewParticipantName('');
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    disabled={!newParticipantName.trim()}
+                    onClick={() => {
+                      onAddParticipant(newParticipantName.trim());
+                      setNewParticipantName('');
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Sidebar - Only shown when isOpen */}
+      {isOpen && (
       <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:static md:h-auto md:w-80 bg-background border-t md:border-t-0 md:border-l border-border/50 flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
         {/* Minimal Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50">
@@ -860,79 +933,7 @@ const RoomChat = ({
           </div>
         </div>
       </aside>
-
-      {/* Participants Modal */}
-      <Dialog open={showParticipantsModal} onOpenChange={onParticipantsModalChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base">Participants</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-3 py-2">
-            {/* Current participants */}
-            <div className="space-y-1.5">
-              {figures.map((figure) => (
-                <div key={figure} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-xs font-medium text-primary">
-                        {figure.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                      </span>
-                    </div>
-                    <span className="text-sm font-medium">{figure}</span>
-                  </div>
-                  {figures.length > 1 && onRemoveParticipant && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        onRemoveParticipant(figure);
-                        onParticipantsModalChange?.(false);
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Add participant */}
-            {onAddParticipant && (
-              <div className="pt-2 border-t border-border/50">
-                <p className="text-xs text-muted-foreground mb-2">Add participant</p>
-                <div className="flex gap-2">
-                  <Input
-                    value={newParticipantName}
-                    onChange={(e) => setNewParticipantName(e.target.value)}
-                    placeholder="e.g., Nikola Tesla"
-                    className="flex-1 h-8 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newParticipantName.trim()) {
-                        onAddParticipant(newParticipantName.trim());
-                        setNewParticipantName('');
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    className="h-8"
-                    disabled={!newParticipantName.trim()}
-                    onClick={() => {
-                      onAddParticipant(newParticipantName.trim());
-                      setNewParticipantName('');
-                    }}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-          </div>
-        </DialogContent>
-      </Dialog>
+      )}
     </>
   );
 };
