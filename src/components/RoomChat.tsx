@@ -60,6 +60,7 @@ const RoomChat = ({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isTTSSpeaking, setIsTTSSpeaking] = useState(false); // True only when audio is actively playing
   const [figuresJoined, setFiguresJoined] = useState<Set<string>>(new Set());
   const [greetingsPlayed, setGreetingsPlayed] = useState<Set<string>>(new Set());
   const [selectedResponders, setSelectedResponders] = useState<Set<string>>(new Set(figures));
@@ -294,19 +295,25 @@ const RoomChat = ({
         // If we have a current audio, pause it
         if (currentAudioRef.current && !currentAudioRef.current.paused) {
           currentAudioRef.current.pause();
+          setIsTTSSpeaking(false); // Audio is paused, not speaking
         }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       // Resume audio if it was paused
       if (currentAudioRef.current && currentAudioRef.current.paused && currentAudioRef.current.currentTime > 0) {
+        setIsTTSSpeaking(true); // Audio resuming
         await new Promise<void>((resolve) => {
           const audio = currentAudioRef.current!;
           audio.onended = () => {
             currentAudioRef.current = null;
+            setIsTTSSpeaking(false);
             resolve();
           };
-          audio.play().catch(() => resolve());
+          audio.play().catch(() => {
+            setIsTTSSpeaking(false);
+            resolve();
+          });
         });
         continue;
       }
@@ -332,6 +339,7 @@ const RoomChat = ({
       const audio = new Audio(audioUrl);
       currentAudioRef.current = audio;
       onSpeakingChange?.(true, figureName);
+      setIsTTSSpeaking(true); // Audio is now actually playing
       
       setMessages(prev => prev.map(msg => 
         msg.speakerName === figureName && msg.type === 'assistant'
@@ -341,6 +349,7 @@ const RoomChat = ({
 
       audio.onended = () => {
         currentAudioRef.current = null;
+        setIsTTSSpeaking(false); // Audio finished
         onSpeakingChange?.(false, undefined);
         setMessages(prev => prev.map(msg => 
           msg.speakerName === figureName
@@ -353,12 +362,14 @@ const RoomChat = ({
       audio.onerror = () => {
         console.error('Audio playback error');
         currentAudioRef.current = null;
+        setIsTTSSpeaking(false); // Audio errored
         resolve();
       };
 
       audio.play().catch((err) => {
         console.error('Failed to play audio:', err);
         currentAudioRef.current = null;
+        setIsTTSSpeaking(false); // Audio failed to play
         resolve();
       });
     });
@@ -754,7 +765,7 @@ const RoomChat = ({
               disabled={isLoading || isUploadingFile}
             />
             
-            {isPlayingAudio ? (
+            {isTTSSpeaking ? (
               <Button
                 size="icon" 
                 variant="ghost"
@@ -762,8 +773,8 @@ const RoomChat = ({
                   // Pause TTS - works for both regular chat and podcast/debate modes
                   if (currentAudioRef.current) {
                     currentAudioRef.current.pause();
+                    setIsTTSSpeaking(false);
                   }
-                  setIsPlayingAudio(false);
                   onSpeakingChange?.(false);
                   
                   // If in mode, also pause the mode
