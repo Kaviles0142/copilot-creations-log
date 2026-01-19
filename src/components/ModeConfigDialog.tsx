@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Radio, Swords, Play, X, Sparkles } from 'lucide-react';
+import { Radio, Swords, Play, X, Sparkles, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ModeConfig {
   topic: string;
@@ -76,17 +76,38 @@ const DEBATE_SCENES = [
 export default function ModeConfigDialog({ mode, figures, onClose, onStart }: ModeConfigDialogProps) {
   const [topic, setTopic] = useState('');
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
+  const [isFormatting, setIsFormatting] = useState(false);
 
   const isPodcast = mode === 'podcast';
   const scenes = isPodcast ? PODCAST_SCENES : DEBATE_SCENES;
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!topic.trim()) return;
     
-    onStart({
-      topic: topic.trim(),
-      scene: selectedScene || scenes[0].id,
-    });
+    setIsFormatting(true);
+    
+    try {
+      // Format the topic using AI
+      const { data, error } = await supabase.functions.invoke('format-topic', {
+        body: { topic: topic.trim(), mode }
+      });
+      
+      const formattedTopic = error ? topic.trim() : (data?.formattedTopic || topic.trim());
+      
+      onStart({
+        topic: formattedTopic,
+        scene: selectedScene || scenes[0].id,
+      });
+    } catch (err) {
+      // Fallback to original topic if formatting fails
+      console.error('Topic formatting failed:', err);
+      onStart({
+        topic: topic.trim(),
+        scene: selectedScene || scenes[0].id,
+      });
+    } finally {
+      setIsFormatting(false);
+    }
   };
 
   if (!mode) return null;
@@ -142,6 +163,7 @@ export default function ModeConfigDialog({ mode, figures, onClose, onStart }: Mo
             onChange={(e) => setTopic(e.target.value)}
             className="text-base h-12"
             autoFocus
+            onKeyDown={(e) => e.key === 'Enter' && topic.trim() && handleStart()}
           />
         </div>
 
@@ -180,11 +202,20 @@ export default function ModeConfigDialog({ mode, figures, onClose, onStart }: Mo
         <div className="px-6 py-4 bg-muted/30 border-t border-border">
           <Button 
             onClick={handleStart}
-            disabled={!topic.trim()}
+            disabled={!topic.trim() || isFormatting}
             className={`w-full h-11 ${isPodcast ? 'bg-primary hover:bg-primary/90' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}
           >
-            <Play className="w-4 h-4 mr-2" />
-            Start
+            {isFormatting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Preparing...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 mr-2" />
+                Start
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>
