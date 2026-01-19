@@ -78,6 +78,18 @@ export default function ModeConfigDialog({ mode, figures, onClose, onStart }: Mo
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [isFormatting, setIsFormatting] = useState(false);
 
+  // Reset state whenever dialog opens with a new mode
+  const previousMode = useState<'podcast' | 'debate' | null>(null);
+  if (mode !== previousMode[0]) {
+    previousMode[0] = mode;
+    if (mode) {
+      // Dialog just opened - reset all state
+      setTopic('');
+      setSelectedScene(null);
+      setIsFormatting(false);
+    }
+  }
+
   const isPodcast = mode === 'podcast';
   const scenes = isPodcast ? PODCAST_SCENES : DEBATE_SCENES;
 

@@ -627,6 +627,34 @@ const RoomChat = ({
     setInputMessage('');
     
     addMessage('user', userMessage, 'You');
+    
+    // If in podcast/debate mode, inject user's steering message and continue
+    if (modeRunning && activeMode) {
+      // Pause current audio to acknowledge user input
+      if (currentAudioRef.current && !currentAudioRef.current.paused) {
+        currentAudioRef.current.pause();
+        setIsTTSSpeaking(false);
+      }
+      
+      // Clear the current turn timer
+      if (orchestrationRef.current) {
+        clearTimeout(orchestrationRef.current);
+      }
+      
+      // Add a system message to acknowledge the steering
+      addSystemMessage(`💬 Steering: "${userMessage}"`);
+      
+      // Resume the mode with the next speaker, incorporating the user's input
+      // The orchestrator will see this in the conversation history
+      if (!modePaused) {
+        const recentMessages = messages.filter(m => m.type === 'assistant' || m.type === 'user').slice(-10);
+        // Add the new user message to history
+        recentMessages.push({ id: Date.now().toString(), type: 'user', content: userMessage, speakerName: 'You', timestamp: new Date() });
+        runOrchestrationTurn(currentTopic, currentSpeakerIndex, recentMessages);
+      }
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -759,7 +787,7 @@ const RoomChat = ({
             <Input
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={modeRunning ? "Change topic..." : "Message..."}
+              placeholder={modeRunning ? "Steer the conversation..." : "Message..."}
               className="flex-1 h-8 text-sm bg-muted/30 border-0 focus-visible:ring-1"
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               disabled={isLoading || isUploadingFile}
