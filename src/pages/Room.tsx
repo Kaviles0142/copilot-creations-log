@@ -38,6 +38,8 @@ import {
   Pause,
   Square,
   FileText,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { getFigureContext } from '@/utils/figureContextMapper';
 import RoomChat from '@/components/RoomChat';
@@ -883,7 +885,7 @@ const Room = () => {
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-foreground"
               >
-                {theme === 'dark' ? '☀️' : '🌙'}
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </button>
             </PopoverContent>
