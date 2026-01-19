@@ -241,7 +241,19 @@ const RoomChat = ({
   };
 
   const replayMessage = async (msg: ChatMessage) => {
-    if (!msg.audioUrl || isPlayingAudio) return;
+    if (!msg.audioUrl) return;
+    
+    // Stop any currently playing audio before replaying
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setIsTTSSpeaking(false);
+    }
+    
+    // Clear the queue and play this message immediately
+    audioQueueRef.current = [];
+    isProcessingAudioRef.current = false;
+    
     queueAudio(msg.audioUrl, msg.speakerName || 'Unknown', msg.content);
   };
 
