@@ -84,6 +84,7 @@ const RoomChat = ({
   const audioQueueRef = useRef<{ audioUrl: string; figureName: string; content: string }[]>([]);
   const isProcessingAudioRef = useRef(false);
   const onAudioCompleteRef = useRef<(() => void) | null>(null);
+  const abortAudioRef = useRef(false); // Signal to abort current audio processing
   
   const { toast } = useToast();
   
@@ -243,6 +244,9 @@ const RoomChat = ({
   const replayMessage = async (msg: ChatMessage) => {
     if (!msg.audioUrl) return;
     
+    // Signal any running audio loop to abort
+    abortAudioRef.current = true;
+    
     // Stop any currently playing audio before replaying
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
@@ -250,10 +254,15 @@ const RoomChat = ({
       setIsTTSSpeaking(false);
     }
     
-    // Clear the queue and play this message immediately
+    // Clear the queue and reset processing state
     audioQueueRef.current = [];
     isProcessingAudioRef.current = false;
     
+    // Small delay to let abort signal propagate
+    await new Promise(resolve => setTimeout(resolve, 50));
+    abortAudioRef.current = false;
+    
+    // Play this message immediately
     queueAudio(msg.audioUrl, msg.speakerName || 'Unknown', msg.content);
   };
 
@@ -302,14 +311,24 @@ const RoomChat = ({
     onSpeakingChange?.(true);
 
     while (audioQueueRef.current.length > 0) {
-      // Wait while paused
-      while (pausedRef.current) {
+      // Check for abort signal
+      if (abortAudioRef.current) {
+        break;
+      }
+      
+      // Wait while paused (but check for abort)
+      while (pausedRef.current && !abortAudioRef.current) {
         // If we have a current audio, pause it
         if (currentAudioRef.current && !currentAudioRef.current.paused) {
           currentAudioRef.current.pause();
           setIsTTSSpeaking(false); // Audio is paused, not speaking
         }
         await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Check abort again after pause loop
+      if (abortAudioRef.current) {
+        break;
       }
       
       // Resume audio if it was paused
