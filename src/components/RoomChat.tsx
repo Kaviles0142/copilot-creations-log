@@ -818,7 +818,7 @@ const RoomChat = ({
 
       {/* Chat Sidebar - Only shown when isOpen */}
       {isOpen && (
-      <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:absolute md:right-0 md:top-4 md:bottom-4 md:h-auto md:w-80 md:mr-4 bg-background border md:border-border/50 md:rounded-2xl md:shadow-lg flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
+      <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:left-auto md:right-4 md:top-4 md:bottom-4 md:h-auto md:w-80 bg-background border md:border-border/50 md:rounded-2xl md:shadow-lg flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
         {/* Minimal Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50">
           <div className="flex items-center gap-2">
