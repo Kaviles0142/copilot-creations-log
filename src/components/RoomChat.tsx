@@ -67,6 +67,9 @@ const RoomChat = ({
   
   // Participants modal state - controlled by parent if provided
   const [newParticipantName, setNewParticipantName] = useState('');
+  // Animation state for smooth close
+  const [isClosing, setIsClosing] = useState(false);
+  const [shouldRender, setShouldRender] = useState(isOpen);
   // Mode orchestration state
   const [modeRunning, setModeRunning] = useState(false);
   const [modePaused, setModePaused] = useState(false);
@@ -108,6 +111,21 @@ const RoomChat = ({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Handle open/close animation
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 300); // Match animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // Handle figures joining and greeting
   useEffect(() => {
@@ -816,9 +834,13 @@ const RoomChat = ({
         </DialogContent>
       </Dialog>
 
-      {/* Chat Sidebar - Only shown when isOpen */}
-      {isOpen && (
-      <aside className="fixed inset-x-0 bottom-0 h-[60vh] md:left-auto md:right-4 md:top-4 md:bottom-4 md:h-auto md:w-80 bg-background border md:border-border/50 md:rounded-2xl md:shadow-lg flex flex-col z-50 animate-in slide-in-from-bottom md:slide-in-from-right duration-300">
+      {/* Chat Sidebar - Animated open/close */}
+      {shouldRender && (
+      <aside className={`fixed inset-x-0 bottom-0 h-[60vh] md:left-auto md:right-4 md:top-4 md:bottom-4 md:h-auto md:w-80 bg-background border md:border-border/50 md:rounded-2xl md:shadow-lg flex flex-col z-50 transition-all duration-300 ${
+        isClosing 
+          ? 'animate-out slide-out-to-bottom md:slide-out-to-right opacity-0' 
+          : 'animate-in slide-in-from-bottom md:slide-in-from-right opacity-100'
+      }`}>
         {/* Minimal Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50">
           <div className="flex items-center gap-2">
