@@ -847,7 +847,7 @@ const Room = () => {
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${podcastMode ? 'text-primary bg-primary/10' : 'text-foreground'}`}
               >
                 <Radio className="w-4 h-4" />
-                Podcast Mode
+                Podcast
               </button>
               <button
                 onClick={() => {
@@ -865,7 +865,7 @@ const Room = () => {
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${debateMode ? 'text-primary bg-primary/10' : 'text-foreground'}`}
               >
                 <Swords className="w-4 h-4" />
-                Debate Mode
+                Debate
               </button>
               <div className="h-px bg-border my-1" />
               <button
