@@ -461,10 +461,6 @@ const Room = () => {
             {displayFigures.length === 1 ? displayFigures[0] : `${displayFigures.length} participants`}
           </span>
         </div>
-        <Switch
-          checked={theme === 'dark'}
-          onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-        />
       </header>
 
       {/* Main Content */}
@@ -849,7 +845,7 @@ const Room = () => {
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${podcastMode ? 'text-primary bg-primary/10' : 'text-foreground'}`}
               >
                 <Radio className="w-4 h-4" />
-                {podcastMode ? 'Disable' : 'Enable'} Podcast Mode
+                Podcast Mode
               </button>
               <button
                 onClick={() => {
@@ -867,7 +863,7 @@ const Room = () => {
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors ${debateMode ? 'text-primary bg-primary/10' : 'text-foreground'}`}
               >
                 <Swords className="w-4 h-4" />
-                {debateMode ? 'Disable' : 'Enable'} Debate Mode
+                Debate Mode
               </button>
               <div className="h-px bg-border my-1" />
               <button
@@ -879,6 +875,16 @@ const Room = () => {
               >
                 <FileText className="w-4 h-4" />
                 Upload File
+              </button>
+              <button
+                onClick={() => {
+                  setTheme(theme === 'dark' ? 'light' : 'dark');
+                  setMoreMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-foreground"
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </button>
             </PopoverContent>
           </Popover>
