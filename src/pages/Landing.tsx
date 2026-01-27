@@ -10,21 +10,22 @@ export default function Landing() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Minimal navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/20">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-lg font-semibold tracking-tight">
-            Never Gone
-          </span>
-          <Button 
-            onClick={() => navigate('/join')} 
-            size="sm" 
-            variant="ghost"
-            className="gap-2 rounded-full"
-          >
-            Enter <ArrowRight className="w-3.5 h-3.5" />
-          </Button>
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      {/* Minimal floating navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50">
+        <div className="mx-4 mt-4">
+          <div className="container mx-auto max-w-6xl bg-background/70 backdrop-blur-2xl border border-border/30 rounded-2xl px-6 py-3 flex items-center justify-between shadow-lg shadow-black/5">
+            <span className="text-lg font-semibold tracking-tight">
+              Never Gone
+            </span>
+            <Button 
+              onClick={() => navigate('/join')} 
+              size="sm" 
+              className="gap-2 rounded-full h-9 px-5"
+            >
+              Get started <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       </nav>
 
