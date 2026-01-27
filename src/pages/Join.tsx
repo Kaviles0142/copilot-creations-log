@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Mic, MicOff, Video, VideoOff, X, UserPlus } from 'lucide-react';
+import { Loader2, Mic, MicOff, Video, VideoOff, X, UserPlus, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Join = () => {
   const navigate = useNavigate();
@@ -290,7 +291,16 @@ const Join = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-8">
+      {/* Back to Home */}
+      <Link 
+        to="/" 
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span className="text-sm">Back to Home</span>
+      </Link>
+      
       <div className="bg-card border border-border rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
         {/* Header Bar */}
         <div className="bg-muted/30 px-5 py-2.5 flex items-center gap-3 border-b border-border">
