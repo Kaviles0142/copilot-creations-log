@@ -13,22 +13,8 @@ import {
   Zap
 } from 'lucide-react';
 
-// Import figure images
-import einstein from '@/assets/figures/einstein.jpg';
-import cleopatra from '@/assets/figures/cleopatra.jpg';
-import davinci from '@/assets/figures/davinci.jpg';
-import napoleon from '@/assets/figures/napoleon.jpg';
-import shakespeare from '@/assets/figures/shakespeare.jpg';
-import curie from '@/assets/figures/curie.jpg';
-
-const figures = [
-  { name: 'Einstein', image: einstein, era: '1879-1955' },
-  { name: 'Cleopatra', image: cleopatra, era: '69-30 BC' },
-  { name: 'Da Vinci', image: davinci, era: '1452-1519' },
-  { name: 'Napoleon', image: napoleon, era: '1769-1821' },
-  { name: 'Shakespeare', image: shakespeare, era: '1564-1616' },
-  { name: 'Marie Curie', image: curie, era: '1867-1934' },
-];
+// Import hero image
+import podcastHero from '@/assets/podcast-hero.jpg';
 
 const features = [
   {
@@ -128,41 +114,16 @@ export default function Landing() {
             </Button>
           </div>
 
-          {/* Floating Figure Avatars */}
-          <div className="relative h-36 sm:h-40">
-            <div className="absolute inset-0 flex items-center justify-center">
-              {figures.map((figure, index) => {
-                const offset = (index - 2.5) * 15;
-                const scale = 1 - Math.abs(index - 2.5) * 0.05;
-                return (
-                  <div 
-                    key={figure.name}
-                    className="absolute transition-all duration-500 ease-out hover:scale-110 hover:z-20 cursor-pointer group"
-                    style={{
-                      left: `${18 + index * 13}%`,
-                      transform: `translateX(-50%) rotate(${offset * 0.3}deg) scale(${scale})`,
-                      zIndex: 10 - Math.abs(index - 2.5),
-                    }}
-                  >
-                    <div className="relative">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden ring-4 ring-background shadow-2xl group-hover:ring-primary/30 transition-all duration-300">
-                        <img 
-                          src={figure.image} 
-                          alt={figure.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:-translate-y-1">
-                        <div className="bg-popover border border-border px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
-                          <span className="text-sm font-medium block">{figure.name}</span>
-                          <span className="text-xs text-muted-foreground">{figure.era}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Hero Image */}
+          <div className="relative max-w-4xl mx-auto">
+            <div className="rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border/50">
+              <img 
+                src={podcastHero} 
+                alt="Historical figures in a podcast studio"
+                className="w-full h-auto object-cover"
+              />
             </div>
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-background/60 via-transparent to-transparent pointer-events-none" />
           </div>
         </div>
       </section>
@@ -220,35 +181,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-24 px-6 bg-muted/20">
-        <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
-              Start in 3 Simple Steps
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { step: '1', title: 'Create a Room', description: 'Start a new conversation room or join with a code.' },
-              { step: '2', title: 'Choose Figures', description: 'Select which historical figures you want to talk to.' },
-              { step: '3', title: 'Start Talking', description: 'Type or speak. Watch history come alive.' },
-            ].map((item, index) => (
-              <div key={item.step} className="text-center relative">
-                {index < 2 && (
-                  <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-border" />
-                )}
-                <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-5 text-xl font-bold shadow-lg shadow-primary/20">
-                  {item.step}
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-muted-foreground text-sm">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="py-24 px-6">
