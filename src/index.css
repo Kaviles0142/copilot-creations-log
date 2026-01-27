@@ -57,50 +57,50 @@
   }
 
   .dark {
-    /* Deep charcoal with warm undertones */
-    --background: 20 15% 6%;
-    --foreground: 40 20% 96%;
+    /* Deep charcoal with cool undertones */
+    --background: 270 20% 6%;
+    --foreground: 270 10% 96%;
 
-    --card: 20 12% 10%;
-    --card-foreground: 40 20% 96%;
+    --card: 270 15% 10%;
+    --card-foreground: 270 10% 96%;
 
-    --popover: 20 12% 10%;
-    --popover-foreground: 40 20% 96%;
+    --popover: 270 15% 10%;
+    --popover-foreground: 270 10% 96%;
 
-    /* Rich amber gold primary */
-    --primary: 38 92% 50%;
-    --primary-foreground: 20 15% 6%;
+    /* Rich purple primary */
+    --primary: 270 70% 60%;
+    --primary-foreground: 270 20% 6%;
 
-    --secondary: 20 10% 15%;
-    --secondary-foreground: 40 20% 90%;
+    --secondary: 270 15% 15%;
+    --secondary-foreground: 270 10% 90%;
 
-    --muted: 20 10% 12%;
-    --muted-foreground: 40 10% 55%;
+    --muted: 270 15% 12%;
+    --muted-foreground: 270 10% 55%;
 
-    /* Warm gold accent */
-    --accent: 38 92% 50%;
-    --accent-foreground: 20 15% 6%;
+    /* Purple accent */
+    --accent: 270 70% 60%;
+    --accent-foreground: 270 20% 6%;
 
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 20 10% 18%;
-    --input: 20 10% 15%;
-    --ring: 38 92% 50%;
+    --border: 270 15% 18%;
+    --input: 270 15% 15%;
+    --ring: 270 70% 60%;
 
-    --hero-gradient-start: 38 92% 50%;
-    --hero-gradient-end: 28 85% 35%;
-    --gold: 45 100% 55%;
-    --gold-muted: 40 30% 40%;
+    --hero-gradient-start: 270 70% 60%;
+    --hero-gradient-end: 280 60% 45%;
+    --gold: 270 80% 65%;
+    --gold-muted: 270 30% 40%;
 
-    --sidebar-background: 20 12% 8%;
-    --sidebar-foreground: 40 20% 90%;
-    --sidebar-primary: 38 92% 50%;
-    --sidebar-primary-foreground: 20 15% 6%;
-    --sidebar-accent: 20 10% 12%;
-    --sidebar-accent-foreground: 40 20% 90%;
-    --sidebar-border: 20 10% 15%;
-    --sidebar-ring: 38 92% 50%;
+    --sidebar-background: 270 15% 8%;
+    --sidebar-foreground: 270 10% 90%;
+    --sidebar-primary: 270 70% 60%;
+    --sidebar-primary-foreground: 270 20% 6%;
+    --sidebar-accent: 270 15% 12%;
+    --sidebar-accent-foreground: 270 10% 90%;
+    --sidebar-border: 270 15% 15%;
+    --sidebar-ring: 270 70% 60%;
   }
 }
 
@@ -131,7 +131,7 @@
   }
 
   .bg-subtle-gradient {
-    background-image: linear-gradient(180deg, hsl(var(--background)), hsl(20 12% 8%));
+    background-image: linear-gradient(180deg, hsl(var(--background)), hsl(270 15% 8%));
   }
 
   .glass-effect {
