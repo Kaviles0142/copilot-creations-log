@@ -6,7 +6,7 @@ export default function HeroSection() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-6 pt-20">
+    <section className="relative min-h-[90vh] flex items-center justify-center px-6 pt-24 pb-12">
       {/* Multiple layered gradient orbs for depth */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/8 rounded-full blur-[180px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
@@ -20,15 +20,15 @@ export default function HeroSection() {
           </p>
         </div>
 
-        {/* Larger, more impactful headline */}
-        <h1 className="font-display text-[3.5rem] sm:text-7xl md:text-8xl lg:text-[7rem] font-bold tracking-tight leading-[0.95] mb-10">
+        {/* Main headline */}
+        <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.95] mb-6">
           <span className="text-foreground">Talk to</span>
           <br />
           <span className="text-primary">history's greatest</span>
         </h1>
 
-        {/* Improved subheadline with better line height */}
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-14 leading-[1.7]">
+        {/* Subheadline */}
+        <p className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
           Have real conversations with Einstein, Cleopatra, Da Vinci, and 50+ legendary figures. 
           Ask questions, debate ideas, and learn from the minds that shaped our world.
         </p>
