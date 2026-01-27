@@ -42,33 +42,13 @@ interface ServerStatus {
 }
 
 export default function Admin() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [videoLogs, setVideoLogs] = useState<any[]>([]);
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [serverLoading, setServerLoading] = useState(false);
   const [podId, setPodId] = useState('');
-
-  // Simple password check (in production, use proper auth)
-  const handleLogin = () => {
-    // This is a simple gate - in production use Supabase Auth with role checks
-    if (password === 'admin2024') {
-      setIsAuthenticated(true);
-      localStorage.setItem('admin_authenticated', 'true');
-      toast.success('Authenticated successfully');
-    } else {
-      toast.error('Invalid password');
-    }
-  };
-
-  useEffect(() => {
-    // Check if already authenticated
-    if (localStorage.getItem('admin_authenticated') === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
 
   // Fetch metrics from database
   const fetchMetrics = async () => {
@@ -209,35 +189,6 @@ export default function Admin() {
       fetchVideoLogs();
     }
   }, [isAuthenticated]);
-
-  // Login gate
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <Lock className="w-6 h-6 text-primary" />
-            </div>
-            <CardTitle>Admin Access</CardTitle>
-            <CardDescription>Enter the admin password to continue</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            />
-            <Button className="w-full" onClick={handleLogin}>
-              Authenticate
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
