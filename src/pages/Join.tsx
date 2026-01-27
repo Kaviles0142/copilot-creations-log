@@ -292,14 +292,16 @@ const Join = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-8">
-      {/* Back to Home */}
-      <Link 
-        to="/" 
-        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm">Back to Home</span>
-      </Link>
+      <div className="max-w-lg w-full">
+        {/* Back to Home */}
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm">Back to Home</span>
+        </Link>
+      </div>
       
       <div className="bg-card border border-border rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
         {/* Header Bar */}
