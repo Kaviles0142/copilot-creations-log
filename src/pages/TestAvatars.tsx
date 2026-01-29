@@ -33,30 +33,13 @@ export default function TestAvatars() {
     setStatus('Generating Einstein image...');
     
     try {
-      const LOVABLE_API_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image',
-          messages: [{
-            role: 'user',
-            content: `Generate a photorealistic portrait of Albert Einstein as an elderly man with his iconic wild white hair, kind eyes, and gentle smile. He should be wearing a simple sweater. The background should be a warm, neutral color. High quality, detailed face suitable for lip-sync animation. Front-facing portrait, looking directly at camera.`
-          }],
-          modalities: ['image', 'text']
-        })
-      });
+      const { data, error } = await supabase.functions.invoke('generate-einstein-image');
 
-      if (!response.ok) {
-        throw new Error(`Image generation failed: ${response.status}`);
+      if (error) {
+        throw new Error(error.message || 'Image generation failed');
       }
 
-      const data = await response.json();
-      const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      const generatedImageUrl = data?.image_url;
       
       if (!generatedImageUrl) {
         throw new Error('No image returned from API');
