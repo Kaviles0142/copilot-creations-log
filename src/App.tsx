@@ -9,6 +9,7 @@ import Join from "./pages/Join";
 import Room from "./pages/Room";
 import OldApp from "./pages/OldApp";
 import Admin from "./pages/Admin";
+import TestAvatars from "./pages/TestAvatars";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,9 @@ const App = () => (
             
             {/* Admin Dashboard */}
             <Route path="/admin" element={<Admin />} />
+            
+            {/* Test Avatars */}
+            <Route path="/test-avatars" element={<TestAvatars />} />
             
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
