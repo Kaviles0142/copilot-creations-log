@@ -132,20 +132,24 @@ export default function TestAvatars() {
     setStatus('Generating TTS audio...');
 
     try {
-      // Step 1: Generate TTS audio
-      const { data: ttsData, error: ttsError } = await supabase.functions.invoke('runpod-tts', {
-        body: { text }
+      // Step 1: Generate TTS audio using Azure (faster than RunPod)
+      const { data: ttsData, error: ttsError } = await supabase.functions.invoke('azure-text-to-speech', {
+        body: { 
+          text,
+          figure_name: 'Albert Einstein',
+          figure_id: 'albert-einstein'
+        }
       });
 
-      if (ttsError || !ttsData?.audio_base64) {
+      if (ttsError || !ttsData?.audioContent) {
         throw new Error(ttsError?.message || 'TTS generation failed');
       }
 
-      console.log('✅ TTS audio received, length:', ttsData.audio_base64.length);
+      console.log('✅ Azure TTS audio received, length:', ttsData.audioContent.length);
       setStatus('Converting audio to PCM...');
 
       // Step 2: Convert audio to float32 PCM 16kHz
-      const pcmData = await convertToFloat32PCM16k(ttsData.audio_base64);
+      const pcmData = await convertToFloat32PCM16k(ttsData.audioContent);
       console.log('✅ PCM data ready, samples:', pcmData.length);
 
       setStatus('Connecting to Ditto WebSocket...');
