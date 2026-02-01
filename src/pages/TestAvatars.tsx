@@ -1,14 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Play, RefreshCw, Volume2 } from "lucide-react";
+import { Loader2, Play, RefreshCw, Volume2, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const DITTO_WS_URL = "wss://cyvz85a1k93zep-8000.proxy.runpod.net/ws/stream";
+import { AvatarTile } from "@/components/AvatarTile";
+import { useIdleVideoPreloader } from "@/hooks/useIdleVideoPreloader";
 
 export default function TestAvatars() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -17,18 +16,40 @@ export default function TestAvatars() {
   const [text, setText] = useState(
     "Hello, I am Albert Einstein. The important thing is not to stop questioning. Curiosity has its own reason for existence.",
   );
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioPcm, setAudioPcm] = useState<Float32Array | null>(null);
   const [status, setStatus] = useState("Ready");
-  const [frameCount, setFrameCount] = useState(0);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
+  const { getIdleVideoUrl, isGenerating: isGeneratingIdle, getCachedUrl } = useIdleVideoPreloader();
+  
+  const [idleVideoUrl, setIdleVideoUrl] = useState<string | null>(null);
+  const figureId = "albert-einstein";
+  const figureName = "Albert Einstein";
 
   // Generate Einstein image on mount
   useEffect(() => {
     generateEinsteinImage();
   }, []);
+
+  // Generate idle video when image is ready
+  useEffect(() => {
+    const generateIdle = async () => {
+      if (imageBase64 && !idleVideoUrl && !isGeneratingIdle(figureId)) {
+        console.log("🎬 Generating idle video...");
+        setStatus("Generating idle loop video...");
+        const url = await getIdleVideoUrl(figureId, imageBase64, figureName);
+        if (url) {
+          setIdleVideoUrl(url);
+          setStatus("Idle video ready!");
+        } else {
+          setStatus("Idle video generation failed - using static image");
+        }
+      }
+    };
+    generateIdle();
+  }, [imageBase64, idleVideoUrl, figureId, getIdleVideoUrl, isGeneratingIdle]);
 
   const generateEinsteinImage = async () => {
     setIsGeneratingImage(true);
@@ -108,15 +129,6 @@ export default function TestAvatars() {
     }
   };
 
-  const float32ToBase64 = (float32Array: Float32Array): string => {
-    const bytes = new Uint8Array(float32Array.buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  };
-
   const startStreaming = async () => {
     if (!imageBase64) {
       toast({ title: "Error", description: "Please generate an image first", variant: "destructive" });
@@ -128,17 +140,16 @@ export default function TestAvatars() {
       return;
     }
 
-    setIsStreaming(true);
-    setFrameCount(0);
+    setIsGeneratingAudio(true);
     setStatus("Generating TTS audio...");
 
     try {
-      // Step 1: Generate TTS audio using Azure (faster than RunPod)
+      // Step 1: Generate TTS audio using Azure
       const { data: ttsData, error: ttsError } = await supabase.functions.invoke("azure-text-to-speech", {
         body: {
           text,
-          figure_name: "Albert Einstein",
-          figure_id: "albert-einstein",
+          figure_name: figureName,
+          figure_id: figureId,
         },
       });
 
@@ -153,173 +164,100 @@ export default function TestAvatars() {
       const pcmData = await convertToFloat32PCM16k(ttsData.audioContent);
       console.log("✅ PCM data ready, samples:", pcmData.length);
 
-      setStatus("Connecting to Ditto WebSocket...");
-
-      // Step 3: Connect to Ditto WebSocket
-      const ws = new WebSocket(DITTO_WS_URL);
-      wsRef.current = ws;
-
-      ws.onopen = async () => {
-        console.log("🔌 WebSocket connected");
-        setStatus("Initializing avatar...");
-
-        // Send init message
-        ws.send(
-          JSON.stringify({
-            type: "init",
-            image_b64: imageBase64,
-            avatar_id: null,
-            max_size: 1024,
-            crop_scale: 2.0,
-          }),
-        );
-
-        // Wait a bit for init to process
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        setStatus("Streaming audio chunks...");
-
-        // Send audio in chunks with [4,8,2] chunksize pattern
-        const chunkSize = 4 * 8 * 2 * 100; // Multiply by 100 for reasonable chunk sizes
-        let offset = 0;
-
-        while (offset < pcmData.length) {
-          const chunk = pcmData.slice(offset, offset + chunkSize);
-          const chunkBase64 = float32ToBase64(chunk);
-
-          ws.send(
-            JSON.stringify({
-              type: "audio_chunk",
-              audio_b64: chunkBase64,
-              sample_rate: 16000,
-              chunksize: [4, 8, 2],
-            }),
-          );
-
-          offset += chunkSize;
-
-          // Small delay to avoid overload
-          await new Promise((resolve) => setTimeout(resolve, 250));
-        }
-
-        // Send end signal
-        ws.send(JSON.stringify({ type: "end" }));
-        setStatus("Audio sent, waiting for frames...");
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-
-          if (message.type === "frame" && message.data) {
-            setFrameCount((prev) => prev + 1);
-
-            // Draw frame on canvas
-            const canvas = canvasRef.current;
-            if (canvas) {
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                const img = new Image();
-                img.onload = () => {
-                  canvas.width = img.width;
-                  canvas.height = img.height;
-                  ctx.drawImage(img, 0, 0);
-                };
-                img.src = `data:image/${message.format || "jpeg"};base64,${message.data}`;
-              }
-            }
-          } else if (message.type === "error") {
-            console.error("Ditto error:", message);
-            setStatus(`Error: ${message.message || "Unknown error"}`);
-          }
-        } catch (e) {
-          console.error("Error parsing WebSocket message:", e);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setStatus("WebSocket error");
-        toast({ title: "WebSocket Error", description: "Connection failed", variant: "destructive" });
-      };
-
-      ws.onclose = () => {
-        console.log("🔌 WebSocket closed");
-        setStatus(`Complete! Received ${frameCount} frames`);
-        setIsStreaming(false);
-        wsRef.current = null;
-      };
+      // Step 3: Set speaking state and pass audio to AvatarTile
+      setAudioPcm(pcmData);
+      setIsSpeaking(true);
+      setStatus("Streaming live video...");
+      setIsGeneratingAudio(false);
     } catch (error) {
-      console.error("Streaming error:", error);
+      console.error("Error:", error);
       setStatus("Error: " + (error instanceof Error ? error.message : "Unknown"));
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Streaming failed",
+        description: error instanceof Error ? error.message : "Failed to generate audio",
         variant: "destructive",
       });
-      setIsStreaming(false);
+      setIsGeneratingAudio(false);
     }
   };
 
   const stopStreaming = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setIsStreaming(false);
+    setIsSpeaking(false);
+    setAudioPcm(null);
     setStatus("Stopped");
   };
+
+  const handleSpeakingEnd = useCallback(() => {
+    setIsSpeaking(false);
+    setAudioPcm(null);
+    setStatus("Stream complete - back to idle");
+  }, []);
+
+  const isIdleVideoGenerating = isGeneratingIdle(figureId);
 
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
         <h1 className="text-3xl font-bold text-foreground">Avatar Streaming Test</h1>
+        <p className="text-muted-foreground">
+          Zoom-like avatar tile with idle loop video + live stream swap
+        </p>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Left: Image Generation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Einstein Portrait
-                <Button variant="outline" size="sm" onClick={generateEinsteinImage} disabled={isGeneratingImage}>
-                  {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
-                {isGeneratingImage ? (
-                  <div className="text-center">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Generating Einstein...</p>
-                  </div>
-                ) : imageUrl ? (
-                  <img src={imageUrl} alt="Generated Einstein" className="w-full h-full object-cover" />
-                ) : (
-                  <p className="text-muted-foreground">No image generated</p>
-                )}
+        {/* Main Avatar Tile */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              {figureName}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={generateEinsteinImage} 
+                disabled={isGeneratingImage || isSpeaking}
+              >
+                {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              <AvatarTile
+                figureName={figureName}
+                figureId={figureId}
+                avatarImageUrl={imageUrl}
+                idleVideoUrl={idleVideoUrl}
+                isLoading={isGeneratingImage || isIdleVideoGenerating}
+                isSpeaking={isSpeaking}
+                audioPcm={audioPcm}
+                imageBase64={imageBase64}
+                showStatusBadge={true}
+                onSpeakingEnd={handleSpeakingEnd}
+                className="w-full h-full"
+              />
+            </div>
+            
+            {/* Status indicators */}
+            <div className="mt-4 grid grid-cols-3 gap-4 text-center text-sm">
+              <div>
+                <p className="text-muted-foreground">Image</p>
+                <p className={imageBase64 ? "text-primary" : "text-muted-foreground"}>
+                  {imageBase64 ? "✅ Ready" : isGeneratingImage ? "⏳ Generating..." : "❌ None"}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Right: Video Output */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Streaming Output</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-square bg-black rounded-lg overflow-hidden flex items-center justify-center">
-                <canvas
-                  ref={canvasRef}
-                  className="max-w-full max-h-full"
-                  style={{ display: frameCount > 0 ? "block" : "none" }}
-                />
-                {frameCount === 0 && <p className="text-white/50">Waiting for stream...</p>}
+              <div>
+                <p className="text-muted-foreground">Idle Video</p>
+                <p className={idleVideoUrl ? "text-primary" : "text-muted-foreground"}>
+                  {idleVideoUrl ? "✅ Ready" : isIdleVideoGenerating ? "⏳ Generating..." : "❌ None"}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground mt-2 text-center">Frames received: {frameCount}</p>
-            </CardContent>
-          </Card>
-        </div>
+              <div>
+                <p className="text-muted-foreground">Mode</p>
+                <p className={isSpeaking ? "text-primary font-bold" : "text-muted-foreground"}>
+                  {isSpeaking ? "🔴 LIVE" : "🟢 IDLE"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* TTS Input */}
         <Card>
@@ -339,25 +277,31 @@ export default function TestAvatars() {
                 placeholder="Enter text for TTS..."
                 className="mt-2"
                 rows={4}
+                disabled={isSpeaking}
               />
             </div>
 
             <div className="flex items-center gap-4">
               <Button
-                onClick={isStreaming ? stopStreaming : startStreaming}
-                disabled={!imageBase64 || isGeneratingImage}
+                onClick={isSpeaking ? stopStreaming : startStreaming}
+                disabled={!imageBase64 || isGeneratingImage || isGeneratingAudio}
                 className="flex-1"
-                variant={isStreaming ? "destructive" : "default"}
+                variant={isSpeaking ? "destructive" : "default"}
               >
-                {isStreaming ? (
+                {isGeneratingAudio ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Stop Streaming
+                    Generating Audio...
+                  </>
+                ) : isSpeaking ? (
+                  <>
+                    <Square className="h-4 w-4 mr-2" />
+                    Stop Speaking
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4 mr-2" />
-                    Generate & Stream Avatar
+                    Make Einstein Speak
                   </>
                 )}
               </Button>
