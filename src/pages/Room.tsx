@@ -45,6 +45,8 @@ import { getFigureContext } from '@/utils/figureContextMapper';
 import RoomChat from '@/components/RoomChat';
 import ModeConfigDialog, { ModeConfig } from '@/components/ModeConfigDialog';
 import LiveVideoOverlay from '@/components/LiveVideoOverlay';
+import { AvatarTile } from '@/components/AvatarTile';
+import { useIdleVideoPreloader } from '@/hooks/useIdleVideoPreloader';
 
 interface Room {
   id: string;
@@ -64,6 +66,8 @@ interface LocationState {
 interface FigureAvatar {
   figureName: string;
   imageUrl: string | null;
+  imageBase64: string | null;
+  idleVideoUrl: string | null;
   isLoading: boolean;
 }
 
@@ -200,7 +204,13 @@ const Room = () => {
       setFigureAvatars(prev => {
         const updated = new Map(prev);
         newFigures.forEach(figureName => {
-          updated.set(figureName, { figureName, imageUrl: null, isLoading: true });
+          updated.set(figureName, { 
+            figureName, 
+            imageUrl: null, 
+            imageBase64: null, 
+            idleVideoUrl: null, 
+            isLoading: true 
+          });
         });
         return updated;
       });
@@ -220,10 +230,32 @@ const Room = () => {
           if (error) throw error;
 
           console.log(`✅ Portrait ready for ${figureName}:`, data.cached ? '(cached)' : '(new)');
-          return { figureName, imageUrl: data.imageUrl, isLoading: false };
+          
+          // Extract base64 from data URL if available
+          let imageBase64: string | null = null;
+          if (data.imageUrl && data.imageUrl.startsWith('data:image/')) {
+            const base64Match = data.imageUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+            if (base64Match) {
+              imageBase64 = base64Match[1];
+            }
+          }
+          
+          return { 
+            figureName, 
+            imageUrl: data.imageUrl, 
+            imageBase64, 
+            idleVideoUrl: null, 
+            isLoading: false 
+          };
         } catch (err) {
           console.error(`❌ Failed to generate portrait for ${figureName}:`, err);
-          return { figureName, imageUrl: null, isLoading: false };
+          return { 
+            figureName, 
+            imageUrl: null, 
+            imageBase64: null, 
+            idleVideoUrl: null, 
+            isLoading: false 
+          };
         }
       });
 
@@ -472,43 +504,26 @@ const Room = () => {
           {/* 1-on-1 Layout: Single figure centered, You tile floating */}
           {displayFigures.length === 1 && !podcastMode && !debateMode ? (
             <>
-              {/* Main Figure Tile - Centered */}
+              {/* Main Figure Tile - Centered using AvatarTile */}
               {(() => {
                 const figure = displayFigures[0];
+                const figureId = figure.toLowerCase().replace(/\s+/g, '-');
                 const avatar = figureAvatars.get(figure);
-                const showImage = avatar?.imageUrl;
-                const isSpeaking = speakingFigure === figure;
+                const isFigureSpeaking = speakingFigure === figure;
                 
                 return (
                   <div className="flex-1 flex items-center justify-center">
-                  <div 
-                    className={`relative rounded-xl overflow-hidden transition-all duration-300 w-full max-w-3xl aspect-video ${showImage ? 'bg-black' : 'bg-card'} border-2 ${
-                      isSpeaking 
-                        ? 'border-primary' 
-                        : 'border-border'
-                    }`}
-                    >
-                      {avatar?.isLoading ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Loader2 className="w-12 h-12 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : showImage ? (
-                        <img 
-                          src={avatar.imageUrl} 
-                          alt={figure}
-                          className="absolute inset-0 w-full h-full object-contain"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
-                            <User className="w-12 h-12 text-muted-foreground" />
-                          </div>
-                        </div>
-                      )}
-                      <div className={`absolute bottom-0 left-0 right-0 p-3 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
-                        <span className={`font-medium text-base ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
-                      </div>
-                    </div>
+                    <AvatarTile
+                      figureName={figure}
+                      figureId={figureId}
+                      avatarImageUrl={avatar?.imageUrl || null}
+                      idleVideoUrl={avatar?.idleVideoUrl || null}
+                      imageBase64={avatar?.imageBase64 || null}
+                      isLoading={avatar?.isLoading || false}
+                      isSpeaking={isFigureSpeaking}
+                      showStatusBadge={true}
+                      className="w-full max-w-3xl aspect-video"
+                    />
                   </div>
                 );
               })()}
@@ -541,7 +556,7 @@ const Room = () => {
               </div>
             </>
           ) : (
-            /* Multi-participant Layout - Original grid */
+            /* Multi-participant Layout - Grid with AvatarTile */
             <div className={`flex justify-center gap-4 flex-wrap ${(podcastMode || debateMode) ? 'flex-shrink-0 mb-4' : 'items-center'}`}>
               {/* Guest (You) Tile */}
               <div className={`relative bg-card rounded-xl overflow-hidden border border-border transition-all duration-300 ${getTileClasses()}`}>
@@ -570,48 +585,50 @@ const Room = () => {
                 )}
               </div>
 
-              {/* Figure Tiles */}
+              {/* Figure Tiles using AvatarTile */}
               {displayFigures.map((figure, index) => {
+                const figureId = figure.toLowerCase().replace(/\s+/g, '-');
                 const avatar = figureAvatars.get(figure);
-                const showImage = !(podcastMode || debateMode) && avatar?.imageUrl;
-                const isSpeaking = speakingFigure === figure;
+                const isFigureSpeaking = speakingFigure === figure;
+                const showAvatarTile = !(podcastMode || debateMode);
                 
-                return (
-                  <div 
-                    key={index} 
-                    className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} ${showImage ? 'bg-black' : 'bg-card'} border-2 ${
-                      isSpeaking 
-                        ? 'border-primary' 
-                        : 'border-border'
-                    }`}
-                  >
-                    {avatar?.isLoading ? (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Loader2 className={`animate-spin text-muted-foreground ${getIconClasses()}`} />
-                      </div>
-                    ) : showImage ? (
-                      <img 
-                        src={avatar.imageUrl} 
-                        alt={figure}
-                        className="absolute inset-0 w-full h-full object-contain"
-                      />
-                    ) : (
+                // For podcast/debate modes, show simple tiles without AvatarTile
+                if (!showAvatarTile) {
+                  return (
+                    <div 
+                      key={index} 
+                      className={`relative rounded-xl overflow-hidden transition-all duration-300 ${getTileClasses()} bg-card border-2 ${
+                        isFigureSpeaking ? 'border-primary' : 'border-border'
+                      }`}
+                    >
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className={`rounded-full bg-muted flex items-center justify-center transition-all ${getAvatarClasses()}`}>
                           <User className={`text-muted-foreground transition-all ${getIconClasses()}`} />
                         </div>
                       </div>
-                    )}
-                    <div className={`absolute bottom-0 left-0 right-0 p-2 ${showImage ? 'bg-gradient-to-t from-black/90 to-transparent' : 'bg-gradient-to-t from-background/90 to-transparent'}`}>
-                      <span className={`font-medium truncate block ${(podcastMode || debateMode) || totalParticipants > 2 ? 'text-xs' : 'text-sm'} ${showImage ? 'text-white' : 'text-foreground'}`}>{figure}</span>
-                    </div>
-                    {/* Camera off badge in special modes */}
-                    {(podcastMode || debateMode) && (
+                      <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-background/90 to-transparent">
+                        <span className="font-medium truncate block text-xs text-foreground">{figure}</span>
+                      </div>
                       <div className={`absolute top-2 right-2 rounded-full bg-destructive flex items-center justify-center ${getMuteIconClasses()}`}>
                         <VideoOff className={`text-destructive-foreground ${getMuteInnerIconClasses()}`} />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <AvatarTile
+                    key={index}
+                    figureName={figure}
+                    figureId={figureId}
+                    avatarImageUrl={avatar?.imageUrl || null}
+                    idleVideoUrl={avatar?.idleVideoUrl || null}
+                    imageBase64={avatar?.imageBase64 || null}
+                    isLoading={avatar?.isLoading || false}
+                    isSpeaking={isFigureSpeaking}
+                    showStatusBadge={false}
+                    className={getTileClasses()}
+                  />
                 );
               })}
             </div>
