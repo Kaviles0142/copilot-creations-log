@@ -6,52 +6,44 @@ import shakespeare from '@/assets/figures/shakespeare.jpg';
 import curie from '@/assets/figures/curie.jpg';
 
 const figures = [
-  { name: 'Albert Einstein', role: 'Physicist', image: einstein },
+  { name: 'Einstein', role: 'Physicist', image: einstein },
   { name: 'Cleopatra', role: 'Pharaoh', image: cleopatra },
-  { name: 'Leonardo da Vinci', role: 'Polymath', image: davinci },
-  { name: 'Napoleon Bonaparte', role: 'Emperor', image: napoleon },
-  { name: 'William Shakespeare', role: 'Playwright', image: shakespeare },
-  { name: 'Marie Curie', role: 'Scientist', image: curie },
+  { name: 'Da Vinci', role: 'Polymath', image: davinci },
+  { name: 'Napoleon', role: 'Emperor', image: napoleon },
+  { name: 'Shakespeare', role: 'Playwright', image: shakespeare },
+  { name: 'Curie', role: 'Scientist', image: curie },
 ];
 
 export default function FigureStrip() {
   return (
-    <section className="py-20 bg-muted/30">
-      <div className="container mx-auto px-6">
-        <p className="text-center text-sm text-muted-foreground mb-10 tracking-wide">
-          Choose from 50+ historical figures
-        </p>
-        
-        <div className="flex items-center justify-center gap-6 md:gap-10 flex-wrap">
+    <section id="figures" className="py-24 px-6 border-t border-border/10">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-14">
+          <p className="text-xs uppercase tracking-[0.2em] text-primary font-medium mb-3">Meet the minds</p>
+          <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight">
+            50+ legendary figures, ready to talk
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-6 md:gap-8">
           {figures.map((figure) => (
-            <div 
-              key={figure.name}
-              className="group relative flex flex-col items-center"
-            >
-              <div className="relative">
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden ring-2 ring-border/40 group-hover:ring-primary/60 transition-all duration-500 group-hover:scale-110 shadow-lg group-hover:shadow-xl group-hover:shadow-primary/10">
-                  <img 
-                    src={figure.image} 
-                    alt={figure.name}
-                    className="w-full h-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500"
-                  />
-                </div>
-                {/* Glow effect on hover */}
-                <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+            <div key={figure.name} className="group flex flex-col items-center">
+              <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-border/30 group-hover:border-primary/40 transition-all duration-500 group-hover:scale-105 shadow-lg group-hover:shadow-xl group-hover:shadow-primary/10">
+                <img
+                  src={figure.image}
+                  alt={figure.name}
+                  className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent opacity-60 group-hover:opacity-0 transition-opacity duration-500" />
               </div>
-              
-              {/* Name and role below avatar */}
-              <div className="mt-3 text-center opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                <p className="text-xs font-medium text-foreground">{figure.name.split(' ')[0]}</p>
-                <p className="text-[10px] text-muted-foreground">{figure.role}</p>
-              </div>
+              <p className="mt-3 text-xs font-semibold text-foreground/80 group-hover:text-foreground transition-colors">{figure.name}</p>
+              <p className="text-[10px] text-muted-foreground">{figure.role}</p>
             </div>
           ))}
         </div>
 
-        {/* Additional context */}
-        <p className="text-center text-xs text-muted-foreground/60 mt-10">
-          Scientists · Artists · Leaders · Philosophers · Inventors
+        <p className="text-center text-xs text-muted-foreground/50 mt-12 tracking-wide">
+          Scientists · Artists · Leaders · Philosophers · Inventors · And many more
         </p>
       </div>
     </section>
